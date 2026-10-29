@@ -976,7 +976,8 @@ def step_kill(gc, difficulty, stage, level, log):
     placed_at = place_at_preset(gc, stage, cls, log)
     mon = gc.acts_find(cls, log)
     if mon is None and seals and seals.get("centre"):
-        gc.acts_walk(seals["centre"][0], seals["centre"][1], reach=20, timeout=180, fight=True, skip=(cls,))
+        if not gc.acts_walk(seals["centre"][0], seals["centre"][1], reach=20, timeout=120, fight=True, skip=(cls,)):
+            gc.acts_planned_walk(seals["centre"][0], seals["centre"][1], log, budget=600, reach=15)  # lane endgame
         kill_gear(gc, level, diff, log)
         mon = gc.acts_find(cls, log, tries=1)
     seal_txt = "; seals %s" % {k: v for k, v in seals.items() if k != "centre"} if seals else ""

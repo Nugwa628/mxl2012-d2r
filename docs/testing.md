@@ -192,7 +192,8 @@ Talk (d35) only. (2) Glacial Trail (bugs #494, #495): new check `glacial` (warps
 `tiles` skips unreadable units; new verb `hashscan`. Bug #394's assert (`ptCreate->hSource`, Missiles.cpp:202) was seen in
 `checks-20261029-093507-s2`, `checks-20261029-124850-s2` and `checks-20261029-135438-s2`, not after main's fix was merged
 (`checks-20261029-150343-s2`). Not run in this lane: throne/baal (routes written, `THRONE_ROUTE`, `BAAL_ROUTE`) and Mephisto's
-bridge with `acts_raise_bridge`.
+bridge with `acts_raise_bridge`. Lane endgame: the cause was the walk (Diablo spawns when the star's room is loaded, 1.13c's
+rule); Diablo killed, Act 5 by Tyrael's red portal (section "Lane endgame").
 
 | Run | Stages | Result |
 |---|---|---|
@@ -2802,9 +2803,13 @@ Seen, not filed (open questions):
 - Mephisto (both difficulties): Blood Hatred swings play (mode 18) next to him, yet he is never hit and never in get-hit or block.
   The character stops about 3 sub-tiles from him (17587 vs 17584); the Durance 3 moat edge is the likely cause (the acts lane's bow
   also failed there; only Frigid Sphere hurt him in Normal). Needs a check whether a melee hit can cross that edge in D2R / 1.13c.
+  Lane endgame: melee from 2 cells with no blocked cell between hits him (52,984 -> 46,569); across the moat the walk-to-target
+  of a melee attack has no path, as in 1.13c: not a port bug (section "Lane endgame").
 - Baal (both): 15135,5920 in level 132 has no reachable spot from the harness arrival; his position may be the throne before the
-  waves. Needs the wave sequence on the player path (Throne of Destruction, level 131) instead of the travel help.
+  waves. Needs the wave sequence on the player path (Throne of Destruction, level 131) instead of the travel help. Lane endgame:
+  all five waves cleared and 132 entered by a mouse click on portal 563; Baal killed (by the travel help) with quest 40 set.
 - Baal Hell: quest 40 went `0010000000000000` -> `1000000000101000` (done bit) on the travel into level 132 without a kill.
+  Lane endgame (Normal): three travels into 132 without a kill left quest 40 at `0000000000000000`; not reproduced there.
 - Duriel Hell: the stun lock of nmhell2 (his A2 stun, AI delay 4), now with Idol2Scosglen up; Median's data.
 - The Diablo seal walk with the kill gear still dies 7-8 times (Chaos Sanctuary packs); deaths put the acts gear back on the walk.
 
@@ -3637,3 +3642,86 @@ Evidence in `mxl2012-runs/maptint/`; `sheets.py <before run> <after run> <out>` 
 
 Still to look at by a player's eye: whether the tints read as Median's maps at normal play (the harness shots are at level 1,
 god mode, mostly at the arrival).
+## Lane endgame: Diablo, Act 5 travel, the Throne waves, Baal and Mephisto's moat on the player path (2026-10-29/30, slots 2-4, background mode, main's plugin)
+
+Sorceress `EndSorc` (slot 2) / `EndSorcD` (slot 3) set up by stage `build` as lane acts5 (level by `xp`, stat points by packet
+0x3a, skill points by `setskill`, two rings and an amulet, no weapon; travel to each level by `level`), level 98 from the xp award.
+Logs `mxl2012-runs/endgame/run1.log` .. `run16-s3.log`, run folders `work/runs/checks-*` below. New in `game_checks.py`:
+`acts_planned_walk` (left clicks on paths planned on the game's walk collision, `relp_walk_to` as lane bugsweep's Hratli walk;
+fallback after a straight `acts_walk` leg fails: route legs, the Diablo star walk, the spell fight's close-in, the throne),
+`acts_rest`, the "lost" loop (Diablo walked off while the character was held at a wall: rest, back to the star, find him, walk up),
+a death on the walk up to the boss now counts and starts the retries (it used to start the fight in town and count nothing),
+`acts_throne` rewritten (revive, gear again, rest and go back after a death, at most 8 times; passes when the fifth wave boss is
+gone and portal 563 stands), `acts_baal_portal` (the `baal` stage enters 132 through that portal by mouse click when the waves
+were done in the run), asked-only stage `mephmelee`, `line_blocked`, `ACTS_END_PLUS_SKILLS` (+10 all skills, stat 127, on the
+given amulet for diablo / throne / baal: the level 80-98 build died 3-6 times per try without it; named in every row), Diablo
+at level 90. Test `tools/test_game_checks_endgame.py`.
+
+**Diablo.** Cause of acts5's "no Diablo": the walk, not the port. 1.13c's rule (D2MOO `A4Q2.cpp`, the 1.13c reimplementation):
+the five seals (objects 392-396) opened AND the three seal bosses killed start `ACT4Q2_KillAllMonstersInCS` and a timer that
+spawns Diablo at the start point object 255 once that object's room is loaded (`OBJECTS_InitFunction55_DiabloStartPoint` re-arms
+the timer when the star loads later). acts5's character never got back to the star, so the star's room never loaded. With the
+planned walk legs the character reached the star, and Diablo (class 243, 22,302,720/256 = 87,120 life) spawned there every time
+all five seals were open and the bosses dead (4 of 4 runs). Run `-051628-s3` opened 4 seals (394 not found) and skipped De Seis:
+no Diablo, as the rule says (its star walk got there, 7794,5292). Quest 26 goes 0000 -> 0001 after the seals. **Diablo killed on
+the player path in `checks-20261030-062933-s3`** (all five seals by mouse click, 0 deaths on the seal walk and in the fight, 80 s of fight, Frigid Sphere /
+Arcane Torrent right clicks with the +10 amulet; he started that fight at 7,176,018 of 22,302,720, worn down by the seal fight
+clicks before he was focused), **quest 26 `0001000000000000` -> `1000000000000100`**, and again `1000000000000000` in a new game.
+
+**Act 5 travel.** Tyrael (367) keeps Talk (d35) only after the kill, also in a new game (`checks-20261030-075529-s3`,
+`acts_travel45.png`: the drawn menu is TALK / CANCEL). That is LoD: Tyrael has no travel line; after Diablo's death he opens a red
+portal beside him (objects.txt 566 `NotKiddingLastPortal`, name "Harrogath", OperateFn 73), seen in that screenshot. travel45
+looked for a menu line (as Warriv / Meshif); it now clicks that portal. **`checks-20261030-075910-s3`: travel45 PASS, one
+background mouse click on portal 566 at 5024,5021 -> Harrogath (109, 5098,5023)** (the screenshot of that run fell on the loading
+screen; the stage now waits for it).
+
+**Throne and Baal.** `checks-20261030-030049-s2`: **all five wave bosses came and died** (1289 seen at 279 s, gone 315; 1148
+328/665; 803 816/825; 1290 837/877; 1281 889/942), portal 563 at 15090,5005 stood, and **a background mouse click 40 px above its
+foot took the character into the Worldstone Chamber (132)**: the player's way in works. 2 deaths (revived, back to the throne).
+The chamber's minions then killed the character on the walk up to Baal (not counted then; fixed). `checks-20261030-055011-s2`:
+**Baal (class 544, 31,897,600/256 = 124,600 life) killed in 322 s with 2 deaths, quest 40 0000000000000000 -> 1000000000000100**
+(entry by harness travel `level 132`: that run's throne stage failed). Runs `-022246-s2`, `-023604-s2` and `-041902-s2` entered
+132 the same way and quest 40 stayed 0000000000000000 without a kill, so nmhell3's "harness travel sets quest 40" did not
+reproduce here. Waves and Baal kill in one run: not achieved (6 tries died 3-6 times in the waves; the build is the limit: wave
+bosses, Baal and his minions all took damage and died as expected).
+
+**Mephisto's moat.** `checks-20261030-052336-s4` (`mephmelee`, Sorceress with the acts axe, 1000-2000 damage, Attack by left
+clicks): the walk towards him died on the council; `place` on the free spot nearest to him put the character at 17576,8076, 2
+cells from Mephisto (17574,8077) with no blocked walk cell on the line: **13 clicks took his life 52,984 -> 46,569** (his mode 4).
+So the port lands melee on Mephisto when the attacker stands within reach. nmhell3's "never hits from the moat edge" is the 1.13c
+behaviour: a player's melee attack first walks to the target on the walk collision, and the lava moat has no path, so from across
+the moat the swing never starts (the "moat trick" is why ranged attacks are used there). Same in 1.14d and D2R; **not a port
+bug**, no row filed. Not done: a swing from the far moat edge itself (the walk died before it got there).
+
+**Load notes** (`acts_load_note`: fps from the client's frame counter, missile ids/s from the server's id counter, live server
+missiles, private memory of the game process; no Mephisto fight with sampling in this lane, see lanes acts5 / nmhell3):
+
+| Boss | Run | Time | Deaths | fps median (min) | missile ids/s median (max) | live missiles median (max) | private MB start -> end (max) |
+|---|---|---|---|---|---|---|---|
+| Diablo (seals + fight) | `checks-20261029-234838-s2` | 3959 s | 1 | 25.0 (18.4) | 22.7 (547) | 11 (179) | 9345 -> 9657 (10105) |
+| Diablo (seals + fight) | `checks-20261030-034855-s3` | 4746 s | 3 | 25.0 (24.5) | 36.6 (564) | 11 (301) | 9344 -> 9850 (10301) |
+| Diablo (seals + fight, killed) | `checks-20261030-062933-s3` | 4929 s | 0 | 25.0 (24.5) | 21.9 (471) | 14 (285) | 8740 -> 8979 (9146) |
+| Throne, five waves | `checks-20261030-030049-s2` | 976 s | 2 | 25.0 (24.6) | 138.3 (1615) | 58 (656) | 9084 -> 9433 (9806) |
+| Baal (killed) | `checks-20261030-055011-s2` | 467 s | 2 | 25.0 (24.5) | 85.7 (221) | 17 (90) | 9590 -> 9821 (9970) |
+
+No crash. Engine asserts: #394 (`ptCreate->hSource`, known, not a bug) in the Diablo runs `-234838-s2`, `-034855-s3` and `-062933-s3`; the
+exit-only pool asserts when `game_ctl.stop()` closes the game (`m_allocated == 0` and the others of the table above, plus
+`m_assets.empty()` and `!IsAnyInstanceAnimationLoading()` in `-052336-s4`, all after the last check). The crash file listed in
+`-052336-s4` is dated 2026-10-29 20:23 UTC, before the run (an older file of slot 4).
+
+| Run | Stages | Result |
+|---|---|---|
+| `checks-20261029-234838-s2` | diablo, travel45 | seals 392-396 0 -> 2 by click, Diablo at 7793,5293; the character was held 54 away at the north corridor wall, unit lost; 1 death. travel45 FAIL |
+| `checks-20261030-011048-s2` | diablo, travel45 | all seals by click, Diablo at 7793,5288; his pack drove the character off, unit lost; 3 deaths. travel45 FAIL |
+| `checks-20261030-022246-s2` | throne, baal | level 80: died on the throne route; baal by harness travel, not killed, quest 40 unchanged |
+| `checks-20261030-023604-s2` | throne, baal | 6 deaths: the given gear stayed on the corpse (life 15787 -> 4027); fixed (gear again after a revive) |
+| `checks-20261030-030049-s2` | throne, baal | **throne PASS (five waves, portal 563)**, **132 entered by a mouse click on the portal**; Baal not reached (death on the walk, not retried; fixed) |
+| `checks-20261030-032352-s2`, `-034828-s2`, `-041902-s2`, `-051628-s2`, `-061108-s2` | throne, baal | throne FAIL: 3-6 deaths, 2-4 of 5 waves gone in the time. `-034828-s2` timed out with the fifth wave alive (its portal click then took nobody), `-051628-s2` read Baal "gone" with 3 waves to come (both fixed in the pass rule). `-061108-s2`: Baal by harness travel down to 14,807,136 of 31,897,600, 5 deaths |
+| `checks-20261030-034855-s3` | build, diablo, travel45 | Diablo spawned (all seals by click), down to 7,872,131 of 22,302,720 after 2 retries, 3 deaths; then not found. travel45 FAIL |
+| `checks-20261030-051628-s3` | diablo, travel45 | 4 seals (394 not found), De Seis skipped: no Diablo (the rule). travel45 FAIL |
+| `checks-20261030-051628-s4` | mephmelee (Barbarian) | life 2450 (the given ring did not lift it); died on the walk. Set-up problem, not judged |
+| `checks-20261030-052336-s4` | build, mephmelee | melee hits from 2 cells (52,984 -> 46,569); see above |
+| `checks-20261030-055011-s2` | throne, baal | throne FAIL (1 wave, the walk back failed); **Baal killed, quest 40 set** (harness travel in) |
+| `checks-20261030-062933-s3` | diablo, travel45 | **Diablo killed** (all seals by click, 80 s, 0 deaths in the fight), quest 26 -> `1000000000000100`; travel45 FAIL (menu only: no line on Tyrael, see above) |
+| `checks-20261030-075529-s3` | travel45 | new game: quest 26 still done, Tyrael Talk / Cancel only; red portal by him on the screenshot |
+| `checks-20261030-075910-s3` | travel45 | **PASS: portal 566 by a mouse click -> Harrogath** |

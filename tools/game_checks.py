@@ -890,7 +890,8 @@ KNOWN_ASSERTS = {"uniqueItemsTbl": "bug #7",  # open bugs owned by another lane:
                  "nDirectionIndex < nDirections": "bugs #54/#73 (srvdofunc 15, masked right after the assert)",
                  "nListNo < TARGET_LISTNO_MAX_REGULAR": "bug #270 (srvdo 119 from hit 23: 1.14d skips the same list add silently)",
                  "s_StatsPool.IsEmpty()": "exit-only pool leak check at Save and Exit (docs/testing.md: ignore)",
-                 "AssetCache": "bug #72 (D2R's asset cache fills up in a long launch)"}
+                 "AssetCache": "bug #72 (D2R's asset cache fills up in a long launch)",
+                 "ptCreate->hSource": "bug #394 (not a bug: D2R logs and makes no missile, as 1.14d makes none; lane hsource394)"}
 _TABLES = {}
 
 
@@ -3625,13 +3626,15 @@ TOWN_WAYPOINT_OBJ = {1: 119, 2: 156, 3: 237, 4: 398, 5: 429}  # objects.txt wayp
 # stage: (act, boss level, boss class, character level the run gives, quest whose bits the kill must change). Mephisto's quest is
 # The Guardian, 22 (17-22 are Act 3's six, 23 the travel to Act 4): his kill in run checks-20261029-021145-s2 left 23 unchanged
 ACT_BOSSES = {"andariel": (1, 37, 156, 50, 6), "duriel": (2, 73, 211, 60, 14), "mephisto": (3, 102, 242, 70, 22),
-              "diablo": (4, 108, 243, 80, 26), "baal": (5, 132, 544, 90, 40)}
+              "diablo": (4, 108, 243, 90, 26), "baal": (5, 132, 544, 90, 40)}
 # act travel through an NPC's menu: stage -> (from town, NPC class, destination town)
 ACT_TRAVEL = {"travel12": (1, 155, 40), "travel23": (40, 210, 75), "travel45": (103, 367, 109)}
-ACTS_STAGES = ["build", "towns", "andariel", "travel12", "duriel", "travel23", "mephisto", "travel34", "diablo", "travel45", "ancients", "throne",
-               "baal", "nightmare"]
-ACTS_ASKED_ONLY = ("build",)  # stages that run only when MXL_ACTS names them (the build's calibration)
+ACTS_STAGES = ["build", "towns", "andariel", "travel12", "duriel", "travel23", "mephisto", "mephmelee", "travel34", "diablo", "travel45",
+               "ancients", "throne", "baal", "nightmare"]
+ACTS_ASKED_ONLY = ("build", "mephmelee")  # stages that run only when MXL_ACTS names them (the build's calibration)
 BAAL_THRONE = 543  # monstats: Baal on his throne (Throne of Destruction, 131), who calls the five waves
+ACTS_END_PLUS_SKILLS = 10  # lane endgame: the level 80-98 build died 3-6 times at Diablo, the throne waves and Baal (runs
+# checks-20261030-034855-s3, -041902-s2); the given amulet adds +10 to all skills (stat 127) for those three stages
 ACTS_BOSS_RETRIES = 4  # goes at a boss after deaths (Mephisto lost 26,000 of 56,440 life per go and does not heal it back)
 ACTS_REGEN = 5  # replenish life per character level on the given ring (Median's Normal Durance / Chaos / throne killed the
 # character with 25 vitality per level within 15-120 s, runs of lane acts2)
@@ -4025,7 +4028,8 @@ def acts_gear(level):
     H("unequip rring")
     H("equip rin 3=%d 0=200 36=50 34=%d 35=%d 99=200 74=%d rring" % (level * ACTS_VIT, level * 2, level, level * ACTS_REGEN))
     H("unequip neck")
-    H("equip amu 39=75 41=75 43=75 45=75 neck")  # the harness takes up to 8 stats per item
+    plus = STATE.get("acts_plus_skills", 0)  # lane endgame: +all skills (stat 127) for the end bosses, named in the rows
+    H("equip amu 39=75 41=75 43=75 45=75%s neck" % (" 127=%d" % plus if plus else ""))  # the harness takes up to 8 stats per item
     top = rd("player", 7)
     if top:
         setstat("player", 6, top)
@@ -4081,6 +4085,11 @@ def acts_build_levels(levels=None):
     with open(path, "w", encoding="utf-8") as f:
         json.dump({str(k): v for k, v in levels.items()}, f)
     return levels
+
+
+def acts_has_build():
+    """True for a class with a spell build (set before acts_level_up's set-up fills STATE["acts_build"])."""
+    return bool(STATE.get("acts_build") or acts_build_skills(hstate()["player"].get("class")))
 
 
 def acts_build_setup(log):
@@ -4183,6 +4192,7 @@ def acts_spell_fight(mon_id, timeout=240, focus=False):
     input). A death ends the fight. Returns (killed, deaths, seconds); the casts and mana spent go to STATE["acts_casts"]."""
     t0, deaths, last, chosen = time.time(), 0, None, None
     area0 = hstate()["player"].get("area")
+    d_start = STATE.get("acts_deaths", 0)
     casts = STATE.setdefault("acts_casts", {})
     while time.time() - t0 < timeout:
         acts_load_sample()
@@ -4193,7 +4203,11 @@ def acts_spell_fight(mon_id, timeout=240, focus=False):
             STATE["acts_deaths"] = STATE.get("acts_deaths", 0) + 1
             revive_if_dead()
             return False, deaths, int(time.time() - t0)
-        if p.get("area") != area0:
+        if p.get("area") != area0:  # revived in town by a walk inside the fight (acts_planned_walk's clearing): a death too
+            if p.get("area") in ACT_TOWNS.values() and area0 not in ACT_TOWNS.values():
+                deaths += 1
+                if STATE.get("acts_deaths", 0) == d_start:  # acts_clear counts the deaths it sees itself
+                    STATE["acts_deaths"] = d_start + 1
             return False, deaths, int(time.time() - t0)
         life = acts_mon_life(mon_id)
         if life is not None and life <= 0:
@@ -4217,8 +4231,9 @@ def acts_spell_fight(mon_id, timeout=240, focus=False):
                                 chosen = None  # stairs with a monster next to the character and every walk refused
                                 continue
                             tx, ty = short_of(q.get("x", 0), q.get("y", 0), u["x"], u["y"], ACTS_SPELL_REACH - 2)
-                            if not acts_walk(tx, ty, reach=4, timeout=20):
-                                acts_near_boss(u, mon_id)
+                            if not acts_walk(tx, ty, reach=4, timeout=20) and not acts_planned_walk(
+                                    u["x"], u["y"], STATE.setdefault("fight_walk_log", []), budget=90, reach=ACTS_SPELL_REACH - 2):
+                                acts_near_boss(u, mon_id)  # the planned walk: lane endgame (Diablo at the star)
             elif not acts_close_in(mon_id, reach=ACTS_SPELL_REACH):
                 continue
             m = next((m for m in hstate()["mons"] if m.get("id") == mon_id), None)
@@ -4297,9 +4312,10 @@ def acts_build_row_note(lvl, cls, life0, killed, secs, deaths, quest, q0, q1):
     """The boss row's note for the spell build: the set-up help, the skills used by right clicks, the result."""
     casts = STATE.get("acts_casts", {})
     return ("level %d Sorceress (xp award); %s; given gear: no weapon, a ring (+%d vitality, replenish life, 75 resistances, 50%% "
-            "and flat damage reduction, 200%% hit recovery), a ring with %d%% mana regeneration, an amulet; boss class %d life %s at "
+            "and flat damage reduction, 200%% hit recovery), a ring with %d%% mana regeneration, an amulet%s; boss class %d life %s at "
             "the start; right clicks with the build's skills so far %s; %s after %d s, %d deaths; quest %d bits %s -> %s"
-            % (lvl, STATE.get("acts_build_note", "-"), lvl * ACTS_VIT, ACTS_BUILD_MANA_REGEN, cls, life0,
+            % (lvl, STATE.get("acts_build_note", "-"), lvl * ACTS_VIT, ACTS_BUILD_MANA_REGEN,
+               " (+%d to all skills)" % STATE["acts_plus_skills"] if STATE.get("acts_plus_skills") else "", cls, life0,
                dict(casts), "killed it" if killed else "did not kill it", secs, deaths, quest, q0, q1))
 
 
@@ -4435,22 +4451,44 @@ def acts_find(cls, log, tries=6):
 def acts_boss(stage):
     act, area, cls, level, quest = ACT_BOSSES[stage]
     log, mark = [], engine_mark()
+    STATE["acts_plus_skills"] = ACTS_END_PLUS_SKILLS if stage in ("diablo", "baal") and acts_has_build() else 0
     lvl = acts_level_up(level)
     ranged = stage in ACTS_RANGED and not STATE.get("acts_build")  # the spell build reaches across the moat by itself
     gear = (lambda: acts_gear_ranged(lvl, log) or acts_gear(lvl)) if ranged else (lambda: acts_gear(lvl))
     dmg = gear()
     q0 = quest_bits(quest)
-    st = goto(area)
+    entry = None
+    if stage == "baal" and STATE.get("throne_portal"):  # the player's way in: the portal Baal leaves after the waves
+        if hstate()["player"].get("area") != 131:  # the throne stage ended with a death (revived in Harrogath)
+            goto(131)
+        entry = acts_baal_portal(log)
+        st = hstate()
+    else:
+        st = goto(area)
+        if stage == "baal":
+            entry = ("harness travel `level 132` (help: the waves were not done in this run; it set no quest 40 bit without the "
+                     "kill in lane endgame's runs)")
     if st["player"].get("area") != area:
-        finish("acts %s: reach level %d" % (stage, area), False, "the character did not get to level %d (area %s)" % (
-            area, st["player"].get("area")), mark, log=log)
+        finish("acts %s: reach level %d" % (stage, area), False, "the character did not get to level %d (area %s)%s" % (
+            area, st["player"].get("area"), "; %s" % entry if entry else ""), mark, log=log)
         return False
     seals = acts_open_seals(log) if stage == "diablo" else None
-    route = acts_route(BAAL_ROUTE, log) if stage == "baal" else None
+    route = acts_route(BAAL_ROUTE, log) if stage == "baal" and not STATE.get("throne_portal") else None
+    if entry:
+        log.append("entry: %s" % entry)
     mon = acts_find(cls, log)
     if mon is None and seals and seals.get("centre"):
-        acts_walk(seals["centre"][0], seals["centre"][1], reach=20, timeout=180, fight=True, skip=(cls,))
-        for _ in range(20):  # he rises at the pentagram some seconds after the last seal / seal boss
+        sx, sy = seals["centre"]
+        how = "walk"
+        if not acts_walk(sx, sy, reach=20, timeout=120, fight=True, skip=(cls,)):
+            how = "planned walk"
+            if not acts_planned_walk(sx, sy, log, budget=600, reach=15):
+                how = "not reached"
+                if acts_place_near(sx, sy, log):  # travel help, named in the row
+                    how = "place (travel help)"
+        p = hstate()["player"]
+        seals["star"] = "%s, at %s,%s (star %d,%d)" % (how, p.get("x"), p.get("y"), sx, sy)
+        for _ in range(40):  # he rises at the pentagram some seconds after the last seal / seal boss
             mon = acts_find(cls, log, tries=0)
             if mon:
                 break
@@ -4462,12 +4500,35 @@ def acts_boss(stage):
                "no unit of class %d found in level %d (presets and places in the log)%s" % (cls, area, "; seals %s" % {
                    k: v for k, v in seals.items() if k not in ("centre", "walk")} if seals else ""), mark, [sh("acts_%s_nofind" % stage)], log)
         return False
+    pre_died = False
+    if stage in ("baal", "diablo"):  # Baal on the chamber's middle platform, open only to the south (BAAL_ROUTE); Diablo at the
+        p = hstate()["player"]  # star, 54 below a character the north corridor's wall held (run checks-20261029-234838-s2)
+        if max(abs(p.get("x", 0) - mon["x"]), abs(p.get("y", 0) - mon["y"])) > (12 if stage == "baal" else 30):  # nearer, the
+            d_before = STATE.get("acts_deaths", 0)  # fight walks up
+            acts_planned_walk(mon["x"], mon["y"] + (6 if stage == "baal" else 0), log, budget=300, reach=10)
+            p = hstate()["player"]
+            if player_dead(p) or p.get("area") != area:  # died to his pack on the walk (run checks-20261030-030049-s2: Baal's
+                if STATE.get("acts_deaths", 0) == d_before:  # minions; the fight then started in town and counted nothing)
+                    STATE["acts_deaths"] = d_before + 1
+                revive_if_dead()
+                pre_died = True
+                log.append("died on the walk up to him")
+
+    def reenter():
+        """Back into the boss level after a death: for Baal through the throne's portal again when the waves were done in this
+        run (a player's way back: Worldstone Keep 3 waypoint, here harness travel to 131, then the portal click)."""
+        if stage == "baal" and STATE.get("throne_portal"):
+            goto(131)
+            log.append("back in: %s" % acts_baal_portal(log))
+        else:
+            goto(area)
+
     shot0 = sh("acts_%s_found" % stage)
     fight_s = 600 if STATE.get("acts_build") else 480 if ranged else 240  # the council of Durance 3 comes first
-    killed, deaths, secs = acts_fight(mon["id"], fight_s, ranged=ranged, focus=True)
+    killed, deaths, secs = (False, 1, 0) if pre_died else acts_fight(mon["id"], fight_s, ranged=ranged, focus=True)
     while not killed and 0 < deaths <= ACTS_BOSS_RETRIES:  # back after a death, as a player does (the corpse run is skipped:
         gear()                                             # the gear is given again); the boss keeps the life it lost
-        goto(area)
+        reenter()
         mon2 = acts_find(cls, log)
         if not mon2:
             break
@@ -4476,6 +4537,28 @@ def acts_boss(stage):
         killed, deaths, secs = k2, deaths + d2, secs + s2
         if not d2:
             break
+    for lost in range(3):  # the unit left the loaded rooms with no death (Diablo walked off the star while the character was
+        if killed:  # held at the north wall, run checks-20261029-234838-s2): find him again and walk up on the planned walk
+            break
+        p = hstate()["player"]
+        if player_dead(p) or p.get("area") != area:
+            break
+        acts_rest(log)  # his pack drove the character to 498 life and 54 away, where his room unloads (run
+        if seals and seals.get("centre"):  # checks-20261030-010437-s2): life back, then to the star, where he stays
+            sx, sy = seals["centre"]
+            if not acts_planned_walk(sx, sy, log, budget=240, reach=20):
+                acts_place_near(sx, sy, log)  # travel help, named in the log
+        u = parse_moveto(Hl("moveto nearest %d" % cls, log)[1]) or acts_find(cls, log, tries=2)
+        if not u or not acts_mon_life(u["id"]):
+            log.append("lost %d: no living unit of class %d found" % (lost + 1, cls))
+            break
+        acts_planned_walk(u["x"], u["y"], log, budget=240, reach=10)
+        log.append("lost %d: boss unit %d life %s" % (lost + 1, u["id"], acts_mon_life(u["id"])))
+        k2, d2, s2 = acts_fight(u["id"], fight_s, ranged=ranged, focus=True)
+        killed, deaths, secs = k2, deaths + d2, secs + s2
+        if d2:
+            break
+    log.extend(STATE.pop("fight_walk_log", []))
     STATE.setdefault("acts_killed", set())
     if killed:
         STATE["acts_killed"].add(stage)
@@ -4491,6 +4574,8 @@ def acts_boss(stage):
         note += "; seals %s" % {k: v for k, v in seals.items() if k != "centre"}
     if route is not None:
         note += "; route to him %s" % route
+    if entry:
+        note += "; way in: %s" % entry
     finish("acts %s: boss fight in level %d" % (stage, area), killed and q1 != q0, note, mark, [shot0, sh("acts_%s_after" % stage)], log)
     return killed
 
@@ -4539,11 +4624,66 @@ def seal_spots(log):
             for wing, offs, n in SEAL_WINGS], (sx, sy)
 
 
+def acts_rest(log, frac=0.7, wait_s=150):
+    """Wait (out of the fight, the given ring's replenish life) until the character's life is back to `frac` of its top, at
+    most `wait_s` seconds, as a player waits before going back in. Returns the life fraction reached."""
+    t0 = time.time()
+    while time.time() - t0 < wait_s:
+        p = hstate()["player"]
+        m = re.match(r"(\d+)/(\d+)", str(p.get("life", "")))
+        if not m or player_dead(p) or int(m.group(1)) >= frac * int(m.group(2)):
+            break
+        time.sleep(3)
+    p = hstate()["player"]
+    log.append("rested %d s, life %s" % (time.time() - t0, p.get("life")))
+    return p.get("life")
+
+
+def acts_planned_walk(tx, ty, log, budget=300, reach=10, rounds=4):
+    """Lane endgame: left clicks to (tx, ty) on paths planned on the game's own walk collision (relp_walk_to over `walkmap`,
+    merged as the walk goes), fighting what comes near before each waypoint. The straight `move` legs and the search walk
+    stayed pinned at the Chaos Sanctuary's wing walls for 10-50 minutes (lane acts5: 7812,5201; 7804-7819,5223-5260; the pocket
+    at 7716-7739,5255-5320), as the click search did at Hratli's house (bug #434, lane bugsweep). True when within `reach`."""
+    import playthrough as pt
+    c = pt.Ctx(sys.modules[__name__], 0, log)
+    area0 = c.player().get("area")
+
+    def there():
+        p = c.player()
+        return abs(p.get("x", 0) - tx) <= reach and abs(p.get("y", 0) - ty) <= reach
+
+    def fight():
+        if hostiles_near(hstate(), 14):
+            acts_clear(14)
+
+    t0 = time.time()
+    for _ in range(rounds):
+        left = budget - (time.time() - t0)
+        if there() or left < 20:
+            break
+        H("skill left 0")  # a left click on the ground walks, on a monster it attacks
+        relp_walk_to(c, tx, ty, there, log, budget=left, fight=fight)
+        p = c.player()
+        if player_dead(p) or p.get("area") != area0:
+            break
+    p = c.player()
+    log.append("planned walk to %d,%d: %s after %d s (at %s,%s)" % (tx, ty, "there" if there() else "not there", time.time() - t0,
+                                                                   p.get("x"), p.get("y")))
+    return there()
+
+
 def acts_legs(points, out, log, walk_s=60):
-    """Walk through the points in order (fighting on the way); a leg the walk does not finish in walk_s is placed (acts_place_near,
-    travel help, counted in out["placed"]). False when the character died."""
+    """Walk through the points in order (fighting on the way); a leg the walk does not finish in walk_s goes by the planned walk
+    (acts_planned_walk), then the search walk, then it is placed (acts_place_near, travel help, counted in out["placed"]). False
+    when the character died."""
     for x, y in points:
         if acts_walk(x, y, reach=8, timeout=walk_s, fight=True):
+            continue
+        p = hstate()["player"]
+        if player_dead(p) or p.get("area") != 108:
+            return False
+        if acts_planned_walk(x, y, log, budget=max(walk_s * 3, 60), reach=8):
+            out["planned"] = out.get("planned", 0) + 1
             continue
         p = hstate()["player"]
         if player_dead(p) or p.get("area") != 108:
@@ -5007,7 +5147,7 @@ def acts_end_talk(area, who, kind, quest, log):
 
 def acts_travel(stage):
     """Act travel through the NPC's menu: first the line the quest added (against the menu `towns` kept), then every line;
-    passes when the character arrives in the next town."""
+    passes when the character arrives in the next town. travel45: then Tyrael's red portal (object 566) by mouse click."""
     frm, npc, dest = ACT_TRAVEL[stage]
     log, mark = [], engine_mark()
     talks = []
@@ -5036,12 +5176,47 @@ def acts_travel(stage):
             break
         g.press("esc")  # a Talk / Trade line opened a panel
         time.sleep(1)
+    portal = ""
+    if stage == "travel45" and hstate()["player"].get("area") != dest:  # LoD: no menu line; Tyrael opens a red portal
+        portal = "; " + acts_click_portal(TYRAEL_PORTAL, frm, dest, log)
     area = hstate()["player"].get("area")
-    finish("acts %s: travel by NPC %d's menu" % (stage, npc), area == dest,
-           "talks first %s (quest bits in the log); menu lines %s, new since the start %s, tried %s, now in area %s (want %d)" % (
-               talks, [(i, "%x" % s) for i, s, _h in menu["lines"]], [(i, "%x" % s) for i, s in added], tried, area, dest), mark,
-           [sh("acts_%s" % stage)], log)
+    if area == dest:
+        time.sleep(5)  # the act change's loading screen (run checks-20261030-075910-s3's shot was black)
+    finish("acts %s: travel by NPC %d's %s" % (stage, npc, "portal" if portal else "menu"), area == dest,
+           "talks first %s (quest bits in the log); menu lines %s, new since the start %s, tried %s, now in area %s (want %d)%s" % (
+               talks, [(i, "%x" % s) for i, s, _h in menu["lines"]], [(i, "%x" % s) for i, s in added], tried, area, dest, portal),
+           mark, [sh("acts_%s" % stage)], log)
     return area == dest
+
+
+TYRAEL_PORTAL = 566  # objects: NotKiddingLastPortal "Harrogath" (OperateFn 73), the red portal by Tyrael after Diablo's death;
+# Tyrael's menu keeps Talk only (LoD has no travel line on him; run checks-20261030-075529-s3, acts_travel45.png)
+
+
+def acts_click_portal(cls, frm, dest, log):
+    """Walk up to the nearest object `cls` and take it by background left clicks on it (then the click packet 0x13, named).
+    Returns a note; the caller reads the area."""
+    objs = [o for o in parse_objects(Hl("objects %d" % cls, log)[1])]
+    if not objs:
+        return "no object %d in area %d" % (cls, frm)
+    obj = objs[0]
+    if not acts_walk(obj["x"], obj["y"] + 3, reach=4, timeout=60):
+        acts_planned_walk(obj["x"], obj["y"] + 3, log, budget=120, reach=5)
+    H("skill left 0")
+    for up in (0, 40, 80, 120):
+        if click_object(obj, up_px=up):
+            for _ in range(4):
+                time.sleep(2)
+                if hstate()["player"].get("area") == dest:
+                    return "portal %d at %d,%d by a mouse click %d px above its foot" % (cls, obj["x"], obj["y"], up)
+    Hl("pkt 13 " + _le(2, obj["id"]), log)
+    for _ in range(4):
+        time.sleep(2)
+        if hstate()["player"].get("area") == dest:
+            return "portal %d by the click packet 0x13 (the mouse clicks did not take the character)" % cls
+    p = hstate()["player"]
+    return "portal %d at %d,%d (mode %s): clicks and the click packet did not take the character (at %s,%s, area %s)" % (
+        cls, obj["x"], obj["y"], obj.get("mode"), p.get("x"), p.get("y"), p.get("area"))
 
 
 ACT4_GATE = 342  # objects: the portal Mephisto's death opens in Durance of Hate 3 (OperateFn 46)
@@ -5134,6 +5309,124 @@ def acts_raise_bridge(log, walk_s=40):
                 return "bridge %d mode %d -> 2 with the character %d from it (walked to %d,%d)" % (
                     MEPHISTO_BRIDGE, b["mode"], d, p.get("x", 0), p.get("y", 0))
     return "bridge %d stayed in mode %s (the walk came %s from it)" % (MEPHISTO_BRIDGE, seal_now(b, log).get("mode"), best)
+
+
+MEPHISTO = 242  # monstats: Mephisto (Median 2012: AI `Vampire`, size 3, MeleeRng 3)
+
+
+def line_blocked(x0, y0, x1, y1, log):
+    """Cells of the game's walk collision (`walkmap`, step 1) the straight line between two points crosses that read blocked
+    (`#`) or not loaded (`?`): the moat between the character and Mephisto. Returns (blocked, unknown, cells)."""
+    half = max(abs(x1 - x0), abs(y1 - y0)) // 2 + 3
+    wm = relp_walkmap((x0 + x1) // 2, (y0 + y1) // 2, half=min(max(half, 4), 60), step=1)
+    if wm is None:
+        return None
+    n = max(abs(x1 - x0), abs(y1 - y0), 1)
+    blocked = unknown = 0
+    for i in range(1, n):
+        x, y = x0 + (x1 - x0) * i // n, y0 + (y1 - y0) * i // n
+        r, c = y - wm["y0"], x - wm["x0"]
+        ch = wm["grid"][r][c] if 0 <= r < len(wm["grid"]) and 0 <= c < len(wm["grid"][r]) else "?"
+        blocked += ch == "#"
+        unknown += ch == "?"
+    return blocked, unknown, n - 1
+
+
+def meph_melee_round(mid, secs, log):
+    """Left clicks with Attack (skill 0, an axe in the hand) on Mephisto's spot for `secs` seconds from where the character
+    stands, plus the cast path (`cast 0 unit`, harness) every 4th tick. Returns a dict: life before / after, distances, player
+    and Mephisto modes, the collision cells on the line between them."""
+    H("skill left 0")
+    l0 = acts_mon_life(mid)
+    out = {"life0": (l0 or 0) >> 8, "clicks": 0, "casts": 0, "pmodes": {}, "mmodes": {}, "dist": []}
+    t0, k = time.time(), 0
+    while time.time() - t0 < secs:
+        st = hstate()
+        p = st["player"]
+        if player_dead(p):
+            out["died"] = True
+            STATE["acts_deaths"] = STATE.get("acts_deaths", 0) + 1
+            break
+        m = next((m for m in st["mons"] if m.get("id") == mid), None)
+        if m is None or not acts_mon_life(mid):
+            out["gone"] = True
+            break
+        d = max(abs(p.get("x", 0) - m["mx"]), abs(p.get("y", 0) - m["my"]))
+        out["dist"].append(d)
+        if k == 0:
+            out["at"] = (p.get("x"), p.get("y"), m["mx"], m["my"])
+            out["line"] = line_blocked(p.get("x", 0), p.get("y", 0), m["mx"], m["my"], log)
+        k += 1
+        if k % 4 == 0:
+            H("cast 0 unit %d" % mid)
+            out["casts"] += 1
+        elif click_unit(mid, "left"):
+            out["clicks"] += 1
+        time.sleep(0.35)
+        q = hstate()
+        pm = q["player"].get("mode")
+        mm = next((x.get("mode") for x in q["mons"] if x.get("id") == mid), None)
+        out["pmodes"][pm] = out["pmodes"].get(pm, 0) + 1
+        out["mmodes"][mm] = out["mmodes"].get(mm, 0) + 1
+        time.sleep(0.25)
+    out["life1"] = (acts_mon_life(mid) or 0) >> 8
+    p = hstate()["player"]
+    out["end"] = (p.get("x"), p.get("y"))
+    dd = out.pop("dist")
+    out["dist"] = (min(dd), max(dd)) if dd else None
+    return out
+
+
+def acts_meph_melee():
+    """Lane endgame, item 4: does a melee hit cross the Durance 3 moat? Mephisto (Normal) with an axe and Attack by left clicks:
+    (1) from where the walk towards him ends (the moat edge when he stands across it), (2) after `place` next to him (travel
+    help, named; after a death on the walk, first `place` on the free spot nearest to him, the moat edge when he is across it).
+    Reads his life, both modes and the collision cells on the line between them. INFO row: the comparison is
+    the result (1.13c: melee does not reach across the moat, the "moat trick" is for ranged attacks)."""
+    log, mark = [], engine_mark()
+    lvl = acts_level_up(80)
+    acts_gear(lvl)
+    dmg = 40 + lvl * 12
+    H("unequip rhand")
+    H("equip %s 21=%d 22=%d 119=400 60=20 93=60 rhand" % (ACTS_WEAPON, dmg, dmg * 2))
+    goto(102)
+    mon = acts_find(MEPHISTO, log)
+    if mon is None:
+        finish("acts mephmelee: melee across the Durance 3 moat", False, "Mephisto not found", mark, [sh("acts_mephmelee_nofind")], log)
+        return
+    rounds, shots = [], []
+    for phase in ("walk towards him", "placed on the free spot nearest to him (help)", "placed next to him (help)"):
+        if phase.startswith("placed on") and rounds and isinstance(rounds[-1][1], dict):
+            continue  # the walk got to the moat edge itself
+        if hstate()["player"].get("area") != 102:  # after a death on the walk: back with the gear, as acts_boss does
+            acts_gear(lvl)
+            H("unequip rhand")
+            H("equip %s 21=%d 22=%d 119=400 60=20 93=60 rhand" % (ACTS_WEAPON, dmg, dmg * 2))
+            goto(102)
+        u = parse_moveto(Hl("moveto %d" % mon["id"], log)[1]) or mon
+        if phase.startswith("walk"):
+            acts_walk(u["x"], u["y"], reach=2, timeout=120, fight=True, skip=(MEPHISTO,))
+            acts_planned_walk(u["x"], u["y"], log, budget=120, reach=3)
+        elif not acts_place_near(u["x"] + (3 if phase.endswith("next to him (help)") else 0),
+                                 u["y"] + (3 if phase.endswith("next to him (help)") else 0), log):
+            rounds.append((phase, "place found no spot"))
+            continue
+        if player_dead(hstate()["player"]) or hstate()["player"].get("area") != 102:
+            revive_if_dead()
+            rounds.append((phase, "died on the way"))
+            continue
+        res = meph_melee_round(mon["id"], 40, log)
+        rounds.append((phase, res))
+        shot = sh("acts_mephmelee_%d" % len(rounds))
+        shots.append(shot)
+        log.append("%s: %s (%s)" % (phase, res, shot))
+        if res.get("died") or res.get("gone"):
+            break
+    hit = [ph for ph, r in rounds if isinstance(r, dict) and r["life1"] < r["life0"]]
+    finish("acts mephmelee: melee across the Durance 3 moat", bool(hit),
+           "axe %d-%d damage, Attack by left clicks (+ `cast 0 unit` every 4th tick); Mephisto life %s at the start; rounds %s; "
+           "melee damage landed in: %s" % (dmg, dmg * 2, (mon.get("life") or 0) >> 8, rounds, hit or "none"), mark, shots, log,
+           partial="the moat comparison with 1.13c (judged in docs/testing.md, lane endgame)")
 
 
 ACT4_GATE_QUESTS = (6, 7, 14, 15, 22, 23)
@@ -5279,56 +5572,142 @@ WAVE_CLASSES = (1289, 1148, 803, 1290, 1281)  # the wave bosses: superuniques 61
 THRONE_ROOM_RADIUS = 45  # the waves come when the throne room is empty of monsters (D2's Baal throne AI): fight all within this
 
 
-def acts_throne(waves_s=420):
-    """Throne of Destruction (131): walk to Baal's throne, then clear the room and fight what comes for up to `waves_s` seconds.
-    Records the classes of every monster seen and whether a wave boss came. A death ends the stage (the character is revived
-    in Harrogath: the "teleport" of run checks-20261028-191050-s2 was such a death the stage did not count)."""
+BAAL_PORTAL = 563  # objects: "baals portal" to the Worldstone Chamber (OperateFn 70), opened behind the throne after the fifth wave
+
+
+def acts_throne(waves_s=2700):
+    """Throne of Destruction (131): walk to Baal's throne, then clear the room and fight what comes, until Baal has left the throne
+    and his portal (object 563) stands, or `waves_s` seconds. Records the classes of every monster seen, when each wave boss came
+    and died. Passes with the fifth wave boss gone (the waves come in order; one can die out of the character's sight) and the
+    portal listed; the portal is then the `baal` stage's way in (lane endgame: the harness travel into 132 sets quest 40 without
+    a kill, lane nmhell3). A death is counted: the character is revived in Harrogath (the "teleport" of run checks-20261028-191050-s2 was such a death), rests and
+    goes back, at most 8 times."""
     log, mark = [], engine_mark()
-    lvl = acts_level_up(80)
+    STATE.pop("throne_portal", None)
+    STATE["acts_plus_skills"] = ACTS_END_PLUS_SKILLS if acts_has_build() else 0
+    lvl = acts_level_up(90)  # 80 died on the route (run 3 of lane endgame); Baal's stage uses 90 too
     acts_gear(lvl)
     d0 = STATE.get("acts_deaths", 0)
-    goto(131)
-    thr = [q for q in parse_presets(Hl("presets 1", log)[1]) if q["class"] == BAAL_THRONE]
-    tx, ty = (thr[0]["x"], thr[0]["y"] + 30) if thr else THRONE_XY
-    seen, t0, waves, left_at = {}, time.time(), {}, None
-    STATE["walk_seen"] = seen  # acts_walk records the classes it meets (first second of the stage)
-    route = None if thr else acts_route(THRONE_ROUTE, log)
-    walked = acts_walk(tx, ty, reach=15, timeout=240, fight=True, skip=(BAAL_THRONE,))
-    STATE.pop("walk_seen", None)
-    empty_since = None
+    seen, t0, waves, died, left_at = {}, time.time(), {}, {}, None
+    STATE.pop("acts_load", None)
+    thr, tx, ty, route, walked, back = [], THRONE_XY[0], THRONE_XY[1], None, False, []
+
+    def to_throne():
+        """Into 131 (harness travel: the stand-in for the Worldstone Keep 3 waypoint) and walk to the throne; True when there."""
+        nonlocal thr, tx, ty, route
+        goto(131)
+        thr = [q for q in parse_presets(Hl("presets 1", log)[1]) if q["class"] == BAAL_THRONE]
+        tx, ty = (thr[0]["x"], thr[0]["y"] + 30) if thr else THRONE_XY
+        STATE["walk_seen"] = seen  # acts_walk records the classes it meets (first second of the stage)
+        route = None if thr else acts_route(THRONE_ROUTE, log)
+        ok = not (route or {}).get("died") and acts_walk(tx, ty, reach=15, timeout=240, fight=True, skip=(BAAL_THRONE,))
+        if not ok and not (route or {}).get("died"):
+            ok = acts_planned_walk(tx, ty, log, budget=300, reach=15)
+        STATE.pop("walk_seen", None)
+        return ok
+
+    def back_after_death(why):
+        """A death (or leaving 131): revive in town, rest, then back to the throne, at most 8 times. The waves stay where they
+        were (D2 keeps the throne's wave count in the level)."""
+        p = hstate()["player"]
+        if player_dead(p):
+            STATE["acts_deaths"] = STATE.get("acts_deaths", 0) + 1
+        revive_if_dead()
+        if len(back) >= 8:
+            return False
+        acts_gear(lvl)  # the given gear stays on the corpse (run 4: life 15787 -> 4027 after the first death, then 5 more deaths)
+        acts_rest(log)
+        ok = to_throne()
+        back.append("%s at %d s: back at the throne %s" % (why, time.time() - t0, ok))
+        return ok
+
+    walked = to_throne()
+    while not walked and len(back) < 8:
+        walked = back_after_death("route")
+    empty_since, portal, baal_gone = None, [], None
     while walked and time.time() - t0 < waves_s:
         st = hstate()
         p = st["player"]
         if (p and player_dead(p)) or p.get("area") != 131:
-            if p and player_dead(p):
-                STATE["acts_deaths"] = STATE.get("acts_deaths", 0) + 1
-                revive_if_dead()
             left_at = int(time.time() - t0)
+            if back_after_death("death" if p and player_dead(p) else "left 131"):
+                continue
             break
+        now = int(time.time() - t0)
+        alive = {m.get("class") for m in st["mons"] if m.get("life", 1) > 0}
         for m in st["mons"]:
-            seen.setdefault(m.get("class"), int(time.time() - t0))
+            seen.setdefault(m.get("class"), now)
             if m.get("class") in WAVE_CLASSES:
-                waves.setdefault(m.get("class"), int(time.time() - t0))
+                waves.setdefault(m.get("class"), now)
+        for c in waves:
+            if c not in died and c not in alive and parse_moveto(H("moveto nearest %d" % c)[1]) is None:
+                died[c] = now
+        if baal_gone is None and BAAL_THRONE not in alive and parse_moveto(H("moveto nearest %d" % BAAL_THRONE)[1]) is None:
+            baal_gone = now
+        acts_load_sample()
         near = hostiles_near(st, THRONE_ROOM_RADIUS, skip=(BAAL_THRONE,))
         if near:
             empty_since = None
             _k, d, _s = acts_fight(near[0]["id"], 60)
             if d:
                 left_at = int(time.time() - t0)
+                if back_after_death("death in a fight"):
+                    continue
                 break
-        else:
-            empty_since = empty_since or int(time.time() - t0)
-            if abs(p.get("x", 0) - tx) > 15 or abs(p.get("y", 0) - ty) > 15:
-                acts_walk(tx, ty, reach=10, timeout=40, fight=True, skip=(BAAL_THRONE,))
-            time.sleep(2)
+            continue
+        empty_since = empty_since or now
+        portal = [o for o in parse_objects(H("objects %d" % BAAL_PORTAL)[1])]
+        if portal and WAVE_CLASSES[-1] in died:  # not "Baal gone": run 10 read him gone (out of reach) with 3 waves to come
+            break
+        if abs(p.get("x", 0) - tx) > 15 or abs(p.get("y", 0) - ty) > 15:
+            acts_walk(tx, ty, reach=10, timeout=40, fight=True, skip=(BAAL_THRONE,))
+        time.sleep(2)
     deaths = STATE.get("acts_deaths", 0) - d0
     shot = sh("acts_throne")
     left = any(m.get("class") == BAAL_THRONE for m in hstate()["mons"])
-    portal = [o for o in parse_objects(Hl("objects", log)[1]) if o["class"] in (59, 60, 563, 564)]
-    finish("acts throne: Baal's waves in the Throne of Destruction", deaths == 0 and bool(waves),
-           "level %d; throne preset %s; route %s; walk reached the throne: %s; classes seen (first second): %s; wave bosses seen %s; "
-           "room empty since %s s; deaths %d (left the throne at %s s); Baal still on the throne: %s; portal objects %s"
-           % (lvl, thr[:1], route, walked, sorted(seen.items()), waves, empty_since, deaths, left_at, left, portal), mark, [shot], log)
+    if not portal:
+        portal = [o for o in parse_objects(Hl("objects %d" % BAAL_PORTAL, log)[1])]
+    if portal:
+        STATE["throne_portal"] = portal[0]
+    others = [o for o in parse_objects(Hl("objects", log)[1]) if o["class"] in (59, 60, 564, 569)]
+    cleared = WAVE_CLASSES[-1] in died  # the waves come in order: the fifth gone = done (run 7 timed out with it alive: the portal
+    if portal and not cleared:  # object stands all along, its click took nobody then
+        STATE.pop("throne_portal", None)
+    finish("acts throne: Baal's waves in the Throne of Destruction", cleared and bool(portal),
+           "level %d%s; throne preset %s; route %s; walk reached the throne: %s; wave bosses seen at s %s, gone at s %s (of %s); "
+           "room empty since %s s; Baal left the throne at %s s (still there at the end: %s); portal %d %s; deaths %d (last left "
+           "the throne at %s s; back: %s); %d s in the stage; classes seen (first second): %s; other portal objects %s; %s"
+           % (lvl, " (+%d to all skills on the given amulet)" % STATE["acts_plus_skills"] if STATE.get("acts_plus_skills") else "",
+              thr[:1], route, walked, waves, died, list(WAVE_CLASSES), empty_since, baal_gone, left, BAAL_PORTAL,
+              portal[:1], deaths, left_at, back, time.time() - t0, sorted(seen.items()), others, acts_load_note()),
+           mark, [shot], log)
+
+
+def acts_baal_portal(log):
+    """The throne stage's portal (object 563) into the Worldstone Chamber, on the player path: walk up to it, background left
+    clicks on it (then the click packet 0x13, named). Returns a note; the caller reads the area."""
+    obj = STATE.get("throne_portal")
+    if hstate()["player"].get("area") != 131:
+        return "not in the Throne of Destruction any more (area %s): no portal to click" % hstate()["player"].get("area")
+    now = parse_objects(Hl("objects %d" % BAAL_PORTAL, log)[1]) or [obj]
+    obj = now[0]
+    if not acts_walk(obj["x"], obj["y"] + 3, reach=4, timeout=90, fight=True, skip=(BAAL_THRONE,)):
+        acts_planned_walk(obj["x"], obj["y"] + 3, log, budget=180, reach=5)
+    H("skill left 0")
+    for up in (0, 40, 80, 120):
+        if click_object(obj, up_px=up):
+            for _ in range(4):
+                time.sleep(2)
+                if hstate()["player"].get("area") == 132:
+                    return "portal %d at %d,%d by a mouse click %d px above its foot" % (BAAL_PORTAL, obj["x"], obj["y"], up)
+    Hl("pkt 13 " + _le(2, obj["id"]), log)
+    for _ in range(4):
+        time.sleep(2)
+        if hstate()["player"].get("area") == 132:
+            return "portal %d by the click packet 0x13 (the mouse clicks did not take the character)" % BAAL_PORTAL
+    p = hstate()["player"]
+    return "portal %d at %d,%d: clicks and the click packet did not take the character (at %s,%s, area %s)" % (
+        BAAL_PORTAL, obj["x"], obj["y"], p.get("x"), p.get("y"), p.get("area"))
 
 
 def acts_nightmare():
@@ -5386,6 +5765,8 @@ def check_acts():
                 acts_ancients()
             elif stage == "throne":
                 acts_throne()
+            elif stage == "mephmelee":
+                acts_meph_melee()
             elif stage == "nightmare":
                 acts_nightmare()
             elif stage == "build":

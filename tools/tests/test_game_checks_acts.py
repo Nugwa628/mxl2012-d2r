@@ -98,7 +98,7 @@ class Cards(unittest.TestCase):
 
 class Stages(unittest.TestCase):
     def test_default_is_every_stage_in_order(self):
-        self.assertEqual(gc.acts_stages(""), [s for s in gc.ACTS_STAGES if s != "build"])
+        self.assertEqual(gc.acts_stages(""), [s for s in gc.ACTS_STAGES if s not in gc.ACTS_ASKED_ONLY])
 
     def test_build_runs_only_when_asked(self):
         self.assertEqual(gc.acts_stages("build,mephisto"), ["build", "mephisto"])
