@@ -1,0 +1,52 @@
+name: Balance or Median difference
+description: A number, drop, skill, monster or rule behaves differently from Median XL 2012 (v005).
+labels: ["balance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project follows Median XL, not D2R, wherever the two differ. If something here does not match Median XL, that is a
+        bug even if it feels fine. Check [docs/unported.md](https://github.com/Nugwa628/mxl2012-d2r/blob/main/docs/unported.md) first:
+        deliberate deviations and known gaps are listed there. Requests to change Median XL's own balance are out of scope.
+  - type: input
+    id: mod_version
+    attributes:
+      label: Mod version
+      description: Type `mxl` in the in-game console, or read it from the release name.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: What differs?
+      multiple: true
+      options:
+        - Item stats or properties
+        - Skill damage, cost or behaviour
+        - Monster stats or behaviour
+        - Drops or treasure classes
+        - Quest, NPC or vendor
+        - Cube recipe or crafting
+        - Experience, level or caps
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: port
+    attributes:
+      label: What you see here
+      description: The values or behaviour in this port (tooltip text, damage numbers, drop rates, screenshots).
+    validations:
+      required: true
+  - type: textarea
+    id: median
+    attributes:
+      label: What Median XL 2012 (v005) does
+      description: The values or behaviour in the original, with a source (wiki link, screenshot, forum post, your own play).
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Character class and level, difficulty, equipment or skill levels that matter, how to reproduce.

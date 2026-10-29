@@ -1,0 +1,7 @@
+[
+  {
+    "key": "d2r:Lilith",
+    "text": "Pandora",
+    "why": "bugs.md #18: D2R names the Uber Tristram monsters (classes 704-709) by class, not by the monstats NameStr; class 707 (uberandariel, Median's Pandora) always reads D2R's key Lilith. Median 2012 uses no other D2R Lilith string."
+  }
+]

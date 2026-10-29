@@ -1,0 +1,2 @@
+# Shell scripts run under Git Bash on Windows: LF, whatever core.autocrlf says.
+*.sh text eol=lf

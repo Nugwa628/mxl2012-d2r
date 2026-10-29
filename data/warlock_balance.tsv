@@ -1,0 +1,306 @@
+skill	table	row	column	d2r	new
+Summon Goatman	monstats	wargoatman	A1MaxD	4	6
+Summon Goatman	monstats	wargoatman	A1MaxD(H)	275	6
+Summon Goatman	monstats	wargoatman	A1MaxD(N)	50	6
+Summon Goatman	monstats	wargoatman	A1MinD	3	1
+Summon Goatman	monstats	wargoatman	A1MinD(H)	230	1
+Summon Goatman	monstats	wargoatman	A1MinD(N)	30	1
+Summon Goatman	monstats	wargoatman	MaxHP(H)	275	1
+Summon Goatman	monstats	wargoatman	MaxHP(N)	175	1
+Summon Goatman	monstats	wargoatman	MinHP(H)	275	1
+Summon Goatman	monstats	wargoatman	MinHP(N)	175	1
+Summon Goatman	monstats	wargoatman	maxHP	100	1
+Summon Goatman	monstats	wargoatman	minHP	100	1
+Summon Goatman	skills	Summon Goatman	EMax		2
+Summon Goatman	skills	Summon Goatman	EMaxLev1		3
+Summon Goatman	skills	Summon Goatman	EMaxLev2		1
+Summon Goatman	skills	Summon Goatman	EMaxLev3		1
+Summon Goatman	skills	Summon Goatman	EMaxLev4		1
+Summon Goatman	skills	Summon Goatman	EMaxLev5		1
+Summon Goatman	skills	Summon Goatman	EMin		2
+Summon Goatman	skills	Summon Goatman	EMinLev1		3
+Summon Goatman	skills	Summon Goatman	EMinLev2		1
+Summon Goatman	skills	Summon Goatman	EMinLev3		1
+Summon Goatman	skills	Summon Goatman	EMinLev4		1
+Summon Goatman	skills	Summon Goatman	EMinLev5		1
+Summon Goatman	skills	Summon Goatman	Param1	35	0
+Summon Goatman	skills	Summon Goatman	Param15		8
+Summon Goatman	skills	Summon Goatman	Param16		1
+Summon Goatman	skills	Summon Goatman	Param5	10	110
+Summon Goatman	skills	Summon Goatman	Param6	10	1
+Summon Goatman	skills	Summon Goatman	lvlmana	1	7
+Summon Goatman	skills	Summon Goatman	mana	30	15
+Death Mark	skills	Death Mark	Param1	-5	-15
+Death Mark	skills	Death Mark	Param2	-2	-15
+Death Mark	skills	Death Mark	lvlmana	1	4
+Death Mark	skills	Death Mark	mana	9	534
+Summon Tainted	monstats	warbighead	MaxHP(H)	290	1
+Summon Tainted	monstats	warbighead	MaxHP(N)	180	1
+Summon Tainted	monstats	warbighead	MinHP(H)	290	1
+Summon Tainted	monstats	warbighead	MinHP(N)	180	1
+Summon Tainted	monstats	warbighead	maxHP	127	1
+Summon Tainted	monstats	warbighead	minHP	127	1
+Summon Tainted	skills	Summon Tainted	Param1	35	0
+Summon Tainted	skills	Summon Tainted	Param15		67
+Summon Tainted	skills	Summon Tainted	Param16		1
+Summon Tainted	skills	Summon Tainted	lvlmana	1	20
+Summon Tainted	skills	Summon Tainted	mana	50	80
+Summon Tainted	skills	Tainted Fire Ball	EMax	14	20
+Summon Tainted	skills	Tainted Fire Ball	EMaxLev1	6	12
+Summon Tainted	skills	Tainted Fire Ball	EMaxLev2	10	6
+Summon Tainted	skills	Tainted Fire Ball	EMaxLev3	40	9
+Summon Tainted	skills	Tainted Fire Ball	EMaxLev4	50	8
+Summon Tainted	skills	Tainted Fire Ball	EMaxLev5	55	6
+Summon Tainted	skills	Tainted Fire Ball	EMin	10	14
+Summon Tainted	skills	Tainted Fire Ball	EMinLev1	4	8
+Summon Tainted	skills	Tainted Fire Ball	EMinLev2	8	5
+Summon Tainted	skills	Tainted Fire Ball	EMinLev3	36	8
+Summon Tainted	skills	Tainted Fire Ball	EMinLev4	48	7
+Summon Tainted	skills	Tainted Fire Ball	EMinLev5	50	6
+Summon Defiler	monstats	warputriddefiler	A1MaxD	91	6
+Summon Defiler	monstats	warputriddefiler	A1MaxD(H)	90	6
+Summon Defiler	monstats	warputriddefiler	A1MaxD(N)	90	6
+Summon Defiler	monstats	warputriddefiler	A1MinD	32	1
+Summon Defiler	monstats	warputriddefiler	A1MinD(H)	30	1
+Summon Defiler	monstats	warputriddefiler	A1MinD(N)	30	1
+Summon Defiler	monstats	warputriddefiler	MaxHP(H)	300	1
+Summon Defiler	monstats	warputriddefiler	MaxHP(N)	190	1
+Summon Defiler	monstats	warputriddefiler	MinHP(H)	300	1
+Summon Defiler	monstats	warputriddefiler	MinHP(N)	190	1
+Summon Defiler	monstats	warputriddefiler	maxHP	140	1
+Summon Defiler	monstats	warputriddefiler	minHP	140	1
+Summon Defiler	skills	Summon Defiler	EMax		241
+Summon Defiler	skills	Summon Defiler	EMaxLev1		1
+Summon Defiler	skills	Summon Defiler	EMaxLev2		1
+Summon Defiler	skills	Summon Defiler	EMaxLev3		1
+Summon Defiler	skills	Summon Defiler	EMaxLev4		1
+Summon Defiler	skills	Summon Defiler	EMaxLev5		1
+Summon Defiler	skills	Summon Defiler	EMin		241
+Summon Defiler	skills	Summon Defiler	EMinLev1		1
+Summon Defiler	skills	Summon Defiler	EMinLev2		1
+Summon Defiler	skills	Summon Defiler	EMinLev3		1
+Summon Defiler	skills	Summon Defiler	EMinLev4		1
+Summon Defiler	skills	Summon Defiler	EMinLev5		1
+Summon Defiler	skills	Summon Defiler	Param1	35	0
+Summon Defiler	skills	Summon Defiler	Param15		88
+Summon Defiler	skills	Summon Defiler	Param16		1
+Summon Defiler	skills	Summon Defiler	Param2	10	4
+Summon Defiler	skills	Summon Defiler	lvlmana	1	50
+Summon Defiler	skills	Summon Defiler	mana	70	400
+Blood Oath	skills	Blood Oath	Param5	50	189
+Blood Oath	skills	Blood Oath	Param6	35	19
+Engorge	skills	Engorge	Param11	15	2
+Engorge	skills	Engorge	Param12	2	1
+Engorge	skills	Engorge	lvlmana	1	4
+Engorge	skills	Engorge	mana	12	199
+Blood Boil	skills	Blood Boil	EMax	20	50
+Blood Boil	skills	Blood Boil	EMaxLev2	12	5
+Blood Boil	skills	Blood Boil	EMaxLev3	18	5
+Blood Boil	skills	Blood Boil	EMaxLev4	26	5
+Blood Boil	skills	Blood Boil	EMaxLev5	30	5
+Blood Boil	skills	Blood Boil	EMin	10	25
+Blood Boil	skills	Blood Boil	EMinLev2	10	4
+Blood Boil	skills	Blood Boil	EMinLev3	12	3
+Blood Boil	skills	Blood Boil	EMinLev4	16	3
+Blood Boil	skills	Blood Boil	EMinLev5	20	4
+Blood Boil	skills	Blood Boil	MaxDam	20	50
+Blood Boil	skills	Blood Boil	MaxLevDam2	12	5
+Blood Boil	skills	Blood Boil	MaxLevDam3	18	5
+Blood Boil	skills	Blood Boil	MaxLevDam4	26	5
+Blood Boil	skills	Blood Boil	MaxLevDam5	30	5
+Blood Boil	skills	Blood Boil	MinDam	10	25
+Blood Boil	skills	Blood Boil	MinLevDam2	10	4
+Blood Boil	skills	Blood Boil	MinLevDam3	12	3
+Blood Boil	skills	Blood Boil	MinLevDam4	16	3
+Blood Boil	skills	Blood Boil	MinLevDam5	20	4
+Blood Boil	skills	Blood Boil	lvlmana	1	16
+Blood Boil	skills	Blood Boil	mana	15	128
+Consume	skills	Consume	mana	25	50
+Eldritch Blast	skills	Eldritch Blast	EMax	6	201
+Eldritch Blast	skills	Eldritch Blast	EMaxLev1	3	27
+Eldritch Blast	skills	Eldritch Blast	EMaxLev2	6	16
+Eldritch Blast	skills	Eldritch Blast	EMaxLev3	9	13
+Eldritch Blast	skills	Eldritch Blast	EMaxLev4	15	14
+Eldritch Blast	skills	Eldritch Blast	EMaxLev5	17	14
+Eldritch Blast	skills	Eldritch Blast	EMin	2	67
+Eldritch Blast	skills	Eldritch Blast	EMinLev1	3	27
+Eldritch Blast	skills	Eldritch Blast	EMinLev2	6	16
+Eldritch Blast	skills	Eldritch Blast	EMinLev3	9	13
+Eldritch Blast	skills	Eldritch Blast	EMinLev4	15	14
+Eldritch Blast	skills	Eldritch Blast	EMinLev5	17	14
+Eldritch Blast	skills	Eldritch Blast	lvlmana	1	10
+Eldritch Blast	skills	Eldritch Blast	mana	11	60
+Hex Bane	skills	Hex Bane	EMax	16	19
+Hex Bane	skills	Hex Bane	EMaxLev1	5	13
+Hex Bane	skills	Hex Bane	EMaxLev2	9	15
+Hex Bane	skills	Hex Bane	EMaxLev4	17	13
+Hex Bane	skills	Hex Bane	EMaxLev5	21	13
+Hex Bane	skills	Hex Bane	EMin	9	11
+Hex Bane	skills	Hex Bane	EMinLev1	3	8
+Hex Bane	skills	Hex Bane	EMinLev2	7	11
+Hex Bane	skills	Hex Bane	EMinLev4	15	11
+Hex Bane	skills	Hex Bane	EMinLev5	19	12
+Hex Bane	skills	Hex Bane	lvlmana	1	0
+Hex Bane	skills	Hex Bane	mana	12	10
+Hex Siphon	skills	Hex Siphon	lvlmana	1	2
+Hex Siphon	skills	Hex Siphon	mana	25	267
+Psychic Ward	skills	Psychic Ward	lvlmana	2	1
+Psychic Ward	skills	Psychic Ward	mana	20	50
+Echoing Strike	skills	Echoing Strike	MaxDam	12	11
+Echoing Strike	skills	Echoing Strike	MaxLevDam3	9	7
+Echoing Strike	skills	Echoing Strike	MaxLevDam4	9	6
+Echoing Strike	skills	Echoing Strike	MaxLevDam5	9	6
+Echoing Strike	skills	Echoing Strike	MinDam	8	7
+Echoing Strike	skills	Echoing Strike	MinLevDam3	6	5
+Echoing Strike	skills	Echoing Strike	MinLevDam4	6	4
+Echoing Strike	skills	Echoing Strike	MinLevDam5	6	4
+Echoing Strike	skills	Echoing Strike	lvlmana	1	-1
+Echoing Strike	skills	Echoing Strike	mana	14	61
+Hex Purge	skills	Hex Purge	EMax	15	7
+Hex Purge	skills	Hex Purge	EMaxLev1	6	5
+Hex Purge	skills	Hex Purge	EMaxLev2	10	6
+Hex Purge	skills	Hex Purge	EMaxLev3	12	5
+Hex Purge	skills	Hex Purge	EMaxLev4	16	5
+Hex Purge	skills	Hex Purge	EMaxLev5	20	6
+Hex Purge	skills	Hex Purge	EMin	10	5
+Hex Purge	skills	Hex Purge	EMinLev2	8	5
+Hex Purge	skills	Hex Purge	EMinLev3	10	4
+Hex Purge	skills	Hex Purge	EMinLev4	14	5
+Hex Purge	skills	Hex Purge	EMinLev5	18	5
+Hex Purge	skills	Hex Purge	lvlmana	1	0
+Hex Purge	skills	Hex Purge	mana	25	35
+Blade Warp	skills	Blade Warp	EMax	10	33
+Blade Warp	skills	Blade Warp	EMaxLev1	3	8
+Blade Warp	skills	Blade Warp	EMaxLev2	5	7
+Blade Warp	skills	Blade Warp	EMaxLev4	8	7
+Blade Warp	skills	Blade Warp	EMaxLev5	8	7
+Blade Warp	skills	Blade Warp	EMin	8	26
+Blade Warp	skills	Blade Warp	EMinLev1	3	8
+Blade Warp	skills	Blade Warp	EMinLev2	5	7
+Blade Warp	skills	Blade Warp	EMinLev4	8	7
+Blade Warp	skills	Blade Warp	EMinLev5	8	7
+Blade Warp	skills	Blade Warp	mana	15	20
+Cleave	skills	Cleave	Param1	20	1
+Cleave	skills	Cleave	Param13		10
+Cleave	skills	Cleave	Param14		1
+Cleave	skills	Cleave	Param2	5	1
+Cleave	skills	Cleave	Param9	10	1
+Cleave	skills	Cleave	mana	3	21
+Mirrored Blades	skills	Mirrored Blades	EMax		3
+Mirrored Blades	skills	Mirrored Blades	EMaxLev1		5
+Mirrored Blades	skills	Mirrored Blades	EMaxLev2		4
+Mirrored Blades	skills	Mirrored Blades	EMaxLev3		6
+Mirrored Blades	skills	Mirrored Blades	EMaxLev4		7
+Mirrored Blades	skills	Mirrored Blades	EMaxLev5		8
+Mirrored Blades	skills	Mirrored Blades	EMin		3
+Mirrored Blades	skills	Mirrored Blades	EMinLev1		5
+Mirrored Blades	skills	Mirrored Blades	EMinLev2		4
+Mirrored Blades	skills	Mirrored Blades	EMinLev3		6
+Mirrored Blades	skills	Mirrored Blades	EMinLev4		7
+Mirrored Blades	skills	Mirrored Blades	EMinLev5		8
+Mirrored Blades	skills	Mirrored Blades	Param1	50	43
+Mirrored Blades	skills	Mirrored Blades	Param2	120	11
+Mirrored Blades	skills	Mirrored Blades	lvlmana	1	0
+Mirrored Blades	skills	Mirrored Blades	mana	10	69
+Sigil Lethargy	skills	Sigil Lethargy	lvlmana	0	1
+Sigil Lethargy	skills	Sigil Lethargy	mana	4	133
+Ring of Fire	skills	Ring of Fire	EMax	10	61
+Ring of Fire	skills	Ring of Fire	EMaxLev1	7	19
+Ring of Fire	skills	Ring of Fire	EMaxLev2	9	11
+Ring of Fire	skills	Ring of Fire	EMaxLev3	11	9
+Ring of Fire	skills	Ring of Fire	EMaxLev4	13	9
+Ring of Fire	skills	Ring of Fire	EMaxLev5	15	10
+Ring of Fire	skills	Ring of Fire	EMin	6	37
+Ring of Fire	skills	Ring of Fire	EMinLev1	6	17
+Ring of Fire	skills	Ring of Fire	EMinLev2	8	10
+Ring of Fire	skills	Ring of Fire	EMinLev3	10	9
+Ring of Fire	skills	Ring of Fire	EMinLev4	11	8
+Ring of Fire	skills	Ring of Fire	EMinLev5	12	8
+Ring of Fire	skills	Ring of Fire	lvlmana	1	8
+Ring of Fire	skills	Ring of Fire	mana	16	24
+Miasma Bolt	skills	Miasma Bolt	EMax	4	68
+Miasma Bolt	skills	Miasma Bolt	EMaxLev1	2	25
+Miasma Bolt	skills	Miasma Bolt	EMaxLev2	2	13
+Miasma Bolt	skills	Miasma Bolt	EMaxLev3	4	17
+Miasma Bolt	skills	Miasma Bolt	EMaxLev4	4	13
+Miasma Bolt	skills	Miasma Bolt	EMaxLev5	6	17
+Miasma Bolt	skills	Miasma Bolt	EMin	2	34
+Miasma Bolt	skills	Miasma Bolt	EMinLev1	2	25
+Miasma Bolt	skills	Miasma Bolt	EMinLev2	2	13
+Miasma Bolt	skills	Miasma Bolt	EMinLev3	3	13
+Miasma Bolt	skills	Miasma Bolt	EMinLev4	3	10
+Miasma Bolt	skills	Miasma Bolt	EMinLev5	4	12
+Miasma Bolt	skills	Miasma Bolt	lvlmana	1	5
+Miasma Bolt	skills	Miasma Bolt	mana	4	10
+Sigil Rancor	skills	Sigil Rancor	lvlmana	0	1
+Sigil Rancor	skills	Sigil Rancor	mana	12	133
+Flame Wave	skills	Flame Wave	EMax	17	100
+Flame Wave	skills	Flame Wave	EMaxLev1	9	21
+Flame Wave	skills	Flame Wave	EMaxLev2	14	13
+Flame Wave	skills	Flame Wave	EMaxLev3	18	11
+Flame Wave	skills	Flame Wave	EMaxLev4	20	10
+Flame Wave	skills	Flame Wave	EMaxLev5	23	10
+Flame Wave	skills	Flame Wave	EMin	13	77
+Flame Wave	skills	Flame Wave	EMinLev1	8	19
+Flame Wave	skills	Flame Wave	EMinLev2	12	11
+Flame Wave	skills	Flame Wave	EMinLev3	17	10
+Flame Wave	skills	Flame Wave	EMinLev4	18	9
+Flame Wave	skills	Flame Wave	EMinLev5	21	9
+Flame Wave	skills	Flame Wave	lvlmana	1	8
+Flame Wave	skills	Flame Wave	mana	14	64
+Miasma Chains	skills	Miasma Chains	EMax	9	70
+Miasma Chains	skills	Miasma Chains	EMaxLev1	2	12
+Miasma Chains	skills	Miasma Chains	EMaxLev2	3	9
+Miasma Chains	skills	Miasma Chains	EMaxLev3	3	7
+Miasma Chains	skills	Miasma Chains	EMaxLev4	4	7
+Miasma Chains	skills	Miasma Chains	EMaxLev5	4	7
+Miasma Chains	skills	Miasma Chains	EMin	6	47
+Miasma Chains	skills	Miasma Chains	EMinLev1	2	12
+Miasma Chains	skills	Miasma Chains	EMinLev2	3	9
+Miasma Chains	skills	Miasma Chains	EMinLev3	3	7
+Miasma Chains	skills	Miasma Chains	EMinLev4	4	7
+Miasma Chains	skills	Miasma Chains	EMinLev5	4	7
+Miasma Chains	skills	Miasma Chains	lvlmana	1	10
+Miasma Chains	skills	Miasma Chains	mana	9	40
+Sigil Death	skills	Sigil Death	lvlmana	1	2
+Sigil Death	skills	Sigil Death	mana	20	267
+Apocalypse	skills	Apocalypse	EMax	100	604
+Apocalypse	skills	Apocalypse	EMaxLev1	25	80
+Apocalypse	skills	Apocalypse	EMaxLev2	50	61
+Apocalypse	skills	Apocalypse	EMaxLev3	75	52
+Apocalypse	skills	Apocalypse	EMaxLev4	95	49
+Apocalypse	skills	Apocalypse	EMaxLev5	115	52
+Apocalypse	skills	Apocalypse	EMin	80	483
+Apocalypse	skills	Apocalypse	EMinLev1	23	74
+Apocalypse	skills	Apocalypse	EMinLev2	46	56
+Apocalypse	skills	Apocalypse	EMinLev3	69	48
+Apocalypse	skills	Apocalypse	EMinLev4	75	39
+Apocalypse	skills	Apocalypse	EMinLev5	95	43
+Apocalypse	skills	Apocalypse	lvlmana	1	5
+Apocalypse	skills	Apocalypse	mana	32	30
+Abyss	missiles	abysscenter	EMax	40	298
+Abyss	missiles	abysscenter	EMin	20	149
+Abyss	missiles	abysscenter	MaxELev1	4	31
+Abyss	missiles	abysscenter	MaxELev2	8	44
+Abyss	missiles	abysscenter	MaxELev3	12	41
+Abyss	missiles	abysscenter	MaxELev4	16	37
+Abyss	missiles	abysscenter	MaxELev5	20	35
+Abyss	missiles	abysscenter	MinELev1	3	23
+Abyss	missiles	abysscenter	MinELev2	6	33
+Abyss	missiles	abysscenter	MinELev3	9	31
+Abyss	missiles	abysscenter	MinELev4	12	28
+Abyss	missiles	abysscenter	MinELev5	15	26
+Abyss	skills	Abyss	EMax	40	548
+Abyss	skills	Abyss	EMaxLev1	4	47
+Abyss	skills	Abyss	EMaxLev2	8	45
+Abyss	skills	Abyss	EMaxLev3	12	38
+Abyss	skills	Abyss	EMaxLev4	16	36
+Abyss	skills	Abyss	EMaxLev5	20	38
+Abyss	skills	Abyss	EMin	20	274
+Abyss	skills	Abyss	EMinLev1	3	35
+Abyss	skills	Abyss	EMinLev2	6	34
+Abyss	skills	Abyss	EMinLev3	9	29
+Abyss	skills	Abyss	EMinLev4	12	27
+Abyss	skills	Abyss	EMinLev5	15	28
+Abyss	skills	Abyss	lvlmana	1	5
+Abyss	skills	Abyss	mana	23	30

@@ -1,0 +1,57 @@
+# --- Never commit third-party game content (Blizzard or Median XL 2012) ---
+# Raw extractions live outside the repo or in these ignored folders.
+/extract/
+/work/
+*.mpq
+*.dc6
+*.dcc
+*.dt1
+*.ds1
+*.cof
+*.wav
+*.bik
+*.exe
+*.dll
+*.pdb
+*.d2s
+*.d2i
+*.sprite
+*.model
+*.texture
+
+# Decompiles and RE databases
+*.gpr
+*.rep/
+*.c.bak
+/research/ghidra/
+
+# Build output
+/build/
+/out/
+/dist/
+CMakeUserPresets.json
+.vs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Logs
+*.log
+
+# Regenerable evidence reports (tools/sigma_tables.py evidence)
+/research/sigma_evidence/
+
+# Agent worktrees
+/.claude/
+
+# assets/ (Median XL's own files, the HD art) is not in git: a versioned asset pack pinned by assets.lock,
+# put there by `py -3 tools/asset_pack.py fetch` (docs/setup.md). Blizzard's base game files are never committed either.
+/assets/
+/.venv-ci/
+/.assets-cache/
+
+# Per-checkout settings written by tools/lane_setup.py (paths of this PC)
+/.mxl-local.json

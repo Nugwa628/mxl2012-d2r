@@ -1,0 +1,14 @@
+{
+  "version": "1",
+  "tag": "assets-1",
+  "file": "assets-1.zip",
+  "format": "zip",
+  "size": 0,
+  "sha256": "<sha256 of the pack file>",
+  "manifest_sha256": "<sha256 of assets-manifest.json>",
+  "files": 0,
+  "bytes": 0,
+  "urls": [
+    "https://dl.werdegames.com/mxl2012/assets/assets-1.zip"
+  ]
+}

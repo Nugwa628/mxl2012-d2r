@@ -1,0 +1,37 @@
+# Manual, incomplete code-only package for inspection; publishing is not enabled for this repo.
+# There is deliberately no tag or push trigger. A player release requires game data and a separate release process.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional version for the incomplete package"
+        required: false
+
+jobs:
+  package:
+    runs-on: mxl-cross
+    steps:
+      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - name: Initialize PluginSDK
+        run: git submodule update --init --depth 1 third_party/PluginSDK
+      - name: Build release plugin
+        run: |
+          cmake -S plugin -B build-release -DCMAKE_TOOLCHAIN_FILE="$PWD/plugin/cmake/xwin-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release -DMXL_RELEASE=ON
+          cmake --build build-release -j6 --target mxl2012_core
+          test -f build-release/mxl2012-core.dll
+      - name: Package without game data
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            python3 -I tools/package_release.py --no-data --plugin build-release/mxl2012-core.dll --version "$INPUT_VERSION" --out dist
+          else
+            python3 -I tools/package_release.py --no-data --plugin build-release/mxl2012-core.dll --out dist
+          fi
+          cat dist/SHA256SUMS
+      - uses: https://git.werdegames.com/actions-mirror/forgejo-upload-artifact@v4
+        with:
+          name: mxl2012-d2r-incomplete
+          path: dist/

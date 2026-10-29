@@ -1,0 +1,4 @@
+# Python packages the unit tests need on the CI runner (the CI image has python3 but neither; it is shared with another
+# project, so they go into a venv in the workspace: .forgejo/workflows/ci.yml, job tools). Pinned for a reproducible run.
+numpy==2.2.6
+Pillow==11.3.0

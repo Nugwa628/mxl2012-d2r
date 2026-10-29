@@ -1,0 +1,4 @@
+# Native StormLib/CascLib are loaded through ctypes from third_party builds.
+pillow>=11
+capstone
+numpy

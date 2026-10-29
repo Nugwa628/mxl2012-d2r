@@ -1,0 +1,79 @@
+# Checks on the shared Forgejo mxl-cross runner. No game data or asset cache is required: the `assets` job downloads the
+# asset pack itself (tools/ci_assets.sh) and skips cleanly while the MXL_ASSETS_TOKEN secret is not set.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plugin:
+    runs-on: mxl-cross
+    steps:
+      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - name: Initialize PluginSDK
+        run: git submodule update --init --depth 1 third_party/PluginSDK
+      - name: Build plugin
+        run: |
+          cmake -S plugin -B build -DCMAKE_TOOLCHAIN_FILE="$PWD/plugin/cmake/xwin-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j6 --target mxl2012_core
+          test -f build/mxl2012-core.dll
+
+  launcher:
+    runs-on: mxl-cross
+    steps:
+      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - name: Build launcher and verify checksum
+        run: |
+          cmake -S launcher -B build-launcher -DCMAKE_TOOLCHAIN_FILE="$PWD/plugin/cmake/xwin-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-launcher -j6 --target mxl_launcher
+          cd build-launcher
+          sha256sum -c D2R-XL-2012-Downloader.exe.sha256
+
+  native-tests:
+    runs-on: mxl-cross
+    steps:
+      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - name: Build and run plugin tests
+        run: |
+          set -e
+          cmake -S plugin/tests -B build-tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-tests -j6 --target tests
+          for t in harness_tests buildguard_tests otherplugins_tests envguard_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests; do ./build-tests/$t; done
+      - name: Build and run launcher tests
+        run: |
+          cmake -S launcher/tests -B build-launcher-tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-launcher-tests -j6
+          ./build-launcher-tests/launcher_tests
+
+  tools:
+    runs-on: mxl-cross
+    steps:
+      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - name: Python venv (numpy, Pillow)
+        # The shared CI image has python3 and a system pip but no ensurepip: a venv without pip, filled by the system pip.
+        run: |
+          python3 -m venv --without-pip .venv-ci
+          python3 -m pip --python .venv-ci/bin/python install --disable-pip-version-check -q -r tools/requirements-ci.txt
+      - name: Python unit tests
+        run: |
+          .venv-ci/bin/python -I -m unittest discover -s tools -p 'test_*.py'
+          .venv-ci/bin/python -I -m unittest discover -s tools/tests -p 'test_*.py'
+      - name: Check tracked text for private details
+        run: python3 -I tools/check_public.py
+
+  assets:
+    # The asset pack (assets.lock) from the private forge release, read with the MXL_ASSETS_TOKEN secret; skips with a notice
+    # while the secret is not set (docs/setup.md, "CI asset pack"). The runner keeps no cache: every run downloads the pack.
+    runs-on: mxl-cross
+    steps:
+      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - name: Fetch and verify the asset pack, Median-only checks
+        env:
+          MXL_ASSETS_TOKEN: ${{ secrets.MXL_ASSETS_TOKEN }}
+        run: bash tools/ci_assets.sh

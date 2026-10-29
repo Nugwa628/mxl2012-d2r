@@ -1,0 +1,192 @@
+# Closest existing icon for the skills items put on the skill bar (charges, oskills) that have no frame of their own
+# in Median XL 2012 (its shared sheet's "?", frame 0). Read by tools/shared_icons.py; docs/hd-icons.md, "Item skills".
+# donor: d2r:<D2R skilldesc row> (D2R's frame, its HD art) | mxl:<Median class skill's skilldesc row> | shared:<Median shared frame>
+skilldesc	donor	skills	reason
+wrath	d2r:fire ball	Wrath	fire missile or fire strike
+bloodstar	d2r:fire ball	Bloodstar	fire missile or fire strike
+splitfire	d2r:fire ball	Splitfire	fire missile or fire strike
+backfire	d2r:fire ball	Backfire	fire missile or fire strike
+fireboltnova	d2r:fire ball	Firebolt Nova	fire missile or fire strike
+disco_inferno	d2r:fire ball	Dinferno	fire missile or fire strike
+deathblossom	d2r:fire ball	Death Blossom, Item Death Blossom	fire missile or fire strike
+ancientshand	d2r:fire ball	Mon Ancients Hand, Ancients Hand	fire missile or fire strike
+sunburn	d2r:fire ball	Syb, Sunburn	fire missile or fire strike
+meteorshower	d2r:meteor	Meteor Shower, NTSHW	fire from the sky, fire bombs, eruptions
+rainofbombs	d2r:meteor	Rain of Bombs	fire from the sky, fire bombs, eruptions
+cataclysm	d2r:meteor	Cataclysm	fire from the sky, fire bombs, eruptions
+immolationbomb	d2r:meteor	Immolation Bomb	fire from the sky, fire bombs, eruptions
+apocalypse	d2r:meteor	Apocalypse	fire from the sky, fire bombs, eruptions
+pyroclasticflow	d2r:meteor	Pyroclastic Flow	fire from the sky, fire bombs, eruptions
+firefountain	d2r:meteor	Fire Fountain	fire from the sky, fire bombs, eruptions
+barreloffun	d2r:meteor	Mon Dynamite, Player Dynamite	fire from the sky, fire bombs, eruptions
+pathofflames	d2r:fire wall	Path of Flames	fire on the ground, fire trap (the picture is on the sheet already, Fire Wall)
+sealoffire	d2r:fire wall	Seal of Fire	fire on the ground, fire trap (the picture is on the sheet already, Fire Wall)
+other_firecascade	d2r:fire wall	Other Fire Cascade	fire on the ground, fire trap (the picture is on the sheet already, Fire Wall)
+phoenixwave	d2r:fire wall	Phoenix Wave	fire on the ground, fire trap (the picture is on the sheet already, Fire Wall)
+runeoffire	d2r:fire wall	Rune of Fire	fire on the ground, fire trap (the picture is on the sheet already, Fire Wall)
+holytrap	mxl:brimstone	Holy Trap, Mon Holy Trap Target	its class version, Paladin Holy Trap Advanced
+firestar	shared:1	Fire Star	a pentagram (Median's shared frame 1, on the sheet already)
+icelance	d2r:ice blast	Ice Lance	cold missile or beam
+cryobeam	d2r:ice blast	Cryo Beam	cold missile or beam
+frozensoul	d2r:ice blast	Frozen Soul	cold missile or beam
+coneofcold	d2r:ice blast	Cone of Cold	cold missile or beam
+icebeam	d2r:ice blast	Mon Ice Beam	cold missile or beam
+glacialnova	d2r:frost nova	Glacial Nova, NTGN, Super Gn	cold nova, ring, storm, trap or cold form
+iceboltnova	d2r:frost nova	Ice Bolt Nova	cold nova, ring, storm, trap or cold form
+frozencrown	d2r:frost nova	Frozen Crown	cold nova, ring, storm, trap or cold form
+doomserpents	d2r:frost nova	Doom Serpents	cold nova, ring, storm, trap or cold form
+countdown	d2r:frost nova	Countdown	cold nova, ring, storm, trap or cold form
+other_pandemonium	d2r:frost nova	Other Pandemonium	cold nova, ring, storm, trap or cold form
+runeofice	d2r:frost nova	Mon Rune of Ice Target, Rune of Ice	cold nova, ring, storm, trap or cold form
+other_shacklesofice	d2r:frost nova	Other Shackles of Ice	cold nova, ring, storm, trap or cold form
+churel	d2r:frost nova	Churel	cold nova, ring, storm, trap or cold form
+hailstorm	d2r:frost nova	Hailstorm	cold nova, ring, storm, trap or cold form
+avalanche	d2r:frost nova	Avalanche	cold nova, ring, storm, trap or cold form
+other_avatar	d2r:frost nova	Other Avatar	cold nova, ring, storm, trap or cold form
+shadowavatar	d2r:frost nova	Shadow Avatar	cold nova, ring, storm, trap or cold form
+coldfear	d2r:terror	Untimered CF, Cold Fear	curse: fear, banish, charm, mark
+other_banish	d2r:terror	Other Banish	curse: fear, banish, charm, mark
+nightmare	d2r:terror	Nightmare	curse: fear, banish, charm, mark
+wyrd	d2r:terror	Wyrd	curse: fear, banish, charm, mark
+bloodspeakers mark	d2r:terror	Bloodspeakers Mark	curse: fear, banish, charm, mark
+other_possess	d2r:terror	Other Possess, Merc Possess	curse: fear, banish, charm, mark
+direcharml	d2r:terror	Dire Charm L	curse: fear, banish, charm, mark
+greatercharm	d2r:terror	Greater Charm	curse: fear, banish, charm, mark
+flashcharm	d2r:terror	Flash Charm	curse: fear, banish, charm, mark
+dominate	d2r:terror	Dominate	curse: fear, banish, charm, mark
+charm	d2r:terror	Timerless Charm, Charm	curse: fear, banish, charm, mark
+novabomb	d2r:nova	Nova Bomb	lightning nova or blast wave
+supernova	d2r:nova	Supernova, Msupernova	lightning nova or blast wave
+elementalrain	d2r:nova	Elemental Rain	lightning nova or blast wave
+other_blastwave	d2r:nova	Other Blast Wave, Mon Longer BW	lightning nova or blast wave
+lightningarena	d2r:thunder storm	Lightning Arena	lightning field, wall, storm or shield
+lightningwall	d2r:thunder storm	Lightning Wall	lightning field, wall, storm or shield
+staticward	d2r:thunder storm	Static Ward	lightning field, wall, storm or shield
+stormfront	d2r:thunder storm	Stormfront	lightning field, wall, storm or shield
+vortex	d2r:thunder storm	Vortex	lightning field, wall, storm or shield
+lightningshield	d2r:thunder storm	Lightning Shield, Mlightning Shield	lightning field, wall, storm or shield
+electrobolt	d2r:lightning	Electrobolt Spell	lightning bolt, beam or strike
+newstaticspike	d2r:lightning	New Static Spike	lightning bolt, beam or strike
+balllightning	d2r:lightning	Ball Lightning	lightning bolt, beam or strike
+ionchannel	d2r:lightning	Ion Channel	lightning bolt, beam or strike
+lcold	d2r:lightning	Lightning Cascade Old	lightning bolt, beam or strike
+shockflower	d2r:lightning	Shock Flower	lightning bolt, beam or strike
+flash	mxl:poisonflash	Flash	its family, Druid Poison Flash (the same barflash missiles)
+bloodflash	mxl:poisonflash	Blood Flash	its family, Druid Poison Flash (the same barflash missiles)
+gammafield	d2r:poison nova	Gamma Field, Mon Gamma	poison cloud, field or strike
+diseasedcattle	d2r:poison nova	Diseased Cattle	poison cloud, field or strike
+devouringacid	d2r:poison nova	Devouring Acid	poison cloud, field or strike
+emeraldprison	d2r:poison nova	Emerald Prison	poison cloud, field or strike
+spikeripple	d2r:poison nova	Mon Spike Ripple	poison cloud, field or strike
+venomousspirit	d2r:poison nova	MercVSpirit, Venomous Spirit	poison cloud, field or strike
+blacklotusstrike	d2r:poison nova	Black Lotus Strike, Mon Lotus Strike	poison cloud, field or strike
+punisher	d2r:poison nova	Punisher, Mpunisher	poison cloud, field or strike
+amatoxin	d2r:poison nova	Amatoxin	poison cloud, field or strike
+energybeam	mxl:searinglight	Mon Energy Beam	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+disintegrate	mxl:searinglight	Disintegrate	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+disinuber	mxl:searinglight	NTDISUber, DisinUber	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+searingorb	mxl:searinglight	Searing Orb	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+bfg83k	mxl:searinglight	BFG83K	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+ohman	mxl:searinglight	OHMAN	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+psionicstorm	mxl:searinglight	Mon Psionic Storm	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+psicrown	mxl:searinglight	Psicrown	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+painspirit	mxl:searinglight	Mon Pain Spirit	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+deathcoil	mxl:searinglight	Death Coil	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+timewave	mxl:searinglight	Time Wave	magic beam, orb, spirit or psionic spell (Paladin Searing Light, a burst of light)
+maelstrom	d2r:hurricane	Maelstrom	vortex, whirlpool, cyclone, squall
+whirlpool	d2r:hurricane	Whirlpool	vortex, whirlpool, cyclone, squall
+typhoon	d2r:hurricane	Typhoon	vortex, whirlpool, cyclone, squall
+whammy	d2r:hurricane	Whammy	vortex, whirlpool, cyclone, squall
+squallgust	d2r:hurricane	Squall Gust	vortex, whirlpool, cyclone, squall
+squallwave	d2r:hurricane	Squall Wave	vortex, whirlpool, cyclone, squall
+manacoil	mxl:manasweep	Mana Coil	mana element, Sorceress Mana Sweep
+runeofmana	mxl:manasweep	Rune of Mana	mana element, Sorceress Mana Sweep
+exorcism	d2r:fist of the heavens	Exorcism	holy spell or holy strike
+sunspear	d2r:fist of the heavens	Sunspear	holy spell or holy strike
+body of the savior	d2r:fist of the heavens	Body of the Savior	holy spell or holy strike
+cherubstrike	d2r:fist of the heavens	Cherub Strike	holy spell or holy strike
+conquest	d2r:fist of the heavens	Conquest	holy spell or holy strike
+dragonshot	mxl:dragon shot	Dragonshot2	its class version, Necromancer Dragon Shot (the same dragoncannonball missile)
+phalanx	mxl:phalanx_real	Mon Bowless Phalanx, Phalanx	its class version, Amazon Phalanx
+scattershot	d2r:multiple shot	Scatter Shot	arrows or bullets
+arrowswarm	d2r:multiple shot	Arrow Swarm	arrows or bullets
+smg	d2r:multiple shot	SMG	arrows or bullets
+wraitharrow	d2r:multiple shot	Wraith Arrow	arrows or bullets
+blindside	d2r:multiple shot	Blindside, SS Blindside	arrows or bullets
+silverstreak	d2r:blade fury	Silver Streak	blades, darts, chains, shards
+shadowblade	d2r:blade fury	Shadow Blade	blades, darts, chains, shards
+char_slicerblade	d2r:blade fury	Char Slicer Blade	blades, darts, chains, shards
+guidedchain	d2r:blade fury	Guided Chain	blades, darts, chains, shards
+bladebarrier	d2r:blade fury	Blade Barrier	blades, darts, chains, shards
+deathshards	d2r:blade fury	Death Shards	blades, darts, chains, shards
+lapidate	mxl:showerofrocks	Lapidate	stones, Barbarian Shower of Rocks
+rockshock	mxl:showerofrocks	Rock Shock	stones, Barbarian Shower of Rocks
+spintowin	d2r:whirlwind	Spin To Win	spinning melee attack
+dansemacabre	d2r:whirlwind	Danse Macabre	spinning melee attack
+harvest	d2r:whirlwind	Harvest	spinning melee attack
+clawtornado	d2r:whirlwind	Mon Claw Tornado Effect, Merc Claw Tornado	spinning melee attack
+spiraldance	d2r:whirlwind	Spiral Dance	spinning melee attack
+skillspiraldance	d2r:whirlwind	Chober Chaber Spiral Dance, Spiral Proc, Skill Spiral Dance	spinning melee attack
+deathstrike	d2r:berserk	Deathstrike, Item Deathstrikes	melee strike
+soulshatter	d2r:berserk	Soulshatter	melee strike
+gorefest	d2r:berserk	Gorefest	melee strike
+medusa	d2r:berserk	Medusa	melee strike
+overpower	d2r:berserk	Overpower	melee strike
+clobber	d2r:berserk	Clobber	melee strike
+hamstring	d2r:berserk	Hamstring	melee strike
+cautiousstrike	d2r:berserk	Cautious Strike	melee strike
+timestrike	d2r:berserk	Mon Time Strike Target, Time Strike	melee strike
+ravage	d2r:berserk	Ravage	melee strike
+feralstrike	d2r:berserk	Feral Strike	melee strike
+thornfield	d2r:berserk	Thorn Field, Merc Thorn Field	melee strike
+shunpo	d2r:teleport	Shunpo	teleport or speed
+other_demonicspeed	d2r:teleport	Other Demonic Speed	teleport or speed
+darkpower	d2r:might	Dark Power	damage or armor aura, shout
+vanquish	d2r:might	Vanquish	damage or armor aura, shout
+bloodfury	d2r:might	Blood Fury	damage or armor aura, shout
+other_ravenheart	d2r:might	Other Raven Heart	damage or armor aura, shout
+hounfor	d2r:might	Reward Hounfor	damage or armor aura, shout
+unholyarmor	d2r:might	Unholy Armor, UA2, Munholy Armor	damage or armor aura, shout
+tantrum	d2r:might	Tantrum	damage or armor aura, shout
+bloodymary	d2r:prayer	Bloody Mary	healing aura
+paganheart	d2r:prayer	Pagan Heart	healing aura
+innerfire	d2r:prayer	Inner Fire	healing aura
+krakenstance	mxl:snakestance	Kraken Stance, Sinwar Kraken	its family, the Barbarian stances
+cranestance	mxl:snakestance	Crane Stance	its family, the Barbarian stances
+fearbombtotem	mxl:deathsfurytotem	Fear Bomb Totem	its family, the Necromancer totems
+manatidetotem	mxl:deathsfurytotem	Mana Tide Totem	its family, the Necromancer totems
+elementaltotem	mxl:deathsfurytotem	Elemental Totem	its family, the Necromancer totems
+lichetotem	mxl:deathsfurytotem	Liche Totem	its family, the Necromancer totems
+deadwalltotem	mxl:deathsfurytotem	Dead Wall Totem	its family, the Necromancer totems
+devilsfangtotem	mxl:deathsfurytotem	Devils Fang Totem	its family, the Necromancer totems
+explodingtotem	mxl:deathsfurytotem	Exploding Totem	its family, the Necromancer totems
+totemboundguardian	mxl:deathsfurytotem	Totembound Guardian	its family, the Necromancer totems
+summonthunderbear	d2r:summon spirit wolf	Summon Thunder Bear	summons beasts
+summonshockbeast	d2r:summon spirit wolf	Summon Shock Beast	summons beasts
+summonrats	d2r:summon spirit wolf	Summon Rats	summons beasts
+goldencalf	d2r:summon spirit wolf	Golden Calf	summons beasts
+summonavalanche	d2r:summon spirit wolf	Summon Avalanche	summons beasts
+summontreewarden	mxl:treewardenform	Summon Treewarden	its class version, Druid Treewarden Form (also a summoned plant)
+summonglowingf	mxl:treewardenform	Summon Glowing Fungus	its class version, Druid Treewarden Form (also a summoned plant)
+callbloodgolem	d2r:bloodgolem	Call Blood Golem	summons a golem
+callnecrobot	d2r:bloodgolem	Call Necrobot	summons a golem
+summonfallen	mxl:summonvoidarchon	Summon Fallen	summons other monsters (Necromancer Summon Void Archon)
+summondarklings	mxl:summonvoidarchon	Summon Darklings	summons other monsters (Necromancer Summon Void Archon)
+summonsinner	mxl:summonvoidarchon	Summon Sinner	summons other monsters (Necromancer Summon Void Archon)
+summonbanemonster	mxl:summonvoidarchon	Summon Bane Monster	summons other monsters (Necromancer Summon Void Archon)
+summonshredder	mxl:summonvoidarchon	Summon Shredder	summons other monsters (Necromancer Summon Void Archon)
+summonoverlord	mxl:summonvoidarchon	Summon Overlord	summons other monsters (Necromancer Summon Void Archon)
+callhenchman	mxl:summonvoidarchon	Call Henchman	summons other monsters (Necromancer Summon Void Archon)
+callangelking	mxl:summonvoidarchon	Call Angel King Safe	summons other monsters (Necromancer Summon Void Archon)
+championsofthesun	mxl:summonvoidarchon	Champions of the Sun	summons other monsters (Necromancer Summon Void Archon)
+summondaystar	mxl:summonvoidarchon	Summon Daystar	summons other monsters (Necromancer Summon Void Archon)
+summonsirens	mxl:summonvoidarchon	Summon Sirens	summons other monsters (Necromancer Summon Void Archon)
+pet corpse on death	mxl:summonvoidarchon	Pet Corpse on Death	summons other monsters (Necromancer Summon Void Archon)
+callleprechaun	mxl:summonvoidarchon	Call Leprechaun	summons other monsters (Necromancer Summon Void Archon)
+chickenlickin	d2r:raven	Player Chickens	birds
+hawktalons	d2r:raven	Hawk Talons	birds
+other_ravenflight	d2r:raven	Other Raven Flight	birds
+atmgsentry	d2r:lightning sentry	ATMG Sentry	sentry or tower
+patriotsentry	d2r:lightning sentry	Patriot Sentry	sentry or tower
+guardtower	d2r:lightning sentry	TLGT, Guard Tower	sentry or tower
+other_typhoonsentry	d2r:lightning sentry	Other Typhoon Sentry	sentry or tower

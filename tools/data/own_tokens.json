@@ -1,0 +1,42 @@
+{
+ "_about": "Own monster tokens (tools/own_tokens.py, docs/legacy-graphics.md section 6). split: Median's rows leave a token D2R's art also uses for the token `new`, which neither D2R nor Median uses (make_plan refuses a token that has files). complete: a token of Median's own whose rows used to borrow a D2R monster's graphics for want of a COF; Median's art is kept and the missing modes / parts are filled.",
+ "tokens": [
+  {
+   "mode": "split",
+   "old": "e9",
+   "new": "KS",
+   "rows": ["slayer", "slayer2"],
+   "why": "Median's Slayer art is on D2R's e9 (Wake of Destruction / Inferno Sentry traps): E9NUHTH has 13 frames and E9S2HTH 14, D2R's animdata records say 2, so D2R's files had to stay and the Slayer drew D2R's trap."
+  },
+  {
+   "mode": "complete",
+   "token": "8@",
+   "rows": ["hornedgods"],
+   "drop_missing_layers": true,
+   "why": "Median ships no DT COF and no right-hand (rh) / S8 DCC for the Horned Gods; the row borrowed Andariel's AN."
+  },
+  {
+   "mode": "complete",
+   "token": "!4",
+   "rows": ["couatlfather1", "couatlfather2", "couatlfather3", "couatlfather_elite"],
+   "why": "Median ships no SC COF for the Couatl Fathers; the rows borrowed the Fallen's FA."
+  },
+  {
+   "mode": "complete",
+   "token": "ji",
+   "rows": ["dead3", "res_dead3"],
+   "fill_variants": true,
+   "drop_missing_layers": true,
+   "why": "Median ships no S1 / RN COF and only the lit look of the torso for the Risen Dead (JI); the rows borrowed D2R's zombie ZM."
+  },
+  {
+   "mode": "borrow",
+   "old": "CR",
+   "new": "HN",
+   "donor": "cr_archer1",
+   "weapons": ["bow"],
+   "rows": ["haunt_vasily", "haunt_esu", "haunt_fiaclagear", "haunt_amazon", "haunt_sorceress", "haunt_druid"],
+   "why": "Median ships no art for the Haunts' tokens AM / DZ / SO (player class codes); they borrowed D2R's Corrupt Rogue (CR, 1hs melee in classic, the archer cr_archer1 in HD), whose COFs have no SC: their MonBow (Sk1mode SC / TH) put them in a mode without an animation (bug #74). HN = D2R's CR bow art with the archer's monstats2 row; A2, BL and SC are filled from A1 / NU."
+  }
+ ]
+}

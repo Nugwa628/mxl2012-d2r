@@ -1,0 +1,79 @@
+name: Bug report
+description: "Something is wrong or missing compared to Median XL (for a crash, use the Crash form)."
+labels: ["needs-repro"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. First check [docs/unported.md](https://github.com/Nugwa628/mxl2012-d2r/blob/main/docs/unported.md): the
+        known gaps and approximations are listed there. Do not attach Blizzard game files.
+  - type: input
+    id: mod_version
+    attributes:
+      label: Mod version
+      description: Type `mxl` in the in-game console, or read it from the release name.
+      placeholder: "0.69.0"
+    validations:
+      required: true
+  - type: input
+    id: d2r_build
+    attributes:
+      label: D2R build
+      description: The mod targets build 93847.
+      placeholder: "93847"
+    validations:
+      required: true
+  - type: input
+    id: d2rloader_version
+    attributes:
+      label: D2RLoader version
+      placeholder: "1.3.1"
+    validations:
+      required: true
+  - type: input
+    id: launcher_version
+    attributes:
+      label: Downloader version
+      description: Leave empty if you did not use the downloader (or the old launcher).
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Install method
+      options:
+        - D2R-XL 2012 Downloader
+        - Manual 7z
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: What you saw. Add screenshots if they help (no Blizzard files).
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a new Barbarian on Normal
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected (what Median XL does)
+      description: How Median XL 2012 (v005) behaves in the same situation. A wiki link or a screenshot of the original is ideal.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: D2RLoader log
+      description: Drag in `d2rloader/logs/d2rloader.log` (and `mods/mxl2012/d2rloader/logs/mxl2012-core.log` if it exists) from your D2R folder.
+  - type: textarea
+    id: save
+    attributes:
+      label: Save file (optional)
+      description: A zip of the affected character's files (`.d2s`, `.d2i`, `.d2rl`) from the `mxl2012` save folder, only if the bug depends on the character. Remove other characters first.

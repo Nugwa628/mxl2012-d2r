@@ -1,0 +1,48 @@
+# Hand-picked HD stand-ins (lane hdfx2, 2026-10-29; docs/hd-effects.md section 9). tools/effects_hd.py applies a line to
+# every row of the art that D2R does not draw itself (class "hand"; an `exact` row keeps D2R's own effect). Picked from
+# offline side-by-sides: Median's classic frames against the classic art each D2R effect stands for.
+# Optional (lane picktint): tint = a colour ramp of tools/hd_recolour.py RAMPS (gold, green, red, fire, violet) mapped onto the
+# effect's colourful gradients, or `<ramp>:<gradient stem>+<stem>` for named (grey-ish) ones; rows = the only missile rows
+# (comma list) the line is for, which then wins even where D2R draws the art itself.
+# kind	art (as in data/hd-effects-map.tsv)	effect (missile model / overlay folder/name)	scale (auto = by art size)	confidence	reason	tint	rows
+kind	art	effect	scale	confidence	reason	tint	rows
+missile	boneghosttrail	yellow_ball_glow_2	auto	high	small pulsing golden glow (arrow trail of Ghost Arrow, Barrage, Great Hunt...); was a fiery exploding-arrow burst
+missile	bonfire	ground_fire_small	auto	high	burning log pile on the ground; was a falling Armageddon meteor
+missile	doomsmoke	fire_smoke	auto	high	grey smoke wisps; was a meteor's fire trail
+missile	extra/cursehit	teethexplode	auto	medium	small star flash (Hammerstrike); was a meteor's fire trail. Colour stays pale (red in classic)
+missile	extra/cursemissle	firebolt	auto	medium	bright star with an orange flame tail (Bear Claw, Stampede, Rebound); was a green poison skull
+missile	extra/explodingarrowdebris01	ceiling_chunk_vanish_02	auto	high	faint grey rock dust spreading on the ground (Shower of Rocks); was a blue bone-cast spark. Same pick as debris02
+missile	extra/explodingarrowdebris03	ceiling_chunk_vanish_02	auto	high	faint grey rock dust (Pummel); was a fiery exploding-arrow burst. Same pick as debris02
+missile	elemental	ground_fire_medium	auto	medium	upright fire figure (Elemental); was a rolling molten boulder
+missile	expansion/moltenfragmentd	meteor	auto	high	small glowing rock chunk, same size as the meteor rock (Aerials Disaster); was a lava puddle / a shuriken
+missile	extra/shamanhealmissile01	yellow_ball_glow_2	auto	high	golden glow ball (Holy Trap Advanced); was a skeleton rising from a blood pool
+missile	focusgreen	expansion_catapultpoisonbomb	auto	medium	green star burst with sparkles; was a blue-white lightning strike (weak stand-in)
+missile	gore20	sand_maggot_dirt_pile	auto	low	flat brown dirt patch on the ground (Miasma); was a fiery exploding-arrow burst. No D2R ground-gore effect
+missile	greenflash	teethexplode	auto	medium	white flash that opens into a ring (Searing Light); was a fiery exploding-arrow burst
+missile	lightandshadowstrike	lightningstrike	auto	high	the art is Lightning Strike's bolt in gold (Judgement): the travelling Lightning Strike bolt in a gold ramp (its flat white core gradients too, else the bolt stays white); lightning_strike (Lightning's hit, bug #481) hung below the target	gold:T_FX_LightBlue_Gradient_02+T_FX_Max_Grad_01+T_FX_LinearGradient_Inset_portal_carpet_Flip
+missile	lightningexplosion	bighead_lightning_explosion	auto	medium	lightning burst spreading from a centre (Stormblast); was a vertical lightning column
+missile	biglightning	bighead_lightning_missile	auto	medium	tangled ball of lightning (Psionic skills); was a vertical lightning column
+missile	littleredball	expansion_imp_fireball	auto	medium	small red glowing ball; one row had a meteor rock. Now every row takes the imp fireball
+missile	lorenado	expansion_tornado	auto	high	the art is Tornado's frames in green (Lorenado); was a green orb. Its brown dust ramp is mapped onto green (bug #482)	green:T_FX_Brown_Dust_Gradient_03
+missile	flipbook	yellow_ball_glow_2	2	medium	Lorenado's 80 flying books: classic shows each as a green glow (the row's green light, bug #482); a glow ball in a green ramp. Was a lightning column, then a few debris bits	green
+missile	scimitar6	expansion_bladefury	auto	medium	small spinning blade (Bladestorm); was a lightning column
+missile	sparklez1	dopplezon_explode	auto	medium	scattered red sparkles (Mythal); was a big red Diablo lightning bolt
+missile	sparklez2	expansion_impmissile_01	auto	medium	red star burst; was a blue lightning strike
+missile	tinyflame	ground_fire_small	auto	high	small flame on the ground (Colosseum); was a flat lava puddle
+missile	discoball	yellow_ball_glow_2	auto	medium	small glowing orb (its colour cycles in classic); was a flying skull (weak stand-in)
+missile	psiorb	ice_orb	auto	medium	blue glowing sphere (Bionetic Slam); was a scatter of sparkles
+missile	psiorbexplode	bighead_lightning_explosion	auto	medium	blue sphere bursting with lightning (Bionetic Slam); was a fiery exploding-arrow burst (weak stand-in)
+missile	swarmhovers	poison_sparks	auto	low	faint specks hovering over an area (Swarm, a poison skill); was a bright blue nova glow (weak stand-in)
+missile	laughingghost	expansion_baaldeathghostie_01	auto	medium	a flying ghost (Laughing Ghost); was a thrown rock
+missile	expansion/deathsentrymissile	expansion_throwing_star_missile	auto	high	small spinning shuriken (Fairy Ring); was a flying skull
+missile	extra/missileflamesword	fire_arrow	auto	high	small flaming blade, the size of a fire arrow; one row (Pillar of Faith) had the Fire Nova burst
+missile	extra/spikefiendmamamissle	spike_fiend_missle	auto	high	a flying quill (Quill Storm); was a plain arrow. D2R's spike fiend quill is the same kind
+overlay	mooncast	necro/cast_familiar	auto	high	white sparkle cast flash (Magic Missiles and most druid / necromancer casts); was the warlock's orange fire cast
+overlay	slayercloud	monster/fetishdeath_2	auto	medium	grey smoke cloud (Slayer, Dark King); was the druid's orange fire cast
+overlay	poisondark	common/poisonhit	auto	medium	green-yellow poison cloud (Miasma); was the Confuse curse's sparkles
+overlay	expansion/steamthick_a	common/ice_explode	auto	low	pale cyan cloud; was a psychic hammer flash (weak stand-in)
+overlay	extra/frogsplash	monster/vulturedemonfeathers	auto	medium	grey splash of small bits; was an orange fire burst (weak stand-in)
+overlay	extra/necromindrecieve	common/shrine_mana_regen	auto	medium	soft blue glow over the target; was a lightning hit spark (weak stand-in)
+overlay	firecrown	common/shrine_mana_regen	0.6	low	small soft blue glow over the head (Bane Hunter, bug #492); was the Holy Shock lightning, an animated crackle that flickered in HD. Median draws one still frame, a dim blue ring
+missile	teethexplodered	yellow_ball_glow_2	auto	medium	red star flash (the trail of Magic Missiles and the magic bolts, bug #483); Teeth's effect has no colour ramp, so a glow ball in a red ramp	red
+missile	teethexplode	yellow_ball_glow_2	1	medium	the magic missiles' own body: classic draws only Teeth's first two frames, a small dot inside the red trail; D2R's Teeth burst made them white-blue (bug #483). Red glow ball	red	magicmissile,magicbolt,monmagicmissile,monmagicbolt,mon2magicmissile,mon2magicbolt,nerfedmagicmissile,nerfedmagicbolt,newmmwave,newmmhit

@@ -1,0 +1,39 @@
+// Version info and the application manifest (common controls v6, per-monitor DPI, long paths, asInvoker: the
+// downloader never asks for administrator rights).
+// No SDK headers (like plugin/src/mxl2012_core.rc): CI compiles this with llvm-rc on Linux, so the constants are written out.
+
+1 24 "launcher.manifest"  // 24 = RT_MANIFEST
+
+// Downloader art (ART.md), plus embedded fonts (NOTICE.md). Ids: the
+// Res* enum in src/win/window.cpp. 10 = RT_RCDATA.
+1 ICON "icon.ico"
+101 10 "background.png"
+103 10 "popup-window.png"
+104 10 "exocet.ttf"
+105 10 "RobotoCondensed.ttf"
+106 10 "comment.svg"
+
+1 VERSIONINFO  // 1 = VS_VERSION_INFO
+ FILEVERSION MXL_LV_NUM  // from app.h through CMakeLists.txt
+ PRODUCTVERSION MXL_LV_NUM
+ FILEOS 0x40004  // VOS_NT_WINDOWS32
+ FILETYPE 0x1  // VFT_APP
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904b0"
+		BEGIN
+			VALUE "CompanyName", "mxl2012-d2r"
+			VALUE "FileDescription", "D2R-XL 2012 Downloader"
+			VALUE "FileVersion", MXL_LV_STR
+			VALUE "ProductName", "mxl2012"
+			VALUE "ProductVersion", MXL_LV_STR
+			VALUE "LegalCopyright", "D2R-XL 2012, a port of Median XL 2012 by Brother Laz. Diablo II by Blizzard Entertainment."
+			VALUE "OriginalFilename", "D2R-XL-2012-Downloader.exe"
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1200
+	END
+END

@@ -1,0 +1,14 @@
+{
+  "version": "1",
+  "tag": "assets-1",
+  "file": "assets-1.zip",
+  "format": "zip",
+  "size": 151094751,
+  "sha256": "7ad1b448d0ed00305a4aa139c20fdf75cbcc05b362c9cc8c9ae21be9e14c2246",
+  "manifest_sha256": "63618be932c1fb1e39ae2d70c1ffeb234b0a763a0f61118001e7ede514cc4fa3",
+  "files": 2364,
+  "bytes": 224050707,
+  "urls": [
+    "https://git.werdegames.com/WerdeGames/mxl2012-assets/releases/download/assets-1/assets-1.zip"
+  ]
+}

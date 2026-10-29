@@ -1,0 +1,42 @@
+{
+ "files": [
+  {
+   "path": "d2rloader/metadata.json",
+   "size": 21,
+   "sha256": "60b085f30419fd596a37b82180d853c427074ec82b32b2d3eb1ab36af8a3a7b4"
+  },
+  {
+   "path": "d2rloader/plugins/mxl2012-core.dll",
+   "size": 61024,
+   "sha256": "4a6b0dbb692f87878a9bbae444b8b007009582915e46b500ff98ecb2e0fc5a5c"
+  },
+  {
+   "path": "modinfo.json",
+   "size": 29,
+   "sha256": "86149d68ffae0ecee3eb2aff0097c626538178e44a602c9f473f76eda209d821"
+  },
+  {
+   "path": "mxl2012.mpq/data/empty.txt",
+   "size": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "mxl2012.mpq/data/global/excel/big.txt",
+   "size": 6558490,
+   "sha256": "49999bac67cbcd91e2a0057c370e6c76f81590d5fb7d8860e17d34ff1743ab03"
+  },
+  {
+   "path": "mxl2012.mpq/data/global/excel/small.txt",
+   "size": 8,
+   "sha256": "8db4d84da82d0020646ed808dff19ce516a74a948820cc5cdbbe1ce69c7e037d"
+  },
+  {
+   "path": "mxl2012.mpq/modinfo.json",
+   "size": 49,
+   "sha256": "8919e1fed53ac4d100f20e559aaa32cf6f635a4b4e17bb3dd8f42f21db03f6ed"
+  }
+ ],
+ "emptyDirs": [
+  "d2rloader/patches"
+ ]
+}

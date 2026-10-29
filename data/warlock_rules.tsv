@@ -1,0 +1,367 @@
+skill	table	row	column	d2r	new
+Summon Goatman	skilldesc	summon goatman	desccalca3	clc1	((1+(pst6/256))*(100+clc1))/100
+Summon Goatman	skilldesc	summon goatman	descline3	13	3
+Summon Goatman	skilldesc	summon goatman	desctexta3	StrSkill42	mxl2012:DescPainless
+Summon Goatman	skilldesc	summon goatman	desctextb3		mxl2012:DescHitPointz
+Summon Goatman	skilldesc	summon goatman	dsc2calca5		blvl
+Summon Goatman	skilldesc	summon goatman	dsc2calcb5		max((min((2+(ulvl/6)),20)),2)+stat('skill_more'.accr)
+Summon Goatman	skilldesc	summon goatman	dsc2line5		73
+Summon Goatman	skilldesc	summon goatman	dsc2texta5		mxl2012:DescMaxLevel2
+Summon Goatman	skilldesc	summon goatman	dsc2textb5		ModStre9c
+Summon Goatman	skills	Summon Goatman	passivecalc6		(((pa15+((lvl-1)*pa16))*256)*(100+(ulvl/2)))/100
+Summon Goatman	skills	Summon Goatman	passivecalc9	ln34	min(edmx,2000)
+Summon Goatman	skills	Summon Goatman	passivestat6		maxhp
+Summon Goatman	skills	Summon Goatman	skpoints		((ulvl)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Demonic Mastery	skilldesc	demonic mastery	dsc2calca5		blvl
+Demonic Mastery	skilldesc	demonic mastery	dsc2calcb5		max((min((2+(ulvl/6)),20)),2)+stat('skill_more'.accr)
+Demonic Mastery	skilldesc	demonic mastery	dsc2line5		73
+Demonic Mastery	skilldesc	demonic mastery	dsc2texta5		mxl2012:DescMaxLevel2
+Demonic Mastery	skilldesc	demonic mastery	dsc2textb5		ModStre9c
+Demonic Mastery	skills	Demonic Mastery	skpoints		((ulvl)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Death Mark	skilldesc	death mark	dsc2calca5		blvl
+Death Mark	skilldesc	death mark	dsc2calcb5		max((min((2+((ulvl-6)/6)),20)),2)+stat('skill_more'.accr)
+Death Mark	skilldesc	death mark	dsc2line5		73
+Death Mark	skilldesc	death mark	dsc2texta5		mxl2012:DescMaxLevel2
+Death Mark	skilldesc	death mark	dsc2textb5		ModStre9c
+Death Mark	skills	Death Mark	skpoints		((ulvl-6)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Summon Tainted	skilldesc	summon tainted	desccalca3	clc1	((1+(pst5/256))*(100+clc1))/100
+Summon Tainted	skilldesc	summon tainted	descline3	13	3
+Summon Tainted	skilldesc	summon tainted	desctexta3	StrSkill42	mxl2012:DescPainless
+Summon Tainted	skilldesc	summon tainted	desctextb3		mxl2012:DescHitPointz
+Summon Tainted	skilldesc	summon tainted	dsc2calca5		blvl
+Summon Tainted	skilldesc	summon tainted	dsc2calcb5		max((min((2+((ulvl-12)/6)),20)),2)+stat('skill_more'.accr)
+Summon Tainted	skilldesc	summon tainted	dsc2line5		73
+Summon Tainted	skilldesc	summon tainted	dsc2texta5		mxl2012:DescMaxLevel2
+Summon Tainted	skilldesc	summon tainted	dsc2textb5		ModStre9c
+Summon Tainted	skills	Summon Tainted	passivecalc5		(((pa15+((lvl-1)*pa16))*256)*(100+(ulvl/2)))/100
+Summon Tainted	skills	Summon Tainted	passivestat5		maxhp
+Summon Tainted	skills	Summon Tainted	skpoints		((ulvl-12)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Summon Defiler	skilldesc	summon defiler	desccalca3	clc1	((1+(pst5/256))*(100+clc1))/100
+Summon Defiler	skilldesc	summon defiler	desccalca6		((1+pst8)*(100+pst2))/100
+Summon Defiler	skilldesc	summon defiler	desccalcb6		((6+pst8)*(100+pst2))/100
+Summon Defiler	skilldesc	summon defiler	descline3	13	3
+Summon Defiler	skilldesc	summon defiler	descline6		75
+Summon Defiler	skilldesc	summon defiler	desctexta3	StrSkill42	mxl2012:DescPainless
+Summon Defiler	skilldesc	summon defiler	desctexta6		StrSkill4
+Summon Defiler	skilldesc	summon defiler	desctextb3		mxl2012:DescHitPointz
+Summon Defiler	skilldesc	summon defiler	dsc2calca5		blvl
+Summon Defiler	skilldesc	summon defiler	dsc2calcb5		max((min((2+((ulvl-18)/6)),19)),2)+stat('skill_more'.accr)
+Summon Defiler	skilldesc	summon defiler	dsc2line5		73
+Summon Defiler	skilldesc	summon defiler	dsc2texta5		mxl2012:DescMaxLevel2
+Summon Defiler	skilldesc	summon defiler	dsc2textb5		ModStre9c
+Summon Defiler	skills	Summon Defiler	passivecalc5		(((pa15+((lvl-1)*pa16))*256)*(100+(ulvl/2)))/100
+Summon Defiler	skills	Summon Defiler	passivecalc8		min(edmx,4000)
+Summon Defiler	skills	Summon Defiler	passivestat5		maxhp
+Summon Defiler	skills	Summon Defiler	passivestat8		item_normaldamage
+Summon Defiler	skills	Summon Defiler	skpoints		((ulvl-18)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Blood Oath	skilldesc	blood oath	dsc2calca5		blvl
+Blood Oath	skilldesc	blood oath	dsc2calcb5		max((min((2+((ulvl-6)/6)),20)),2)+stat('skill_more'.accr)
+Blood Oath	skilldesc	blood oath	dsc2line5		73
+Blood Oath	skilldesc	blood oath	dsc2texta5		mxl2012:DescMaxLevel2
+Blood Oath	skilldesc	blood oath	dsc2textb5		ModStre9c
+Blood Oath	skills	Blood Oath	skpoints		((ulvl-6)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Engorge	skilldesc	engorge	dsc2calca5		blvl
+Engorge	skilldesc	engorge	dsc2calcb5		max((min((2+((ulvl-24)/6)),18)),2)+stat('skill_more'.accr)
+Engorge	skilldesc	engorge	dsc2line5		73
+Engorge	skilldesc	engorge	dsc2texta5		mxl2012:DescMaxLevel2
+Engorge	skilldesc	engorge	dsc2textb5		ModStre9c
+Engorge	skills	Engorge	skpoints		((ulvl-24)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Blood Boil	skilldesc	blood boil	dsc2calca5		blvl
+Blood Boil	skilldesc	blood boil	dsc2calcb5		max((min((2+((ulvl-18)/6)),19)),2)+stat('skill_more'.accr)
+Blood Boil	skilldesc	blood boil	dsc2line5		73
+Blood Boil	skilldesc	blood boil	dsc2texta5		mxl2012:DescMaxLevel2
+Blood Boil	skilldesc	blood boil	dsc2textb5		ModStre9c
+Blood Boil	skilldesc	blood boil	dsc3calca2	par8	
+Blood Boil	skilldesc	blood boil	dsc3calca3	par8	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Blood Boil	skilldesc	blood boil	dsc3calcb2	 	
+Blood Boil	skilldesc	blood boil	dsc3line2	76	65
+Blood Boil	skilldesc	blood boil	dsc3line3	76	67
+Blood Boil	skilldesc	blood boil	dsc3texta2	Firedplev	mxl2012:strchrenghard
+Blood Boil	skilldesc	blood boil	dsc3texta3	Damplev	mxl2012:DescCurrentSyn
+Blood Boil	skilldesc	blood boil	dsc3textb2	BloodOathName	mxl2012:DescFireSyn
+Blood Boil	skilldesc	blood boil	dsc3textb3	EngorgeName	mxl2012:DescPctNoS
+Blood Boil	skills	Blood Boil	DmgSymPerCalc	(skill('Engorge'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Blood Boil	skills	Blood Boil	EDmgSymPerCalc	(skill('Blood Oath'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Blood Boil	skills	Blood Boil	HitShift	8	4
+Blood Boil	skills	Blood Boil	skpoints		((ulvl-18)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Consume	skilldesc	consume	dsc2calca5		blvl
+Consume	skilldesc	consume	dsc2calcb5		max((min((2+((ulvl-30)/6)),17)),2)+stat('skill_more'.accr)
+Consume	skilldesc	consume	dsc2line5		73
+Consume	skilldesc	consume	dsc2texta5		mxl2012:DescMaxLevel2
+Consume	skilldesc	consume	dsc2textb5		ModStre9c
+Consume	skills	Consume	skpoints		((ulvl-30)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Bind Demon	skilldesc	bind demon	dsc2calca5		blvl
+Bind Demon	skilldesc	bind demon	dsc2calcb5		max((min((2+((ulvl-30)/6)),17)),2)+stat('skill_more'.accr)
+Bind Demon	skilldesc	bind demon	dsc2line5		73
+Bind Demon	skilldesc	bind demon	dsc2texta5		mxl2012:DescMaxLevel2
+Bind Demon	skilldesc	bind demon	dsc2textb5		ModStre9c
+Bind Demon	skills	Bind Demon	skpoints		((ulvl-30)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Levitate	skilldesc	levitate	dsc2calca5		blvl
+Levitate	skilldesc	levitate	dsc2calcb5		max((min((2+(ulvl/6)),20)),2)+stat('skill_more'.accr)
+Levitate	skilldesc	levitate	dsc2line5		73
+Levitate	skilldesc	levitate	dsc2texta5		mxl2012:DescMaxLevel2
+Levitate	skilldesc	levitate	dsc2textb5		ModStre9c
+Levitate	skills	Levitate	skpoints		((ulvl)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Eldritch Blast	skilldesc	eldritchblast	dsc2calca5		blvl
+Eldritch Blast	skilldesc	eldritchblast	dsc2calcb5		max((min((2+((ulvl-24)/6)),18)),2)+stat('skill_more'.accr)
+Eldritch Blast	skilldesc	eldritchblast	dsc2line5		73
+Eldritch Blast	skilldesc	eldritchblast	dsc2texta5		mxl2012:DescMaxLevel2
+Eldritch Blast	skilldesc	eldritchblast	dsc2textb5		ModStre9c
+Eldritch Blast	skilldesc	eldritchblast	dsc3calca2	par8	
+Eldritch Blast	skilldesc	eldritchblast	dsc3calca3	par8	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Eldritch Blast	skilldesc	eldritchblast	dsc3line2	76	65
+Eldritch Blast	skilldesc	eldritchblast	dsc3line3	76	67
+Eldritch Blast	skilldesc	eldritchblast	dsc3texta2	Magdplev	mxl2012:strchrenghard
+Eldritch Blast	skilldesc	eldritchblast	dsc3texta3	Magdplev	mxl2012:DescCurrentSyn
+Eldritch Blast	skilldesc	eldritchblast	dsc3textb2	PurgeHexName	mxl2012:DescMagSyn
+Eldritch Blast	skilldesc	eldritchblast	dsc3textb3	BladeWarpName	mxl2012:DescPctNoS
+Eldritch Blast	skills	Eldritch Blast	EDmgSymPerCalc	(skill('Blade Warp'.blvl)+skill('Hex Purge'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Eldritch Blast	skills	Eldritch Blast	HitShift	8	4
+Eldritch Blast	skills	Eldritch Blast	skpoints		((ulvl-24)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Hex Bane	skilldesc	hex bane	dsc2calca5		blvl
+Hex Bane	skilldesc	hex bane	dsc2calcb5		max((min((2+(ulvl/6)),20)),2)+stat('skill_more'.accr)
+Hex Bane	skilldesc	hex bane	dsc2line5		73
+Hex Bane	skilldesc	hex bane	dsc2texta5		mxl2012:DescMaxLevel2
+Hex Bane	skilldesc	hex bane	dsc2textb5		ModStre9c
+Hex Bane	skilldesc	hex bane	dsc3calca2	pa10	par9
+Hex Bane	skilldesc	hex bane	dsc3calca3	pa10	
+Hex Bane	skilldesc	hex bane	dsc3calca4	pa10	
+Hex Bane	skilldesc	hex bane	dsc3calca6	par9	
+Hex Bane	skilldesc	hex bane	dsc3calcb2		25
+Hex Bane	skilldesc	hex bane	dsc3calcb6	25	
+Hex Bane	skilldesc	hex bane	dsc3line2	76	79
+Hex Bane	skilldesc	hex bane	dsc3line3	76	
+Hex Bane	skilldesc	hex bane	dsc3line4	76	
+Hex Bane	skilldesc	hex bane	dsc3line6	79	
+Hex Bane	skilldesc	hex bane	dsc3texta2	Magdplev	SynEnemyHexDuration
+Hex Bane	skilldesc	hex bane	dsc3texta3	Magdplev	
+Hex Bane	skilldesc	hex bane	dsc3texta4	Magdplev	
+Hex Bane	skilldesc	hex bane	dsc3texta6	SynEnemyHexDuration	
+Hex Bane	skilldesc	hex bane	dsc3textb2	MirroredBladesName	EldritchBlastName
+Hex Bane	skilldesc	hex bane	dsc3textb3	PurgeHexName	
+Hex Bane	skilldesc	hex bane	dsc3textb4	ConsumeName	
+Hex Bane	skilldesc	hex bane	dsc3textb6	EldritchBlastName	
+Hex Bane	skills	Hex Bane	EDmgSymPerCalc	(skill('Consume'.blvl)*pa10)+(skill('Hex Purge'.blvl)*pa10)+(skill('Mirrored Blades'.blvl)*pa10)	10*ulvl
+Hex Bane	skills	Hex Bane	skpoints		((ulvl)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Hex Siphon	skilldesc	hex siphon	dsc2calca5		blvl
+Hex Siphon	skilldesc	hex siphon	dsc2calcb5		max((min((2+((ulvl-24)/6)),18)),2)+stat('skill_more'.accr)
+Hex Siphon	skilldesc	hex siphon	dsc2line5		73
+Hex Siphon	skilldesc	hex siphon	dsc2texta5		mxl2012:DescMaxLevel2
+Hex Siphon	skilldesc	hex siphon	dsc2textb5		ModStre9c
+Hex Siphon	skills	Hex Siphon	skpoints		((ulvl-24)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Psychic Ward	skilldesc	psychic ward	dsc2calca5		blvl
+Psychic Ward	skilldesc	psychic ward	dsc2calcb5		max((min((2+((ulvl-18)/6)),19)),2)+stat('skill_more'.accr)
+Psychic Ward	skilldesc	psychic ward	dsc2line5		73
+Psychic Ward	skilldesc	psychic ward	dsc2texta5		mxl2012:DescMaxLevel2
+Psychic Ward	skilldesc	psychic ward	dsc2textb5		ModStre9c
+Psychic Ward	skills	Psychic Ward	skpoints		((ulvl-18)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Echoing Strike	skilldesc	echoing strike	dsc2calca5		blvl
+Echoing Strike	skilldesc	echoing strike	dsc2calcb5		max((min((2+((ulvl-12)/6)),20)),2)+stat('skill_more'.accr)
+Echoing Strike	skilldesc	echoing strike	dsc2line5		73
+Echoing Strike	skilldesc	echoing strike	dsc2texta5		mxl2012:DescMaxLevel2
+Echoing Strike	skilldesc	echoing strike	dsc2textb5		ModStre9c
+Echoing Strike	skilldesc	echoing strike	dsc3calca3	par9	
+Echoing Strike	skilldesc	echoing strike	dsc3calca4	par9	
+Echoing Strike	skilldesc	echoing strike	dsc3line3	76	
+Echoing Strike	skilldesc	echoing strike	dsc3line4	76	
+Echoing Strike	skilldesc	echoing strike	dsc3texta3	Damplev	
+Echoing Strike	skilldesc	echoing strike	dsc3texta4	Damplev	
+Echoing Strike	skilldesc	echoing strike	dsc3textb3	MirroredBladesName	
+Echoing Strike	skilldesc	echoing strike	dsc3textb4	BladeWarpName	
+Echoing Strike	skills	Echoing Strike	DmgSymPerCalc	(skill('Mirrored Blades'.blvl)+skill('Blade Warp'.blvl))*par8	10*ulvl
+Echoing Strike	skills	Echoing Strike	skpoints		((ulvl-12)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Hex Purge	skilldesc	hex purge	dsc2calca5		blvl
+Hex Purge	skilldesc	hex purge	dsc2calcb5		max((min((2+((ulvl-12)/6)),20)),2)+stat('skill_more'.accr)
+Hex Purge	skilldesc	hex purge	dsc2line5		73
+Hex Purge	skilldesc	hex purge	dsc2texta5		mxl2012:DescMaxLevel2
+Hex Purge	skilldesc	hex purge	dsc2textb5		ModStre9c
+Hex Purge	skilldesc	hex purge	dsc3calca2	par9	(pa10/100)
+Hex Purge	skilldesc	hex purge	dsc3calca3	par9	par2
+Hex Purge	skilldesc	hex purge	dsc3calca4	(pa10/100)	
+Hex Purge	skilldesc	hex purge	dsc3calca5	par2	
+Hex Purge	skilldesc	hex purge	dsc3calcb3		25
+Hex Purge	skilldesc	hex purge	dsc3calcb5	25	
+Hex Purge	skilldesc	hex purge	dsc3line3	76	79
+Hex Purge	skilldesc	hex purge	dsc3line4	76	
+Hex Purge	skilldesc	hex purge	dsc3line5	79	
+Hex Purge	skilldesc	hex purge	dsc3texta2	Magdplev	SynHexPurgeChanceToErupt
+Hex Purge	skilldesc	hex purge	dsc3texta3	Magdplev	SynEnemyHexDuration
+Hex Purge	skilldesc	hex purge	dsc3texta4	SynHexPurgeChanceToErupt	
+Hex Purge	skilldesc	hex purge	dsc3texta5	SynEnemyHexDuration	
+Hex Purge	skilldesc	hex purge	dsc3textb2	BaneHexName	DeathSigilName
+Hex Purge	skilldesc	hex purge	dsc3textb4	DeathSigilName	
+Hex Purge	skilldesc	hex purge	dsc3textb5	EldritchBlastName	
+Hex Purge	skills	Hex Purge	EDmgSymPerCalc	(skill('Hex Bane'.blvl)+skill('Eldritch Blast'.blvl))*par9	10*ulvl
+Hex Purge	skills	Hex Purge	skpoints		((ulvl-12)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Blade Warp	skilldesc	blade warp	dsc2calca5		blvl
+Blade Warp	skilldesc	blade warp	dsc2calcb5		max((min((2+((ulvl-18)/6)),19)),2)+stat('skill_more'.accr)
+Blade Warp	skilldesc	blade warp	dsc2line5		73
+Blade Warp	skilldesc	blade warp	dsc2texta5		mxl2012:DescMaxLevel2
+Blade Warp	skilldesc	blade warp	dsc2textb5		ModStre9c
+Blade Warp	skilldesc	blade warp	dsc3calca1	2	
+Blade Warp	skilldesc	blade warp	dsc3calca2	par8	
+Blade Warp	skilldesc	blade warp	dsc3calca3	par8	
+Blade Warp	skilldesc	blade warp	dsc3line1	40	
+Blade Warp	skilldesc	blade warp	dsc3line2	76	
+Blade Warp	skilldesc	blade warp	dsc3line3	76	
+Blade Warp	skilldesc	blade warp	dsc3texta1	Sksyn	
+Blade Warp	skilldesc	blade warp	dsc3texta2	Magdplev	
+Blade Warp	skilldesc	blade warp	dsc3texta3	Magdplev	
+Blade Warp	skilldesc	blade warp	dsc3textb1	BladeWarpName	
+Blade Warp	skilldesc	blade warp	dsc3textb2	MirroredBladesName	
+Blade Warp	skilldesc	blade warp	dsc3textb3	EchoingStrikeName	
+Blade Warp	skills	Blade Warp	EDmgSymPerCalc	(skill('Echoing Strike'.blvl)+skill('Mirrored Blades'.blvl))*par8	10*ulvl
+Blade Warp	skills	Blade Warp	skpoints		((ulvl-18)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Cleave	skilldesc	cleave	desccalca2		clc2
+Cleave	skilldesc	cleave	descline2		74
+Cleave	skilldesc	cleave	desctexta2		StrSkillDamageFlat
+Cleave	skilldesc	cleave	dsc2calca5		blvl
+Cleave	skilldesc	cleave	dsc2calcb5		max((min((2+((ulvl-6)/6)),20)),2)+stat('skill_more'.accr)
+Cleave	skilldesc	cleave	dsc2line5		73
+Cleave	skilldesc	cleave	dsc2texta5		mxl2012:DescMaxLevel2
+Cleave	skilldesc	cleave	dsc2textb5		ModStre9c
+Cleave	skills	Cleave	calc2	0	((pa13+((lvl-1)*pa14))*(100+(10*ulvl)))/100
+Cleave	skills	Cleave	skpoints		((ulvl-6)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Mirrored Blades	skilldesc	mirrored blades	desccalca2		enma
+Mirrored Blades	skilldesc	mirrored blades	desccalcb2		exma
+Mirrored Blades	skilldesc	mirrored blades	descline2		75
+Mirrored Blades	skilldesc	mirrored blades	desctexta2		StrSkill39
+Mirrored Blades	skilldesc	mirrored blades	dsc2calca5		blvl
+Mirrored Blades	skilldesc	mirrored blades	dsc2calcb5		max((min((2+((ulvl-30)/6)),17)),2)+stat('skill_more'.accr)
+Mirrored Blades	skilldesc	mirrored blades	dsc2line5		73
+Mirrored Blades	skilldesc	mirrored blades	dsc2texta5		mxl2012:DescMaxLevel2
+Mirrored Blades	skilldesc	mirrored blades	dsc2textb5		ModStre9c
+Mirrored Blades	skills	Mirrored Blades	EDmgSymPerCalc		10*ulvl
+Mirrored Blades	skills	Mirrored Blades	EType		mag
+Mirrored Blades	skills	Mirrored Blades	skpoints		((ulvl-30)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Sigil Lethargy	skilldesc	sigil lethargy	dsc2calca5		blvl
+Sigil Lethargy	skilldesc	sigil lethargy	dsc2calcb5		max((min((2+((ulvl-6)/6)),20)),2)+stat('skill_more'.accr)
+Sigil Lethargy	skilldesc	sigil lethargy	dsc2line5		73
+Sigil Lethargy	skilldesc	sigil lethargy	dsc2texta5		mxl2012:DescMaxLevel2
+Sigil Lethargy	skilldesc	sigil lethargy	dsc2textb5		ModStre9c
+Sigil Lethargy	skills	Sigil Lethargy	skpoints		((ulvl-6)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Ring of Fire	skilldesc	ring of fire	dsc2calca5		blvl
+Ring of Fire	skilldesc	ring of fire	dsc2calcb5		max((min((2+((ulvl-6)/6)),20)),2)+stat('skill_more'.accr)
+Ring of Fire	skilldesc	ring of fire	dsc2line5		73
+Ring of Fire	skilldesc	ring of fire	dsc2texta5		mxl2012:DescMaxLevel2
+Ring of Fire	skilldesc	ring of fire	dsc2textb5		ModStre9c
+Ring of Fire	skilldesc	ring of fire	dsc3calca2	par8	
+Ring of Fire	skilldesc	ring of fire	dsc3calca3	par8	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Ring of Fire	skilldesc	ring of fire	dsc3line2	76	65
+Ring of Fire	skilldesc	ring of fire	dsc3line3	76	67
+Ring of Fire	skilldesc	ring of fire	dsc3texta2	Firedplev	mxl2012:strchrenghard
+Ring of Fire	skilldesc	ring of fire	dsc3texta3	Firedplev	mxl2012:DescCurrentSyn
+Ring of Fire	skilldesc	ring of fire	dsc3textb2	FlameWaveName	mxl2012:DescFireSyn
+Ring of Fire	skilldesc	ring of fire	dsc3textb3	ApocalypseName	mxl2012:DescPctNoS
+Ring of Fire	skills	Ring of Fire	EDmgSymPerCalc	(skill('Flame Wave'.blvl)+skill('Apocalypse'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Ring of Fire	skills	Ring of Fire	HitShift	8	4
+Ring of Fire	skills	Ring of Fire	skpoints		((ulvl-6)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Miasma Bolt	skilldesc	miasma bolt	dsc2calca5		blvl
+Miasma Bolt	skilldesc	miasma bolt	dsc2calcb5		max((min((2+(ulvl/6)),20)),2)+stat('skill_more'.accr)
+Miasma Bolt	skilldesc	miasma bolt	dsc2line5		73
+Miasma Bolt	skilldesc	miasma bolt	dsc2texta5		mxl2012:DescMaxLevel2
+Miasma Bolt	skilldesc	miasma bolt	dsc2textb5		ModStre9c
+Miasma Bolt	skilldesc	miasma bolt	dsc3calca2	par8	
+Miasma Bolt	skilldesc	miasma bolt	dsc3calca3	par9	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Miasma Bolt	skilldesc	miasma bolt	dsc3calca4	par8	par9
+Miasma Bolt	skilldesc	miasma bolt	dsc3line2	76	65
+Miasma Bolt	skilldesc	miasma bolt	dsc3line3	76	67
+Miasma Bolt	skilldesc	miasma bolt	dsc3texta2	Magdplev	mxl2012:strchrenghard
+Miasma Bolt	skilldesc	miasma bolt	dsc3texta3	AMDImm	mxl2012:DescCurrentSyn
+Miasma Bolt	skilldesc	miasma bolt	dsc3texta4	Magdplev	AMDImm
+Miasma Bolt	skilldesc	miasma bolt	dsc3textb2	MiasmaChainName	mxl2012:DescMagSyn
+Miasma Bolt	skilldesc	miasma bolt	dsc3textb3	MiasmaChainName	mxl2012:DescPctNoS
+Miasma Bolt	skilldesc	miasma bolt	dsc3textb4	AbyssName	MiasmaChainName
+Miasma Bolt	skills	Miasma Bolt	EDmgSymPerCalc	(skill('Miasma Chains'.blvl)+skill('Abyss'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Miasma Bolt	skills	Miasma Bolt	HitShift	7	4
+Miasma Bolt	skills	Miasma Bolt	skpoints		((ulvl)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Sigil Rancor	skilldesc	sigil rancor	dsc2calca5		blvl
+Sigil Rancor	skilldesc	sigil rancor	dsc2calcb5		max((min((2+((ulvl-12)/6)),20)),2)+stat('skill_more'.accr)
+Sigil Rancor	skilldesc	sigil rancor	dsc2line5		73
+Sigil Rancor	skilldesc	sigil rancor	dsc2texta5		mxl2012:DescMaxLevel2
+Sigil Rancor	skilldesc	sigil rancor	dsc2textb5		ModStre9c
+Sigil Rancor	skills	Sigil Rancor	skpoints		((ulvl-12)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Enhanced Entropy	skilldesc	enhanced entropy	dsc2calca5		blvl
+Enhanced Entropy	skilldesc	enhanced entropy	dsc2calcb5		max((min((2+((ulvl-24)/6)),18)),2)+stat('skill_more'.accr)
+Enhanced Entropy	skilldesc	enhanced entropy	dsc2line5		73
+Enhanced Entropy	skilldesc	enhanced entropy	dsc2texta5		mxl2012:DescMaxLevel2
+Enhanced Entropy	skilldesc	enhanced entropy	dsc2textb5		ModStre9c
+Enhanced Entropy	skills	Enhanced Entropy	skpoints		((ulvl-24)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Flame Wave	skilldesc	flame wave	dsc2calca5		blvl
+Flame Wave	skilldesc	flame wave	dsc2calcb5		max((min((2+((ulvl-18)/6)),19)),2)+stat('skill_more'.accr)
+Flame Wave	skilldesc	flame wave	dsc2line5		73
+Flame Wave	skilldesc	flame wave	dsc2texta5		mxl2012:DescMaxLevel2
+Flame Wave	skilldesc	flame wave	dsc2textb5		ModStre9c
+Flame Wave	skilldesc	flame wave	dsc3calca2	par8	
+Flame Wave	skilldesc	flame wave	dsc3calca3	par9	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Flame Wave	skilldesc	flame wave	dsc3calca4	par8	par9
+Flame Wave	skilldesc	flame wave	dsc3line2	76	65
+Flame Wave	skilldesc	flame wave	dsc3line3	76	67
+Flame Wave	skilldesc	flame wave	dsc3texta2	Firedplev	mxl2012:strchrenghard
+Flame Wave	skilldesc	flame wave	dsc3texta3	AFDImm	mxl2012:DescCurrentSyn
+Flame Wave	skilldesc	flame wave	dsc3texta4	Firedplev	AFDImm
+Flame Wave	skilldesc	flame wave	dsc3textb2	RingOfFireName	mxl2012:DescFireSyn
+Flame Wave	skilldesc	flame wave	dsc3textb3	RingOfFireName	mxl2012:DescPctNoS
+Flame Wave	skilldesc	flame wave	dsc3textb4	ApocalypseName	RingOfFireName
+Flame Wave	skills	Flame Wave	EDmgSymPerCalc	(skill('Ring of Fire'.blvl)+skill('Apocalypse'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Flame Wave	skills	Flame Wave	HitShift	8	4
+Flame Wave	skills	Flame Wave	skpoints		((ulvl-18)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Miasma Chains	skilldesc	miasma chains	dsc2calca4		blvl
+Miasma Chains	skilldesc	miasma chains	dsc2calcb4		max((min((2+((ulvl-12)/6)),20)),2)+stat('skill_more'.accr)
+Miasma Chains	skilldesc	miasma chains	dsc2line4		73
+Miasma Chains	skilldesc	miasma chains	dsc2texta4		mxl2012:DescMaxLevel2
+Miasma Chains	skilldesc	miasma chains	dsc2textb4		ModStre9c
+Miasma Chains	skilldesc	miasma chains	dsc3calca2	par8	
+Miasma Chains	skilldesc	miasma chains	dsc3calca3	par9	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Miasma Chains	skilldesc	miasma chains	dsc3calca4	par8	par9
+Miasma Chains	skilldesc	miasma chains	dsc3line2	76	65
+Miasma Chains	skilldesc	miasma chains	dsc3line3	76	67
+Miasma Chains	skilldesc	miasma chains	dsc3texta2	Magdplev	mxl2012:strchrenghard
+Miasma Chains	skilldesc	miasma chains	dsc3texta3	AMDImm	mxl2012:DescCurrentSyn
+Miasma Chains	skilldesc	miasma chains	dsc3texta4	Magdplev	AMDImm
+Miasma Chains	skilldesc	miasma chains	dsc3textb2	MiasmaBoltName	mxl2012:DescMagSyn
+Miasma Chains	skilldesc	miasma chains	dsc3textb3	MiasmaBoltName	mxl2012:DescPctNoS
+Miasma Chains	skilldesc	miasma chains	dsc3textb4	AbyssName	MiasmaBoltName
+Miasma Chains	skills	Miasma Chains	EDmgSymPerCalc	(skill('Miasma Bolt'.blvl)+skill('Abyss'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Miasma Chains	skills	Miasma Chains	HitShift	8	4
+Miasma Chains	skills	Miasma Chains	skpoints		((ulvl-12)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Sigil Death	skilldesc	sigil death	dsc2calca5		blvl
+Sigil Death	skilldesc	sigil death	dsc2calcb5		max((min((2+((ulvl-24)/6)),18)),2)+stat('skill_more'.accr)
+Sigil Death	skilldesc	sigil death	dsc2line5		73
+Sigil Death	skilldesc	sigil death	dsc2texta5		mxl2012:DescMaxLevel2
+Sigil Death	skilldesc	sigil death	dsc2textb5		ModStre9c
+Sigil Death	skills	Sigil Death	skpoints		((ulvl-24)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Apocalypse	skilldesc	apocalypse	dsc2calca5		blvl
+Apocalypse	skilldesc	apocalypse	dsc2calcb5		max((min((2+((ulvl-30)/6)),17)),2)+stat('skill_more'.accr)
+Apocalypse	skilldesc	apocalypse	dsc2line5		73
+Apocalypse	skilldesc	apocalypse	dsc2texta5		mxl2012:DescMaxLevel2
+Apocalypse	skilldesc	apocalypse	dsc2textb5		ModStre9c
+Apocalypse	skilldesc	apocalypse	dsc3calca2	par8	
+Apocalypse	skilldesc	apocalypse	dsc3calca3	par8	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Apocalypse	skilldesc	apocalypse	dsc3line2	76	65
+Apocalypse	skilldesc	apocalypse	dsc3line3	76	67
+Apocalypse	skilldesc	apocalypse	dsc3texta2	Firedplev	mxl2012:strchrenghard
+Apocalypse	skilldesc	apocalypse	dsc3texta3	Firedplev	mxl2012:DescCurrentSyn
+Apocalypse	skilldesc	apocalypse	dsc3textb2	RingOfFireName	mxl2012:DescFireSyn
+Apocalypse	skilldesc	apocalypse	dsc3textb3	FlameWaveName	mxl2012:DescPctNoS
+Apocalypse	skills	Apocalypse	EDmgSymPerCalc	(skill('Ring of Fire'.blvl)+skill('Flame Wave'.blvl))*par8	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Apocalypse	skills	Apocalypse	HitShift	8	4
+Apocalypse	skills	Apocalypse	skpoints		((ulvl-30)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1
+Abyss	skilldesc	abyss	dsc2calca5		blvl
+Abyss	skilldesc	abyss	dsc2calcb5		max((min((2+((ulvl-30)/6)),17)),2)+stat('skill_more'.accr)
+Abyss	skilldesc	abyss	dsc2line5		73
+Abyss	skilldesc	abyss	dsc2texta5		mxl2012:DescMaxLevel2
+Abyss	skilldesc	abyss	dsc2textb5		ModStre9c
+Abyss	skilldesc	abyss	dsc3calca2	par8	
+Abyss	skilldesc	abyss	dsc3calca3	par8	(((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(min(((stat('energy'.accr)*stat('enr_factor'.accr)/15000)+(stat('strength'.accr)*stat('str_factor'.accr)/15000)),200))
+Abyss	skilldesc	abyss	dsc3line2	76	65
+Abyss	skilldesc	abyss	dsc3line3	76	67
+Abyss	skilldesc	abyss	dsc3texta2	Magdplev	mxl2012:strchrenghard
+Abyss	skilldesc	abyss	dsc3texta3	AMDImm	mxl2012:DescCurrentSyn
+Abyss	skilldesc	abyss	dsc3texta4	Magdplev	AMDImm
+Abyss	skilldesc	abyss	dsc3textb2	MiasmaBoltName	mxl2012:DescMagSyn
+Abyss	skilldesc	abyss	dsc3textb3	MiasmaBoltName	mxl2012:DescPctNoS
+Abyss	skilldesc	abyss	dsc3textb4	MiasmaChainName	MiasmaBoltName
+Abyss	skills	Abyss	EDmgSymPerCalc	(skill('Miasma Bolt'.blvl)+skill('Miasma Chains'.blvl))*(skill('Abyss'.par8))	(((100+(20*ulvl))*(100+((((260*(stat('energy'.accr)+10)))/(stat('energy'.accr)+250))+(skill('DSK 2'.pst2)))))/100)-100
+Abyss	skills	Abyss	HitShift	8	4
+Abyss	skills	Abyss	skpoints		((ulvl-30)<((blvl-1-stat('skill_more'.accr))*6))?(stat('newskills'.accr)+1):1

@@ -1,0 +1,21 @@
+# Intentional hits for tools/check_public.py. One entry per line: <path glob> | <regex matched against the line>.
+# Keep this list short and explain each entry.
+
+# A software version number (Granny exporter SDK), not an IP address.
+docs/hd-models.md | SDK version 2\.12\.0\.5
+# Inventory software versions, not IP addresses.
+docs/source-inventory.md | SGD2FreeRes.*3\.0\.3\.1
+docs/source-inventory.md | PlugY 14\.0\.3\.0
+docs/source-inventory.md | D2GL 1\.0\.4\.0
+# The common-controls assembly version in the launcher manifest, not an IP address.
+launcher/res/launcher.manifest | Microsoft\.Windows\.Common-Controls" version="6\.0\.0\.0"
+# D2RLoader file versions (LoaderVersionMatches), not addresses
+launcher/* | 1\.3\.1\.[02]
+docs/launcher.md | `1\.3\.1\.0`
+# binary art and fonts of the downloader (history scan with --text reads their bytes as lines)
+launcher/res/*.gif | .
+launcher/res/*.ttf | .
+launcher/res/*.png | .
+launcher/res/*.ico | .
+# monster token 8@ (lane tokens): DCC file names, not addresses
+docs/legacy-graphics.md | 8@[a-z0-9]+\.(dcc|cof)
