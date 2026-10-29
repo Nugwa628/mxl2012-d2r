@@ -14,12 +14,12 @@ The numbers in the progress column are our own estimate of each phase, not a mea
 | 3 | Triage of engine differences | 100 % | every row has an in-game or static verdict (engine-triage.md section 7: same 13, ported 15, unported 2); #16 (`rprunes`), #18 (`cubeclasses`) and #24 (`rpsignets`, lane phase3) confirmed on the player path; #24's Apple needs engine work and went to the plugin plan (section 25, bug #499) |
 | 4 | Plugin | 90 % | v0.1 built and in game; first game pass done (all plugin-plan 10.1 checks run, bugs #4 / #5 fixed) and its failures ported (#6 `cltnomis`, #14, #15, #16); later parts (whirlwind, ilvl, runeletter, cubedupe, lvlupui, ...) in. Left: the Apple part (plugin-plan.md section 25, bug #499), whirlwind feel by eye (human visual review) |
 | 5 | Graphics | 65 % | HD stand-ins (monsters, effects, maps floors, icons, UI) and classic Median art in the build; map walls and custom art open |
-| 6 | Test and release | 50 % | game checks in tools/game_checks.py (acts, cube, rules, saves); alpha package tool (tools/cut_alpha.ps1); release scripts and owner server steps ready (docs/hosting.md); 0.1.0 published to the test channel (2026-10-29), downloader with it; signing, GitHub mirror and open bugs left |
+| 6 | Test and release | 50 % | game checks in tools/game_checks.py (acts, cube, rules, saves); alpha package tool (tools/cut_alpha.ps1); release scripts and owner server steps ready (docs/hosting.md); 0.1.0 to 0.1.2 published (2026-10-29), downloader with it; public GitHub mirror live; signing and open bugs left |
 
 Overall: roughly 80 % (2026-10-29 evening, lane phase3: phases 0-4 audited; 78 % earlier that day, 72 % on 2026-10-28 evening).
 
 ## Phase 0: Setup
-- [x] Repo on the forge (private), `.gitignore` forbids game content; GitHub mirror later
+- [x] Repo on the forge (private), `.gitignore` forbids game content; public GitHub mirror since 2026-10-29
 - [x] Source: Median XL 2012 v005 (provisional: archive.org D2SE/D2GL repack; the ModDB zip to replace it), docs/source-inventory.md, docs/verify-original.md
 - [x] Feature list docs/median2012-features.md, engine triage docs/engine-triage.md, plugin plan docs/plugin-plan.md
 - [x] Tooling scaffold (tools/, plugin skeleton, downloader, CI, templates), docs/scaffold-notes.md
@@ -75,4 +75,4 @@ Overall: roughly 80 % (2026-10-29 evening, lane phase3: phases 0-4 audited; 78 %
 - [x] Game checks on slots 2/3 (tools/game_checks.py; lanes boot, harness, datafix, qa)
 - [ ] All open bugs in docs/bugs.md triaged/fixed; Warlock in-game check (needs a RotW account)
 - [ ] Release package, publish to files.werdegames.com/mxl2012/, downloader signing
-- [ ] GitHub mirror and issue templates live
+- [x] GitHub mirror and issue templates live (2026-10-29: https://github.com/Nugwa628/mxl2012-d2r, public; fresh history, one snapshot commit per mirror run)
