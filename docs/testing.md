@@ -3510,3 +3510,29 @@ right click); `veillab.py` is lane veilking's (Summon Veil King). Seen with the 
 | `veil2` | + all 49 colorshift 0, `slayercloud` -> `druid/cyclonearmor_1back` | PASS: HD Veil King with pale swirling bands, no green; legacy unchanged (`veil2_sheet.png`) |
 | `g2` | same | PASS: no green in HD for any of the 39 states (neon-green pixel share 0.000 in every crop, 0.007 mean before: `green_metric.txt`; `sheet_after_sor.png`, `sheet_after_all.png`); legacy (Sorceress group) unchanged |
 | `tot3` | + `mxl_lightningspire_moved` for the 12 skill-summoned totems (tools/hd_monsters.py) | PASS: HD spires without the glass orb, after Bend the Shadows nothing left at the cast spots; legacy unchanged (`tot3_sheet.png`) |
+
+## Lane uicheck: release-note known issues re-checked, slot 4's shared stash emptied (2026-10-30, slot 4, background mode)
+
+Slot 4's installed build (lane build of 2026-10-29 18:30, after hdicons2 and the #33 fix), no build or install of this lane. Scratch
+driver (not committed): `mxl2012-runs/uicheck/` (`drv.py`, `cls.py` per class, `stashclear.py`); evidence
+`mxl2012-runs/uicheck/checks-20261030-012114-s4/`. New level 1 characters `UicSor`, `UicAma`, `UicNec`, `UicPal`, `UicBar`,
+`UicDru`, `UicAss` (+ a time stamp, in `mxl2012-s4`), each: the skill bar, the three tree tabs in HD and in legacy (G). 0 asserts,
+0 crash files, about 13 minutes of slot time.
+
+| Release-note line | Seen | Evidence |
+|---|---|---|
+| Fire Wall and Moon Queen / Balance / Wings of W show no icon on the skill bar | **gone**. Fire Wall (learnt by `setskill`, put on the right button by `skill right 51`) shows its fire wall in HD and legacy. Moon Queen and Balance learnt (Wings of W: `setskill` refused, level 0): passives, never on a button. Static: their `~shared` rows have cels 92 / 88 / 90, Fire Wall 78, all on the 116-frame shared sheet | `uic_sor_hd_bar.png`, `uic_sor_legacy_bar.png`, `uic_sor_hd_popup.png` |
+| The skill trees use D2R's plain background | **gone**: Median's page art in HD (hdicons2) | `uic_*_hd_tree*.png` |
+| Legacy (G): the skill tab titles are drawn twice | **gone** for all seven classes, three tabs each: only the art's labels (SPECIAL, MANA, ...). Warlock not made (no RotW on the slots' account); the classic layout keeps D2R's titles for it and the mod ships no Warlock page art, so nothing to double | `uic_legacy_tablabels.png`, `uic_legacy_trees_sheet.png` |
+
+The notes now drop those three lines. Also re-read (static): the walls line said 17 maps without walls in HD, but since lane walls
+8 of them have D2R's stock walls in Median's layout (docs/unported.md), so it now says 9 without walls and 8 with D2R's; the item
+picture line now says "most" (23 pictures reuse D2R's HD art, lane hditems). Still true as written: Pandemonium 2 by town portal
+(#392, open, not reproduced since, no player route), Colossal Summit (#261), long sessions (#360: fixed, the warning can still
+come on a very long route), stand-in HD art, made-up names, Chronicle naming the base (#331).
+
+**Slot 4's shared stash.** `SharedStashSoftCoreV2.d2i` held 3 pages with 35 + 1 + 4 items (lane uifix's sweep). No tool or
+harness verb clears shared tabs (`packclear` / `remove` take the player's own items), so with the lock held and the game closed
+the item list of each page was emptied in the file (header kept, page size 68: `JM` and a count of 0; 1756 -> 204 bytes;
+backup `mxl2012-runs/uicheck/stash-backup/`). In game the shared tab then showed pages 1-3 empty (`uic_stash_shared*.png`,
+`uic_stash_pages.png`) and the game saved it back unchanged (204 bytes).

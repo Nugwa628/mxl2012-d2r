@@ -69,12 +69,11 @@ What we know is wrong or different. Please don't report these again, unless you 
 
 - **Stand-in HD art.** Many Median-only monsters, missiles, effects and items show a borrowed or recoloured D2R model or
   picture in HD. Legacy graphics (G) show Median's own classic art where it has one.
-- **Some of Median's own maps have no walls in HD.** 17 maps that Median added or changed show the right floor and light
-  but no walls or buildings in HD. Legacy graphics (G) show them as Median drew them.
-- **Item pictures in HD** are Median's classic pictures scaled up, so they look soft.
-- **Skill icons.** Fire Wall and three item skills (Moon Queen, Balance, Wings of W) show no icon on the skill bar. The
-  skill trees use D2R's plain background instead of Median's art.
-- **Legacy graphics (G):** the skill tab titles are drawn twice over each other.
+- **Some of Median's own maps look different in HD.** 9 maps that Median added or changed show the right floor and light
+  but no walls or buildings in HD; 8 more have D2R's own walls in Median's layout, not Median's recoloured ones. Legacy
+  graphics (G) show them all as Median drew them.
+- **Item pictures in HD:** most are Median's classic pictures scaled up, so they look softer than D2R's own.
+- **Skill trees in HD** are Median's classic page art scaled up.
 - **A few names** that Median XL 2012 itself never wrote (some potions, monsters and objects) show a name we gave them.
 - **Chronicle:** making some runewords (for example Kyrie) names the base item in the chat message; the item itself is right.
 

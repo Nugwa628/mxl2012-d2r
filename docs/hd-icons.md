@@ -163,6 +163,11 @@ icon; D2R draws no visible pressed look on these buttons, so this shows only tha
 Item Balance and Item Wings of W ("Wild and Free") are passives (`passive` 1): the game puts them on no button and lists them
 in no pop-up, so their new pictures are only seen with the check, not by a player.
 
+Again in game (lane uicheck, 2026-10-30, slot 4's installed build of 2026-10-29 18:30, new level 1 Sorceress, Fire Wall,
+Item Moon Queen and Item Balance learnt by `setskill`; Item Wings of W refused at level 0): Fire Wall on the right button shows
+its fire wall in HD and legacy (`uic_sor_hd_bar.png`, `uic_sor_legacy_bar.png` in `mxl2012-runs/uicheck/checks-20261030-012114-s4/`).
+The release notes' "no icon on the skill bar" line was written before this lane's sheet and is gone from them.
+
 ### Check (`tools/skill_icon_check.py`)
 
 659 skills name a skilldesc (210 tree, 17 start, 201 bar, 21 item, 210 monster). Reference resolution (row exists, numeric
