@@ -63,6 +63,8 @@ int main() {
 	Check(BuildSelectSkillPacket(pkt, 154, true) == 9 && pkt[0] == 0x3c && pkt[1] == 154 && pkt[4] == 0x80 && pkt[5] == 0xff && pkt[8] == 0xff,
 	      "select skill packet left");
 	Check(BuildSelectSkillPacket(pkt, 300, false) == 9 && pkt[1] == 0x2c && pkt[2] == 0x01 && pkt[4] == 0, "select skill packet right");
+	Check(BuildSelectSkillPacket(pkt, 54, true, 0x0c) == 9 && pkt[1] == 54 && pkt[4] == 0x80 && pkt[5] == 0x0c && pkt[6] == 0 && pkt[8] == 0,
+	      "select skill packet with an item owner (charged skill)");
 
 	CastTarget ct;
 	Split("cast 154", &t);

@@ -209,9 +209,10 @@ inline auto BuildWalkPacket(uint8_t* out, uint8_t id, int curX, int curY, int de
 }
 
 // Packet 0x3c (select a skill, handler 0x4b4250): u8 id, u32 skill id (bit 31 = left button), u32 item id (-1 = none).
-inline auto BuildSelectSkillPacket(uint8_t* out, int skillId, bool left) noexcept -> size_t {
+// `owner`: 0xffffffff for the player's own skill, an item's id for the item's charged skill (what the client's skill menu sends).
+inline auto BuildSelectSkillPacket(uint8_t* out, int skillId, bool left, uint32_t owner = 0xffffffffU) noexcept -> size_t {
 	const uint32_t a = static_cast<uint32_t>(skillId) | (left ? 0x80000000U : 0U);
-	const uint32_t b = 0xffffffffU;
+	const uint32_t b = owner;
 	out[0] = 0x3c;
 	std::memcpy(out + 1, &a, 4);
 	std::memcpy(out + 5, &b, 4);

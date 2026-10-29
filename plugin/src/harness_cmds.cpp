@@ -1004,9 +1004,9 @@ auto CmdLvlBtn(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 }
 
 // Selects an active skill through packet 0x3c's handler; returns the skill id that is active afterwards.
-auto SelectSkill(Ctx* c, long long id, bool left) noexcept -> int {
+auto SelectSkill(Ctx* c, long long id, bool left, uint32_t owner = 0xffffffffU) noexcept -> int {
 	uint8_t pkt[9];
-	const size_t n = hcmd::BuildSelectSkillPacket(pkt, static_cast<int>(id), left);
+	const size_t n = hcmd::BuildSelectSkillPacket(pkt, static_cast<int>(id), left, owner);
 	const auto handler = reinterpret_cast<PacketFn>(*reinterpret_cast<const uint64_t*>(g_base + RvaPacketTable + 0x3c * 8));
 	handler(c->game, c->player, pkt, static_cast<int32_t>(n));
 	return SkillIdOf(left ? Fn<ActiveSkillFn>(RvaLeftSkill)(c->player) : Fn<ActiveSkillFn>(RvaRightSkill)(c->player));
@@ -1055,20 +1055,30 @@ auto CmdSetSkill(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return now == level ? true : Fail(c, "setskill: stopped at level %d (the game refused the next point)", now);
 }
 
-// `cast <skill id> [x y | unit <id> | nearest [class] | self]`: the skill used the way the cast packets do (location
-// 0x4fdb40, unit 0x4f8de0). Poll `state` / `missiles` for the result.
-auto CmdCast(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
-	long long id = 0;
+// `cast <skill id> [x y | unit <id> | nearest [class] | self] [item <id>]`: the skill used the way the cast packets do
+// (location 0x4fdb40, unit 0x4f8de0). Poll `state` / `missiles` for the result. With `item <id>` the skill is the worn item's
+// charged skill (owner = the item's id, selected as the skill menu does; lane bugsweep, bug #484: a charge used this way).
+auto CmdCast(Ctx* c, const hcmd::Tokens& in) noexcept -> bool {
+	long long id = 0, item = -1;
+	hcmd::Tokens t = in;
+	if (t.n >= 4 && hcmd::LowerEq(t.tok[t.n - 2], "item")) {
+		if (!hcmd::ParseInt(t.tok[t.n - 1], &item) || item < 0 || item > 0xffffffffLL) {
+			return Fail(c, "usage: cast ... item <item id>");
+		}
+		t.n -= 2;
+	}
 	hcmd::CastTarget tg;
 	if (t.n < 2 || !hcmd::ParseInt(t.tok[1], &id) || id < 0 || id > 0xffff || !hcmd::ParseCastTarget(t, 2, &tg)) {
-		return Fail(c, "usage: cast <skill id> [x y | unit <id> | nearest [class] | self]");
+		return Fail(c, "usage: cast <skill id> [x y | unit <id> | nearest [class] | self] [item <id>]");
 	}
-	uint8_t* sk = Fn<SkillByIdFn>(RvaSkillById)(c->player, static_cast<int32_t>(id), -1);
+	const uint32_t owner = item < 0 ? 0xffffffffU : static_cast<uint32_t>(item);
+	uint8_t* sk = Fn<SkillByIdFn>(RvaSkillById)(c->player, static_cast<int32_t>(id), static_cast<int32_t>(owner));
 	if (sk == nullptr) {
-		return Fail(c, "cast: the player has no skill %lld (setskill %lld 1 first)", id, id);
+		return item < 0 ? Fail(c, "cast: the player has no skill %lld (setskill %lld 1 first)", id, id)
+		                : Fail(c, "cast: the player has no skill %lld owned by item %lld (worn?)", id, item);
 	}
-	if (SkillIdOf(Fn<ActiveSkillFn>(RvaLeftSkill)(c->player)) != id && SelectSkill(c, id, true) != id &&
-	    SelectSkill(c, id, false) != id && (tg.kind == hcmd::CastTarget::Unit || tg.kind == hcmd::CastTarget::Nearest)) {
+	if (SkillIdOf(Fn<ActiveSkillFn>(RvaLeftSkill)(c->player)) != id && SelectSkill(c, id, true, owner) != id &&
+	    SelectSkill(c, id, false, owner) != id && (tg.kind == hcmd::CastTarget::Unit || tg.kind == hcmd::CastTarget::Nearest)) {
 		return Fail(c, "cast: the game would not select skill %lld (a passive, or not usable as an active skill)", id);
 	}
 	const int manaBefore = Stat(c->player, StatMana) >> 8;
@@ -2176,7 +2186,7 @@ auto CmdIstat(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 // --- lane realpath: vendor / gamble / use verbs and warp tiles (the rest of its player-path verbs are above) --------
 constexpr uint64_t RvaUseCheck = 0x5817f0;      // (game, player, item, target)
 using UseFn = uint64_t (*)(Game*, Unit*, Unit*, Unit*);
-constexpr int HashTiles = 0x6c6;  // unit type 5 (warp tiles: cave / dungeon entrances and exits)
+constexpr int TileList = 0x3630;  // unit type 5 (warp tiles): ONE chain, not a 128-bucket hash like types 0-4
 
 // `gold get | gold set <carried> <bank>` (set-up only: the money a purchase or a gamble needs).
 auto CmdGold(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
@@ -2252,46 +2262,53 @@ auto CmdUseCheck(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
-// `tiles`: the warp tiles (unit type 5) of the game near the player, nearest first in the output order of the hash; a player
-// takes one with the interact packet 0x13 (`pkt 13 05 00 00 00 <id>`), the client's packet of a click on the entrance.
-// Bug #399: the hash holds tile units of levels that are not loaded (Catacombs 2's stairs, 1444 away, listed from Catacombs 3);
-// reading one of them threw and ended the whole verb after two lines. Each unit and each chain step is read under its own
-// guard now; an unreadable unit is counted and skipped.
-struct TileFacts {
-	uint32_t id;
-	int32_t cls, mode, x, y, level;
+// `tiles`: the warp tiles (unit type 5) of the game, in list order; a player takes one with the interact packet 0x13
+// (`pkt 13 05 00 00 00 <id>`), the client's packet of a click on the entrance.
+// Bug #399: the verb answered `FAIL crashed` after the first tile or two, in every level (Catacombs 2 and 3, lane bugsweep run
+// checks-20261029-185149-s1). It walked 128 "buckets" from game + 0x3630 as for types 0-4, but D2R keeps the tiles in a single
+// chain there: the unit lookups 0x48fd54 / 0x48fe80 take `lea rax,[game+0x3630]` for type 5 (no id hash) and the tile walker
+// 0x4922b0 follows `[game+0x3630]` through +0x158. The words after it are other fields of the game (0x50, 0x2f, ASCII text from
+// "bucket" 65 on), and the first of them read as a unit threw. Now only that chain is walked, under its own SEH frame, and
+// each tile's line is read in its own frame too (`stage`: 1 position, 2 distance, 3 room).
+struct TileLine {
+	uint32_t id = 0;
+	int32_t cls = -1, mode = -1, x = 0, y = 0, area = -1;
+	double dist = 1e9;
+	int stage = 0;
 };
 
-// 0 = a tile read in full; 1 = the unit's memory threw; 2 = not type 5 (f->cls holds the type); 3 = no path
-auto ReadTile(Unit* u, TileFacts* f) noexcept -> int {
+auto ReadTile(Unit* player, Unit* u, TileLine* t) noexcept -> bool {
 	__try {
-		const int32_t type = TypeOf(u);
-		if (type != 5) {
-			f->cls = type;
-			return 2;
-		}
-		f->id = IdOf(u);
-		f->cls = ClassOf(u);
-		f->mode = ModeOf(u);
-		int32_t x = 0, y = 0;
-		if (!d2r::UnitXY(u, &x, &y)) {
-			return 3;
-		}
-		f->x = x;
-		f->y = y;
-		f->level = LevelOf(u);
-		return 0;
+		t->id = IdOf(u);
+		t->cls = ClassOf(u);
+		t->mode = ModeOf(u);
+		t->stage = 1;
+		d2r::UnitXY(u, &t->x, &t->y);
+		t->stage = 2;
+		t->dist = DistTo(player, u);
+		t->stage = 3;
+		t->area = LevelOf(u);
+		t->stage = 4;
+		return true;
 	} __except (EXCEPTION_EXECUTE_HANDLER) {
-		return 1;
+		return false;
 	}
 }
 
-auto NextInHash(Unit* u, bool* bad) noexcept -> Unit* {
+// The tile units of the game's tile chain into `out` (up to `cap`); false when a link faulted (`*bad` = that link).
+auto TileChain(Game* game, Unit** out, int* n, int cap, Unit** bad) noexcept -> bool {
+	Unit* u = d2r::At<Unit*>(game, TileList);
 	__try {
-		return d2r::At<Unit*>(u, UnitNextInHash);
+		for (int guard = 0; u != nullptr && guard < 4000; ++guard) {
+			if (TypeOf(u) == 5 && *n < cap) {
+				out[(*n)++] = u;
+			}
+			u = d2r::At<Unit*>(u, UnitNextInHash);
+		}
+		return true;
 	} __except (EXCEPTION_EXECUTE_HANDLER) {
-		*bad = true;
-		return nullptr;
+		*bad = u;
+		return false;
 	}
 }
 
@@ -2342,29 +2359,29 @@ auto CmdHashScan(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 }
 
 auto CmdTiles(Ctx* c, const hcmd::Tokens&) noexcept -> bool {
-	int32_t px = 0, py = 0;
-	d2r::UnitXY(c->player, &px, &py);
-	int n = 0, skipped = 0, broken = 0, guard = 0;
-	for (int b = 0; b < 128; ++b) {
-		bool bad = false;
-		for (Unit* u = d2r::At<Unit*>(c->game, (HashTiles + b) * 8); u != nullptr && guard < 20000; u = NextInHash(u, &bad), ++guard) {
-			TileFacts f{};
-			const int why = ReadTile(u, &f);
-			if (why != 0) {
-				if (++skipped <= 12) {  // bug #399: what the hash holds where no tile could be read
-					Out("tile unreadable: bucket %d unit %p: %s %d", b, static_cast<void*>(u),
-					    why == 1 ? "memory threw" : why == 2 ? "type" : "no path, class", f.cls);
-				}
-				continue;
-			}
-			if (n++ < 40) {
-				const double d = std::sqrt(static_cast<double>(f.x - px) * (f.x - px) + static_cast<double>(f.y - py) * (f.y - py));
-				Out("tile id=%u class=%d mode=%d at %d,%d dist=%.0f area=%d", f.id, f.cls, f.mode, f.x, f.y, d, f.level);
-			}
-		}
-		broken += bad ? 1 : 0;
+	constexpr int Cap = 256;
+	Unit* tiles[Cap];
+	int n = 0, skipped = 0;
+	Unit* bad = nullptr;
+	if (!TileChain(c->game, tiles, &n, Cap, &bad)) {
+		Out("tiles chain broken at %p (not a readable unit), the rest skipped", static_cast<void*>(bad));
 	}
-	Out("tiles %d (skipped %d unreadable units, %d broken chains)", n, skipped, broken);
+	int listed = 0;
+	for (int i = 0; i < n; ++i) {
+		TileLine t;
+		if (!ReadTile(c->player, tiles[i], &t)) {
+			++skipped;
+			Out("tile id=%u class=%d skipped (exception at stage %d)", t.id, t.cls, t.stage);
+			continue;
+		}
+		if (listed++ < 40) {
+			Out("tile id=%u class=%d mode=%d at %d,%d dist=%.0f area=%d", t.id, t.cls, t.mode, t.x, t.y, t.dist, t.area);
+		}
+	}
+	Out("tiles %d", listed);
+	if (bad != nullptr || skipped > 0) {
+		Out("tiles chain broken %d, skipped tiles %d", bad != nullptr ? 1 : 0, skipped);
+	}
 	return true;
 }
 

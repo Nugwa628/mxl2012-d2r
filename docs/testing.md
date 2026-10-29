@@ -3040,7 +3040,8 @@ Check `ven_vendors` (new). It visits every town vendor of acts 1, 2, 3 and 5 on 
   panel); one item is gambled where the menu offers Gamble.
 - **Repair (smiths):** Repair All on a worn Circlet (below).
 
-`MXL_VEN_TOWNS` and `MXL_VEN_NPCS` pick a part. `MXL_VEN_HRATLI_PIER=1` clears the Act 3 intro word by save (bug #434).
+`MXL_VEN_TOWNS` and `MXL_VEN_NPCS` pick a part. `MXL_VEN_HRATLI_PIER=1` clears the Act 3 intro word by save (bug #434). `MXL_VEN_HRATLI_HOUSE=1` sets it done (a new character: Hratli at his
+house, reached the long way round, lane bugsweep).
 `MXL_VEN_WEAR=click` (lane durability, bug #433) wears the Circlet by clicks (dropped by `item ... ground`, picked up, lifted onto
 the head slot) instead of the harness `equip`, and takes a tooltip screenshot of it back in town (`ven_wear_tooltip_<town>.png`).
 
@@ -3375,3 +3376,22 @@ the game's own level-up; then Save and Exit + Play.
 So ME9 holds with the cap at 119, not 120 as docs/median-rules-audit.md wrote. Not run: the other acts' mercenaries (same hireling
 formula, Exp/Lvl 1 on every row), a mercenary that levels with a player who levels at the same time. During runs at 19:00-19:11
 the PC's own mouse moved (the user at the desk); the checks use background input only, the results do not depend on it.
+
+## Lane bugsweep: open low bugs looked at again (2026-10-29, slots 1 and 2, background mode, build of lane/bugsweep)
+
+Round 1 on slot 1 (owner-approved), round 2 on slot 2 after merging main. Evidence in `mxl2012-runs/bugsweep/` (run logs
+`run*.log`, `evidence/`). The rows of docs/bugs.md have the details.
+
+| Bug | Result | Runs |
+|---|---|---|
+| #399 `tiles` crash | Fixed (harness): D2R keeps the warp tiles in one chain at game + 0x3630, not a 128-bucket hash; `CmdTiles` walks that chain under SEH (acts5's `hashscan` verb kept) | `checks-20261029-195926-s1`: 6 calls in Catacombs 2 / 3, all `tiles OK` |
+| #434 Hratli out of reach | Not a game bug: his house is reached the long way round (south pier, east market). `ven_planned_walk` walks the measured legs (`VEN_VIA`) and plans the rest on `walkmap`; round 2 tries it first | `checks-20261029-213747-s1` PASS (click routes then the walk), `checks-20261029-224222-s2` PASS (new character SweepBarb, `MXL_VEN_HRATLI_HOUSE=1`, the walk only: trade, sell back, Repair All) |
+| #436 Belial green | State 232 `meslayer` (colorshift 1) on the units, on server and client; fixed on main by lane veilking (colorshift 0) | `checks-20261029-183600-s1` |
+| #484 charges | Not a bug in game: charges used and recharged reach the client without the patch | `checks-20261029-201732-s1` (with `MXL_CONTROL=dursync`) |
+| #392 portal into 134 | Not reproduced: a town portal from 134 to Harrogath and back works | `checks-20261029-195926-s1` |
+| #432 vendor asserts | Not reproduced in 8 trade rounds; no data cause found statically | `checks-20261029-185149-s1` |
+| #292 mercenary in 110 | Not reproduced in 2 tries (bare and equipped Rogue) | `-185149-s1`, `-195926-s1` |
+| #17 first-chance report | Not reproduced in 6 launches; a report of the same kind came from an exception the plugin caught itself (D2R's last-resort handler logs caught ones too) | slot 1 runs above |
+
+Run `checks-20261029-224054-s2` was BLOCKED by the check itself: a new character's save has no quest section before its first
+Save and Exit (`quest_done` now reads that as "not done"; the closed edit saves first).

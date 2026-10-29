@@ -6677,6 +6677,15 @@ def rp_fight(area, seconds, want, log, rows):
 RP_ACT_OPEN = {2: (7,), 3: (15,), 4: (23,), 5: (26, 28)}
 
 
+def quest_done(save, word, difficulty=0):
+    """Bit 0 (done) of a quest word in a save; False for a new character's save, which has no quest section until its first
+    Save and Exit (the closed edit saves first, then finds it; run checks-20261029-224054-s2)."""
+    try:
+        return bool(rc_setup.get_quest(save, difficulty, word) & 1)
+    except ValueError:
+        return False
+
+
 def rp_open_acts(acts, log):
     """SET-UP by save (rc_setup, coordinator rule "PLAYER PATH vs SET-UP"): the act-completed quest words of Normal for the acts
     before the highest one asked for, so the waypoint panel has those acts' tabs (round 1: only tab I was drawn, the row click
@@ -6687,7 +6696,7 @@ def rp_open_acts(acts, log):
         return []
     with open(path, "rb") as f:
         save = f.read()
-    missing = [w for w in need if not rc_setup.get_quest(save, 0, w) & 1]
+    missing = [w for w in need if not quest_done(save, w)]
     if not missing:
         return []
 
@@ -8954,7 +8963,8 @@ VEN_HRATLI_WORD = 16           # Act 3 intro: Hratli leaves the pier for his hou
 # Where an NPC stands while it is out of `state`'s view (the route's target until it is in view): Lut Gholein and the Docks from
 # D2R's town maps (lut2 / docktown3 presets + the level origin measured from Fara, Lysander, Ormus, Alkor), the code-placed ones
 # (Hratli, Larzuk, Anya) from `moveto nearest` in run ven-probe-s3 (2026-10-29). Hratli stands on the pier by the waypoint
-# until the Act 3 intro (quest word 16) is done, then at his house in the north-east (out of reach, bug #434)
+# until the Act 3 intro (quest word 16) is done, then at his house in the north-east (reached the long way round,
+# bug #434: ven_planned_walk)
 VEN_HOME = {177: (5090, 5022), 178: (5117, 5076), 199: (5028, 5098), 202: (5115, 5103), 252: (5034, 5096), 253: (5219, 5038),
             254: (5084, 5014), 255: (5119, 5091), 511: (5142, 5044), 512: (5106, 5115), 513: (5077, 5024)}
 
@@ -9137,24 +9147,66 @@ def ven_click_talk(npc, log, tries=8):
     return None
 
 
+# Legs of the long way round to an NPC the click search does not find, measured on the walk that reached it: Hratli's house in
+# the Kurast Docks, east along the south pier, north through the east market (run checks-20261029-203319-s1, bug #434)
+VEN_VIA = {253: [(5173, 5165), (5172, 5131), (5217, 5135), (5219, 5082)]}
+
+
+def ven_planned_walk(npc, town, log, rounds=4):
+    """From the town arrival, left clicks to the NPC on paths planned on the game's own walk collision (relp_walk_to,
+    `walkmap`): through its VEN_VIA legs, then a few rounds to its spot. Hratli's house in the Kurast Docks is reached only the
+    long way round, which the click search does not find, bug #434 (lane bugsweep). Returns whether it is in view."""
+    import playthrough as pt
+    spot = ven_npc_spot(npc, log)
+    if spot is None:
+        return False
+    if town in VEN_WEAR_AREA:  # a stop deep in the market walls plans no way out (run checks-20261029-204457-s1)
+        goto(VEN_WEAR_AREA[town])
+        goto(town)
+    c = pt.Ctx(sys.modules[__name__], 0, log)
+    seen = lambda: npc_within(npc, 12)  # noqa: E731
+    for vx, vy in VEN_VIA.get(npc, []):
+        near = lambda vx=vx, vy=vy: seen() or abs(c.player()["x"] - vx) + abs(c.player()["y"] - vy) <= 6  # noqa: E731
+        relp_walk_to(c, vx, vy, near, log, budget=90)
+    for _ in range(rounds):
+        if relp_walk_to(c, spot[0], spot[1], seen, log, budget=240):
+            return True
+    return seen()
+
+
 def ven_reach_and_talk(npc, nm, log, paths):
-    """The click route, then the click talk; `paths[nm]` says how it went. Returns the menu or None."""
+    """The click route, then the click talk; `paths[nm]` says how it went. Returns the menu or None. An NPC with measured legs
+    (VEN_VIA) or reached by the planned walk before goes by the planned walk first (the click routes spend ~8 minutes each
+    failing on Hratli, bug #434); the click routes stay its fallback the first time."""
     if npc_within(npc, 8):
         paths.setdefault(nm, "standing next to it")
+        ok = True
     else:
-        ok, _clicks, note = ven_click_route(npc, log)
-        paths[nm] = "click route: %s" % note
         town = hstate()["player"].get("area")
-        if not ok and town in VEN_WEAR_AREA:
-            # once more from the town's arrival spot (harness warp out and back: set-up); Hratli's route from Asheara's corner of
-            # the Docks spent its clicks in the market's walls, run checks-20261029-061635-s3
-            goto(VEN_WEAR_AREA[town])
-            goto(town)
+        ok = False
+        planned_before = npc in STATE.get("ven_planned", ())
+        if planned_before or npc in VEN_VIA:
+            ok = ven_planned_walk(npc, town, log)
+            paths[nm] = paths.get(nm, "") + "; " * (nm in paths) + "%swalk planned on `walkmap`: %s" % (
+                "again by the " if planned_before else "", "in view" if ok else "not reached")
+        if not ok and not planned_before:
             ok, _clicks, note = ven_click_route(npc, log)
-            paths[nm] += "; again from the town arrival: %s" % note
-        if not ok:
-            STATE.setdefault("ven_shots", []).append(sh("ven_noreach_%s" % nm.lower()))
-            return None
+            paths[nm] = paths.get(nm, "") + "; " * (nm in paths) + "click route: %s" % note
+            if not ok and town in VEN_WEAR_AREA:
+                # once more from the town's arrival spot (harness warp out and back: set-up); Hratli's route from Asheara's corner
+                # of the Docks spent its clicks in the market's walls, run checks-20261029-061635-s3
+                goto(VEN_WEAR_AREA[town])
+                goto(town)
+                ok, _clicks, note = ven_click_route(npc, log)
+                paths[nm] += "; again from the town arrival: %s" % note
+            if not ok and npc not in VEN_VIA:
+                ok = ven_planned_walk(npc, town, log)
+                paths[nm] += "; walk planned on `walkmap`: %s" % ("in view" if ok else "not reached")
+        if ok and "walkmap`: in view" in paths[nm]:
+            STATE.setdefault("ven_planned", set()).add(npc)
+    if not ok:
+        STATE.setdefault("ven_shots", []).append(sh("ven_noreach_%s" % nm.lower()))
+        return None
     menu = ven_click_talk(npc, log)
     if menu is None:
         paths[nm] = paths.get(nm, "") + "; the click talk opened no menu"
@@ -9346,17 +9398,24 @@ def ven_setup(towns, log):
     if 109 in towns:
         with open(os.path.join(SAVES, g.CHAR_NAME + ".d2s"), "rb") as f:
             save = f.read()
-        if not rc_setup.get_quest(save, 0, VEN_ANYA_WORD) & 1:
+        if not quest_done(save, VEN_ANYA_WORD):
             rc2_closed_edit(lambda s: rc_setup.set_quest_bits(s, 0, VEN_ANYA_WORD, rc_setup.DONE), log)
             notes.append("quest word %d (Prison of Ice) done by save" % VEN_ANYA_WORD)
     if 75 in towns and os.environ.get("MXL_VEN_HRATLI_PIER") == "1":
-        # Hratli by the waypoint again: his house spot is out of reach (bug #434); the Act 3 intro word cleared by save
+        # Hratli by the waypoint again (his house is reached only the long way round, bug #434); the Act 3 intro word cleared by save
         def clear(s, w=VEN_HRATLI_WORD):
             s = bytearray(s)
             struct.pack_into("<H", s, rc_setup.quest_offset(s, 0, w), 0)
             return bytes(s)
         rc2_closed_edit(clear, log)
         notes.append("quest word %d (Act 3 intro, Hratli) cleared by save" % VEN_HRATLI_WORD)
+    elif 75 in towns and os.environ.get("MXL_VEN_HRATLI_HOUSE") == "1":
+        # a new character: the Act 3 intro done by save, so Hratli stands at his house (the long way round, bug #434)
+        with open(os.path.join(SAVES, g.CHAR_NAME + ".d2s"), "rb") as f:
+            save = f.read()
+        if not quest_done(save, VEN_HRATLI_WORD):
+            rc2_closed_edit(lambda s: rc_setup.set_quest_bits(s, 0, VEN_HRATLI_WORD, rc_setup.DONE), log)
+            notes.append("quest word %d (Act 3 intro, Hratli) done by save" % VEN_HRATLI_WORD)
     rp_ready()
     for n in RP_TOWN_WP.values():
         H("waypoint n %d set" % n)
