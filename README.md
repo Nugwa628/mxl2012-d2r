@@ -1,6 +1,6 @@
 # D2R-XL 2012
 
-A fan port of **Median XL 2012 (v005) by Brother Laz** to **Diablo II: Resurrected 3.3** (build 93847), running through
+A fan port of **Median XL 2012 (v005) by Brother Laz** to **Diablo II: Resurrected 3.3**, running through
 **D2RLoader 1.3.1**. Mod folder `mods\mxl2012`.
 
 ## Credits
@@ -16,7 +16,7 @@ Diablo II and Diablo II: Resurrected belong to Blizzard Entertainment. D2RLoader
 
 ## Playing it
 
-You need your own Diablo II: Resurrected at build 93847 and D2RLoader 1.3.1. Each release's notes (on the Releases page)
+You need your own Diablo II: Resurrected 3.3 and D2RLoader 1.3.1. Each release's notes (on the Releases page)
 explain the install step by step; the D2R-XL 2012 Downloader keeps the mod up to date. Characters live in their own save
 folder and do not touch your normal D2R characters.
 
