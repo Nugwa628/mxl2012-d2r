@@ -163,14 +163,14 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 
 | map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | floor cells (with models) | set pieces left out | placed | capped | models in scene | distinct models | scene size |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| expansion/dystopic/desertpeak.ds1 | act3_docktown | 2692 | 2384 | 306 | 2 | 1012 | 0 | 13435 (63) | 17 | 2905 | 0 | 2905 | 40 | 2246 KB |
-| expansion/ghetto/cypherpunk.ds1 | act3_docktown | 3983 | 3218 | 760 | 5 | 1109 | 0 | 9039 (966) | 11 | 10166 | 5743 | 4423 | 83 | 3821 KB |
-| expansion/glados/glados.ds1 | mxl2012_act4_mesa | 832 | 436 | 395 | 0 | 445 | 1 | 6911 (1300) | 5 | 3698 | 0 | 3698 | 53 | 3183 KB |
-| expansion/neonmile/downtown.ds1 | mxl2012_act4_mesa | 3278 | 2203 | 693 | 256 | 797 | 126 | 32292 (0) | 1 | 2367 | 0 | 2367 | 18 | 1766 KB |
-| expansion/redsquare/moskvich.ds1 | mxl2012_act4_mesa | 212 | 74 | 126 | 11 | 49 | 1 | 308 (62) | 1 | 538 | 0 | 538 | 105 | 510 KB |
-| expansion/terror/borgir.ds1 | mxl2012_act4_fort | 734 | 418 | 312 | 3 | 36 | 1 | 774 (25) | 3 | 2442 | 0 | 2442 | 74 | 2517 KB |
-| expansion/voodoo/macumba.ds1 | mxl2012_act4_fort | 405 | 356 | 20 | 28 | 18 | 1 | 1128 (0) | 31 | 568 | 0 | 568 | 20 | 437 KB |
-| expansion/zakarum/charismatic.ds1 | mxl2012_act4_fort | 568 | 143 | 402 | 22 | 366 | 1 | 1173 (94) | 126 | 424 | 0 | 424 | 12 | 323 KB |
+| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 306 | 2 | 1012 | 0 | 13435 (63) | 17 | 2905 | 0 | 2905 | 40 | 2246 KB |
+| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 760 | 5 | 1109 | 0 | 9039 (966) | 11 | 10166 | 5743 | 4423 | 83 | 3821 KB |
+| expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 395 | 0 | 445 | 1 | 6911 (1300) | 5 | 3698 | 0 | 3698 | 53 | 3183 KB |
+| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2203 | 693 | 256 | 797 | 126 | 32292 (0) | 1 | 2367 | 0 | 2367 | 18 | 1766 KB |
+| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 212 | 74 | 126 | 11 | 49 | 1 | 308 (62) | 1 | 538 | 0 | 538 | 105 | 510 KB |
+| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 312 | 3 | 36 | 1 | 774 (25) | 3 | 2442 | 0 | 2442 | 74 | 2517 KB |
+| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 356 | 20 | 28 | 18 | 1 | 1128 (0) | 31 | 568 | 0 | 568 | 20 | 437 KB |
+| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 402 | 22 | 366 | 1 | 1173 (94) | 126 | 424 | 0 | 424 | 12 | 323 KB |
 | act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 209 | 5 | 572 (87) | 0 | 484 | 0 | 484 | 67 | 756 KB |
 | act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
 | act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
@@ -211,6 +211,133 @@ crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #
 Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 3 show only part of them (caveroom4,
 belial, charismatic) and all 17 show D2R's stock walls, not Median's colours.
 
+## Median's look on the 8 retextured maps (lane maptint, 2026-10-30)
+
+`tools/map_tint.py` (build step inside `walls_hd.py build`, tests `tools/tests/test_map_tint.py`; pixel reader
+`tools/dt1_pixels.py`).
+
+**Median's 51 retextured .dt1 are not recoloured.** `py -3 -I tools/map_tint.py measure` compares every tile of a new .dt1
+pixel by pixel with the same tile of its stock donor (the donor under its own act's palette, Median's under Act 5's): the mean
+RGB distance is 0.4 - 5.9 of 441, and only 0 - 1% of the pixels are more than 24 off (table below). Hue moves by at most 0.03 of
+a turn and brightness by under 0.01. Only saturation drops, in the darkest pixels: Kurast's and the jungle's greens lose
+0.05 - 0.11, the jungle trees 0.45 (dark green to dark grey-green). What Median changed is the palette **index**. The five act
+palettes share 226 of their 256 entries, and Median moved every pixel onto those shared entries (the donors draw up to 46% of
+their pixels with act-only entries), so a tile set looks the same whatever act's level uses it. D2R's wall models, placed by
+`walls_hd.py`, already have the donors' colours; recoloured copies of the donor textures would change nothing worth the size.
+
+**What makes the maps look like Median in legacy mode is their light.** Median places invisible light monsters
+(`idleredlight`, `idlegreenlight`, `idlebluelight`, `idleyellowlight`: monstats2 Light 4-7 in red, green, blue, yellow) and
+coloured lit objects in these maps. Classic (G) shows cypherpunk in indigo neon, glados in teal, charismatic as cool lavender
+marble, macumba and borgir as dark with a few lit spots, and downtown, moskvich and desertpeak in warm red to gold (lane
+hdwalls2's classic shots). D2R HD lights every map of a biome with that biome's directional key light (`global_key_light` of
+`data/hd/env/vis/<biome>_<time>.json`: white for the Fortress, warm grey for the Mesa and Docktown), so all 8 looked like the
+same warm grey stone.
+
+**What the build does.** `map_tint.apply` gives each of the 8 maps its own biome, `mxl2012_tint_<map>`. It is a copy of the
+biome its scene uses (D2R's, or maps_hd's generated floor biome, so the floor masks stay), and every time-of-day slot names
+one visual data file, `data/hd/env/vis/mxl2012_tint_<map>.json`. That file is a copy of the base biome's day file with the
+key light in the map's colour and power (`TINTS`). This is the same lever D2R itself uses for its time of day (Docktown's
+night key light is blue). Only the key light changes (lightMask 9: scene and ground); the player, monster and item lights,
+the grading LUT, IBL and fog stay D2R's. Cost: 8 biomes (about 70 KB each: a biome holds its terrain layers) and 8 visual data files (7 KB each), 0.6 MB, no
+textures or models. maps_hd's floor biomes `mxl2012_act4_fort` and `mxl2012_act4_mesa` are still written, but no scene
+names them now: their six maps use tinted copies of them, which keep their tile masks.
+
+Also looked at and not used: the grading LUT (`gradingLutFile`, a .dds per visual data file) would recolour the player and
+monsters too; `VisualDataBoxDefinitionComponent` (a visual data file per box of a scene) does the same as a whole-map biome
+for a whole map; material or texture overrides of the placed models (`OverrideModelDefinitionComponent` swaps the whole
+model) and recoloured texture copies would only repeat the donor colours (see the measurement above).
+
+**In game** (slot 4, 2026-10-30, HD and classic, check `wall_maps`; docs/testing.md "Lane maptint"). All 8 maps were seen in HD
+with their tint, no assert, load screens as before (0.1 - 2.9 s). Sheets: `mxl2012-runs/maptint/sheets/sheet_<map>.png`
+(before = main's build, after = this build, legacy).
+
+| Map | HD before | HD after | Legacy (G) | Left |
+|---|---|---|---|---|
+| desertpeak | grey stone | warm gold, saturation 0.22 -> 0.54 | gold, 0.66 | - |
+| cypherpunk | warm grey | indigo / violet, hue 0.83 | 0.85 | - |
+| glados | warm grey | cyan-teal | teal | - |
+| downtown | warm grey | warm red-orange, saturation 0.37 -> 0.48 | 0.44 | 126 Harrogath cells without an HD wall |
+| moskvich | warm | warmer gold, 0.47 -> 0.61 | 0.63 | - |
+| borgir | grey, bright | dark teal-green | dark, teal floor, yellow torches | darker overall than before; torches keep their own light |
+| macumba | grey, bright | dark warm | very dark warm | - |
+| charismatic | white-grey | cool lavender-grey, hue 0.84 | lavender, hue 0.70, a bit more saturated | the cathedral's arches and roofs (no D2R model) |
+
+The tint lights the scene and ground only. Median's coloured light spots (the light monsters) are not ported: D2R draws them
+with the monsters' own HD light, as before.
+
+<!-- map_tint:begin (generated: py -3 -I tools/map_tint.py docs) -->
+
+| map | cells on new .dt1 (of all) | mean RGB distance | pixels > 24 off | hue shift | saturation | brightness | classic light (TINTS) | HD key light |
+|---|---|---|---|---|---|---|---|---|
+| expansion/dystopic/desertpeak.ds1 | 19084 (19122) | 2.2 | 0.00% | -0.010 | -0.080 | -0.0013 | dark gold, green glow on the floor rings | rgb 1.00 0.80 0.45, power x0.8 |
+| expansion/ghetto/cypherpunk.ds1 | 15813 (17142) | 2.2 | 0.07% | -0.011 | -0.080 | -0.0010 | indigo with magenta neon | rgb 0.65 0.42 1.00, power x0.9 |
+| expansion/glados/glados.ds1 | 3630 (8723) | 2.5 | 0.07% | -0.010 | +0.004 | +0.0032 | teal / cyan | rgb 0.45 0.85 1.00, power x1.0 |
+| expansion/neonmile/downtown.ds1 | 38190 (38792) | 2.1 | 0.00% | -0.008 | +0.005 | +0.0022 | red-orange brick, green neon near the crowds | rgb 1.00 0.58 0.42, power x0.9 |
+| expansion/redsquare/moskvich.ds1 | 331 (871) | 2.5 | 0.27% | -0.012 | -0.006 | +0.0027 | warm orange | rgb 1.00 0.72 0.42, power x1.0 |
+| expansion/terror/borgir.ds1 | 2544 (2545) | 2.1 | 0.00% | -0.016 | -0.081 | -0.0007 | dark, teal floor lattice, yellow torches | rgb 0.62 1.00 0.97, power x0.5 |
+| expansion/voodoo/macumba.ds1 | 1648 (1876) | 1.4 | 0.00% | -0.027 | -0.004 | +0.0011 | dim sepia | rgb 1.00 0.72 0.48, power x0.6 |
+| expansion/zakarum/charismatic.ds1 | 2476 (2478) | 1.4 | 0.19% | -0.017 | -0.019 | +0.0013 | bright cool lavender-grey marble and slate | rgb 0.70 0.68 1.00, power x2.0 |
+
+Per new .dt1 (all 51 copies; pixel pairs at the same place of the same tile key, new against donor):
+
+| new .dt1 | donor | pixels | mean RGB distance | > 24 off | hue shift | saturation | brightness | on shared palette entries |
+|---|---|---|---|---|---|---|---|---|
+| expansion/dystopic/docks.dt1 | act3/docktown/docks.dt1 | 409592 | 1.5 | 0.00% | -0.005 | -0.101 | -0.0008 | 100% |
+| expansion/dystopic/floors.dt1 | act3/kurast/floors.dt1 | 128680 | 1.7 | 0.00% | -0.006 | -0.077 | -0.0015 | 100% |
+| expansion/dystopic/interior.dt1 | act3/kurast/interior.dt1 | 590864 | 1.2 | 0.00% | -0.004 | -0.053 | -0.0006 | 100% |
+| expansion/dystopic/pyramid.dt1 | act3/docktown/pyramid.dt1 | 219875 | 2.8 | 0.26% | -0.010 | -0.048 | -0.0022 | 99% |
+| expansion/dystopic/ruinflr.dt1 | act3/docktown/ruinflr.dt1 | 912840 | 2.6 | 0.00% | -0.008 | -0.082 | +0.0003 | 100% |
+| expansion/dystopic/ruinwall.dt1 | act3/docktown/ruinwall.dt1 | 228005 | 2.3 | 0.00% | -0.010 | -0.035 | -0.0019 | 100% |
+| expansion/dystopic/terraces.dt1 | act3/kurast/terraces.dt1 | 393165 | 2.9 | 0.00% | -0.016 | -0.109 | -0.0023 | 100% |
+| expansion/dystopic/treegrp.dt1 | act3/jungle/treegrp.dt1 | 617230 | 5.9 | 0.00% | -0.032 | -0.474 | -0.0065 | 100% |
+| expansion/dystopic/trees.dt1 | act3/jungle/trees.dt1 | 829387 | 4.9 | 0.00% | -0.027 | -0.445 | -0.0020 | 100% |
+| expansion/magma/floor.dt1 | act4/lava/floor.dt1 | 2214807 | 2.4 | 0.97% | -0.014 | -0.102 | -0.0023 | 100% |
+| expansion/magma/rocks.dt1 | act4/lava/rocks.dt1 | 77734 | 1.1 | 0.00% | -0.011 | -0.013 | +0.0012 | 100% |
+| expansion/magma/walls.dt1 | act4/diab/walls.dt1 | 735612 | 2.2 | 0.00% | -0.002 | -0.180 | +0.0019 | 100% |
+| expansion/neonmile/bridge.dt1 | act3/docktown/bridge.dt1 | 369291 | 2.0 | 0.00% | -0.009 | -0.054 | -0.0008 | 100% |
+| expansion/neonmile/buildings.dt1 | expansion/town/buildings.dt1 | 1847801 | 0.4 | 0.00% | -0.002 | +0.001 | -0.0005 | 100% |
+| expansion/neonmile/buildingses.dt1 | expansion/town/buildingses.dt1 | 1888837 | 0.4 | 0.00% | -0.002 | +0.001 | -0.0005 | 100% |
+| expansion/neonmile/floors.dt1 | act3/travincal/floors.dt1 | 183693 | 1.7 | 0.00% | -0.006 | -0.092 | -0.0003 | 100% |
+| expansion/neonmile/gate.dt1 | act3/travincal/gate.dt1 | 297339 | 1.6 | 0.00% | -0.004 | -0.035 | -0.0010 | 100% |
+| expansion/neonmile/ground.dt1 | expansion/town/ground.dt1 | 1172883 | 0.7 | 0.00% | -0.004 | +0.002 | -0.0009 | 100% |
+| expansion/neonmile/keepwall.dt1 | expansion/town/keepwall.dt1 | 1580786 | 0.3 | 0.00% | -0.001 | +0.009 | -0.0001 | 100% |
+| expansion/neonmile/maingate.dt1 | expansion/town/maingate.dt1 | 220409 | 0.9 | 0.00% | -0.001 | +0.006 | -0.0007 | 100% |
+| expansion/neonmile/otherwalls.dt1 | expansion/town/otherwalls.dt1 | 47794 | 0.4 | 0.00% | -0.002 | +0.002 | -0.0004 | 100% |
+| expansion/neonmile/rkwall.dt1 | expansion/town/rkwall.dt1 | 1010187 | 0.9 | 0.00% | -0.003 | +0.002 | -0.0010 | 100% |
+| expansion/neonmile/terraces.dt1 | act3/travincal/terraces.dt1 | 607902 | 1.8 | 0.00% | -0.005 | -0.089 | -0.0009 | 100% |
+| expansion/neonmile/townwalls.dt1 | expansion/town/walls.dt1 | 342437 | 1.5 | 0.00% | -0.002 | -0.013 | -0.0017 | 100% |
+| expansion/neonmile/trees.dt1 | expansion/town/trees.dt1 | 41035 | 0.3 | 0.00% | -0.002 | +0.001 | -0.0003 | 100% |
+| expansion/neonmile/wallrocks.dt1 | act3/kurast/terraces.dt1 | 393165 | 2.9 | 0.00% | -0.016 | -0.109 | -0.0023 | 100% |
+| expansion/neonmile/walls.dt1 | act3/travincal/walls.dt1 | 620663 | 1.7 | 0.00% | +0.001 | -0.122 | +0.0002 | 100% |
+| expansion/neonmile/walls2.dt1 | expansion/town/walls2.dt1 | 360210 | 0.5 | 0.00% | -0.003 | -0.000 | -0.0007 | 100% |
+| expansion/redsquare/arch_walls.dt1 | act4/mesa/arch_walls.dt1 | 135771 | 2.0 | 0.00% | -0.020 | -0.162 | +0.0001 | 100% |
+| expansion/redsquare/brick_walls.dt1 | act4/mesa/brick_walls.dt1 | 136601 | 2.4 | 0.00% | -0.026 | -0.100 | +0.0016 | 100% |
+| expansion/redsquare/chain_walls.dt1 | act4/mesa/chain_walls.dt1 | 202336 | 2.0 | 0.00% | -0.021 | -0.176 | +0.0001 | 100% |
+| expansion/redsquare/dist_wall.dt1 | act4/mesa/dist_wall.dt1 | 346850 | 2.3 | 0.00% | -0.017 | -0.256 | +0.0002 | 100% |
+| expansion/redsquare/floor.dt1 | act4/mesa/floor.dt1 | 686866 | 2.5 | 0.00% | -0.010 | +0.007 | +0.0034 | 100% |
+| expansion/redsquare/weird.dt1 | act4/mesa/weird.dt1 | 10024 | 1.1 | 0.00% | +0.012 | -0.043 | -0.0007 | 100% |
+| expansion/terror/basewall.dt1 | act1/crypt/basewall.dt1 | 236761 | 3.3 | 0.00% | -0.036 | +0.010 | +0.0007 | 100% |
+| expansion/terror/column.dt1 | act1/cathedrl/column.dt1 | 21339 | 2.9 | 0.00% | -0.025 | -0.005 | -0.0013 | 100% |
+| expansion/terror/floor.dt1 | act1/crypt/floor.dt1 | 19200 | 2.9 | 0.00% | -0.034 | +0.014 | +0.0014 | 100% |
+| expansion/terror/frescoes.dt1 | act1/cathedrl/frescoes.dt1 | 253386 | 2.9 | 0.00% | -0.017 | +0.002 | -0.0012 | 100% |
+| expansion/terror/graveyrd.dt1 | act1/graveyard/graveyrd.dt1 | 526383 | 2.4 | 0.00% | -0.051 | -0.004 | +0.0005 | 100% |
+| expansion/terror/stained.dt1 | act1/cathedrl/stained.dt1 | 140982 | 2.6 | 0.00% | -0.028 | +0.000 | -0.0003 | 100% |
+| expansion/voodoo/floors.dt1 | act3/travincal/floors.dt1 | 183693 | 1.7 | 0.00% | -0.006 | -0.092 | -0.0003 | 100% |
+| expansion/voodoo/pygmy.dt1 | act3/jungle/pygmy.dt1 | 154968 | 3.1 | 0.00% | -0.021 | -0.124 | +0.0021 | 100% |
+| expansion/voodoo/ruin.dt1 | act3/jungle/ruin.dt1 | 386131 | 4.5 | 0.00% | -0.028 | -0.118 | -0.0003 | 100% |
+| expansion/voodoo/terraces.dt1 | act3/kurast/terraces.dt1 | 393165 | 2.9 | 0.00% | -0.016 | -0.109 | -0.0023 | 100% |
+| expansion/voodoo/treegrp.dt1 | act3/jungle/treegrp.dt1 | 617230 | 5.9 | 0.00% | -0.032 | -0.474 | -0.0065 | 100% |
+| expansion/voodoo/trees.dt1 | act3/jungle/trees.dt1 | 829387 | 4.9 | 0.00% | -0.027 | -0.445 | -0.0020 | 100% |
+| expansion/voodoo/walls.dt1 | act3/kurast/walls.dt1 | 1013715 | 2.9 | 0.00% | -0.014 | -0.151 | -0.0023 | 100% |
+| expansion/zakarum/exterior.dt1 | act4/fort/exterior.dt1 | 512595 | 2.4 | 1.25% | -0.024 | -0.043 | +0.0004 | 100% |
+| expansion/zakarum/foregate.dt1 | act4/fort/foregate.dt1 | 706270 | 2.1 | 0.00% | -0.016 | -0.039 | +0.0021 | 100% |
+| expansion/zakarum/interior.dt1 | act4/fort/interior.dt1 | 310773 | 1.7 | 0.00% | -0.000 | -0.091 | +0.0008 | 100% |
+| expansion/zakarum/plaza.dt1 | act4/fort/plaza.dt1 | 476737 | 1.0 | 0.00% | -0.016 | -0.004 | +0.0014 | 100% |
+
+Distances are in RGB units (0-441): Median's tile under the Act 5 palette against the donor under its own act's. Hue in turns (1 = 360 degrees), only over pixels coloured on both sides; saturation and brightness on the HSV 0-1 scale. Map rows weight each file by the map's wall and floor cells drawn from it.
+
+<!-- map_tint:end -->
+
 ## Files
 
 | File | State |
@@ -223,7 +350,8 @@ belial, charismatic) and all 17 show D2R's stock walls, not Median's colours.
 | `tools/objpreset.py` | not copied: Median has no ObjPreset table and D2R's resolves every object id |
 | `tools/area_audit.py` | not copied: the checks that matter for 34 maps are `maps_hd.audit` |
 
-Not done: Median's own textures for the retextured maps (the HD textures). Gaps are in `docs/unported.md` (section Maps).
+Median's own textures for the retextured maps: none needed (the retextures keep the donors' colours, section "Median's look"); the
+maps' coloured light is `tools/map_tint.py`. Gaps are in `docs/unported.md` (section Maps).
 
 ## Generated tables
 

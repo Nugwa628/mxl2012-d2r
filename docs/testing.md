@@ -3622,3 +3622,18 @@ Not seen: `baaldeathhead01` (Bend the Shadows blinks the player to the totem in 
 0.3 / 1.5 s), `extra/shiverscast` / `shiversoverlay` (state `slowed` never landed: Spider Lay refused, Vine Attack on the zombie
 and spawned plague poppies / spiders gave no `slowed` in 15 s). The four unused arts (`extra/aurablue`, `aurared`, `aurast_bl`,
 `aurast_rd`) keep the stub. Unit tests: `test_overlay_picks_not_empty`, `test_no_stub_stand_ins` (tools/test_effects_hd.py).
+
+## Lane maptint: Median's look on the 8 retextured maps (2026-10-30, slot 4, background mode, build of lane/maptint, slot plugin 0.1.2)
+
+Build: `py -3 tools/build.py` (the tint is a step of `walls_hd.py build`), install `MXL_SLOT=4 MXL_RUN=maptint py -3
+tools/install_mod.py --slot 4` (data only). Check (harness travel and god mode, new level 1 character MapTint):
+`MXL_RUN=maptint MXL_SLOT=4 MXL_CHAR=MapTint MXL_CACHE_POLL=3 MXL_WALL_LEVELS=60,59,95,18,98,126,125,127 py -3 tools/game_checks.py all wall_maps`.
+Evidence in `mxl2012-runs/maptint/`; `sheets.py <before run> <after run> <out>` makes the before HD | after HD | legacy sheets.
+
+| run | result |
+|---|---|
+| `run1-checks-20261030-032500-s4` | first tints: all 8 maps in HD and classic, asserts none, 0 ERROR / ASSERT lines in `d2rloader.log`, no crash file. Charismatic only went neutral grey, cypherpunk too pale (`sheets1/`) |
+| `run2-checks-20261030-033400-s4` | final tints (cypherpunk and charismatic stronger): the same 16 visits, asserts none, no errors; peaks VTT 105/128, TileMaskRuleSet 3/16, ModelAsset 1421/2750; load screens as before (cypherpunk 0.72 s vs 0.55 s, glados 2.59 s vs 2.53 s). Per-map results: docs/maps-hd.md "Median's look" (`sheets/`, before = lane hdwalls2's `checks-20261030-010654-s1`) |
+
+Still to look at by a player's eye: whether the tints read as Median's maps at normal play (the harness shots are at level 1,
+god mode, mostly at the arrival).

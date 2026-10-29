@@ -43,6 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ds1_remap  # noqa: E402
+import map_tint  # noqa: E402
 import maps_hd  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -536,12 +537,14 @@ def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene):
     return wanted, cells, lib
 
 
-def build(data_dir: Path, wanted, cells, lib, biomes=None):
+def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None):
     """Write the wall scenes. -> {map: stats + bytes}. biomes: {map: biome name}; None = the biome of the scene maps_hd's
-    build wrote into data_dir (a generated floor biome, maps_hd.floor_biomes), else the plan's."""
+    build wrote into data_dir (a generated floor biome, maps_hd.floor_biomes), else the plan's. The maps of map_tint.TINTS get a
+    copy of that biome with their own key light (tools/map_tint.py); read(rel) -> D2R json for it (default fxpaths)."""
     out = {}
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
+        biome = map_tint.apply(data_dir, e["map"], map_tint.base_biome(data_dir, biome, e["biome"]), read)   # the 8 retextured maps: a biome with the map's own light
         text, st = build_scene(cells[e["map"]], lib, biome)
         dest = Path(data_dir) / "hd" / "env" / "preset" / (e["map"][:-4] + ".json")
         dest.parent.mkdir(parents=True, exist_ok=True)

@@ -70,7 +70,8 @@ Overall: roughly 80 % (2026-10-29 evening, lane phase3: phases 0-4 audited; 78 %
 - [x] Classic and HD stand-ins for Median-only monsters, missiles, items (tools/gfx_placeholders.py, hd_monsters.py, effects_hd.py)
 - [x] Skill tree, inventory and panel art (HD layouts + classic Median art; docs/hd-ui.md, docs/legacy-graphics.md)
 - [x] HD walls for the 8 retextured Median maps: D2R's own wall models in Median's layout (tools/walls_hd.py, docs/maps-hd.md; lane walls)
-- [ ] Recolour tints and custom art for those maps (Median's retextured look; charismatic's cathedral, downtown's 382 uncovered cells) (last)
+- [x] Median's look for those maps: no recolour needed (the retextures keep the donors' colours); each map gets its own coloured key light like legacy mode (tools/map_tint.py, docs/maps-hd.md "Median's look"; lane maptint)
+- [ ] Custom art for those maps: charismatic's cathedral arches and roofs, downtown's 126 Harrogath cells (orientation 14) without an HD wall (last)
 
 ## Phase 6: Test and release
 - [x] Game checks on slots 2/3 (tools/game_checks.py; lanes boot, harness, datafix, qa)

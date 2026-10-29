@@ -70,7 +70,7 @@ What we know is wrong or different. Please don't report these again, unless you 
 - **Stand-in HD art.** Many Median-only monsters, missiles, effects and items show a borrowed or recoloured D2R model or
   picture in HD. Legacy graphics (G) show Median's own classic art where it has one.
 - **Median's own maps show D2R's walls in HD.** The 17 maps that Median added or changed have D2R's own walls in Median's
-  layout in HD, not Median's recoloured look; 3 of them show only part of their walls (Hole Level 2, Ancient Tunnels, and
+  layout in HD, lit in each map's own colour as in legacy mode; 3 of them show only part of their walls (Hole Level 2, Ancient Tunnels, and
   Khalimgrad's cathedral). Legacy graphics (G) show them as Median drew them.
 - **Item pictures in HD:** most are Median's classic pictures scaled up, so they look softer than D2R's own.
 - **Skill trees in HD** are Median's classic page art scaled up.
