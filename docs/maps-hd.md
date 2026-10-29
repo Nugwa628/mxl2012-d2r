@@ -67,7 +67,7 @@ resolves monster rows and objects by the header act. Under the header act, the 7
 a ConsolationChest, which fits a lava map; under the level's act they would be a BurningPit and DrehyaInTown. What 1.13c does with
 the mismatch is unconfirmed, so this is flagged, not changed.
 
-## Walls of the 8 retextured maps (lane walls, 2026-10-29)
+## Walls of Median's 17 own maps (lanes walls and wallsfix 2026-10-29, hdwalls2 2026-10-30)
 
 `tools/walls_hd.py` (build step after `maps_hd.py build`, tests `tools/tests/test_walls_hd.py`) replaces the minimal scene of
 desertpeak, cypherpunk, glados, downtown, moskvich, borgir, macumba and charismatic with a scene that also holds **wall
@@ -106,6 +106,26 @@ entities made of D2R's own wall models**:
 Size: the 8 scenes are 10.2 MB of JSON together (before wallsfix 10.9 MB); the largest is cypherpunk, 4,423 placed models,
 3.29 MB, 33 distinct models (before: 5,820, 4.31 MB, 42). They name only D2R's own models, no new textures.
 
+**The other 9 maps** (lane hdwalls2). `walls_hd.MAPS` is now all 17 maps maps_hd gives a minimal scene: the 8 above
+(`RETEXTURED`) and the 9 on stock tiles (`STOCK`: inarius, belial, excelsior3, rockisdead, epicwhiners and the edits caveroom4,
+dungrm6a, temple5, temple6, whose layout is too far from D2R's scene to keep it). Their tiles are D2R's own, so no donor is
+needed; the method is the same. Two gaps of the method showed on them and are fixed for all 17:
+
+7. **Model variations.** 87k of D2R's 393k model entities carry no `ModelDefinitionComponent` but a
+   `ModelVariationDefinitionComponent` (weighted list of models, the engine picks one): all fences of the Flayer Dungeon, most
+   of the ice caves', Mesa, Travincal, the Arcane Sanctuary. walls_hd skipped them, so dungrm6a got 87 models for 475 wall
+   cells. They are learnt now (`model_of` takes the first entry, `models_of` lists all for the scene's `dependencies`; the
+   component is copied).
+8. **Walls on floor tiles** (`floor_cells`). D2R draws some walls on floor tiles: in the Act 1 caves 82% of the wall models
+   stand on cells with a floor and no wall tile (5% on wall cells; caveroom4 has 3 wall cells and 87 floor cells), the ice cave
+   ledges, Kurast stairs, the Arcane platforms' trims, Travincal's trench. Cells with a floor and no wall are keyed by their
+   floor tiles and learnt the same way; `choose()` keeps a floor bare unless D2R gives that floor tile models in a third of its
+   cells, and a floor tile D2R never has stays bare (never *uncovered*, never a generic wall).
+
+With both, the self-check on D2R's own maps went from 43% to 55% of their wall entities. The 8 earlier maps change too
+(cypherpunk 5,825 -> 10,166 placed pieces, still capped at 4,423; glados 850 -> 3,698, mostly Travincal trench and Kurast
+stairs on floor tiles). The 17 scenes are 21.9 MB together; none is above the cap.
+
 **Floors** (lane wallsfix, `tools/maps_hd.py`). HD paints a floor tile from the biome's terrain layers through the biome's
 tile mask (`data/hd/env/tilemasks/*.json`), keyed by .dt1 path; a tile no mask names gets the base layer. Median's new .dt1
 are in no mask, so before this lane every Median floor got its biome's base layer: Kurast's, chosen for cypherpunk by its
@@ -141,23 +161,55 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 
 <!-- walls_hd:begin (generated: py -3 -I tools/walls_hd.py docs) -->
 
-| map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | set pieces left out | placed | capped | models in scene | distinct models | scene size |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| expansion/dystopic/desertpeak.ds1 | act3_docktown | 2692 | 2384 | 306 | 2 | 1016 | 0 | 22 | 2790 | 0 | 2790 | 24 | 2153 KB |
-| expansion/ghetto/cypherpunk.ds1 | act3_docktown | 3983 | 3218 | 760 | 5 | 1121 | 0 | 19 | 5825 | 1402 | 4423 | 33 | 3370 KB |
-| expansion/glados/glados.ds1 | mxl2012_act4_mesa | 832 | 436 | 395 | 0 | 445 | 1 | 53 | 850 | 0 | 850 | 22 | 656 KB |
-| expansion/neonmile/downtown.ds1 | mxl2012_act4_mesa | 3278 | 2203 | 693 | 256 | 797 | 126 | 4 | 2362 | 0 | 2362 | 12 | 1760 KB |
-| expansion/redsquare/moskvich.ds1 | mxl2012_act4_mesa | 212 | 74 | 126 | 11 | 50 | 1 | 2 | 364 | 0 | 364 | 52 | 277 KB |
-| expansion/terror/borgir.ds1 | mxl2012_act4_fort | 734 | 418 | 312 | 3 | 37 | 1 | 1 | 2074 | 0 | 2074 | 43 | 1605 KB |
-| expansion/voodoo/macumba.ds1 | mxl2012_act4_fort | 405 | 356 | 20 | 28 | 18 | 1 | 38 | 561 | 0 | 561 | 15 | 431 KB |
-| expansion/zakarum/charismatic.ds1 | mxl2012_act4_fort | 568 | 143 | 402 | 22 | 366 | 1 | 87 | 228 | 0 | 228 | 9 | 171 KB |
-| all | | 12704 | 9232 | 3014 | 327 | 3850 | 131 | 226 | 15054 | 1402 | 13652 | | 10423 KB |
+| map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | floor cells (with models) | set pieces left out | placed | capped | models in scene | distinct models | scene size |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| expansion/dystopic/desertpeak.ds1 | act3_docktown | 2692 | 2384 | 306 | 2 | 1012 | 0 | 13435 (63) | 17 | 2905 | 0 | 2905 | 40 | 2246 KB |
+| expansion/ghetto/cypherpunk.ds1 | act3_docktown | 3983 | 3218 | 760 | 5 | 1109 | 0 | 9039 (966) | 11 | 10166 | 5743 | 4423 | 83 | 3821 KB |
+| expansion/glados/glados.ds1 | mxl2012_act4_mesa | 832 | 436 | 395 | 0 | 445 | 1 | 6911 (1300) | 5 | 3698 | 0 | 3698 | 53 | 3183 KB |
+| expansion/neonmile/downtown.ds1 | mxl2012_act4_mesa | 3278 | 2203 | 693 | 256 | 797 | 126 | 32292 (0) | 1 | 2367 | 0 | 2367 | 18 | 1766 KB |
+| expansion/redsquare/moskvich.ds1 | mxl2012_act4_mesa | 212 | 74 | 126 | 11 | 49 | 1 | 308 (62) | 1 | 538 | 0 | 538 | 105 | 510 KB |
+| expansion/terror/borgir.ds1 | mxl2012_act4_fort | 734 | 418 | 312 | 3 | 36 | 1 | 774 (25) | 3 | 2442 | 0 | 2442 | 74 | 2517 KB |
+| expansion/voodoo/macumba.ds1 | mxl2012_act4_fort | 405 | 356 | 20 | 28 | 18 | 1 | 1128 (0) | 31 | 568 | 0 | 568 | 20 | 437 KB |
+| expansion/zakarum/charismatic.ds1 | mxl2012_act4_fort | 568 | 143 | 402 | 22 | 366 | 1 | 1173 (94) | 126 | 424 | 0 | 424 | 12 | 323 KB |
+| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 209 | 5 | 572 (87) | 0 | 484 | 0 | 484 | 67 | 756 KB |
+| act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
+| act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
+| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 1 | 84 (19) | 0 | 21 | 0 | 21 | 16 | 18 KB |
+| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 331 | 68 | 1709 (95) | 5 | 1873 | 0 | 1873 | 97 | 1561 KB |
+| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 3 | 96 (96) | 0 | 662 | 0 | 662 | 16 | 546 KB |
+| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 442 | 14 | 449 | 1 | 4412 (190) | 546 | 3988 | 0 | 3988 | 86 | 3031 KB |
+| act1/cathedrl/inarius.ds1 | act1_cathedral | 110 | 110 | 0 | 0 | 16 | 0 | 145 (0) | 1 | 245 | 0 | 245 | 35 | 202 KB |
+| expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 3 | 0 | 3556 (440) | 0 | 542 | 0 | 542 | 47 | 888 KB |
+| all | | 15842 | 11821 | 3471 | 341 | 4840 | 209 | 75996 (3437) | 747 | 31627 | 5743 | 25884 | | 22446 KB |
 
-Learnt from 1063 D2R maps (92406 wall cells, 3455 distinct cell keys, 12437 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
+Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 41748 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
 
-Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 of the learnt D2R maps have 945 of their 2203 wall entities (43%; same model within 1.5 units).
+Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 of the learnt D2R maps have 3503 of their 6361 wall entities (55%; same model within 1.5 units).
 
 <!-- walls_hd:end -->
+
+### Status per map (lane hdwalls2, 2026-10-30, slot 1, check `wall_maps`)
+
+Every map entered by harness travel in HD and then in classic in one launch per group, three shots each; HD judged against
+legacy graphics (G) by eye. Runs `checks-20261030-005953-s1` (the 9 maps on stock tiles) and `checks-20261030-010654-s1`
+(the 8 retextured maps, again after this lane's changes): all 16 levels reached in both modes, **no engine assert and no
+crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #360). Walkability: the scenes are drawing only
+(no physics bodies, no tile or .ds1 change), so collision is the classic map's. Order: most visited first.
+
+| map | level | HD walls | seen in game (HD against classic) |
+|---|---|---|---|
+| act3/jungle/dungrm6a | 90 Flayer Dungeon 3 | yes | stone walls, arches and the iron gate follow the classic layout |
+| act3/temple/temple5, temple6 | 96 Forgotten Reliquary (one of the two, identical in Median) | yes | temple walls and pillars as in classic; the HD floor is the Kurast biome's grass where classic has temple stone (biome, not walls) |
+| act1/caves/caveroom4 | 15 Hole Level 2 | partial | cave rock walls where classic has walls; classic's stairs at the arrival have no HD model (Median's map has 87 floor cells, D2R's 400; 21 pieces) |
+| act3/kurast/excelsior3 | 84 Spider Cave | yes | Kurast walls, stairs and the courtyard as in classic; 68 wall cells stay without (43 tiles no file of the level type has, 25 Kurast corner halves) |
+| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is drawn as floor in HD (biome terrain) and classic's arches under the platform edge are missing |
+| expansion/morework/epicwhiners | 13 Cave Level 2 | yes | cave walls, stalagmites and rock mounds roughly where classic has them |
+| act1/cathedrl/inarius | 14 Underground Passage Level 2 | yes | cathedral walls, arches and windows as in classic |
+| expansion/icecave/rockisdead | 116 Drifter Cavern | yes | ice cave walls and ledges where classic has walls (classic is Median's brown cave colour) |
+| the 8 retextured maps | 60, 59, 95, 18, 98, 126, 125, 127 | yes (charismatic partial) | as in lanes walls / wallsfix; glados and cypherpunk now also show Kurast stairs and Travincal trench pieces on floor tiles; charismatic still statues, pillars and building walls but not classic's arches and roofs |
+
+Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 3 show only part of them (caveroom4,
+belial, charismatic) and all 17 show D2R's stock walls, not Median's colours.
 
 ## Files
 
@@ -171,8 +223,7 @@ Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 o
 | `tools/objpreset.py` | not copied: Median has no ObjPreset table and D2R's resolves every object id |
 | `tools/area_audit.py` | not copied: the checks that matter for 34 maps are `maps_hd.audit` |
 
-Not done: building a scene for a generated or custom-art map beyond the minimal one, any game run, the HD textures. Gaps are in
-`docs/unported.md` (section Maps).
+Not done: Median's own textures for the retextured maps (the HD textures). Gaps are in `docs/unported.md` (section Maps).
 
 ## Generated tables
 
@@ -185,18 +236,18 @@ Refresh: `py -3 -I tools/maps_hd.py docs`. Needs the extract and the D2R 93847 b
 | map | levels (lvlprest -> levels.txt) | size | kind | plan | scene / biome | conf. | art needed for walls/buildings |
 |---|---|---|---|---|---|---|---|
 | act1/cathedrl/cathy3.ds1 | 33 Act 1 - Cathedral | 29x35 | D2R map, edited by Median | D2R scene | D2R scene | high | none (D2R's scene) |
-| act1/cathedrl/inarius.ds1 | 14 Act 1 - Cave 3 Treasure | 29x35 | Median map | minimal scene | act1_cathedral | medium | missing in HD: all 110 wall cells are stock tiles, a generated scene (stage 2) can use stock wall models |
-| act1/caves/caveroom4.ds1 | 15 Act 1 - Cave 4 Treasure | 25x25 | D2R map, edited by Median | minimal scene | act1_caves | medium | missing in HD (D2R scene dropped: layout changed); stock tiles, generatable |
+| act1/cathedrl/inarius.ds1 | 14 Act 1 - Cave 3 Treasure | 29x35 | Median map | minimal scene | act1_cathedral | medium | D2R's stock walls in HD (tools/walls_hd.py): all 110 wall cells are stock tiles |
+| act1/caves/caveroom4.ds1 | 15 Act 1 - Cave 4 Treasure | 25x25 | D2R map, edited by Median | minimal scene | act1_caves | medium | D2R's stock walls in HD (tools/walls_hd.py; D2R's scene dropped: layout changed) |
 | act1/caves/caveroom5.ds1 | 16 Act 1 - Cave 5 Treasure | 25x25 | D2R map, edited by Median | D2R scene | D2R scene | high | none (D2R's scene) |
 | act1/outdoors/bivouac.ds1 | preset rows: Act 1 - Bivouac | 17x17 | D2R map, edited by Median | D2R scene | D2R scene | high | none (D2R's scene) |
-| act2/arcane/belial.ds1 | 65 Act 2 - Sewer 2 A | 48x48 | Median map | minimal scene | act2_arcane | medium | missing in HD: all 81 wall cells are stock tiles, a generated scene (stage 2) can use stock wall models |
+| act2/arcane/belial.ds1 | 65 Act 2 - Sewer 2 A | 48x48 | Median map | minimal scene | act2_arcane | medium | D2R's stock walls in HD (tools/walls_hd.py): all 81 wall cells are stock tiles |
 | act2/maggot/magqueen.ds1 | preset rows: Act 2 - Lair Tight Spot S | 11x11 | D2R map, edited by Median | D2R scene | D2R scene | high | none (D2R's scene) |
 | act2/palace/harem2.ds1 | 50 Act 2 - Harem | 17x20 | D2R map, edited by Median | D2R scene | D2R scene | high | none (D2R's scene) |
 | act2/tomb/duriel.ds1 | 73 Act 2 - Duriel's Lair | 33x48 | D2R map, edited by Median | D2R scene | D2R scene | high | none (D2R's scene) |
-| act3/jungle/dungrm6a.ds1 | 90 Act 3 - Dungeon 1 Treasure | 41x41 | D2R map, edited by Median | minimal scene | act3_jungle (level type: act3_jungle_dungeon) | medium | missing in HD (D2R scene dropped: layout changed); stock tiles, generatable |
-| act3/kurast/excelsior3.ds1 | 84 Act 3 - Spider 1 | 51x51 | Median map | minimal scene | act3_kurast | medium | missing in HD: all 1199 wall cells are stock tiles, a generated scene (stage 2) can use stock wall models |
-| act3/temple/temple5.ds1 | 96 Act 3 - Temple 3 | 25x25 | D2R map, edited by Median | minimal scene | act3_kurast | medium | missing in HD (D2R scene dropped: layout changed); stock tiles, generatable |
-| act3/temple/temple6.ds1 | 96 Act 3 - Temple 3 | 25x25 | D2R map, edited by Median | minimal scene | act3_kurast | medium | missing in HD (D2R scene dropped: layout changed); stock tiles, generatable |
+| act3/jungle/dungrm6a.ds1 | 90 Act 3 - Dungeon 1 Treasure | 41x41 | D2R map, edited by Median | minimal scene | act3_jungle (level type: act3_jungle_dungeon) | medium | D2R's stock walls in HD (tools/walls_hd.py; D2R's scene dropped: layout changed) |
+| act3/kurast/excelsior3.ds1 | 84 Act 3 - Spider 1 | 51x51 | Median map | minimal scene | act3_kurast | medium | D2R's stock walls in HD (tools/walls_hd.py): all 1199 wall cells are stock tiles |
+| act3/temple/temple5.ds1 | 96 Act 3 - Temple 3 | 25x25 | D2R map, edited by Median | minimal scene | act3_kurast | medium | D2R's stock walls in HD (tools/walls_hd.py; D2R's scene dropped: layout changed) |
+| act3/temple/temple6.ds1 | 96 Act 3 - Temple 3 | 25x25 | D2R map, edited by Median | minimal scene | act3_kurast | medium | D2R's stock walls in HD (tools/walls_hd.py; D2R's scene dropped: layout changed) |
 | act4/diab/entry1.ds1 | preset rows: Act 4 - Diablo Entry | 25x25 | D2R map, unchanged | D2R scene | D2R scene | exact | none (D2R's scene) |
 | act4/diab/heart.ds1 | preset rows: Act 4 - Diablo Heart | 25x25 | D2R map, edited by Median | D2R scene | D2R scene | medium | none (D2R's scene) |
 | act4/diab/winge1.ds1 | preset rows: Act 4 - Diablo Arm E | 25x25 | D2R map, unchanged | D2R scene | D2R scene | exact | none (D2R's scene) |
@@ -207,17 +258,17 @@ Refresh: `py -3 -I tools/maps_hd.py docs`. Needs the extract and the D2R 93847 b
 | act4/diab/wings2.ds1 | preset rows: Act 4 - Diablo Arm S | 25x25 | D2R map, unchanged | D2R scene | D2R scene | exact | none (D2R's scene) |
 | act4/diab/wingw1.ds1 | preset rows: Act 4 - Diablo Arm W | 25x25 | D2R map, unchanged | D2R scene | D2R scene | exact | none (D2R's scene) |
 | act4/diab/wingw2.ds1 | preset rows: Act 4 - Diablo Arm W | 25x25 | D2R map, unchanged | D2R scene | D2R scene | exact | none (D2R's scene) |
-| expansion/dystopic/desertpeak.ds1 | 60 Act 2 - Tomb 2 Treasure | 128x128 | Median map | minimal scene | act3_docktown (level type: act2_tomb) | medium | missing in HD: stand-in tiles are stock act3/docktown, act3/jungle, act3/kurast, act4/fort; Median's re-textured look needs custom art (2697 of 2992 wall cells on new .dt1) |
-| expansion/ghetto/cypherpunk.ds1 | 59 Act 2 - Tomb 1 Treasure | 128x128 | Median map | minimal scene | act3_docktown (level type: act2_tomb) | medium | missing in HD: stand-in tiles are stock act3/docktown, act3/jungle, act3/kurast, act4/fort; Median's re-textured look needs custom art (4691 of 5228 wall cells on new .dt1) |
-| expansion/glados/glados.ds1 | 95 Act 3 - Temple 2 | 120x120 | Median map | minimal scene | act4_mesa (level type: act3_kurast) | medium | missing in HD: stand-in tiles are stock act4/fort, act4/mesa; Median's re-textured look needs custom art (200 of 1038 wall cells on new .dt1) |
-| expansion/icecave/rockisdead.ds1 | 116 Act 5 - Ice Cave 2A | 65x65 | Median map | minimal scene | expansion_icecave | medium | missing in HD: all 52 wall cells are stock tiles, a generated scene (stage 2) can use stock wall models |
-| expansion/morework/epicwhiners.ds1 | 13 Act 1 - Cave 2 Treasure | 120x120 | Median map | minimal scene | act1_caves (level type: act1_cathedral) | medium | missing in HD: all 1735 wall cells are stock tiles, a generated scene (stage 2) can use stock wall models |
-| expansion/neonmile/downtown.ds1 | 18 Act 1 - Crypt 1 A | 251x251 | Median map | minimal scene | act4_mesa (level type: act1_crypt) | medium | missing in HD: stand-in tiles are stock act3/travincal, act4/fort, act4/mesa, expansion/town; Median's re-textured look needs custom art (2002 of 3493 wall cells on new .dt1) |
-| expansion/redsquare/moskvich.ds1 | 98 Act 3 - Temple 5 | 25x25 | Median map | minimal scene | act4_mesa (level type: act3_kurast) | medium | missing in HD: stand-in tiles are stock act4/fort, act4/mesa; Median's re-textured look needs custom art (82 of 393 wall cells on new .dt1) |
-| expansion/terror/borgir.ds1 | 126 Act 5 - Hell 2 | 100x100 | Median map | minimal scene | act4_fort (level type: expansion_icecave) | medium | missing in HD: stand-in tiles are stock act3/jungle, act3/kurast, act4/fort; Median's re-textured look needs custom art (1306 of 1315 wall cells on new .dt1) |
+| expansion/dystopic/desertpeak.ds1 | 60 Act 2 - Tomb 2 Treasure | 128x128 | Median map | minimal scene | act3_docktown (level type: act2_tomb) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act3/docktown, act3/jungle, act3/kurast, act4/fort; Median's re-textured look needs custom art (2697 of 2992 wall cells on new .dt1) |
+| expansion/ghetto/cypherpunk.ds1 | 59 Act 2 - Tomb 1 Treasure | 128x128 | Median map | minimal scene | act3_docktown (level type: act2_tomb) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act3/docktown, act3/jungle, act3/kurast, act4/fort; Median's re-textured look needs custom art (4691 of 5228 wall cells on new .dt1) |
+| expansion/glados/glados.ds1 | 95 Act 3 - Temple 2 | 120x120 | Median map | minimal scene | act4_mesa (level type: act3_kurast) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act4/fort, act4/mesa; Median's re-textured look needs custom art (200 of 1038 wall cells on new .dt1) |
+| expansion/icecave/rockisdead.ds1 | 116 Act 5 - Ice Cave 2A | 65x65 | Median map | minimal scene | expansion_icecave | medium | D2R's stock walls in HD (tools/walls_hd.py): all 52 wall cells are stock tiles |
+| expansion/morework/epicwhiners.ds1 | 13 Act 1 - Cave 2 Treasure | 120x120 | Median map | minimal scene | act1_caves (level type: act1_cathedral) | medium | D2R's stock walls in HD (tools/walls_hd.py): all 1735 wall cells are stock tiles |
+| expansion/neonmile/downtown.ds1 | 18 Act 1 - Crypt 1 A | 251x251 | Median map | minimal scene | act4_mesa (level type: act1_crypt) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act3/travincal, act4/fort, act4/mesa, expansion/town; Median's re-textured look needs custom art (2002 of 3493 wall cells on new .dt1) |
+| expansion/redsquare/moskvich.ds1 | 98 Act 3 - Temple 5 | 25x25 | Median map | minimal scene | act4_mesa (level type: act3_kurast) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act4/fort, act4/mesa; Median's re-textured look needs custom art (82 of 393 wall cells on new .dt1) |
+| expansion/terror/borgir.ds1 | 126 Act 5 - Hell 2 | 100x100 | Median map | minimal scene | act4_fort (level type: expansion_icecave) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act3/jungle, act3/kurast, act4/fort; Median's re-textured look needs custom art (1306 of 1315 wall cells on new .dt1) |
 | expansion/town/townwest.ds1 | 109 Act 5 - Town | 41x41 | D2R map, unchanged | D2R scene | D2R scene | exact | none (D2R's scene) |
-| expansion/voodoo/macumba.ds1 | 125 Act 5 - Hell 1 | 64x64 | Median map | minimal scene | act4_fort (level type: expansion_icecave) | medium | missing in HD: stand-in tiles are stock act1/graveyard, act3/kurast, act4/fort; Median's re-textured look needs custom art (421 of 429 wall cells on new .dt1) |
-| expansion/zakarum/charismatic.ds1 | 127 Act 5 - Hell 3 | 96x96 | Median map | minimal scene | act4_fort (level type: act4_lava) | medium | missing in HD: stand-in tiles are stock act4/fort; Median's re-textured look needs custom art (870 of 871 wall cells on new .dt1) |
+| expansion/voodoo/macumba.ds1 | 125 Act 5 - Hell 1 | 64x64 | Median map | minimal scene | act4_fort (level type: expansion_icecave) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act1/graveyard, act3/kurast, act4/fort; Median's re-textured look needs custom art (421 of 429 wall cells on new .dt1) |
+| expansion/zakarum/charismatic.ds1 | 127 Act 5 - Hell 3 | 96x96 | Median map | minimal scene | act4_fort (level type: act4_lava) | medium | D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock act4/fort; Median's re-textured look needs custom art (870 of 871 wall cells on new .dt1) |
 
 Notes per map: diff against D2R, tile resolution through lvlprest Dt1Mask + lvltypes, ids the remap / ID map must see:
 

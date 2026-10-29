@@ -11,8 +11,8 @@ The numbers in the progress column are our own estimate of each phase, not a mea
 | 0 | Setup | 98 % | every item done (toolchain checked by `tools/lane_setup.py` 2026-10-29); left: CI's `assets` job runs only after the owner's asset-pack upload + secret (OWNER-QUESTIONS #28) |
 | 1 | Tools | 98 % | full `tools/build.py` runs end to end (lane phase3 rebuild 2026-10-29: 8 min, validate 0 errors); asset pack `assets-1` built and pinned in assets.lock; left: the owner's upload of it (same blocker as phase 0) |
 | 2 | Data port | 90 % | all 86 tables migrated, validate 0 errors; boots, all five act towns load; saves round-trip (lane savefmt); D2R additions removed; open bugs left (2026-10-29): #434 (medium, Hratli out of reach) and lows #17, #292, #392, #399, #432, #436, #484, plus the player reports #487-#498 of other lanes |
-| 3 | Triage of engine differences | 100 % | every row has an in-game or static verdict (engine-triage.md section 7: same 13, ported 15, unported 2); #16 (`rprunes`), #18 (`cubeclasses`) and #24 (`rpsignets`, lane phase3) confirmed on the player path; #24's Apple needs engine work and went to the plugin plan (section 25, bug #499) |
-| 4 | Plugin | 90 % | v0.1 built and in game; first game pass done (all plugin-plan 10.1 checks run, bugs #4 / #5 fixed) and its failures ported (#6 `cltnomis`, #14, #15, #16); later parts (whirlwind, ilvl, runeletter, cubedupe, lvlupui, ...) in. Left: the Apple part (plugin-plan.md section 25, bug #499), whirlwind feel by eye (human visual review) |
+| 3 | Triage of engine differences | 100 % | every row has an in-game or static verdict (engine-triage.md section 7: same 13, ported 15, unported 2); #16 (`rprunes`), #18 (`cubeclasses`) and #24 (`rpsignets`, lane phase3) confirmed on the player path; #24's Apple needed engine work: plugin part `appleuse` (plugin-plan.md section 25, bug #499, lane apple) |
+| 4 | Plugin | 90 % | v0.1 built and in game; first game pass done (all plugin-plan 10.1 checks run, bugs #4 / #5 fixed) and its failures ported (#6 `cltnomis`, #14, #15, #16); later parts (whirlwind, ilvl, runeletter, cubedupe, lvlupui, ...) in. Apple part `appleuse` in (lane apple, bug #499). Left: whirlwind feel by eye (human visual review) |
 | 5 | Graphics | 65 % | HD stand-ins (monsters, effects, maps floors, icons, UI) and classic Median art in the build; map walls and custom art open |
 | 6 | Test and release | 50 % | game checks in tools/game_checks.py (acts, cube, rules, saves); alpha package tool (tools/cut_alpha.ps1); release scripts and owner server steps ready (docs/hosting.md); 0.1.0 to 0.1.2 published (2026-10-29), downloader with it; public GitHub mirror live; signing and open bugs left |
 
@@ -62,7 +62,8 @@ Overall: roughly 80 % (2026-10-29 evening, lane phase3: phases 0-4 audited; 78 %
 - [x] v0.1 parts of docs/plugin-plan.md (CltDoWall, empty-slot stubs, dev harness subset)
 - [x] First game pass, then per-failure ports (lane boot's partial pass, docs/testing.md "First boot"; harness bugs #4, #5 fixed; full
   pass in docs/testing.md "Harness lane" / "Lane triage" / "Lane pluginplan2"; failures ported: #6 `cltnomis`, #14, #15, #16)
-- [ ] Apple: 1.13c item spell 10 starts skill 47 (plugin-plan.md section 25, bug #499; found by lane phase3)
+- [x] Apple: 1.13c item spell 10 starts skill 47 (plugin-plan.md section 25, bug #499; found by lane phase3; part `appleuse`,
+  lane apple, 2026-10-30)
 
 ## Phase 5: Graphics
 - [x] Downloader art

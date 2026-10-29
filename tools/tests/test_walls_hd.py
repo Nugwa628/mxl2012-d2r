@@ -19,15 +19,16 @@ import walls_hd  # noqa: E402
 from tests.test_maps import cell, make_dt1  # noqa: E402
 
 
-def make_ds1(w, h, walls, files=(), version=18):
-    """walls: [(cells, orientations)] per wall layer (w*h dwords each); one empty floor layer; header lists `files`."""
+def make_ds1(w, h, walls, files=(), version=18, floor=None):
+    """walls: [(cells, orientations)] per wall layer (w*h dwords each); one floor layer (`floor`: w*h dwords, else empty);
+    header lists `files`."""
     n = w * h
     out = struct.pack("<iiii", version, w - 1, h - 1, 0) + struct.pack("<i", 0)
     out += struct.pack("<i", len(files)) + b"".join(f.encode() + b"\0" for f in files)
     out += struct.pack("<ii", len(walls), 1)
     for wc, oc in walls:
         out += struct.pack("<%dI" % n, *wc) + struct.pack("<%dI" % n, *oc)
-    out += struct.pack("<%dI" % n, *([0] * n)) * 2          # floor, shadow
+    out += struct.pack("<%dI" % n, *(floor or [0] * n)) + struct.pack("<%dI" % n, *([0] * n))   # floor, shadow
     out += struct.pack("<i", 0)
     return out
 
@@ -79,6 +80,21 @@ class TilesTest(unittest.TestCase):
         self.assertEqual(cells[(2, 1)], ((None, 1, 9, 9),))
         self.assertEqual(len(cells), 2)
 
+    def test_floor_cells_skip_walls_and_unresolved(self):
+        w = 3
+        floor = [cell(5, 0), cell(2, 1), cell(7, 7), 0, cell(2, 1), 0]
+        ds = ds1_remap.Ds1(make_ds1(w, 2, [layer(w, 2, {(0, 0): (cell(2, 0), 1)})], floor=floor))
+        tiles = {"mod/new/floor.dt1": dt1.parse(make_dt1([(0, 5, 0, 8, 8, b"f"), (0, 2, 1, 8, 8, b"g")])),
+                 "act1/caves/cave.dt1": dt1.parse(make_dt1([(1, 2, 0, 8, 8, b"w")]))}
+        donor = lambda p: "act1/caves/cave.dt1" if p.startswith("mod/") else p   # noqa: E731
+        cells = walls_hd.map_cells(ds, ["mod/new/floor.dt1", "act1/caves/cave.dt1"], tiles.get, donor)
+        self.assertEqual(cells[(0, 0)], (("act1/caves", 1, 2, 0),))      # the wall wins: no floor key on a wall cell
+        self.assertEqual(cells[(1, 0)], (("act1/caves", 0, 2, 1),))
+        self.assertNotIn((2, 0), cells)                                    # floor tile in no file
+        self.assertEqual(set(cells), {(0, 0), (1, 0), (1, 1)})
+        self.assertTrue(walls_hd.is_floor(cells[(1, 0)]))
+        self.assertFalse(walls_hd.is_floor(cells[(0, 0)]))
+
     def test_orientation_uses_low_byte(self):
         ds = ds1_remap.Ds1(make_ds1(1, 1, [layer(1, 1, {(0, 0): (cell(2, 0), 0x0501)})]))
         self.assertEqual(walls_hd.wall_cells(ds, {(1, 2, 0): "a/b.dt1"})[(0, 0)], (("a", 1, 2, 0),))
@@ -98,6 +114,20 @@ class SceneTest(unittest.TestCase):
         self.assertEqual([c["type"] for c in e["components"]],
                          ["TransformDefinitionComponent", "ModelDefinitionComponent", "WallTransparencyComponent"])
         self.assertEqual(e["components"][2]["name"], "e_w")      # D2R's own is kept
+
+    def test_model_variations_count_as_models(self):
+        e = entity(WALL, 1, 1)
+        e["components"] = [c for c in e["components"] if c["type"] != "ModelDefinitionComponent"]
+        e["components"].append({"type": "ModelVariationDefinitionComponent", "name": "v", "variations": [
+            {"type": "ModelVariationEntry", "weight": 0.5, "filename": WALL}, {"type": "ModelVariationEntry", "weight": 0.5,
+                                                                              "filename": PILLAR}]})
+        self.assertEqual(walls_hd.model_of(e), WALL)
+        self.assertEqual(walls_hd.models_of(e), [WALL, PILLAR])
+        self.assertEqual(len(walls_hd.wall_entities({"entities": [e]})), 1)
+        s = walls_hd.strip_entity(e)
+        self.assertIn("ModelVariationDefinitionComponent", [c["type"] for c in s["components"]])
+        scene = json.loads(walls_hd.scene_json("act3_kurast", walls_hd.place([(s, 0.0, 0.0)], 1, 1, 0)))
+        self.assertEqual(scene["dependencies"]["models"], [{"path": PILLAR}, {"path": WALL}])
 
     def test_strip_adds_wall_transparency(self):
         e = walls_hd.strip_entity(entity(WALL, 1, 1))
@@ -156,6 +186,18 @@ class SceneTest(unittest.TestCase):
         self.assertEqual((st["exact"], st["empty"], st["uncovered"], st["cells"], st["entities"], st["set_pieces"]), (2, 1, 1, 3, 2, 0))
         self.assertEqual(sorted(walls_hd.transform(e)["position"]["x"] for e in scene["entities"]), [25.0, 26.0])
         self.assertTrue(all(c["type"] != "PhysicsBodyDefinitionComponent" for e in scene["entities"] for c in e["components"]))
+
+
+    def test_floor_cells_are_counted_apart(self):
+        lib = walls_hd.Library()
+        f_wall, f_bare = (("act1/caves", 0, 2, 0),), (("act1/caves", 0, 5, 0),)
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): f_wall, (1, 0): f_bare}, {"entities": [entity(WALL, 5, 5)]})
+        cells = {(2, 2): f_wall, (3, 2): f_bare, (4, 2): (("act1/caves", 0, 9, 9),), (5, 2): (("z", 1, 1, 1),)}
+        text, st = walls_hd.build_scene(cells, lib, "act1_caves")
+        self.assertEqual(len(json.loads(text)["entities"]), 1)
+        self.assertEqual((st["floor_cells"], st["floor_walls"], st["cells"], st["uncovered"]), (3, 1, 1, 1))
+        self.assertEqual(lib.pick((("act1/caves", 0, 9, 9),)), ((), "floor"))   # a floor D2R never has stays bare
 
 
 PROP = "data/hd/env/model/act3/kurast/props/book02.model"
@@ -309,9 +351,10 @@ class LearnLibraryTest(unittest.TestCase):
             self.assertEqual(st["expansion/x/y.ds1"]["biome"], "mxl2012_act4_fort")
             self.assertEqual(json.loads(p.read_text())["biomeFilename"], "data/hd/env/biome/mxl2012_act4_fort.json")
 
-    def test_the_eight_maps_are_median_paths(self):
-        self.assertEqual(len(walls_hd.MAPS), 8)
-        self.assertTrue(all(m.startswith("expansion/") and m.endswith(".ds1") for m in walls_hd.MAPS))
+    def test_the_seventeen_maps(self):
+        self.assertEqual((len(walls_hd.RETEXTURED), len(walls_hd.STOCK), len(set(walls_hd.MAPS))), (8, 9, 17))
+        self.assertTrue(all(m.startswith("expansion/") and m.endswith(".ds1") for m in walls_hd.RETEXTURED))
+        self.assertTrue(all(m.endswith(".ds1") for m in walls_hd.STOCK))
 
 
 if __name__ == "__main__":

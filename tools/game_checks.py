@@ -5517,8 +5517,142 @@ def check_rpsignets():
     character (harness, as a monster's drop), picked up by a left click, used by a right click in the inventory; the stats of its
     stat1 / stat2 read before and after. MXL_CHAR must be a NEW character (level 1, no gold, caps 0)."""
     for code, what, gains in RP_SIGNETS:
-        rc_quest_use("rpsig_%s" % re.sub(r"\W", "_", code), code, lambda s0, s1, g_=gains: signet_verdict(g_, s0, s1), list(gains),
-                     "%s: %s" % (what, ", ".join("%s +%d" % kv for kv in gains.items())))
+        rule = (lambda s0, s1, g_=gains: signet_verdict(g_, s0, s1) and apple_state(None)["on"]) if code == "dog" else \
+            (lambda s0, s1, g_=gains: signet_verdict(g_, s0, s1))
+        rc_quest_use("rpsig_%s" % re.sub(r"\W", "_", code), code, rule, list(gains),
+                     "%s: %s%s" % (what, ", ".join("%s +%d" % kv for kv in gains.items()),
+                                   ", state mega_apple (%d) on the player" % APPLE_STATE if code == "dog" else ""))
+
+
+# Bug #499 (plugin part `appleuse`): the Apple (`dog`, misc pSpell 10) casts skills row 47 `Apple Healing Spell` as 1.13c's item
+# spell 10 did: state `mega_apple` for auralencalc 15000 frames (10 minutes) with aurastat1-5 = hpregen
+# ((maxhp.accr / 3000) * (100 + item_faster_potions.accr)) / 100, item_vitality_percent = skill_bloodymary_bonus, damagepercent =
+# skill_elixirs_synergy, item_energy_percent = skill_paganheart_bonus, item_allskills = skill_paganheart_synergy.
+APPLE_STATE, APPLE_FRAMES = 44, 15000
+APPLE_STATS = {74: "hpregen", 393: "item_vitality_percent", 25: "damagepercent", 392: "item_energy_percent", 127: "item_allskills"}
+APPLE_SYNERGY = {393: (444, 7), 25: (498, 9), 392: (445, 11), 127: (461, 1)}  # aurastat -> (source stat, SET-UP value)
+APPLE_FASTER_POTIONS = 523
+
+
+def apple_hpregen(maxhp_raw, faster_potions):
+    """skills.txt row 47 aurastatcalc1 in the engine's integer arithmetic (stats in their raw units, life * 256)."""
+    return int(maxhp_raw / 3000) * (100 + faster_potions) // 100
+
+
+def apple_state(log):
+    """The player's state 44 from `states player 44`: {on, end, stats {stat: value}} (end = the list's end frame)."""
+    _, ln = Hl("states player %d" % APPLE_STATE, log) if log is not None else H("states player %d" % APPLE_STATE)
+    line = next((l for l in ln if l.startswith("server state %d:" % APPLE_STATE)), "")
+    on = "bit=1" in line
+    end = first([line], r"end=(-?\d+)") if line else None
+    stats = {int(s): int(v) for s, _l, v in re.findall(r" (\d+):(\d+)=(-?\d+)", line.split("stat:layer=value", 1)[-1])} if line else {}
+    return {"on": on, "end": end, "stats": stats, "line": line}
+
+
+def apple_buy(npc, nm, log, shots):
+    """A vendor's Trade panel (talk 0x2f, menu line Trade), the Apple found in `shop` and bought by a right click as a player does.
+    SET-UP: `gold set` pays for it. Returns the new inventory item dict or None."""
+    H("packclear")
+    menu = rp_npc_menu(npc, log)
+    line = rp_menu_line(menu, RP_TRADE) if menu else None
+    if line is None:
+        log.append("%s: no Trade line" % nm)
+        return None
+    Hl("menu %d" % line, log)
+    for _ in range(12):
+        time.sleep(1.5)
+        if trade_panel_open():
+            break
+    if not trade_panel_open():
+        log.append("%s: the trade panel did not open" % nm)
+        return None
+    H("gold set 900000 0")
+    stock = [kv(l) for l in Hl("shop %d" % npc, log)[1] if l.startswith("item ")]
+    apples = [s for s in stock if s.get("code") == "dog"]
+    shots.append(sh("apple_shop"))
+    got = None
+    for s in apples[:1]:
+        page, x, y = int(s["page"]), int(s["x"]), int(s["y"])
+        g.click(RP_SHOP_TABS[page][0] / 1600, RP_SHOP_TABS[page][1] / 900)
+        time.sleep(0.8)
+        ids0 = {i.get("id") for i in rp_items_now()}
+        gold0 = first(H("gold get")[1], r"carried=(\d+)")
+        g.click(*rp_inv_xy(x, y, RP_SHOP), button="right")
+        time.sleep(1.5)
+        gold1 = first(H("gold get")[1], r"carried=(\d+)")
+        got = next((i for i in rp_items_now() if i.get("id") not in ids0 and i.get("page") == 0 and i.get("code") == "dog"), None)
+        log.append("%s: Apple in stock %s; bought %s for %s" % (nm, s, got, (gold0 - gold1) if gold0 and gold1 else "?"))
+    if not apples:
+        log.append("%s: no Apple in %d stock items" % (nm, len(stock)))
+    rp_close_trade()
+    return got
+
+
+def check_apple_use():
+    """Bug #499 on the player path: buy an Apple from Charsi (Trade, right click), use it by a right click in the inventory, then
+    read state `mega_apple` (44) on the server's player: its end frame (15000 frames from the use), its five stats against skills row
+    47's formulas, and the player's hpregen. SET-UP by harness: gold for the purchase, the four synergy source stats (444 / 498 /
+    445 / 461 = 7 / 9 / 11 / 1, so aurastat2-5 are not 0). Then Save and Exit and back in: the Apple stays used up and the game runs
+    (1.13c saves no states: `mega_apple` is expected gone after the reload)."""
+    mark = engine_mark()
+    log, shots, bad = [], [], []
+    goto(1)
+    for _aura, (src, v) in APPLE_SYNERGY.items():
+        Hl("stat player %d set %d" % (src, v), log)
+    n0 = len(rc_of("dog", RC_PAGE_INV, log))
+    it = apple_buy(154, "Charsi", log, shots)
+    if it is None:
+        return add("apple_use", "BLOCKED", "no Apple bought from Charsi: %s" % (log[-1] if log else "?"), shots, log)
+    s0 = rc_stats(["newskills", "maxhp"], log)
+    regen0 = stat_of(Hl("stat player 74", log)[1]) or 0
+    fp = stat_of(Hl("stat player %d" % APPLE_FASTER_POTIONS, log)[1]) or 0
+    frame0 = first(Hl("state", log)[1], r"frame=(\d+)")
+    rc_use(it, log, shots, "apple")
+    st = apple_state(log)
+    frame1 = first(Hl("state", log)[1], r"frame=(\d+)")
+    s1 = rc_stats(["newskills", "maxhp"], log)
+    regen1 = stat_of(Hl("stat player 74", log)[1]) or 0
+    left = [i for i in rc_of("dog", RC_PAGE_INV, log) if i["id"] == it["id"]]
+    want = {74: apple_hpregen(s0["maxhp"] or 0, fp)}
+    want.update({aura: v for aura, (_src, v) in APPLE_SYNERGY.items()})
+    if left:
+        bad.append("the Apple was not used up")
+    if not st["on"]:
+        bad.append("no state mega_apple (%d) after the use" % APPLE_STATE)
+    for sid, v in want.items():
+        if st["stats"].get(sid) != v:
+            bad.append("%s %s, want %s" % (APPLE_STATS[sid], st["stats"].get(sid), v))
+    rest = (st["end"] or 0) - (frame1 or 0)
+    if not (frame0 and frame1 and APPLE_FRAMES - (frame1 - frame0) - 2 <= rest <= APPLE_FRAMES):
+        bad.append("state lasts %s frames from now (used between frames %s and %s), want %d from the use" % (rest, frame0, frame1, APPLE_FRAMES))
+    if regen1 - regen0 != want[74]:
+        bad.append("player hpregen %s -> %s, want +%d" % (regen0, regen1, want[74]))
+    if (s1["newskills"] or 0) != (s0["newskills"] or 0):
+        bad.append("skill points %s -> %s (the Book's effect)" % (s0["newskills"], s1["newskills"]))
+    note = ("Apple bought from Charsi (%d in the backpack before), used by a right click: %s; state %d %s, end frame %s at frame %s "
+            "(%s frames left, used after frame %s); stats %s (want %s); player hpregen %s -> %s; skill points %s -> %s" % (
+                n0, "kept" if left else "used up", APPLE_STATE, "on" if st["on"] else "OFF", st["end"], frame1, rest, frame0,
+                {APPLE_STATS[k]: v for k, v in st["stats"].items() if k in APPLE_STATS}, {APPLE_STATS[k]: v for k, v in want.items()},
+                regen0, regen1, s0["newskills"], s1["newskills"]))
+    log.append("state 44 line: %s" % st["line"])
+    shots.append(sh("apple_after"))
+    for _aura, (src, _v) in APPLE_SYNERGY.items():
+        Hl("stat player %d set 0" % src, log)
+    finish("apple_use", not bad, "SET-UP: gold and the synergy source stats %s by harness; " % {s_: v for s_, v in APPLE_SYNERGY.values()}
+           + note + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log)
+    # Save and Exit, then back in (own row: Save and Exit's pool asserts are exit-only, the mark is taken after the reload)
+    log, shots = [], []
+    if not rc2_save_exit():
+        return add("apple_save", "FAIL", "Save and Exit did not leave the game", shots, log)
+    back = enter_game(card_of(g.CHAR_NAME) or 1, "normal")
+    mark = engine_mark()
+    st2 = apple_state(log) if back else {"on": None}
+    still = [i for i in rc_of("dog", RC_PAGE_INV, log) if i["id"] == it["id"]] if back else []
+    shots.append(sh("apple_reload"))
+    finish("apple_save", back and game_alive() and not still,
+           "Save and Exit and back in: %s; the used Apple %s; state mega_apple after the reload: %s (1.13c saves no states)" % (
+               "entered" if back else "NOT entered", "is back" if still else "stays gone", "on" if st2["on"] else "off"),
+           mark, shots, log)
 
 
 def refund_verdict(before, after, spent_stats, spent_skills):
@@ -6961,6 +7095,7 @@ CHECKS += [("rcbook", check_rcbook), ("rcdelay", check_rcdelay), ("rctoken", che
            ("rpequip", check_rpequip)]
 CHECKS += [("runeletters", check_runeletters)]  # lane runeletters: bug #334
 CHECKS += [("rpsignets", check_rpsignets)]  # lane phase3: engine-triage #24, signets (pSpell 3) and the Apple (pSpell 10)
+CHECKS += [("apple_use", check_apple_use)]  # lane apple: bug #499, the Apple bought, used, Save and Exit
 CHECKS += [("acts", check_acts)]
 # lane rulescheck2: the same rules with a SET-UP character (rc2setup first: it edits the save)
 CHECKS += [("rc2setup", check_rc2setup), ("rc2quest", check_rc2quest), ("rc2refund", check_rc2refund), ("rc2delay", check_rc2delay),
@@ -8390,10 +8525,11 @@ def hdit_icons():
 
 CHECKS += [("hdit_icons", hdit_icons)]
 
-# ---------------------------------------------------------------- lane walls: HD wall scenes of the 8 retextured Median maps
-# level -> map (tools/walls_hd.py MAPS, levels from docs/maps-hd.md)
+# ---------------------------------------------------------------- lanes walls / hdwalls2: HD wall scenes of Median's 17 own maps
+# level -> map (tools/walls_hd.py MAPS, levels from docs/maps-hd.md); level 96 loads temple5 or temple6 (the same map in Median)
 WALL_MAPS = {60: "desertpeak", 59: "cypherpunk", 95: "glados", 18: "downtown", 98: "moskvich", 126: "borgir", 125: "macumba",
-             127: "charismatic"}
+             127: "charismatic", 90: "dungrm6a", 96: "temple5", 15: "caveroom4", 84: "excelsior3", 65: "belial", 13: "epicwhiners",
+             14: "inarius", 116: "rockisdead"}
 WALL_OFFSETS = ((0, 0), (12, 12), (-12, 12))   # subtiles from the arrival: three views per map (`place`, travel help)
 
 
@@ -8429,8 +8565,8 @@ def wall_visit(mode, log, shots):
 
 
 def wall_maps():
-    """The 8 Median maps whose tiles Median retextured, in HD (wall scenes of tools/walls_hd.py: D2R's own wall models on the
-    map's wall cells) and in classic graphics (Median's own tiles). SHORTCUT: the harness travels there (`h level`, `place`);
+    """Median's own maps (the 8 it retextured and the 9 on stock tiles), in HD (wall scenes of tools/walls_hd.py: D2R's own
+    wall models on the map's wall cells) and in classic graphics (Median's own tiles); MXL_WALL_LEVELS=90,96 for some only. SHORTCUT: the harness travels there (`h level`, `place`);
     this is a graphics check, not a player path. What is judged by hand from the screenshots: walls drawn where the classic
     view has them, nothing floating or blocking a walkable floor, no black holes. FAIL on an engine assert or crash.
     SET-UP: D2R's `god 1` cheat, so the level-1 test character lives through the screenshots (Amazon Warriors kill it on
@@ -11042,6 +11178,107 @@ def check_totem_spread():
 
 
 CHECKS += [("totem_spread", check_totem_spread)]
+
+# Owner ruling 2026-10-29 (lane apple): `petspread` moves totems only. Median XL 2012 has no golem skill (D2R's golem rows 290-292
+# are made by no Median skill), so the walking necromancer pet is Summon Shadows (473, pettype `shadowspet`, warp 1).
+PK_PET = 473
+PK_COUNTERS = ("owner moves with pets", "pet warps", "onto the owner", "spread", "other pets left")
+
+
+def pk_counts():
+    """The `petspread` line's counters {name: n} and the line."""
+    ln = mxl_part(mxl_text().splitlines(), "petspread")
+    return {k: int(v) for k, v in re.findall(r"(%s) (\d+)" % "|".join(PK_COUNTERS), ln)}, ln
+
+
+def pk_pets(ids):
+    """(player (x, y), {id: (class, mx, my, distance in sub-tiles)}) of the given monster ids right now."""
+    st = hstate()
+    p = st["player"]
+    px, py = p.get("x"), p.get("y")
+    return (px, py), {m["id"]: (m.get("class"), m.get("mx"), m.get("my"), max(abs(m["mx"] - px), abs(m["my"] - py)))
+                      for m in st["mons"] if m.get("id") in ids and m.get("mx") is not None}
+
+
+def pk_step(what, ids, c0, notes, bad):
+    """After an owner move: the pets' spots right away and the counter changes. Other pets must not be spread."""
+    (px, py), pets = pk_pets(ids)
+    c1, ln = pk_counts()
+    d = {k: c1.get(k, 0) - c0.get(k, 0) for k in PK_COUNTERS}
+    notes.append("%s: player at %s,%s; pets %s; petspread +%s" % (what, px, py, pets, d))
+    if d["spread"]:
+        bad.append("%s: petspread moved %d pet(s) that are no totems" % (what, d["spread"]))
+    return c1, d, pets
+
+
+def check_pet_keep():
+    """Owner ruling 2026-10-29: only totems leave the owner's spot. A Necromancer with a Kashya mercenary and Summon Shadows (473)
+    moves twice: Bend the Shadows (486, right click on the shadow pet: D2R's owner move `0x491ca0` -> `0x500a40`) and a real
+    waypoint (Rogue Encampment -> Cold Plains). After each the `petspread` line must count no spread (the mercenary and the shadow
+    keep D2R's placement: `onto the owner` / `other pets left` count them when D2R set them on the player's sub-tile), and their
+    spots right after the move are noted. SET-UP: the hire gate quest bit and gold (hire_in), skill levels, level 120 and Tank by
+    the harness, the shadow cast by `cast`, the Cold Plains waypoint bit."""
+    mark, log, shots, notes, bad = engine_mark(), [], [], [], []
+    goto(1)
+    merc = merc_info()[0] or hire_in(1, 1, 150, "Kashya", 271, log, notes, bad)
+    if merc is None:
+        return add("pet_keep", "BLOCKED", "no mercenary: " + "; ".join(notes + bad), shots, log)
+    with Tank(), Level(120):
+        learn(PK_PET, 20)
+        learn(TS_BLINK, 20)
+        goto(2)
+        ids0 = {m["id"] for m in hstate()["mons"]}
+        Hl("cast %d self" % PK_PET, log)
+        time.sleep(2.0)
+        merc = merc_info()[0] or merc
+        shadows = [m for m in hstate()["mons"] if m["id"] not in ids0 and m["id"] != merc.get("id") and m.get("mode") not in (0, 12)]
+        ids = {merc.get("id")} | {m["id"] for m in shadows}
+        notes.append("mercenary id %s class %s; shadow pets %s" % (merc.get("id"), merc.get("class"), [(m["id"], m.get("class")) for m in shadows]))
+        if not shadows:
+            bad.append("Summon Shadows made no pet")
+        c0, ln = pk_counts()
+        if not ln or "FAILED" in ln or ln.startswith("petspread off"):
+            bad.append("petspread not on (%s)" % ln[:80])
+        # 1) Bend the Shadows onto the shadow pet, about 10 sub-tiles away first
+        if shadows:
+            px, py = player_xy()
+            Hl("move %d %d" % (px + 10, py), log)
+            time.sleep(2.5)
+            Hl("skill right %d" % TS_BLINK, log)
+            p0 = player_xy()
+            for _ in range(3):  # the shadow walks after its owner: click its spot of the moment again until the player blinks
+                click_unit(shadows[0]["id"], button="right")
+                time.sleep(1.0)
+                if player_xy() != p0:
+                    break
+            c0, d, _pets = pk_step("Bend the Shadows", ids, c0, notes, bad)
+            shots.append(sh("pet_keep_blink"))
+            if player_xy() == p0:
+                bad.append("the right click did not blink the player")
+            elif not d["owner moves with pets"]:
+                bad.append("Bend the Shadows: the owner move brought no pets")
+            elif d["other pets left"] < 1:
+                bad.append("Bend the Shadows: petspread left no pet to D2R")
+        # 2) a real waypoint: Rogue Encampment -> Cold Plains
+        H("waypoint n 1 set")
+        area = rp_waypoint_to(3, log)
+        time.sleep(0.3)
+        _c, d, pets = pk_step("waypoint to Cold Plains (area %s)" % area, ids, c0, notes, bad)
+        shots.append(sh("pet_keep_waypoint"))
+        if area != 3:
+            bad.append("the waypoint did not reach Cold Plains (area %s)" % area)
+        if merc.get("id") not in pets:
+            bad.append("the mercenary did not come along")
+        # the spots above are read after the arrival, when the mercenary may already walk off (16 sub-tiles in run
+        # checks-20261030-005939-s3, 4 in -005552-s3): the counters say where D2R set them
+        if d["other pets left"] < len(ids):
+            bad.append("waypoint: petspread left %d pet(s) to D2R, want %d (the mercenary and the shadow)" % (d["other pets left"], len(ids)))
+        goto(1)
+    finish("pet_keep", not bad, "; ".join(notes) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial="harness set-up (hire gate, skill levels, level, Tank, the shadow cast by `cast`)")
+
+
+CHECKS += [("pet_keep", check_pet_keep)]
 
 
 if __name__ == "__main__":

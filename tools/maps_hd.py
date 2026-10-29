@@ -490,12 +490,12 @@ def plan(inp: Inputs, threshold=DEFAULT_EDITED_THRESHOLD):
             e.update(kind="Median map", action="minimal scene", biome=b, alt_biome=alt, has_d2r_scene=False,
                      confidence="low" if low else "medium", note="biome by %s" % how)
             if tiles["new_dt1_used"]:
-                e["art"] = ("missing in HD: stand-in tiles are stock %s; Median's re-textured look needs custom art "
-                            "(%d of %d wall cells on new .dt1)" % (
+                e["art"] = ("D2R's stock walls in HD (tools/walls_hd.py): stand-in tiles are stock %s; Median's re-textured "
+                            "look needs custom art (%d of %d wall cells on new .dt1)" % (
                                 ", ".join(sorted({tiledir(donor_of(p)) for p in tiles["new_dt1_used"]})[:4]), tiles["wall_new"], tiles["wall_cells"]))
                 e["art_class"] = "custom"
             else:
-                e["art"] = "missing in HD: all %d wall cells are stock tiles, a generated scene (stage 2) can use stock wall models" % tiles["wall_cells"]
+                e["art"] = "D2R's stock walls in HD (tools/walls_hd.py): all %d wall cells are stock tiles" % tiles["wall_cells"]
                 e["art_class"] = "generate"
         if e["action"] == "minimal scene" and e["biome"] not in inp.biomes:
             raise SystemExit("biome %s of %s is not in D2R" % (e["biome"], key))
@@ -626,7 +626,7 @@ def md_tables(maps, dt1s, levels, findings=(), mons=None) -> str:
         elif e["action"] == "D2R scene":
             art = "none (D2R's scene)"
         else:
-            art = "missing in HD (D2R scene dropped: layout changed); stock tiles, generatable"
+            art = "D2R's stock walls in HD (tools/walls_hd.py; D2R's scene dropped: layout changed)"
         out.append("| %s | %s | %dx%d | %s | %s | %s | %s | %s |" % (
             e["map"], lv, e["size"][0], e["size"][1], e["kind"], e["action"], scene, e["confidence"], art))
     out += ["", "Notes per map: diff against D2R, tile resolution through lvlprest Dt1Mask + lvltypes, ids the remap / ID map must see:", "",

@@ -1,6 +1,7 @@
 // Standalone test of the pet-warp spread rule (pet_spread_logic.h; not part of the plugin DLL).
 #include "../src/pet_spread_logic.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 
@@ -55,6 +56,20 @@ int main() {
 		}
 	}
 	Check(apart, "the 8 first-ring spots do not take each other");
+
+	// only totems: the owner's `totemic` list (pettype row 34) decides; a node has the unit id at +4 and the next node at +0x18
+	Check(TotemicPetType == 34, "totemic is pettype row 34");
+	struct Node {
+		uint32_t flags, id;
+		uint8_t pad[0x10];
+		const Node* next;
+	};
+	static_assert(offsetof(Node, id) == PetNodeUnitId && offsetof(Node, next) == PetNodeNext);
+	const Node third {0, 77, {}, nullptr}, second {1, 52, {}, &third}, first {0, 40, {}, &second};
+	const auto* head = reinterpret_cast<const uint8_t*>(&first);
+	Check(Listed(head, 40) && Listed(head, 52) && Listed(head, 77), "every totem of the list is found");
+	Check(!Listed(head, 41) && !Listed(nullptr, 40), "a mercenary / golem id or an empty list is no totem");
+	Check(!Listed(head, 77, 2), "the walk stops at its limit");
 
 	if (failures == 0) {
 		std::printf("pet spread tests: all passed\n");

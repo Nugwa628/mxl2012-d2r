@@ -2641,6 +2641,25 @@ HD against classic: **cypherpunk** floor dark stone (Docktown biome) where it wa
 shows no visible change in these shots, so whether HD reads a mask entry for a mod .dt1 path is still open; the other maps
 look as in lane walls' run.
 
+## Lane hdwalls2: HD walls of the other 9 Median maps (2026-10-30, slot 1, background mode, build of lane/hdwalls2)
+
+Same check `wall_maps` (lane walls above), now over all 17 maps (`WALL_MAPS` has the levels 90, 96, 15, 84, 65, 13, 14, 116
+too; level 96 loads temple5 or temple6, identical in Median). Harness travel `h level` / `place` and god mode: seen with the
+harness, not on the player path. Data of this lane's build; the plugin was the one already in slot 1 (no plugin change in this
+lane). Commands: `MXL_RUN=hdwalls2 MXL_SLOT=1 MXL_CHAR=WallsTwo MXL_CACHE_POLL=3 MXL_WALL_LEVELS=90,96,15,84,65,13,14,116 py -3
+tools/game_checks.py all wall_maps`, then the same with `MXL_WALL_LEVELS=60,59,95,18,98,126,125,127`. Run folders and sheets
+(HD left, classic right) are kept outside the repo (`mxl2012-runs/hdwalls2/`).
+
+| run | result |
+|---|---|
+| `checks-20261030-005953-s1` (the 9 maps on stock tiles) | all 8 levels reached in HD and classic, no assert in any of the 16 visits, 0 crash files; VariantTransformTable peak 107 / 128 |
+| `checks-20261030-010654-s1` (the 8 retextured maps, with this lane's model variations and floor-tile walls) | all 8 reached in both modes, no assert, 0 crash files; the launch's whole d2rloader.log has no ASSERT line; VTT peak 105 / 128 |
+
+On slot 1 d2rloader.log starts anew at each launch, so the report's "0 new lines" is the size mark of the previous launch;
+the per-map assert lines and the copy of the whole log are what count. HD against classic per map: docs/maps-hd.md "Status
+per map". In short: dungrm6a, temple5/6, excelsior3, epicwhiners, inarius and rockisdead have their walls where classic has
+them; caveroom4 and belial only partly; temple5/6's HD floor is the Kurast biome's grass (biome, not walls).
+
 ## Lane cachewalls: asset caches over long sessions, the walls assert (2026-10-29, slots 2 and 4, background mode)
 
 New: `MXL_CACHE_POLL=<seconds>` on any `game_checks.py` run reads every asset cache the probe finds (tools/cache_probe.py `poll`,
@@ -3536,3 +3555,46 @@ harness verb clears shared tabs (`packclear` / `remove` take the player's own it
 the item list of each page was emptied in the file (header kept, page size 68: `JM` and a count of 0; 1756 -> 204 bytes;
 backup `mxl2012-runs/uicheck/stash-backup/`). In game the shared tab then showed pages 1-3 empty (`uic_stash_shared*.png`,
 `uic_stash_pages.png`) and the game saved it back unchanged (204 bytes).
+## Lane apple: the Apple's item spell and totems-only `petspread` (bugs #499, #493, 2026-10-30, slot 3, background mode, build of lane/apple)
+
+Build: lane/apple (lane/totems merged), plugin `mxl2012-core` 0.1.2 with the new part `appleuse` and `petspread` narrowed to
+totems. The data build is `tools/build.py` (validate 0 errors). All runs used slot 3 in background mode, and the real-input
+watchdog was clean in every run. Evidence is in `mxl2012-runs/apple/<run>/`, with console logs `run1.log` to `run5.log` next to it.
+
+| Run | Character | Checks | Result |
+|---|---|---|---|
+| `checks-20261030-004650-s3` | new Barbarian `Applebar` | `mxl2012`, `apple_use`, `rpsignets` | `mxl2012` PASS (29 lines, `appleuse` on); `rpsignets` PASS, all 7 rows: `dog` is used up, no skill point, state `mega_apple` (44) on. `apple_use` BLOCKED: it tried Akara, who does not sell the Apple (misc.txt `dog` has no Akara min / max; Charsi, Fara, Lysander, Hratli, Alkor, Larzuk, Anya and Jamella sell it). The check now buys from Charsi |
+| `checks-20261030-005257-s3` | new Barbarian `Applebarb` | `apple_use` | **PASS**: bought from Charsi by a right click in her Trade panel, used by a right click in the backpack, used up; state 44 on, end frame 16795 read at frame 1905 (14890 of 15000 frames left); stats hpregen 6 (= maxhp / 3000 x 100 %), item_vitality_percent 7, damagepercent 9, item_energy_percent 11, item_allskills 1 (= the synergy stats 444 / 498 / 445 / 461 set to 7 / 9 / 11 / 1 by harness); the player's hpregen 0 -> 6; skill points 0 -> 0. **`apple_save` PASS**: after Save and Exit and back in, the Apple is still gone and the state is off (1.13c saves no states). One last-resort crash report at shutdown: the known handled first-chance access violation outside the game image (module base `0x7ffeb1c50000`, as in "Lane equip391"), copied into the run folder |
+| `checks-20261030-005552-s3` | new Necromancer `Applenec` | `mxl2012`, `totem_spread`, `pet_keep` | `totem_spread` **PARTIAL (pass)**: four totems at (+1,+7) (-5,+7) (-5,+1) (+1,+1) of the old spot, round the player after Bend the Shadows; "onto the owner 4, spread 4, other pets left 0" (`totem_spread_after.png`). `pet_keep` FAIL: the right click on the walking shadow missed. The check now clicks again, up to 3 times |
+| `checks-20261030-005939-s3` | `Applenec` | `pet_keep` | The blink worked (spread +0, other pets left +2). FAIL only on the distance rule: the mercenary was 16 sub-tiles away 0.3 s after the waypoint (4 in the run before), so it had already walked off. The check now judges by the counters |
+| `checks-20261030-010127-s3` | `Applenec` | `pet_keep` | **PARTIAL (pass)**. A Kashya mercenary (class 271) and a Summon Shadows pet (473, class 1709): after Bend the Shadows "owner moves with pets +1, onto the owner +2, spread +0, other pets left +2", pets 4 and 5 sub-tiles away; after the waypoint Rogue Encampment -> Cold Plains "+2 / +4 / +0 / +4", mercenary 4 and shadow 9 sub-tiles away (`pet_keep_blink.png`, `pet_keep_waypoint.png`) |
+
+Notes:
+- **Not on the player path:**
+  - `apple_use`: gold, and the four synergy stats (so that stats 2-5 are not 0).
+  - `pet_keep`: the hire-gate quest bit, gold, skill levels, level 120, Tank, the shadow made by `cast`, and the Cold Plains waypoint bit.
+- **Pets:** Median 2012 gives players no golem skill (D2R's golem rows are made by no Median skill), so Summon Shadows stands in for "a golem". Both non-totem pets keep D2R's placement on the player's sub-tile and walk off by themselves.
+- **Unit tests:** `appleuse_tests` covers the Book / Apple codes and the constants. `petspread_tests` gains `Listed` (the pet-list walk).
+
+By hand, for the Apple:
+1. Buy an Apple from Charsi and right-click it in the backpack.
+2. It is used up, the regeneration starts, and life refills for 10 minutes.
+3. A Book of Skill still gives a skill point.
+
+By hand, for the pets:
+1. With a mercenary and shadows, Bend the Shadows onto a shadow.
+2. They arrive on you and walk off.
+3. Totems cast first are spread round you instead.
+## Lane playerbugs: "Goodbye" in the chat and cave snappers (bugs #504 / #505 / #508, 2026-10-30, slot 4, background mode, release build 0.1.2)
+
+Lab scripts and evidence in `mxl2012-runs/playerbugs/` (`lab.py`, `lab2.py` .. `lab5.py`, run logs `run*.out`, shots in
+`run1/` .. `run5/`, chat crops `sheet_*.png`). Test character: a new Druid "PbTrapRat". Table edits for a run were made on the
+slot's installed tables (`variant.py`, `fixslot.py`) with a backup, and restored and compared afterwards. The rows of
+docs/bugs.md have the details.
+
+| Bug | Result | Runs |
+|---|---|---|
+| #504 `<name> says: Goodbye.` | Reproduced and fixed: Vanquish 678, Other Raven Heart 605 and Female Vanquish 905 (the Act 1 Rogue mercenary's buff) each print the line, HD and legacy; with `player_voice_sounds` applied, 20 casts of 678 / 605 / 685 / 905 print none. Idle and walking 100 s and the numpad "Say" keys print nothing | `run1` (HD + legacy casts, idle, keys), `run2` (sound row variants: the line follows the file), `run3` (after the fix), `run4` (Mana Coil before the fix: harness cast prints nothing) |
+| #504 in Trap Rat Form | Not tested: the harness cast of 448 is refused at level 1 (no gear); the morph has no voice sound in its rows | `run1` |
+| #505 cave snappers | Median's design: hpregen 2180/256 per frame (~213 life/s) on the Sleeping Cave Snapper, 328/256 on the Cave Snapper; Fire Bolt hurts the Cave Snapper and does not get past the sleeping one's regeneration; no damage reduction | `run4`, `run5` |
+| #508 boss / soldier lines | Listed from the tables only (vo.json keys), not tested | none |

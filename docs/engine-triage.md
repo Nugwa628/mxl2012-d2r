@@ -179,7 +179,7 @@ background mode, plugin 0.1.0 dev of lane/triage, character `Triagebarb`; report
 | 21 | ported (data) | lane qa: starting kit and innate skills (testing.md) |
 | 22 | same | check `pandewp` PARTIAL (the panel's look is by eye): Pandemonium 2 (134) reached by the waypoint warp; no class-402 waypoint object there, as 1.13c (its preset loop skips 402 in level 134), so nothing in Pandemonium 2 sets bit 17 by operating; the Valley sets bit 17 = 1 and the panel opens |
 | 23 | same | pure table logic on #14's ids |
-| 24 | ported (plugin, open) | lane phase3, check `rpsignets` (slot 3, run `checks-20261029-184343-s3`; items picked up by a click, used by a right click): **pSpell 3 same**: Signets of Gold (+150 gold), Experience (+250), Learning (+1 stat point, potion_stat_cap +1), Bling Bling (+5 / +5), Buyable Signet of Gold (+150 bank) and Signet of Skill (+1 skill point, potion_skill_cap +1) each give misc.txt's calc1 / calc2 at level 1 and are used up. **pSpell 10 differs**: 1.14d's item spell 10 (`0x5bf170`) starts skill 47 (Median: Apple Healing Spell), D2R's runs the Book of Skill, so the Apple is refused (bug #499); moved to the plugin plan (section 25). pSpell 9 (elixirs): lane elixir |
+| 24 | ported (plugin) | lane phase3, check `rpsignets` (slot 3, run `checks-20261029-184343-s3`; items picked up by a click, used by a right click): **pSpell 3 same**: Signets of Gold (+150 gold), Experience (+250), Learning (+1 stat point, potion_stat_cap +1), Bling Bling (+5 / +5), Buyable Signet of Gold (+150 bank) and Signet of Skill (+1 skill point, potion_skill_cap +1) each give misc.txt's calc1 / calc2 at level 1 and are used up. **pSpell 10 differs**: 1.14d's item spell 10 (`0x5bf170`) starts skill 47 (Median: Apple Healing Spell), D2R's runs the Book of Skill, so the Apple is refused (bug #499); moved to the plugin plan (section 25). Lane apple (2026-10-30): plugin part `appleuse` runs 1.14d's entry 10 for every pSpell 10 item but the Book of Skill; `rpsignets` and `apple_use` pass. pSpell 9 (elixirs): lane elixir |
 | 25 | same | monster sweep (testing.md, Lane monsweep) |
 | 26 | ported (data) | owner decision: Warlock stays playable with D2R's own skills; the merge keeps its entries |
 | 27 | ported (data) | check `terrorzones` PASS (testing.md) |
@@ -188,7 +188,7 @@ background mode, plugin 0.1.0 dev of lane/triage, character `Triagebarb`; report
 | 30 | unported | already in unported.md (dropped) |
 
 Count (30 rows): **same 13** (#3, #5, #6, #10, #11, #12, #16, #17, #18, #22, #23, #25, #28), **ported 15**
-(#1, #2, #4, #7, #9, #13, #14, #15, #19, #20, #21, #24, #26, #27, #29; #24's pSpell 10 part is the open plugin item of bug #499),
+(#1, #2, #4, #7, #9, #13, #14, #15, #19, #20, #21, #24, #26, #27, #29; #24's pSpell 10 part is plugin part `appleuse`, bug #499),
 **unported 2** (#8, #30 dropped). #6's Batstrike, "verify" before, is same since lane skillsweep; #16 and #18 are same by lane
 rulescheck's `rprunes` and lanes cube / cube2's `cubeclasses`; #24 was checked by lane phase3 (2026-10-29). Nothing in section 2 is left
 without a verdict.

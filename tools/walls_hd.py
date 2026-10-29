@@ -15,6 +15,8 @@ entities on its wall cells:
   3. scene: for every wall cell of the Median map (Median's new .dt1 swapped for their stock donor: tools/maps_hd.py
      donor_table; every new .dt1 is a retextured copy with the same tile keys) the variant of its key, moved to the cell.
      A cell whose full key was never seen falls back to the best single-tile key (the most layers in common).
+     Floor-only cells are keyed by their floor tiles the same way (floor_cells: D2R draws the Act 1 cave walls, the ice cave
+     ledges, Kurast stairs and the Arcane platforms' trims on floor tiles); a floor D2R leaves bare stays bare.
      Cells without any match stay without a wall model (counted in the report: `uncovered`).
 
 What the player sees is D2R's stock walls of the donor tile set (the same layout Median's tiles have), not Median's
@@ -57,12 +59,19 @@ MAX_BYTES = 4_651_080
 DETAIL = re.compile(r"buttress|pillar|arch|column|support|beam|cap_|trim|roof|lip|stair|step|gargoyle|statue|mural|crenel|"
                     r"banner|torch|lamp|chain|ornament|post", re.I)
 SIGHT = re.compile(r"wall|cliff|elevation|fence|treeline|gate|rock|ruin|segment|corner|end_", re.I)
-# The 8 maps whose tiles Median retextured (docs/maps-hd.md, art class "custom"): they get a wall scene from stock models.
-MAPS = ["expansion/dystopic/desertpeak.ds1", "expansion/ghetto/cypherpunk.ds1", "expansion/glados/glados.ds1",
-        "expansion/neonmile/downtown.ds1", "expansion/redsquare/moskvich.ds1", "expansion/terror/borgir.ds1",
-        "expansion/voodoo/macumba.ds1", "expansion/zakarum/charismatic.ds1"]
-KEEP_COMPONENTS = {"TransformDefinitionComponent", "ModelDefinitionComponent", "ModelPlatformTierComponent",
-                   "WallTransparencyComponent"}
+# The 8 maps whose tiles Median retextured (docs/maps-hd.md, art class "custom", lane walls) ...
+RETEXTURED = ["expansion/dystopic/desertpeak.ds1", "expansion/ghetto/cypherpunk.ds1", "expansion/glados/glados.ds1",
+              "expansion/neonmile/downtown.ds1", "expansion/redsquare/moskvich.ds1", "expansion/terror/borgir.ds1",
+              "expansion/voodoo/macumba.ds1", "expansion/zakarum/charismatic.ds1"]
+# ... and the 9 on stock tiles (art class "generate" and the 4 edits too far from D2R's scene, lane hdwalls2), the ones players
+# walk through in normal play first: Flayer Dungeon 3 (Khalim's Brain), Forgotten Reliquary (one of its two maps at random),
+# Hole 2, Spider Cave, Ancient Tunnels, Cave 2, Underground Passage 2, Drifter Cavern.
+STOCK = ["act3/jungle/dungrm6a.ds1", "act3/temple/temple5.ds1", "act3/temple/temple6.ds1", "act1/caves/caveroom4.ds1",
+         "act3/kurast/excelsior3.ds1", "act2/arcane/belial.ds1", "expansion/morework/epicwhiners.ds1",
+         "act1/cathedrl/inarius.ds1", "expansion/icecave/rockisdead.ds1"]
+MAPS = RETEXTURED + STOCK   # every map tools/maps_hd.py gives a minimal scene (17): each gets a wall scene from stock models
+KEEP_COMPONENTS = {"TransformDefinitionComponent", "ModelDefinitionComponent", "ModelVariationDefinitionComponent",
+                   "ModelPlatformTierComponent", "WallTransparencyComponent"}
 # Decoration that D2R's artists put on and around walls (plants, rubble, bones, stains): not part of the wall, and copied per
 # cell it multiplies (desertpeak: 18,565 entities, 14 MB, most of it ivy, ferns and stones). Dropped unless the entity fades
 # with the wall (WallTransparencyComponent) or its file names a structural piece (STRUCTURE: skull arches, gargoyle pillars,
@@ -72,7 +81,7 @@ DECOR = re.compile(r"weed|fern|cinchona|ivy|root|vine|debris|dirt|blood|rubble|s
                    r"grounding|grass|offering|bone|skull|skeleton|candle|grunge|moss|bush|flower|sand_pile|snow_pile|stain|"
                    r"decal|puddle|ritual|_props|clutter|junk|trash|corpse|cluster|chest|sword|spear|shield|weapon|barrel|potstack|_pot|"
                    r"vase|bottle|urns?/|_urn|basket|_mat|mats/|rug|straw|lumber|pallet|plank|cloth|dryrack|stool|food|slush|"
-                   r"snow_pile|snowprops|shrub|elephant_ear|tree_dead", re.I)
+                   r"snow_pile|snowprops|shrub|elephant_ear|tree_dead|gore/|guts", re.I)
 # D2R's own (29,475 of D2R's 31,217 have these values: the fade follows the entity's position)
 WALL_TRANSPARENCY = {"type": "WallTransparencyComponent", "drawOrder": 0, "wallTileLocalCoord": {"x": -1, "y": -1}}
 DEP_KEYS = ("particles", "models", "skeletons", "animations", "textures", "physics", "json", "variantdata", "objecteffects", "other")
@@ -124,13 +133,75 @@ def wall_cells(ds: ds1_remap.Ds1, idx, donor_of=lambda p: p):
     return {xy: tuple(sorted(v, key=lambda k: (k[0] or "", k[1:]))) for xy, v in cells.items()}
 
 
+def floor_index(paths, tiles_of):
+    """(0, style, sequence) -> the first file in `paths` that has the floor tile."""
+    idx = {}
+    for p in paths:
+        for t in tiles_of(p) or ():
+            if t.orientation == 0:
+                idx.setdefault(t.key, p)
+    return idx
+
+
+def floor_cells(ds: ds1_remap.Ds1, idx, donor_of=lambda p: p, skip=()):
+    """{(x, y): tuple of (folder, 0, style, sequence)} for every cell with a floor tile and no wall (cells in `skip`). D2R
+    draws the walls of some tile sets on floor tiles (lane hdwalls2): the Act 1 caves (82% of their wall models stand on
+    floor-only cells, 5% on wall cells), Diablo's sanctuary, the bigcliff; Median's cave maps need those to get any wall.
+    Floor tiles that D2R leaves bare (open ground) get no model through choose(); unresolved floor tiles are left out."""
+    cells = collections.defaultdict(list)
+    for lay in ds.floor_layers():
+        for i, c in enumerate(lay):
+            if c == 0:
+                continue
+            xy = (i % ds.width, i // ds.width)
+            if xy in skip:
+                continue
+            s, q = ds1_remap.cell_key(c)
+            p = idx.get((0, s, q))
+            if p:
+                cells[xy].append((maps_hd.tiledir(donor_of(p)), 0, s, q))
+    return {xy: tuple(sorted(set(v))) for xy, v in cells.items()}
+
+
+def map_cells(ds: ds1_remap.Ds1, paths, tiles_of, donor_of=lambda p: p):
+    """wall_cells() plus floor_cells() of the cells without a wall: every cell a wall model can stand on."""
+    walls = wall_cells(ds, wall_index(paths, tiles_of), donor_of)
+    out = dict(walls)
+    out.update(floor_cells(ds, floor_index(paths, tiles_of), donor_of, walls))
+    return out
+
+
+def is_floor(key) -> bool:
+    return all(k[1] == 0 for k in key)
+
+
 # ---- scenes ----------------------------------------------------------------------------------------------------------------
 def transform(e):
     return next((c for c in e.get("components", ()) if c.get("type") == "TransformDefinitionComponent"), None)
 
 
 def model_of(e):
-    return next((c.get("filename") for c in e.get("components", ()) if c.get("type") == "ModelDefinitionComponent"), None)
+    """The entity's model: its ModelDefinitionComponent, else the first entry of its ModelVariationDefinitionComponent (lane
+    hdwalls2: 87k of D2R's 393k model entities draw one of several weighted models that way, all of the Flayer Dungeon's
+    fences and most of the ice caves'; before, those walls were never learnt)."""
+    for c in e.get("components", ()):
+        if c.get("type") == "ModelDefinitionComponent":
+            return c.get("filename")
+    for c in e.get("components", ()):
+        if c.get("type") == "ModelVariationDefinitionComponent":
+            return next((v.get("filename") for v in c.get("variations", ()) if v.get("filename")), None)
+    return None
+
+
+def models_of(e):
+    """Every model the entity may draw (the scene's `dependencies` must name all variations)."""
+    out = []
+    for c in e.get("components", ()):
+        if c.get("type") == "ModelDefinitionComponent" and c.get("filename"):
+            out.append(c["filename"])
+        elif c.get("type") == "ModelVariationDefinitionComponent":
+            out += [v["filename"] for v in c.get("variations", ()) if v.get("filename")]
+    return out
 
 
 def is_decor(e) -> bool:
@@ -216,6 +287,8 @@ class Library:
         for k in key:
             if k in self.single and sum(self.single[k].values()) > score:
                 best, score = choose(self.single[k]), sum(self.single[k].values())
+        if is_floor(key):  # a floor D2R never has: bare ground (no search over every learnt key, no generic wall)
+            return (best, "partial") if best is not None else ((), "floor")
         if best is None:   # any learnt key that holds one of this cell's tiles
             tiles = set(key)
             for k, c in self.seen.items():
@@ -259,7 +332,7 @@ def choose(seen: collections.Counter):
 
 # Short component names: the long "<entity>_<type>" form made cypherpunk's scene larger than D2R's largest (docktown3, 4.65 MB).
 SHORT = {"ModelDefinitionComponent": "m", "TransformDefinitionComponent": "t", "ModelPlatformTierComponent": "p",
-         "WallTransparencyComponent": "w"}
+         "WallTransparencyComponent": "w", "ModelVariationDefinitionComponent": "v"}
 
 
 def place(variant, x: int, y: int, serial: int):
@@ -282,7 +355,7 @@ def place(variant, x: int, y: int, serial: int):
 def scene_json(biome: str, entities: list) -> str:
     """maps_hd's minimal scene plus wall entities and the models they name in `dependencies`."""
     scene = json.loads(maps_hd.scene_json(biome))
-    models = sorted({model_of(e) for e in entities})
+    models = sorted({m for e in entities for m in models_of(e)})
     scene["dependencies"]["models"] = [{"path": m} for m in models]
     scene["entities"] = entities
     return json.dumps(scene, separators=(",", ":"))
@@ -328,25 +401,32 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
     ents, stats = [], collections.Counter()
     for serial, (xy, key) in enumerate(sorted(cells.items(), key=lambda t: (t[0][1], t[0][0]))):
         sig, how = lib.pick(key)
-        if sig is None:
+        if is_floor(key):          # floor-only cells: counted apart, never 'uncovered' (most floors are bare ground)
+            stats["floor_cells"] += 1
+            if not sig:
+                continue
+            stats["floor_walls"] += 1
+        elif sig is None:
             stats["uncovered"] += 1
             continue
-        stats[how] += 1
-        if not sig:
-            stats["empty"] += 1     # D2R draws this tile without an entity (baked into its terrain, or nothing)
-        keep = [v for v in lib.variants[sig] if not lib.set_piece(model_of(v[0]))]
-        stats["set_pieces"] += len(lib.variants[sig]) - len(keep)
+        else:
+            stats[how] += 1
+            if not sig:
+                stats["empty"] += 1     # D2R draws this tile without an entity (baked into its terrain, or nothing)
+        variant = lib.variants.get(sig, [])
+        keep = [v for v in variant if not lib.set_piece(model_of(v[0]))]
+        stats["set_pieces"] += len(variant) - len(keep)
         ents += place(keep, xy[0], xy[1], serial)
     kept = cap(ents, limit)
     text = scene_json(biome, kept)
     while len(text.encode("utf-8")) > max_bytes and kept:
         kept = cap(ents, min(len(kept) - 1, int(len(kept) * max_bytes / len(text.encode("utf-8")))))
         text = scene_json(biome, kept)
-    stats["cells"] = len(cells)
+    stats["cells"] = len(cells) - stats["floor_cells"]
     stats["placed"] = len(ents)
     stats["capped"] = len(ents) - len(kept)
     stats["entities"] = len(kept)
-    stats["models"] = len({model_of(e) for e in kept})
+    stats["models"] = len({m for e in kept for m in models_of(e)})
     return text, stats
 
 
@@ -406,7 +486,7 @@ def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=No
         scene = scene_of(key)
         if scene is None:
             continue
-        lib.learn(key, wall_cells(ds, wall_index(files, tiles.get)), scene)
+        lib.learn(key, map_cells(ds, files, tiles.get), scene)
     return lib
 
 
@@ -431,14 +511,14 @@ def self_check(inp: maps_hd.Inputs, lib: Library, sample=40, scene_of=d2r_scene)
     f = t = 0
     for key in keys:
         ds = ds1_remap.Ds1(inp.d2r_tiles.read(key + ".ds1"))
-        a, b = recall(wall_cells(ds, wall_index(header_dt1(ds), tiles.get)), scene_of(key), lib)
+        a, b = recall(map_cells(ds, header_dt1(ds), tiles.get), scene_of(key), lib)
         f, t = f + a, t + b
     return f, t, len(keys)
 
 
 def median_cells(inp: maps_hd.Inputs, entry: dict, donors: dict, tiles: dict):
     ds = ds1_remap.Ds1(inp.mod_tiles.read(entry["map"]))
-    return wall_cells(ds, wall_index(entry["dt1_files"], tiles.get), lambda p: donors[p]["donor"] if p in donors else p)
+    return map_cells(ds, entry["dt1_files"], tiles.get, lambda p: donors[p]["donor"] if p in donors else p)
 
 
 def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene):
@@ -471,27 +551,30 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None):
 
 
 def md_table(stats: dict, lib: Library) -> str:
-    lines = ["| map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | set pieces left out | placed "
-             "| capped | models in scene | distinct models | scene size |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | floor cells (with models) "
+             "| set pieces left out | placed | capped | models in scene | distinct models | scene size |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     tot = collections.Counter()
     for m in MAPS:
         s = stats.get(m)
         if not s:
             continue
-        lines.append("| %s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %d | %d | %d | %.0f KB |" % (
+        lines.append("| %s | %s | %d | %d | %d | %d | %d | %d | %d (%d) | %d | %d | %d | %d | %d | %.0f KB |" % (
             m, s.get("biome", ""), s["cells"], s.get("exact", 0), s.get("partial", 0), s.get("generic", 0), s.get("empty", 0),
-            s.get("uncovered", 0), s.get("set_pieces", 0), s.get("placed", s["entities"]), s.get("capped", 0), s["entities"],
+            s.get("uncovered", 0), s.get("floor_cells", 0), s.get("floor_walls", 0), s.get("set_pieces", 0), s.get("placed", s["entities"]), s.get("capped", 0), s["entities"],
             s.get("models", 0), s["bytes"] / 1024))
         tot.update({k: v for k, v in s.items() if isinstance(v, int) and k != "models"})
-    lines.append("| all | | %d | %d | %d | %d | %d | %d | %d | %d | %d | %d | | %.0f KB |" % (
-        tot["cells"], tot["exact"], tot["partial"], tot["generic"], tot["empty"], tot["uncovered"], tot["set_pieces"],
+    lines.append("| all | | %d | %d | %d | %d | %d | %d | %d (%d) | %d | %d | %d | %d | | %.0f KB |" % (
+        tot["cells"], tot["exact"], tot["partial"], tot["generic"], tot["empty"], tot["uncovered"], tot["floor_cells"],
+        tot["floor_walls"], tot["set_pieces"],
         tot["placed"], tot["capped"], tot["entities"], tot["bytes"] / 1024))
-    lines += ["", "Learnt from %d D2R maps (%d wall cells, %d distinct cell keys, %d variants). *exact*: the cell's wall tiles "
+    lines += ["", "Learnt from %d D2R maps (%d wall and floor cells, %d distinct cell keys, %d variants). *exact*: the cell's wall tiles "
               "were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall "
               "tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act "
               "(Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or "
-              "nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *set "
+              "nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *floor "
+              "cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave "
+              "walls, ledges, stairs, trims; floor_cells); *set "
               "pieces*: models D2R places on fewer than %d wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay "
               "within D2R's largest scene (docktown3: %d placed models, %.2f MB)." % (
                   len(lib.sources), sum(lib.sources.values()), len(lib.seen), len(lib.variants), SET_PIECE_CELLS, MAX_PLACED,

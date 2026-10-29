@@ -380,6 +380,34 @@ def by_row_merge(mod_rows: list[list[str]], d2r_rows: list[list[str]], convert) 
     return out + d2r_rows[len(mod_rows):]
 
 
+PLAYER_CLASSES = ("amazon", "assassin", "barbarian", "druid", "necromancer", "paladin", "sorceress")
+
+
+def player_voice_rows(header: list[str], rows: list[list[str]]) -> set[str]:
+    """Sound rows playing a class voice file (common\\<class>\\..., D2R subtitles those as "<unit> says: ...")."""
+    fi, si = header.index("FileName"), header.index("Sound")
+    out = set()
+    for r in rows:
+        if len(r) <= fi or not r[si]:
+            continue
+        parts = r[fi].lower().replace("/", "\\").split("\\")
+        if len(parts) > 2 and parts[0] == "common" and parts[1] in PLAYER_CLASSES:
+            out.add(r[si])
+    return out
+
+
+def blank_voice_cells(header: list[str], rows: list[list[str]], voices: set[str]) -> list[tuple[str, str, str]]:
+    """Blank every sound column cell naming one of `voices`; returns (row, column, sound) per cell."""
+    cols = [i for i, c in enumerate(header) if "sound" in c.lower() and not c.startswith("*")]
+    hits = []
+    for r in rows:
+        for i in cols:
+            if i < len(r) and r[i] in voices:
+                hits.append((r[0], header[i], r[i]))
+                r[i] = ""
+    return hits
+
+
 def write_tsv(path: Path, header: list[str], rows: list[list[str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as f:
@@ -1442,6 +1470,33 @@ class Migrator:
         self.report.append(f"\nsounds: {copied} Median rows took a vanilla file's D2R audio columns, "
                            f"{custom} play Median's own audio (silent until it is ported)")
 
+    def player_voice_sounds(self) -> None:
+        """Bug #504: D2R prints a chat line "<unit> says: <line>" whenever a voice file plays whose name is a key of its
+        data/local/lng/strings/vo.json (ass_goodbye -> "Goodbye."; tested: the line follows the file, not the sound row or
+        its channel). The class voices (common\\<class>\\...) put the player's own name on the line. Median
+        gives some states and skills a class voice as their sound: Vanquish (pal_goodbye), Raven Heart's ravenstrike
+        (ass_goodbye), the Act 1 mercenary's Female Vanquish (ama_goodbye), Mana Coil (sor_goodbye), Charged Elemental
+        Fury (sor_timetodie) and the monster skill Mon Cherub Avatar (bar_die). In 1.13c that was only audio; in D2R each
+        cast writes "<player> says: Goodbye." into the chat. Those cells go blank (no sound). D2R's own tables have no such
+        reference. Median's reuse of boss / soldier lines (Baal's laugh, "Help us!") is left alone (bug #508)."""
+        blanked = []
+        for bank in ("base", ""):
+            ex = OUT / "data" / "global" / "excel" / bank
+            if not (ex / "sounds.txt").exists():
+                continue
+            voices = player_voice_rows(*read_tsv(ex / "sounds.txt"))
+            for table in ("states", "skills", "missiles"):
+                p = ex / f"{table}.txt"
+                if not p.exists():
+                    continue
+                h, rows = read_tsv(p)
+                hits = blank_voice_cells(h, rows, voices)
+                if hits:
+                    write_tsv(p, h, rows)
+                    if bank == "":
+                        blanked += [f"{table} {row} {col} ({snd})" for row, col, snd in hits]
+        self.report.append("\nplayer voices (#504): sound cells blanked: " + ("; ".join(blanked) or "none"))
+
     def fill_skilldesc(self) -> None:
         """D2R asserts when a class skill has no skilldesc (Median's hidden class skills, granted at character
         creation, have none). They point at the "attack" description, which has no skill tree page."""
@@ -1924,6 +1979,7 @@ def main() -> int:
     m.fix_maze_positions()
     m.level_entries()
     m.sound_rows()
+    m.player_voice_sounds()
     m.clean_references()
     m.item_spell_states()
     m.state_colour_shifts()

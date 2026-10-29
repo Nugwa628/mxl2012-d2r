@@ -427,7 +427,7 @@ class PlanTest(unittest.TestCase):
     def test_tables_and_docs_splice(self):
         text = maps_hd.md_tables(self.maps, self.dt1s, self.levels, maps_hd.audit(self.inp, self.maps),
                                  maps_hd.monster_rows(self.maps))
-        for needle in ("act1/cathedrl/a.ds1", "expansion/x/floor.dt1", "| 970 | quest_laser | 1067 |", "missing in HD"):
+        for needle in ("act1/cathedrl/a.ds1", "expansion/x/floor.dt1", "| 970 | quest_laser | 1067 |", "D2R's stock walls in HD"):
             self.assertIn(needle, text)
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "maps-hd.md"

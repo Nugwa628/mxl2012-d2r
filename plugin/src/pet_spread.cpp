@@ -13,6 +13,8 @@
 // (pet_spread_logic.h; not within 2 sub-tiles of a pet the same gather already placed) with the unit move the warp itself uses (`0x491ca0`, free-spot search), then flagged teleported
 // (`0x34f490(unit, 1)`) as D2R does after a pet move. `0x596d40`'s pet gets the same after it returns. The gather itself, its
 // tries and its results are unchanged; a pet already off the owner's spot is left where it is.
+// Only totems move (owner ruling 2026-10-29): a pet counts as one when its unit id is in its owner's list of pettype `totemic`
+// (`0x5013f0` on the player data's pet root). Mercenaries, golems and the other warp pets keep D2R's placement and walk off.
 #include "pet_spread.h"
 
 #include "d2r.h"
@@ -31,6 +33,10 @@ constexpr uint64_t RvaPetWarp = 0x596d40;      // (game, owner, pet) -> 1 when t
 constexpr uint64_t RvaMove = 0x491ca0;         // (game, unit, room or 0, x, y, exact, 0): the unit move every teleport uses
 constexpr uint64_t RvaSpotBlocked = 0x350a20;  // (unit, x, y, mask) -> non-zero when the unit's footprint there is blocked
 constexpr uint64_t RvaSetTeleported = 0x34f490;  // (unit, 1): unit flag 0x10000, set by D2R after a pet move
+constexpr uint64_t RvaPlayerData = 0x34b240;     // (player) -> player data; +0x98 = the root of its pet lists (0x500a40 reads it)
+constexpr uint64_t RvaPetList = 0x5013f0;        // (dataFlag, root, pettype) -> that pettype's list (+0 first node), null outside the table
+constexpr int PlayerDataPets = 0x98;
+constexpr int UnitId = 0x08;
 // MOV [RSP+0x20],RSI / MOV [RSP+0x10],RDX / PUSH RBP / PUSH RDI / PUSH R12 / PUSH R13
 constexpr uint8_t GatherEntry[] = {0x48, 0x89, 0x74, 0x24, 0x20, 0x48, 0x89, 0x54, 0x24, 0x10, 0x55, 0x57, 0x41, 0x54, 0x41, 0x55};
 // MOV [RSP+0x10],RBX / MOV [RSP+0x18],RBP / PUSH RSI / PUSH RDI / PUSH R14 / SUB RSP,0x40
@@ -46,6 +52,8 @@ using PetWarpFn = int32_t (*)(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet)
 using MoveFn = int64_t (*)(d2r::Game*, d2r::Unit*, void*, int32_t, int32_t, int32_t, int32_t);
 using SpotBlockedFn = int32_t (*)(d2r::Unit*, int32_t, int32_t, int32_t);
 using SetTeleportedFn = void (*)(d2r::Unit*, int32_t);
+using PlayerDataFn = uint8_t* (*)(d2r::Unit*);
+using PetListFn = uint8_t** (*)(uint32_t dataFlag, void* root, int32_t petType);
 
 uint64_t g_base = 0;
 GatherFn g_gather = nullptr;
@@ -55,6 +63,7 @@ volatile LONG g_gathers = 0;  // owner moves that set pets on the owner (0x500a4
 volatile LONG g_warps = 0;    // single pet warps that moved a pet (0x596d40)
 volatile LONG g_stacked = 0;  // pets of either left on the owner's spot
 volatile LONG g_spread = 0;   // ... moved to a ring spot
+volatile LONG g_kept = 0;     // pets on the owner's spot that are no totem: left to D2R
 volatile LONG g_lastClass = -1;
 
 // The pets 0x501df0 sets during one 0x500a40 call on this thread (the game's server thread); moved after it returns.
@@ -68,6 +77,17 @@ auto Fn(uint64_t rva) noexcept -> F {
 	return reinterpret_cast<F>(g_base + rva);
 }
 
+// True when the pet is in its owner's `totemic` list. Only a player owner has the pet root the gather reads.
+auto IsTotem(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet) noexcept -> bool {
+	if (d2r::At<int32_t>(owner, d2r::UnitType) != 0) {
+		return false;
+	}
+	const uint8_t* data = Fn<PlayerDataFn>(RvaPlayerData)(owner);
+	void* root = data != nullptr ? d2r::At<void*>(data, PlayerDataPets) : nullptr;
+	uint8_t** list = root != nullptr ? Fn<PetListFn>(RvaPetList)(d2r::DataFlag(game), root, pet_spread::TotemicPetType) : nullptr;
+	return list != nullptr && pet_spread::Listed(*list, d2r::At<uint32_t>(pet, UnitId));
+}
+
 // `taken` / `count`: the spots earlier pets of the same gather got (nullptr for a single warp); the new spot is added.
 void Spread(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, pet_spread::Spot* taken, int* count) noexcept {
 	int32_t ox = 0, oy = 0, px = 0, py = 0;
@@ -76,6 +96,10 @@ void Spread(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, pet_spread::Spot*
 	}
 	InterlockedIncrement(&g_stacked);
 	InterlockedExchange(&g_lastClass, d2r::At<int32_t>(pet, d2r::UnitClass));
+	if (!IsTotem(game, owner, pet)) {
+		InterlockedIncrement(&g_kept);
+		return;
+	}
 	for (const auto& o : pet_spread::Ring) {
 		const int32_t x = ox + o.dx, y = oy + o.dy;
 		if (taken != nullptr && pet_spread::Taken(x, y, taken, *count)) {
@@ -158,15 +182,16 @@ auto InstallPetSpread(const D2RL::PluginContext* context, char* report, size_t r
 	                                                        reinterpret_cast<void**>(&g_gather));
 	const bool warp = context->InstallInlineHook(RvaPetWarp, PetWarpEntry, sizeof(PetWarpEntry), reinterpret_cast<void*>(&PetWarpHook),
 	                                             reinterpret_cast<void**>(&g_petWarp));
-	std::snprintf(report, reportSize, "pets brought onto their owner's spot are spread round it (0x500a40 / 0x501df0%s, 0x596d40%s hooked)",
+	std::snprintf(report, reportSize, "totems brought onto their owner's spot are spread round it (0x500a40 / 0x501df0%s, 0x596d40%s hooked)",
 	              place && gather ? "" : " FAILED", warp ? "" : " FAILED");
 	return (place && gather ? 1 : 0) + (warp ? 1 : 0);
 }
 
-void PetSpreadCounts(long* gathers, long* warps, long* stacked, long* spread, long* lastClass) noexcept {
+void PetSpreadCounts(long* gathers, long* warps, long* stacked, long* spread, long* kept, long* lastClass) noexcept {
 	*gathers = g_gathers;
 	*warps = g_warps;
 	*stacked = g_stacked;
 	*spread = g_spread;
+	*kept = g_kept;
 	*lastClass = g_lastClass;
 }

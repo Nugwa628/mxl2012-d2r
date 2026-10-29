@@ -781,7 +781,7 @@ the disable's `mov byte [rcx+0x67a],1` and the 20 bytes of `0x846210`. `mxl2012`
 "Lane uiplus" round 2): the buttons light at the level-up and open the panels; HD unchanged; no asserts.
 
 
-## 25. Apple: 1.13c item spell 10 (lane phase3, 2026-10-29; bug #499; not built)
+## 25. Apple: 1.13c item spell 10 (lane phase3, 2026-10-29; bug #499; built by lane apple, 2026-10-30)
 
 engine-triage #24 sends this here. 1.14d `Game.exe` item-spell table `0x741794` (8 bytes per entry; 1-11 filled: `0x5be230`, `0x5be290`,
 `0x5be3f0`, `0x5be7b0`, `0x5beac0`, `0x5bef90`, `0x5bf0c0`, `0x5bf060`, `0x5beda0` (elixirs, tables-status.md), `0x5bf170`, `0x5bf1f0`).
@@ -796,6 +796,29 @@ with D2R's own skill-start path, then use the item up; `ass ` goes to D2R's hand
 entry 10 (not in d2r-addresses.md yet), the skill-start function. Check: `rpsignets` (its `dog` row: the Apple used up, skill points
 unchanged; by hand: state `mega_apple` on the player, hpregen up). Data stand-in if the part is refused: pSpell 6 with
 state `mega_apple`, len 15000, stat1 hpregen (loses the synergy stats; an unported.md "approx" row).
+
+**Built (lane apple, 2026-10-30; owner decision: the plugin part, the full effect).** D2R's item spells, read in the dump
+(D2Game SkillItem.cpp):
+
+| What | Address | Notes |
+|---|---|---|
+| item-spell descriptor | `0x300ae0(dataFlag, item)` -> `0x236fe30 + 12 * pSpell` | `{check index, use index, flag}`, 20 entries; items record `+0x94` = pSpell. pSpell 10 is `{7, 10, 0}` |
+| check table | `0x1d3ea30`, 11 entries, `(game, user, item) -> bool` | called by `0x5817f0`. Slot 7 = `0x5806f0`: Radament's book flag (quest 9 bit 5) set, else "I can't" (`0x491960(user, 0x14)`). Only reached through the table |
+| use table | `0x1d3ea90`, 16 entries, `(game, user, item) -> bool` | called by `0x581680`, which then uses the item up (`0x46f090`) and logs a SkillItem.cpp verify line on a 0 answer. Slot 10 = `0x580750`: the Book (stat 5 +1, the quest flag, sound 8) |
+| item-event casts | `0x5896e0(unit, skill, level, target, flag)`, `0x589820(unit, skill, level, x, y, flag)` | 1.14d `0x5fdca0` / `0x5fdd60`; both go through the resolver `0x589930` (the skill needs ItemEffect: row 47 has 1). Target `0x48fe20(game, unit)`; position words `0x34b8f0` / `0x34b940` as the event handler `0x583b30` passes them |
+
+**Part `appleuse`** (`apple_use.cpp`, `apple_use_logic.h`, test `appleuse_tests`, off word `appleuse`): check slot 7 and use slot 10
+get the part's functions (written only while they hold D2R's). For an item whose code is not `ass ` (D2R's Book of Skill keeps its
+own two functions) the check passes, as in 1.14d (entry 10 has no check), and the use casts skill 47 at level 1, flag 0, exactly
+as 1.14d `0x5bf170`: on the user's target unit when there is one, else at the user's position. The use answers 1, so the item is
+used up. The id 47 is a constant: 1.13c rows keep their ids (id-mapping.md), like `melttrail`'s 173. `mxl2012` prints "casts N,
+refused N, Books of Skill left to D2R N". Checks `apple_use` (bought from Charsi, state 44, its five stats and 15000 frames, Save and
+Exit) and `rpsignets` (`dog`: used up, no skill point, state `mega_apple`); results in docs/testing.md "Lane apple".
+
+Checked in game (lane apple, 2026-10-30, slot 3, new Barbarians): the Apple bought from Charsi and used by a right click is used
+up and starts `mega_apple` with 14890 of 15000 frames left when read. Its five stats equal skills row 47's formulas
+(hpregen 6 = maxhp / 3000 at item_faster_potions 0, and 7 / 9 / 11 / 1 from the four synergy stats). No skill point is added.
+After Save and Exit the Apple stays used up and the state is gone (1.13c saves no states). `rpsignets` passes all seven rows.
 
 ## 26. Pets spread round their owner after a warp (lane totems, 2026-10-29; bug #493)
 
@@ -821,11 +844,16 @@ The totems cannot walk (monstats2 `barbtotem`: modes DT / NU / A1), so they stay
 - The move is the unit move `0x491ca0(game, pet, 0, x, y, 0, 0)`. If the pet landed within one sub-tile of the asked spot, it
   is flagged teleported (`0x34f490`).
 - A pet that `0x596d40` leaves on the owner's spot gets the same treatment (without the list).
-- The gather itself is unchanged, and pets that are already off the owner's spot are left alone. This covers every warp pet
-  (mercenary, golem, etc.), not only the totems: a walking pet only starts a few sub-tiles away.
-- `mxl2012` prints "owner moves with pets N, pet warps N, onto the owner N, spread N (last pet class N)".
+- The gather itself is unchanged, and pets that are already off the owner's spot are left alone.
+- **Totems only** (owner ruling 2026-10-29, lane apple): a pet is moved only when its unit id is in its owner's list of pettype
+  `totemic` (row 34: the necromancer's five totems and Median's other `totemic` summons). The list is the one the gather walks:
+  `0x5013f0(dataFlag, root, 34)`, root = `*(0x34b240(owner) + 0x98)`, for a player owner. Mercenaries and every other warp pet
+  (Median 2012 gives players no golem) keep D2R's placement on the owner's spot and walk off by themselves.
+- `mxl2012` prints "owner moves with pets N, pet warps N, onto the owner N, spread N, other pets left N (last pet class N)".
 
-Checked in game (docs/testing.md "Lane totems"): the four totems end on four ring spots (diagonals at 3) round the player, in HD
+Checked in game (docs/testing.md "Lane totems", "Lane apple"): the four totems end on four ring spots (diagonals at 3) round the player, in HD
 and legacy. Attack rates and states are unchanged (they were unchanged without the part too). Open: the 1.13c twin of `0x500a40`
 was not found in 1.14d `Game.exe`, so whether 1.13c also stacked them is not known. The HD orbs left at the old spot are bug #500,
-which the part does not change.
+which the part does not change. Lane apple (totems only, 2026-10-30): `totem_spread` still spreads the four totems, and
+`pet_keep` shows a Kashya mercenary and a Summon Shadows pet left to D2R after Bend the Shadows and after a waypoint
+(`spread` +0, `other pets left` +2 / +4).
