@@ -51,6 +51,23 @@ constexpr auto PickAnswer(int id) noexcept -> uint64_t {
 	return static_cast<uint32_t>(id);
 }
 
+// Bug #502: the Barbarian's spirit summons (Guardian / Defender / Protector Spirit, skills 433-435) are monsters 1085-1087 drawn
+// with D2R's HD Ancients (monsters.json: ancientbarb2 / ancientbarb1 / ancientbarb3). Their HD death timeline plays
+// ancient_death_hd through the client play 0x1a0780 each time a spirit dies or is cast again; legacy plays only their monsounds
+// death sound. tools/tests/test_sound_rows.py checks both against the built tables.
+inline constexpr uint64_t RvaClientPlay = 0x1a0780;  // (sound id, unit, ?, ?, ?) -> 0 when nothing played; 204 callers
+// push rbp / push rsi / push rdi / push r14 / push r15 / lea rbp,[rsp-0x2f]
+inline constexpr uint8_t ClientPlayEntry[] = {0x40, 0x55, 0x56, 0x57, 0x41, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0xd1};
+inline constexpr int AncientDeathHd = 6754;  // sounds.txt *Index of ancient_death_hd (both banks, as D2R's)
+inline constexpr int SpiritFirst = 1085;     // monstats guardians
+inline constexpr int SpiritLast = 1087;      // monstats protectors
+inline constexpr int UnitMonster = 1;
+
+// True when the client play of `id` for a unit of `type` / `cls` is the Ancients' HD death sound of a spirit summon: skipped.
+constexpr auto SkipsSpiritDeath(int id, int type, int cls) noexcept -> bool {
+	return id == AncientDeathHd && type == UnitMonster && cls >= SpiritFirst && cls <= SpiritLast;
+}
+
 enum class Table { NotLoaded, Ours, Short };
 
 // The sounds table after a table load: not loaded yet (no rows), ours, or short (D2RLoader's snapshot start: D2R's own rows).

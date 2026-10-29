@@ -15,8 +15,16 @@
 // is -1 for that start. CheckSoundTable (after every table load, D2RLoader's DataTablesLoaded listener) tells the player to
 // restart; until then those sounds are silent.
 //
+// Part spiritsound (InstallSpiritSound, off word spiritsound, bug #502): the client play 0x1a0780 skips ancient_death_hd for
+// the Barbarian's spirit summons (monsters 1085-1087, drawn with D2R's HD Ancients). Their HD death timeline played the
+// Ancients' death roar each time a spirit died or was cast again ("ancient armor noises"); legacy never played it.
+//
 // Dev builds: MXL_SOUNDGUARD_TEST=1 turns the Neutral sound id (caller +0x107cd4) into -1 and lets the 0x107dd0 hook skip it,
 // =2 passes the -1 on to 0x107dd0, where the record reader hook on 0xd8c70 has to catch it.
+// MXL_SOUND_TRACE=<file>: every id the five record readers, 0x107dd0 and the client play 0x1a0780 (part spiritsound, not
+// counted when it is off) see is counted per function, and the file is rewritten at most every
+// second with one line per id seen ("<id> <c7> <b0> <path> <pick> <variant> <unit sound 0x107dd0> <client play 0x1a0780>"), so a check can tell which sounds the game
+// resolved while it did something (lane sound, bugs #501 / #502).
 #include "sound_guard.h"
 
 #include "build_guard.h"
@@ -53,9 +61,56 @@ ReaderFn g_fieldB0 = nullptr;
 ReaderFn g_path = nullptr;
 ReaderFn g_pick = nullptr;
 ReaderFn g_variant = nullptr;
+using ClientPlayFn = uint64_t (*)(int32_t id, const void* unit, uint64_t a, uint64_t b, uint64_t c) noexcept;
+ClientPlayFn g_clientPlay = nullptr;
+std::atomic<uint32_t> g_spiritSkips{0};
+
+#ifndef MXL_RELEASE
+// The dev trace (MXL_SOUND_TRACE): counts per id and reader, written by whichever thread passes the one-second mark.
+constexpr int TraceIds = 16384;
+constexpr int TraceReaders = 7;  // the five readers, the unit sound 0x107dd0, the client play 0x1a0780
+char g_tracePath[MAX_PATH] = "";
+std::atomic<uint32_t> g_trace[TraceIds][TraceReaders];
+std::atomic<uint64_t> g_traceDue{0};
+std::atomic<bool> g_traceWriting{false};
+
+auto ReaderSlot(uint64_t site) noexcept -> int {
+	return site == RvaFieldC7 ? 0 : site == RvaFieldB0 ? 1 : site == RvaPath ? 2 : site == RvaPick ? 3 : site == RvaVariant ? 4 : site == RvaPlayingSound ? 5 : 6;
+}
+
+void Trace(int id, uint64_t site) noexcept {
+	if (g_tracePath[0] == '\0' || id < 0 || id >= TraceIds) {
+		return;
+	}
+	++g_trace[id][ReaderSlot(site)];
+	const uint64_t now = GetTickCount64();
+	if (now < g_traceDue.load() || g_traceWriting.exchange(true)) {
+		return;
+	}
+	g_traceDue = now + 1000;
+	FILE* f = nullptr;
+	if (fopen_s(&f, g_tracePath, "w") == 0 && f != nullptr) {
+		for (int i = 0; i < TraceIds; ++i) {
+			uint32_t n[TraceReaders];
+			uint32_t any = 0;
+			for (int r = 0; r < TraceReaders; ++r) {
+				any |= n[r] = g_trace[i][r].load();
+			}
+			if (any != 0) {
+				std::fprintf(f, "%d %u %u %u %u %u %u %u\n", i, n[0], n[1], n[2], n[3], n[4], n[5], n[6]);
+			}
+		}
+		std::fclose(f);
+	}
+	g_traceWriting = false;
+}
+#else
+void Trace(int, uint64_t) noexcept {}
+#endif
 
 // True (counted, the first five logged) when `id` is not a row of the loaded sounds table.
 auto Skip(int id, uint64_t site, uint64_t caller) noexcept -> bool {
+	Trace(id, site);
 	const int rows = g_count();
 	if (!Skips(id, rows)) {
 		return false;
@@ -101,6 +156,17 @@ uint64_t PickHook(int id, uint64_t a, uint64_t b, uint64_t c) noexcept {
 
 uint64_t VariantHook(int id, uint64_t a, uint64_t b, uint64_t c) noexcept {
 	return Skip(id, RvaVariant, Caller(_ReturnAddress())) ? PickAnswer(id) : g_variant(id, a, b, c);
+}
+
+// The client play 0x1a0780: the Ancients' HD death sound of a spirit summon returns 0 (nothing played), bug #502.
+uint64_t ClientPlayHook(int32_t id, const void* unit, uint64_t a, uint64_t b, uint64_t c) noexcept {
+	Trace(id, RvaClientPlay);
+	if (id == AncientDeathHd && unit != nullptr &&
+	    SkipsSpiritDeath(id, *static_cast<const int32_t*>(unit), *reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(unit) + 4))) {
+		++g_spiritSkips;
+		return 0;
+	}
+	return g_clientPlay(id, unit, a, b, c);
 }
 
 void* PlayingSoundHook(void* unit, int id) noexcept {
@@ -163,6 +229,9 @@ auto InstallSoundGuard(const D2RL::PluginContext* context, char* report, size_t 
 	if (GetEnvironmentVariableA("MXL_SOUNDGUARD_TEST", env, sizeof(env)) > 0) {
 		g_test = env[0] == '2' ? 2 : (env[0] == '1' ? 1 : 0);
 	}
+	if (GetEnvironmentVariableA("MXL_SOUND_TRACE", g_tracePath, sizeof(g_tracePath)) >= sizeof(g_tracePath)) {
+		g_tracePath[0] = '\0';
+	}
 #endif
 	const bool ok = context->InstallInlineHook(RvaPlayingSound, PlayingSoundEntry, sizeof(PlayingSoundEntry),
 	                                           reinterpret_cast<void*>(&PlayingSoundHook), reinterpret_cast<void**>(&g_original));
@@ -206,7 +275,27 @@ auto InstallSoundGuard(const D2RL::PluginContext* context, char* report, size_t 
 	              ok ? "" : " FAILED", in, ReaderCount, failed[0] != '\0' ? " (FAILED:" : "", failed[0] != '\0' ? failed : "",
 	              failed[0] != '\0' ? ")" : "", listening ? "" : " (NO LISTENER)",
 	              g_test == 0 ? "" : (g_test == 2 ? " (TEST 2: Neutral id -1 passed on)" : " (TEST 1: Neutral id -1)"));
+#ifndef MXL_RELEASE
+	if (g_tracePath[0] != '\0') {
+		const size_t len = std::strlen(report);
+		std::snprintf(report + len, reportSize - len, " (TRACE to %s)", g_tracePath);
+	}
+#endif
 	return all;
+}
+
+auto InstallSpiritSound(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> bool {
+	const bool ok = context->InstallInlineHook(RvaClientPlay, ClientPlayEntry, sizeof(ClientPlayEntry), reinterpret_cast<void*>(&ClientPlayHook),
+	                                           reinterpret_cast<void**>(&g_clientPlay));
+	std::snprintf(report, reportSize,
+	              ok ? "spiritsound on: ancient_death_hd (%d) of the spirit summons %d-%d not played (client play 0x1a0780)"
+	                 : "spiritsound off: the client play hook 0x1a0780 FAILED (ancient_death_hd %d, spirits %d-%d)",
+	              AncientDeathHd, SpiritFirst, SpiritLast);
+	return ok;
+}
+
+auto SpiritSoundSkips() noexcept -> long {
+	return static_cast<long>(g_spiritSkips.load());
 }
 
 void SoundGuardStatus(char* out, size_t outSize) noexcept {

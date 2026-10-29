@@ -47,6 +47,17 @@ int main() {
 	}
 	Check(RvaFieldC7 == 0xd8c70 && RvaPlayingSound == 0x107dd0 && RvaSoundCount == 0x3b20c0, "rvas of the guard");
 
+	// part spiritsound (#502): only ancient_death_hd, only for monsters 1085-1087
+	Check(SkipsSpiritDeath(AncientDeathHd, UnitMonster, 1085) && SkipsSpiritDeath(AncientDeathHd, UnitMonster, 1087), "guardians / protectors");
+	Check(SkipsSpiritDeath(AncientDeathHd, UnitMonster, 1086), "defenders");
+	Check(!SkipsSpiritDeath(AncientDeathHd, UnitMonster, 1088), "crusaders (no summon skill, not drawn as an Ancient here)");
+	Check(!SkipsSpiritDeath(AncientDeathHd, UnitMonster, 540) && !SkipsSpiritDeath(AncientDeathHd, UnitMonster, 541), "the real Ancients keep it");
+	Check(!SkipsSpiritDeath(AncientDeathHd, 0, 1085) && !SkipsSpiritDeath(AncientDeathHd, 3, 1085), "players / missiles with the same class");
+	Check(!SkipsSpiritDeath(AncientDeathHd + 1, UnitMonster, 1085) && !SkipsSpiritDeath(-1, UnitMonster, 1085), "other sounds of a spirit");
+	Check(!Skips(AncientDeathHd, D2RSoundRows), "ancient_death_hd is a D2R row");
+	Check(RvaClientPlay == 0x1a0780 && sizeof(ClientPlayEntry) == 13 && ClientPlayEntry[0] == 0x40 && ClientPlayEntry[12] == 0xd1,
+	      "0x1a0780: 13 bytes, lea rbp,[rsp-0x2f]");
+
 	if (failures == 0) {
 		std::printf("sound guard tests: all passed\n");
 	}

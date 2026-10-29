@@ -320,7 +320,7 @@ auto CmdHelp(Ctx*, const hcmd::Tokens&) noexcept -> bool {
 	Out("harness frames seen %ld last game %ld, frame hook %s", static_cast<long>(g_frames), static_cast<long>(g_lastGame),
 	    g_frameHooked ? "on" : "OFF (server verbs cannot run)");
 	Out("verbs: help | echo <text> | frames | state | units | stat player|merc|mon:<id> <stat> [layer] [set <v>] | level <id> [warp [kind]|npc] | spawn <class> [count [x y]] | kill <id>|nearest [class]");
-	Out("verbs: setskill <id> <level> | skill [left|right <id>] | cast <id> [x y|unit <id>|nearest [class]|self] | mcast <id> <mode> unit <id>|nearest [class] [at <id>]");
+	Out("verbs: setskill <id> <level> | skill [left|right <id> [<item id>]] | cast <id> [x y|unit <id>|nearest [class]|self] | mcast <id> <mode> unit <id>|nearest [class] [at <id>]");
 	Out("verbs: missile <row> [dx dy [skill level [where]]] | missiles [reset] | missilescan | cltdo <skill> [level] [orig] | cltst <skill> [orig] (client) | slot <table> [index] (client)");
 	Out("verbs: waypoint n <number> [get|set|clear] | waypoint open | objects [class] | object <class> [dx dy] | operate <id> <fn> | objmode <id> <mode> | enter nearest|<id> | dump mon <class> [offset]");
 	Out("verbs: item <code> [normal|magic|rare|set|unique [row]] [q=n] [uniq=row] [set=row] [ilvl=n] [inv|cube|ground] [unid] [stat=value ..] | equip <code> ... <head|rhand|lhand|body|...> | unequip <bodyloc> | identify [all|<item id>] | items");
@@ -1012,16 +1012,19 @@ auto SelectSkill(Ctx* c, long long id, bool left, uint32_t owner = 0xffffffffU) 
 	return SkillIdOf(left ? Fn<ActiveSkillFn>(RvaLeftSkill)(c->player) : Fn<ActiveSkillFn>(RvaRightSkill)(c->player));
 }
 
-// `skill` prints the active skills; `skill left|right <id>` selects one.
+// `skill` prints the active skills; `skill left|right <id> [<item id>]` selects one (with an item id: the charged skill of
+// that item, as the game's skill list selects it).
 auto CmdSkill(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	if (t.n >= 3) {
 		long long id = 0;
+		long long owner = -1;
 		const bool left = hcmd::LowerEq(t.tok[1], "left");
-		if ((!left && !hcmd::LowerEq(t.tok[1], "right")) || !hcmd::ParseInt(t.tok[2], &id) || id < 0 || id > 0xffff) {
-			return Fail(c, "usage: skill [left|right <skill id>]");
+		if ((!left && !hcmd::LowerEq(t.tok[1], "right")) || !hcmd::ParseInt(t.tok[2], &id) || id < 0 || id > 0xffff ||
+		    (t.n >= 4 && (!hcmd::ParseInt(t.tok[3], &owner) || owner < 0 || owner > 0xfffffffeLL))) {
+			return Fail(c, "usage: skill [left|right <skill id> [<item id>]]");
 		}
-		const int now = SelectSkill(c, id, left);
-		Out("skill %s %lld: active now %d", left ? "left" : "right", id, now);
+		const int now = SelectSkill(c, id, left, static_cast<uint32_t>(owner));
+		Out("skill %s %lld%s: active now %d", left ? "left" : "right", id, owner >= 0 ? " (item charges)" : "", now);
 		return now == id ? true : Fail(c, "skill: the game did not select %lld (no level in it? try setskill)", id);
 	}
 	Out("skill left=%d right=%d", SkillIdOf(Fn<ActiveSkillFn>(RvaLeftSkill)(c->player)), SkillIdOf(Fn<ActiveSkillFn>(RvaRightSkill)(c->player)));

@@ -10821,6 +10821,149 @@ def check_ml_merc():
 CHECKS += [("ml_merc", check_ml_merc)]
 
 
+# ---------------------------------------------------------------- lane sound: bugs #501 (Raid's charged Blink) / #502 (spirit summons)
+# A dev DLL started with MXL_SOUND_TRACE=<file> (sound_guard.cpp) writes, about once a second, how often each sound id went
+# through the client's sound functions; snd_trace() reads it ({} without the trace) and snd_delta() lists the ids that grew.
+SND_ANCIENT_DEATH_HD = 6754  # sounds.txt *Index of ancient_death_hd (plugin sound_guard_logic.h AncientDeathHd)
+SND_SPIRITS = (433, 434, 435)  # Guardian / Defender / Protector Spirit: monsters 1085-1087, drawn with D2R's HD Ancients
+SND_BLINK = 346  # Blink: Raid's charged skill (runes.txt mxl2012:Raid, charged 346 level 5)
+SND_JAVELIN = "132"  # Javelin (Grade 1), a Raid base
+
+
+def snd_trace():
+    """{sound id: (variant picks, client plays)} of the MXL_SOUND_TRACE file, {} when there is none."""
+    path, out = os.environ.get("MXL_SOUND_TRACE"), {}
+    try:
+        for ln in open(path or ""):
+            p = [int(x) for x in ln.split()]
+            if len(p) == 8:
+                out[p[0]] = (p[5], p[7])
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def snd_ids():
+    """{sounds.txt name: id}: the id is the *Index column (a blank row is id 0), read without quote handling as the game does."""
+    import csv
+    with open(os.path.join(EXCEL, "sounds.txt"), encoding="latin-1", newline="") as f:
+        rows = list(csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE))
+    ix = rows[0].index("*Index")
+    return {r[0]: int(r[ix]) for r in rows[1:] if len(r) > ix and r[0] and r[ix].isdigit()}
+
+
+def snd_delta(a, b):
+    """{id: (variant picks, client plays)} that grew between two snd_trace() snapshots."""
+    return {i: (v[0] - a.get(i, (0, 0))[0], v[1] - a.get(i, (0, 0))[1]) for i, v in b.items() if v != a.get(i, (0, 0))}
+
+
+def snd_skipped():
+    """The plugin's spiritsound skip count (`mxl2012` line '...; plays skipped N'), None without the line."""
+    line = mxl_part(mxl_text().splitlines(), "spiritsound")
+    m = re.search(r"plays skipped (\d+)", line)
+    return (int(m.group(1)) if m else None), line
+
+
+def check_snd_spirits():
+    """Bug #502 (lane sound): the Barbarian's spirit summons played D2R's Ancients death roar (ancient_death_hd) in HD each time
+    one died or was cast again. SET-UP: a Barbarian of the check's own (SndBarb), the three spirit skills at level 10 by harness
+    `setskill`. Per graphics mode in town: each spirit is cast by a right click, cast again 8 times (the old one dies) and the
+    spirits are killed by harness. PASS: the plugin's `spiritsound` count grew in HD, and with MXL_SOUND_TRACE the trace shows no
+    variant pick of ancient_death_hd in either mode; the game alive."""
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    if not switch_character("SndBarb", "barbarian", 4):
+        return finish("snd_spirits", False, "no Barbarian", mark, shots, log)
+    traced = bool(os.environ.get("MXL_SOUND_TRACE"))
+    for mode in ("hd", "legacy"):
+        set_graphics(mode)
+        goto(1)
+        time.sleep(3)
+        n0, _ = snd_skipped()
+        t0 = snd_trace()
+        for sid in SND_SPIRITS:
+            learn(sid, 10)
+            Hl("skill right %d" % sid, log)
+            g.click(0.56, 0.47, button="right")
+            time.sleep(2)
+        for k in range(8):
+            g.click(0.56 if k % 2 == 0 else 0.44, 0.47, button="right")
+            time.sleep(1.5)
+        shots.append(sh("snd_spirits_%s" % mode))
+        for m in [m for m in hstate()["mons"] if m.get("class") in (1085, 1086, 1087)]:
+            Hl("kill %d" % m["id"], log)
+        time.sleep(4)
+        n1, line = snd_skipped()
+        d = snd_delta(t0, snd_trace()).get(SND_ANCIENT_DEATH_HD, (0, 0))
+        rows.append("%s: spiritsound skips %s -> %s, ancient_death_hd variant picks %s, client plays %s%s" % (
+            mode, n0, n1, d[0], d[1], "" if traced else " (no trace)"))
+        if mode == "hd" and (n0 is None or n1 is None or n1 <= n0):
+            bad.append("HD: no ancient_death_hd play skipped (%s)" % (line or "no spiritsound line"))
+        if traced and d[0] > 0:
+            bad.append("%s: ancient_death_hd played %d times" % (mode, d[0]))
+    set_graphics("hd")
+    if not game_alive():
+        bad.append("the game is gone")
+    finish("snd_spirits", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial=None if traced else "no MXL_SOUND_TRACE: the HD death roar judged by the plugin's count only")
+
+
+CHECKS += [("snd_spirits", check_snd_spirits)]
+
+
+def check_snd_blink():
+    """Bug #501 (lane sound): Raid (runeword, javelin) gives Blink (346) as level 5 charges. SET-UP: an Amazon of the check's own
+    (SndAma), a Javelin with 60 charges of Blink level 5 by harness `equip` in the right hand, selected for the right button with
+    the item's id (as the game's charged-skill list does). Per graphics mode outside town: 12 Blinks by right click. PASS: Blink
+    selected, the player moved, the charges went down, the Blink sounds (baal_teleport, druid_shockwave) resolved when traced,
+    no new assert, the game alive."""
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    if not switch_character("SndAma", "amazon", 0):
+        return finish("snd_blink", False, "no Amazon", mark, shots, log)
+    names = snd_ids()
+    for mode in ("hd", "legacy"):
+        set_graphics(mode)
+        goto(2)
+        time.sleep(3)
+        item = None
+        for code, body, extra in ((SND_JAVELIN, "rhand", " 70=60"), ("rin", "rring", "")):  # the ring when the javelin is refused
+            Hl("unequip %s" % body, log)
+            _ok, lines = Hl("equip %s normal%s 204:%d=%d %s" % (code, extra, SND_BLINK << 6 | 5, 60 << 8 | 60, body), log)
+            item = first(lines, r"item id=(\d+)")
+            if item:
+                rows.append("%s: Blink charges on %s" % (mode, code))
+                break
+        sel, _ = Hl("skill right %d %d" % (SND_BLINK, item or 0), log)
+        if not (item and sel):
+            bad.append("%s: the charged Blink was not selected (item %s)" % (mode, item))
+            continue
+        t0, p0 = snd_trace(), hstate()["player"]
+        moved = 0
+        for k in range(12):
+            dx = 5 if k % 2 == 0 else -5
+            before = hstate()["player"]
+            g.click((800 + dx * 27) / 1600, (405 - dx * 13.5) / 900, button="right")
+            time.sleep(1.4)
+            after = hstate()["player"]
+            moved += (before.get("x"), before.get("y")) != (after.get("x"), after.get("y"))
+        shots.append(sh("snd_blink_%s" % mode))
+        d = snd_delta(t0, snd_trace())
+        heard = {n: d.get(names.get(n), (0, 0))[0] for n in ("baal_teleport", "druid_shockwave", "fingermage_hit_1")}
+        rows.append("%s: item %s, moved on %d of 12 Blinks, sounds %s" % (mode, item, moved, heard if d else "(no trace)"))
+        if moved < 6:
+            bad.append("%s: the player moved on %d of 12 Blinks" % (mode, moved))
+        if d and not heard["baal_teleport"]:
+            bad.append("%s: no baal_teleport" % mode)
+        if not game_alive():
+            bad.append("%s: the game is gone" % mode)
+            break
+    set_graphics("hd")
+    finish("snd_blink", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial="the sound itself is judged by the client's sound calls, not by ear")
+
+
+CHECKS += [("snd_blink", check_snd_blink)]
+
+
 if __name__ == "__main__":
     main()
 

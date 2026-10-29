@@ -3435,3 +3435,23 @@ hdicons2's shared icon sheet (02:27), which gives Fire Wall D2R's icon and the t
 (docs/hd-icons.md, seen in game there); Moon Queen / Balance / Wings of W are passives, never on a skill button. Not re-checked in
 game by this lane.
 
+## Lane sound: Raid (#501) and "ancient armor" noises (#502) (2026-10-30, slot 3, background mode, build of lane/sound)
+
+Dev tool: a dev DLL started with `MXL_SOUND_TRACE=<file>` (plugin `sound_guard.cpp`) counts every sound id that goes through the
+five sound record readers, the unit sound `0x107dd0` and the client play `0x1a0780`, and rewrites the file about once a second
+(`<id> <c7> <b0> <path> <pick> <variant> <unit sound> <client play>`). Column 6 (variant picks) is a sound that resolved to a
+file; column 8 counts every request. The id is sounds.txt's `*Index` column (line 2 of the file is a blank row with id 0).
+The lab script (`mxl2012-runs/sound/lab.py`) takes the counts before and after each step and lists the sounds by name.
+New harness form: `skill left|right <id> <item id>` selects a charged skill of that item (the game's charge list).
+
+| Run | What | Result |
+|-----|------|--------|
+| `mxl2012-runs/sound/run2` | Barbarian SndBarb, spirits 433-435 summoned, re-cast, killed; HD and legacy (before the fix) | HD: `ancient_death_hd` (6754) on every spirit death / re-cast (11 in 12 re-casts), legacy none: bug #502 |
+| `mxl2012-runs/sound/run3` | the same with part `spiritsound` | HD: 10 requests, 0 plays, `plays skipped 11`; the spirits' own `barbarian_death_1` still plays; legacy unchanged; 0 asserts |
+| `mxl2012-runs/sound/run5`, `run6` | Amazon SndAma, Blink level 5 charges (Raid's) on a ring, `skill right 346 <item>`, 12 and 40 right clicks per mode in the Blood Moor | Blink warps, `baal_teleport` plays, `druid_shockwave` asked for 64 times per cast and played once; sounds go on afterwards; 0 asserts, game alive: #501 not reproduced |
+| `checks-20261030-004112-s3` | checks `snd_spirits`, `snd_blink` (tools/game_checks.py, with `MXL_SOUND_TRACE`) | `snd_spirits` PASS (HD: 11 requests of `ancient_death_hd`, 0 played, skips 0 -> 11; legacy: none); `snd_blink` PARTIAL (6 casts per mode, `baal_teleport` 6 each, the game alive; the by-ear part not judged); `mxl2012` PASS. Copied to `mxl2012-runs/sound/checks-20261030-004112-s3/` |
+
+The checks: `MXL_RUN=<lock> MXL_SLOT=N MXL_SOUND_TRACE=<file> py -3 tools/game_checks.py all mxl2012 snd_spirits snd_blink`
+(each makes its own character: SndBarb, SndAma). Without the trace `snd_spirits` judges by the plugin's skip count only
+(PARTIAL). Not judged: what the speakers play (no audio capture on this PC); a stackable javelin cannot be put in the hand by the
+harness, so the charges sit on a ring (the same stat 204).

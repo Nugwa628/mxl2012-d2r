@@ -44,6 +44,8 @@
 //      of D2R's raw printf labels ("Fire Damage: %d-%d12-15") (skill_text.cpp, off word skilltext, #396);
 //   +  D2R's client sound record lookups skip a sound id outside the loaded sounds.txt, and a sounds table short of ours (the
 //      start that builds D2RLoader's table cache) gets a "start again" notice (sound_guard.cpp, off word soundguard, crash-audit C17);
+//   +  the Barbarian's spirit summons (Guardian / Defender / Protector Spirit, drawn with D2R's HD Ancients) do not play the
+//      Ancients' HD death roar each time one dies or is cast again (sound_guard.cpp, off word spiritsound, #502);
 //   +  D2R's unit translation event handler skips an event with an unreadable payload (translation_guard.cpp, off word
 //      transguard, crash-audit C14);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
@@ -131,7 +133,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard transguard lvlupui), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -403,6 +405,7 @@ char g_mercEquipReport[200] = "";
 char g_durSyncReport[160] = "";
 char g_origAssertReport[orig_asserts::BlockCount][160] = {};
 char g_soundGuardReport[256] = "";
+char g_spiritSoundReport[160] = "";
 char g_transGuardReport[192] = "";
 char g_lvlUpUiReport[192] = "";
 char g_harnessReport[192] = "";
@@ -536,6 +539,8 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		std::snprintf(line, sizeof(line), "%s | %s", g_soundGuardReport, status);
 		SayPart(command, "soundguard", line);
 	}
+	std::snprintf(line, sizeof(line), "%s; plays skipped %ld", g_spiritSoundReport, SpiritSoundSkips());
+	SayPart(command, "spiritsound", line);
 	unsigned events = 0, skipped = 0;
 	TranslationGuardStats(&events, &skipped);
 	std::snprintf(line, sizeof(line), "%s; events %u, skipped %u", g_transGuardReport, events, skipped);
@@ -691,6 +696,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("soundguard")) {
 		InstallSoundGuard(context, g_soundGuardReport, sizeof(g_soundGuardReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: sound guard %s", g_soundGuardReport);
+		context->LogInfo(line);
+	}
+	if (!Off("spiritsound")) {
+		InstallSpiritSound(context, g_spiritSoundReport, sizeof(g_spiritSoundReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_spiritSoundReport);
 		context->LogInfo(line);
 	}
 	if (!Off("transguard")) {
