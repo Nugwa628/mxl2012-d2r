@@ -82,6 +82,8 @@ What we know is wrong or different. Please don't report these again, unless you 
 
 - Kashya hires mercenaries from character level 8 even before her quest is done.
 - D2R's shared stash tabs, materials tab, Chronicle, loot filter and auto gold pick-up are there; Median had none of them.
+  As in D2R, quest items (the Horadric Cube, Wirt's Leg, the Bark Scroll, Khalim's parts and so on) cannot go into the
+  shared tabs, also not by Ctrl-click; keep them in the Personal tab.
 - The mercenary panel lists the mercenary's skills; some auras there read "Attack".
 
 **Other**

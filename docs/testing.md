@@ -459,7 +459,7 @@ What was measured (D2R 3.3.0 build 93847, D2RLoader 1.3.1, game window behind th
 | Text typing (names) | WM_KEYDOWN + WM_CHAR, same path as keys | same (typing a character name is untested in game) |
 | Mouse move / click / right click | does NOT work: D2R reads the position with GetCursorPos and the buttons with GetKeyState and ignores WM_MOUSEMOVE / WM_xBUTTON lParam, with or without focus | plugin harness: game_ctl writes a virtual cursor and button state into a shared block, the plugin answers GetCursorPos / GetKeyState from it, and the WM_ messages are posted as well; hover and ImGui menus work |
 | Ctrl+` (developer console panel) | does NOT work (the console is a D2R input action; modifiers from posted messages are ignored, also with real focus) | plugin harness runs the line through D2RCore's `ExecuteConsoleCommand` on the UI thread; the panel stays closed |
-| Modifier state (Shift/Ctrl/Alt) | not seen by D2R | virtual state in the shared block (GetKeyState) |
+| Modifier state (Shift/Ctrl/Alt) | not seen by D2R | virtual state in the shared block (GetKeyState: the win32u syscall and, since lane uifix, the game exe's `GetKeyState` import, which mostly answers from the thread's cached key state without the syscall; before that a Ctrl-click was a plain click). `click(..., mods=("ctrl",))` |
 
 Other things the harness keeps off the user's desktop: D2R's own `SetCursorPos` (called once at start in a normal run)
 and `ClipCursor` calls become no-ops (otherwise the real cursor jumps and is confined to the game window),
@@ -3395,3 +3395,43 @@ Round 1 on slot 1 (owner-approved), round 2 on slot 2 after merging main. Eviden
 
 Run `checks-20261029-224054-s2` was BLOCKED by the check itself: a new character's save has no quest section before its first
 Save and Exit (`quest_done` now reads that as "not done"; the closed edit saves first).
+
+## Lane uifix: Ctrl-click quick move to the stash (bug #503, 2026-10-30, slot 4, background mode)
+
+Slot 4's installed build (lane build of 2026-10-29 18:30) with this lane's dev plugin swapped in (slot's own DLL backed up and put back,
+sha1 checked), new Sorceress `UifixStash` (still in `mxl2012-s4`). Scratch driver and helpers (not committed):
+`mxl2012-runs/uifix/` (`drv.py`, `qm.py`, `sweep.py`, `list1.py`); evidence `mxl2012-runs/uifix/checks-20261030-000212-s4/`.
+
+**Harness first.** A posted Ctrl never reached D2R's item click: the clicks were plain pick-ups (the trace's GetKeyState histogram
+never had vk 0x11). user32's `GetKeyState` answers from the thread's cached key state, which posted messages do not update, and only
+some calls reach the hooked `NtUserGetKeyState` syscall. The harness now also redirects the game exe's import of `GetKeyState`
+(`PatchImport` by the resolved address in the IAT directory; the startup line says `GetKeyState import hooked`), and
+`game_ctl.click` takes `mods`. After that a Ctrl-click moved a scroll into the stash (`s6_ctrl_tsc.png`).
+
+**Sweep** (Ctrl-click of each item from the backpack with the stash open, HD; 40 kinds: runes incl. a Great Rune, gems incl. rainbow
+stone and onyx, jewel, carry1 charms `a55` / `yq7` (2x2), relic, crystal, arcane crystal, oil, class reward, signet, elixirs, Token of
+Absolution, summoning scroll, shrine (1x2), Boss Killer ring, mystic orb, tome, key, magic ring, rare amulet, uniques 600 / 1440, set
+150, body armour 2x3, polearm / bows / claw / shield 2x4, class helms, sorceress orb, quest items):
+
+| Target | Result | Evidence |
+|---|---|---|
+| Personal tab | every kind moves; the two last 2x2 items stayed only because the page had no 2x2 gap left (correct) | `sweep_personal.json`, `sw_personal_end.png` |
+| Shared tab | every non-quest kind moves, also the carry1 charms (brought back from the personal tab) | `sweep_shared.json`, `sw_shared_end.png`, `sh4_carry_leg.png` |
+| Shared tab, quest items | **refused**: Horadric Cube, Bark Scroll, Wirt's Leg, also on an empty shared page where a normal 2x2 helm goes in | `sh3_page2.png`, `sh4_carry_leg.png` |
+| Legacy graphics (G), shared tab | the same: scroll and rune move, Wirt's Leg stays | `lg1_quickmove.png` |
+
+The refused ones are exactly the items with a `quest` value in misc / weapons.txt (26 rows: cube, scrolls, Khalim's parts, staves,
+Wirt's Leg, ...): the same codes and values as D2R's own tables, and D2R keeps quest items out of the shared tabs. Median's own
+`ques`-type items without a `quest` value (Token of Absolution) move. So no port problem was found (bugs.md #503).
+
+Not done: Ctrl-click from the stash or cube back to the backpack was only used, not swept; the materials tab (D2R 3.3) is not in
+this stash. **Left behind:** slot 4's shared stash (`mxl2012-s4`) holds about 40 test items on pages 1-3 (not cleaned: the slot was
+taken by another lane right after the run).
+
+**Skill icons / legacy tab titles (dropped from this lane, coordinator 2026-10-30).** Found before the hand-over, nothing changed:
+both release-note lines look stale. The notes were written (relprep, 2026-10-29 02:06) after the tab-title fix (bug #33, lane
+monitems, 2026-10-28; slot 4's installed classic `skillstreepanel.json` has the seven classes' `textTab0-2` empty) and before lane
+hdicons2's shared icon sheet (02:27), which gives Fire Wall D2R's icon and the three item skills class-sheet frames
+(docs/hd-icons.md, seen in game there); Moon Queen / Balance / Wings of W are passives, never on a skill button. Not re-checked in
+game by this lane.
+

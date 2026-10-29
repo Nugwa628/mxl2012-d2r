@@ -527,10 +527,12 @@ def _set_mods(mods):
         v[5] = sum(bits[m] for m in mods)
 
 
-def click_bg(fx, fy, button="left", move_only=False):
+def click_bg(fx, fy, button="left", move_only=False, mods=()):
     """Mouse without the real mouse: the virtual cursor in the plugin's input block (position and button state as
     D2R's GetCursorPos / GetKeyState see them) plus WM_MOUSEMOVE / WM_xBUTTON messages with client coordinates.
-    Messages alone are ignored by D2R (it takes the position from GetCursorPos, not from lParam)."""
+    Messages alone are ignored by D2R (it takes the position from GetCursorPos, not from lParam). `mods` ("ctrl",
+    "shift", "alt") are held in the virtual block for the click only, e.g. ctrl for D2R's quick move to the stash (needs
+    a plugin whose harness hooks the exe's GetKeyState import, lane uifix)."""
     h = need_window()
     cr = wt.RECT()
     user32.GetClientRect(h, ctypes.byref(cr))
@@ -549,18 +551,24 @@ def click_bg(fx, fy, button="left", move_only=False):
     if move_only:
         return
     down, up, bit, mk = (WM_LBUTTONDOWN, WM_LBUTTONUP, 1, 1) if button == "left" else (WM_RBUTTONDOWN, WM_RBUTTONUP, 2, 2)
-    v[4] |= bit
-    user32.PostMessageW(h, down, mk, lp(x, y))
-    time.sleep(0.08)
-    v[4] &= ~bit
-    user32.PostMessageW(h, up, 0, lp(x, y))
-    time.sleep(0.4)
+    _set_mods(mods)
+    try:
+        v[4] |= bit
+        user32.PostMessageW(h, down, mk, lp(x, y))
+        time.sleep(0.08)
+        v[4] &= ~bit
+        user32.PostMessageW(h, up, 0, lp(x, y))
+        time.sleep(0.4)
+    finally:
+        _set_mods(())
     log(f"click(bg) {fx:.3f},{fy:.3f} -> client {x},{y} {button}")
 
 
-def click(fx, fy, button="left", move_only=False):
+def click(fx, fy, button="left", move_only=False, mods=()):
     if BG:
-        return click_bg(fx, fy, button, move_only)
+        return click_bg(fx, fy, button, move_only, mods)
+    if mods:
+        raise SystemExit("click with modifiers is implemented for background input only")
     h = need_window()
     focus(h)
     l, t, r, b = client_rect(h)

@@ -174,6 +174,22 @@ int64_t H_NtUserGetCursorPos(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uin
 }
 
 volatile LONG64 g_vkCounts[256] = {};
+
+// The virtual state of a mouse button or modifier key: true with *down set when the harness answers for `vk`.
+auto VirtualKeyState(uint32_t vk, bool* down) noexcept -> bool {
+	if (g_shared == nullptr || g_shared->active == 0) {
+		return false;
+	}
+	switch (vk & 0xff) {
+	case 0x01: *down = (g_shared->buttons & 1) != 0; return true;
+	case 0x02: *down = (g_shared->buttons & 2) != 0; return true;
+	case 0x10: case 0xa0: case 0xa1: *down = (g_shared->mods & 1) != 0; return true;
+	case 0x11: case 0xa2: case 0xa3: *down = (g_shared->mods & 2) != 0; return true;
+	case 0x12: case 0xa4: case 0xa5: *down = (g_shared->mods & 4) != 0; return true;
+	default: return false;
+	}
+}
+
 Stat g_stat_NtUserGetKeyState;
 Fn g_orig_NtUserGetKeyState = nullptr;
 int64_t H_NtUserGetKeyState(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e, uint64_t f, uint64_t g, uint64_t h,
@@ -181,22 +197,58 @@ int64_t H_NtUserGetKeyState(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint
 	Note(&g_stat_NtUserGetKeyState, a, b, c, d);
 	InterlockedIncrement64(&g_vkCounts[a & 0xff]);
 	int64_t result = g_orig_NtUserGetKeyState(a, b, c, d, e, f, g, h, i, j, k, l);
-	if (g_shared != nullptr && g_shared->active != 0) {
-		bool down = false;
-		bool known = true;
-		switch (static_cast<uint32_t>(a) & 0xff) {
-		case 0x01: down = (g_shared->buttons & 1) != 0; break;
-		case 0x02: down = (g_shared->buttons & 2) != 0; break;
-		case 0x10: case 0xa0: case 0xa1: down = (g_shared->mods & 1) != 0; break;
-		case 0x11: case 0xa2: case 0xa3: down = (g_shared->mods & 2) != 0; break;
-		case 0x12: case 0xa4: case 0xa5: down = (g_shared->mods & 4) != 0; break;
-		default: known = false; break;
-		}
-		if (known) {
-			result = down ? static_cast<int64_t>(static_cast<int16_t>(0x8000)) : 0;
-		}
+	if (bool down = false; VirtualKeyState(static_cast<uint32_t>(a), &down)) {
+		result = down ? static_cast<int64_t>(static_cast<int16_t>(0x8000)) : 0;
 	}
 	return result;
+}
+
+// user32!GetKeyState mostly answers from the thread's cached key state without the syscall above, and posted key
+// messages never update that cache, so a posted Ctrl was invisible to D2R's item clicks (Ctrl-click quick move, bug #503).
+// The game exe's import of GetKeyState is redirected here as well.
+using GetKeyStateFn = SHORT(WINAPI*)(int);
+GetKeyStateFn g_origGetKeyState = nullptr;
+volatile LONG64 g_iatKeyStateCalls = 0;
+SHORT WINAPI H_GetKeyState(int vk) {
+	InterlockedIncrement64(&g_iatKeyStateCalls);
+	InterlockedIncrement64(&g_vkCounts[vk & 0xff]);
+	if (bool down = false; VirtualKeyState(static_cast<uint32_t>(vk), &down)) {
+		return down ? static_cast<SHORT>(0x8000) : 0;
+	}
+	return g_origGetKeyState(vk);
+}
+
+// Replaces the exe's import address table slots that hold `module!name` (matched by the resolved address: the
+// game exe keeps no name thunks for every import) with `hook`; false when no slot holds it.
+auto PatchImport(HMODULE exe, const char* module, const char* name, void* hook, void** original) noexcept -> bool {
+	HMODULE target = GetModuleHandleA(module);
+	const auto resolved = target != nullptr ? reinterpret_cast<ULONGLONG>(GetProcAddress(target, name)) : 0;
+	if (resolved == 0) {
+		return false;
+	}
+	auto* base = reinterpret_cast<uint8_t*>(exe);
+	const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+	const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+	const IMAGE_DATA_DIRECTORY& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT];
+	if (dir.VirtualAddress == 0 || dir.Size < sizeof(ULONGLONG)) {
+		return false;
+	}
+	auto* slots = reinterpret_cast<ULONGLONG*>(base + dir.VirtualAddress);
+	bool patched = false;
+	for (size_t n = 0; n < dir.Size / sizeof(ULONGLONG); ++n) {
+		if (slots[n] != resolved) {
+			continue;
+		}
+		DWORD old = 0;
+		if (!VirtualProtect(&slots[n], sizeof(ULONGLONG), PAGE_READWRITE, &old)) {
+			continue;
+		}
+		*original = reinterpret_cast<void*>(resolved);
+		slots[n] = reinterpret_cast<ULONGLONG>(hook);
+		VirtualProtect(&slots[n], sizeof(ULONGLONG), old, &old);
+		patched = true;
+	}
+	return patched;
 }
 
 // D2R moves and confines the real cursor on its own (SetCursorPos, ClipCursor): while the virtual input is active
@@ -741,7 +793,7 @@ void DumpTrace() noexcept {
 		ReleaseSRWLockShared(&g_lock);                                                                              \
 	}
 	HARNESS_ALL(DUMP)
-	std::fprintf(f, "GetKeyState vk histogram:");
+	std::fprintf(f, "GetKeyState import calls %lld; vk histogram (syscall and import):", static_cast<long long>(g_iatKeyStateCalls));
 	for (int vk = 0; vk < 256; ++vk) {
 		if (g_vkCounts[vk] != 0) {
 			std::fprintf(f, " %02x:%lld", vk, static_cast<long long>(g_vkCounts[vk]));
@@ -832,6 +884,8 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 	}
 	HARNESS_ALL(INSTALL)
 #undef INSTALL
+	const bool keyStateImport = PatchImport(GetModuleHandleA(nullptr), "user32.dll", "GetKeyState",
+	                                        reinterpret_cast<void*>(&H_GetKeyState), reinterpret_cast<void**>(&g_origGetKeyState));
 	if (std::strstr(mode, "diag") != nullptr) {
 		char path[MAX_PATH];
 		std::snprintf(path, sizeof(path), "%smxl2012-testharness-diag-%lu.log", g_dir, static_cast<unsigned long>(GetCurrentProcessId()));
@@ -923,8 +977,8 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 		CreateThread(nullptr, 0, TitleThread, nullptr, 0, nullptr);
 	}
 	std::snprintf(report, reportSize,
-	              "on (mode '%.20s'): %d win32u input calls traced to mxl2012-testharness-trace.log (%d not present)%s",
-	              mode, hooked, missing, g_spoofSerial != 0 ? "; volume serial of C: reported (offline cookie readable from another drive)"
+	              "on (mode '%.20s'): %d win32u input calls traced to mxl2012-testharness-trace.log (%d not present), GetKeyState import %s%s",
+	              mode, hooked, missing, keyStateImport ? "hooked" : "not found", g_spoofSerial != 0 ? "; volume serial of C: reported (offline cookie readable from another drive)"
 	                                 : (g_noCookie ? "; offline cookie.bin hidden" : ""));
 	return true;
 }
