@@ -19,7 +19,7 @@ Checks: mxl2012 cltdostub rockshock cltdo83 srvhit23 frenzy cltnomis srvhit6spaw
 melttrail elixirs uniquecarry whirlwind cubeclasses acts playthrough mercs (docs/plugin-plan.md section 10.1; results in docs/testing.md); lane rulescheck (player-path
 verdicts of docs/median-rules-audit.md): rcbook rcdelay rctoken rclife rcscroll rchire rcdeath rclevels rprunes runeletters rpdarkring rpcharm
 rpnames rpequip; bug #395 load probe: swarm; lane rulescheck2 (a SET-UP character, tools/rc_setup.py): rc2setup rc2quest rc2refund rc2delay rc2death; lane realpath (player-path checks, no god mode, no Tank, no `item ... inv`: docs/testing.md
-"Player-path checks"): rp_items rp_vendors rp_death rp_areas rp_persist rp_use; lane isinside (bug #242): ins_levels; lane identify (bug #485): identify; lane elvensong (bug #487): elvensong; lane uiplus (bugs #488 / #489): lvlup_ui; lane unported (unported.md item use, ME9 mercenary level): iu_use ml_merc.
+"Player-path checks"): rp_items rp_vendors rp_death rp_areas rp_persist rp_use; lane isinside (bug #242): ins_levels; lane identify (bug #485): identify; lane elvensong (bug #487): elvensong; lane uiplus (bugs #488 / #489): lvlup_ui; lane unported (unported.md item use, ME9 mercenary level): iu_use ml_merc; lane totems (bug #493): totem_spread.
 """
 import ctypes
 import ctypes.wintypes as wt
@@ -10962,6 +10962,86 @@ def check_snd_blink():
 
 
 CHECKS += [("snd_blink", check_snd_blink)]
+
+
+# --- bug #493 (play test 0.1.1): totems "slow / lose effects" after Bend the Shadows ---------------------------------------------
+TS_TOTEMS = (488, 495, 493, 497)  # Death's Fury, Fireheart, Frostclaw, Stormeye: each needs a corpse (TargetCorpse)
+TS_BLINK = 486  # Bend the Shadows: teleport to a minion; pettype `totemic` warp 1 gathers the totems to the player
+
+
+def ts_totems():
+    """(player (x, y), [(class, id, mx, my), ...]) of the living totems (monstats 1072-1080) right now."""
+    st = hstate()
+    p = st["player"]
+    tms = [(m["class"], m["id"], m.get("mx"), m.get("my")) for m in st["mons"]
+           if 1072 <= (m.get("class") or 0) <= 1080 and m.get("mode") not in (0, 12)]
+    return (p.get("x"), p.get("y")), tms
+
+
+def check_totem_spread():
+    """Bug #493 (player: "Totems slow / lose effects after Shadow Blink"; owner ruling 2026-10-29: they still warp with the
+    player but must not stack). A Necromancer casts the four totems on zombie corpses 3 sub-tiles apart, then Bend the Shadows
+    (486) by a background right click on the first totem. D2R's pet warp (0x596d40) puts every gathered totem on the player's own
+    sub-tile; the plugin part `petspread` moves each to a free ring spot round the player. PASS when all totems were gathered
+    (none farther than 8 sub-tiles), no two share a sub-tile, none is on the player's sub-tile, and the `petspread` line counts
+    spread warps. SHORTCUT: skill levels, level 120 and Tank by the harness, corpses from spawned zombies, the totems cast by `cast`."""
+    mark, log, shots, notes, bad = engine_mark(), [], [], [], []
+    ln = mxl_part(mxl_text().splitlines(), "petspread")
+    notes.append("plugin: %s" % (ln[:200] or "no petspread line"))
+    if not ln or "FAILED" in ln or ln.startswith("petspread off"):
+        bad.append("petspread not on")
+    goto(2)
+    with Tank(), Level(120):
+        for sid in TS_TOTEMS + (TS_BLINK,):
+            learn(sid, 20)
+        for _ in range(30):
+            ok, _l = H("kill nearest")
+            if not ok:
+                break
+        px, py = player_xy()
+        for k, sid in enumerate(TS_TOTEMS):
+            _, sp = Hl("spawn 5 1 %d %d" % (px - 4 + 3 * k, py + 4), log)
+            cid = first(sp, r"id=(\d+)")
+            time.sleep(0.4)
+            Hl("kill %s" % cid, log)
+            time.sleep(1.0)
+            Hl("cast %d unit %s" % (sid, cid), log)
+            time.sleep(1.2)
+        _, before = ts_totems()
+        notes.append("before: %s" % [(c, x, y) for c, _i, x, y in before])
+        shots.append(sh("totem_spread_before"))
+        if len(before) < 4:
+            bad.append("only %d totems cast" % len(before))
+        Hl("skill right %d" % TS_BLINK, log)
+        p0 = player_xy()
+        if before:
+            click_unit(before[0][1], button="right")
+        time.sleep(1.5)
+        (ox, oy), after = ts_totems()
+        notes.append("Bend the Shadows: player %s -> %s; after: %s" % (p0, (ox, oy), [(c, x, y) for c, _i, x, y in after]))
+        shots.append(sh("totem_spread_after"))
+        if (ox, oy) == p0:
+            bad.append("the right click did not blink the player")
+        spots = [(x, y) for _c, _i, x, y in after]
+        if len(set(spots)) != len(spots):
+            bad.append("totems share a sub-tile")
+        if any((x, y) == (ox, oy) for x, y in spots):
+            bad.append("a totem is on the player's sub-tile")
+        far = [(x, y) for x, y in spots if max(abs(x - ox), abs(y - oy)) > 8]
+        if far:
+            bad.append("totems not gathered: %s" % far)
+        ln = mxl_part(mxl_text().splitlines(), "petspread")
+        notes.append("plugin after: %s" % ln[-80:])
+        m = re.search(r"spread (\d+)", ln)
+        if not m or int(m.group(1)) == 0:
+            bad.append("petspread counted no spread")
+        for _c, i, _x, _y in after:
+            H("kill %d" % i)
+    note = "; ".join(notes) + ("; PROBLEMS: " + "; ".join(bad) if bad else "")
+    finish("totem_spread", not bad, note, mark, shots, log, partial="harness set-up (skill levels, level, Tank, spawned corpses, totems cast by `cast`)")
+
+
+CHECKS += [("totem_spread", check_totem_spread)]
 
 
 if __name__ == "__main__":

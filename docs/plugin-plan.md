@@ -796,3 +796,36 @@ with D2R's own skill-start path, then use the item up; `ass ` goes to D2R's hand
 entry 10 (not in d2r-addresses.md yet), the skill-start function. Check: `rpsignets` (its `dog` row: the Apple used up, skill points
 unchanged; by hand: state `mega_apple` on the player, hpregen up). Data stand-in if the part is refused: pSpell 6 with
 state `mega_apple`, len 15000, stat1 hpregen (loses the synergy stats; an unported.md "approx" row).
+
+## 26. Pets spread round their owner after a warp (lane totems, 2026-10-29; bug #493)
+
+Owner ruling (2026-10-29): Bend the Shadows (486) keeps gathering the totems, but they must not end stacked. Median's pettype
+`totemic` has `warp` 1, so D2R brings the totems along whenever the Necromancer is moved, and puts them on the owner's own sub-tile.
+The totems cannot walk (monstats2 `barbtotem`: modes DT / NU / A1), so they stay stacked. There are two D2R paths, both read in the dump:
+
+| What | Address | Notes |
+|---|---|---|
+| owner's pets set on its new spot | `0x500a40(game, owner, x, y)` | called by the unit move `0x491ca0` at `0x491f92` after the owner is placed. Pettypes 1..n (table `+0x12d8`, 0xc8 bytes each): for a type whose flag byte `+4` has the warp bit (mask dword `0x1d996d0` = 1), every pet of the owner's list of that type (`0x5013f0`; node `+0` flags, `+4` unit id, `+0x18` next; unit `0x48fe80(game, 1, id)`) is set **exactly** on (x, y). Types with mask `0x1d996d4` go through `0x501920` instead. This is the Bend the Shadows path: it moves the player with srvdo 27 `0x554c40` -> `0x491ca0`. Entry `48 89 74 24 20 48 89 54 24 10 55 57 41 54 41 55` |
+| set a unit on a spot as it is | `0x501df0(game, unit, node or 0, room, x, y)` | no free-spot search; sets the teleported flag `0x34f490(unit, 1)`. Also called by `0x4fe8f0` (a pet's own pets) and the level change. Entry `48 89 5c 24 10 48 89 6c 24 18 56 57 41 56 48 83 ec 40` |
+| pet warp to the owner | `0x596d40(game, owner, pet)` | D2Game AiUtil.cpp. It is used for a pet in an inactive room (`0x504b70`) and by AI functions `0x5bc940` / `0x5c1460` / `0x5d6910`. It tries a random spot in the owner's room first, then the owner's position through `0x491ca0`'s free-spot search `0x362f90` (mask 0x1c09: no unit bit), then that position as it is. **Not** used by Bend the Shadows (counter 0 in game). Entry `48 89 5c 24 18 55 56 57 41 54 41 55 41 56 41 57` |
+
+**Part `petspread`** (`pet_spread.cpp`, `pet_spread_logic.h`, test `petspread_tests`, off word `petspread`):
+- `0x500a40` is wrapped. During the call, a hook on `0x501df0` only records the units it places (at most 32). It moves nothing
+  inside D2R's pet-list loop.
+- When `0x500a40` returns, each recorded pet that stands within one sub-tile of its owner is moved to the first spot of a ring
+  round the owner that is both:
+  - free: `0x350a20(unit, x, y, mask)` with 0x1c09 plus the player, monster and pet bits 0x80 / 0x100 / 0x2000;
+  - not within 2 sub-tiles of a pet this gather already placed. D2R's collision test did not see a totem placed a moment
+    earlier: in the first build all four ended 1 sub-tile apart.
+- The ring is 8 spots at 3 sub-tiles, then 16 at 5 and 16 at 7.
+- The move is the unit move `0x491ca0(game, pet, 0, x, y, 0, 0)`. If the pet landed within one sub-tile of the asked spot, it
+  is flagged teleported (`0x34f490`).
+- A pet that `0x596d40` leaves on the owner's spot gets the same treatment (without the list).
+- The gather itself is unchanged, and pets that are already off the owner's spot are left alone. This covers every warp pet
+  (mercenary, golem, etc.), not only the totems: a walking pet only starts a few sub-tiles away.
+- `mxl2012` prints "owner moves with pets N, pet warps N, onto the owner N, spread N (last pet class N)".
+
+Checked in game (docs/testing.md "Lane totems"): the four totems end on four ring spots (diagonals at 3) round the player, in HD
+and legacy. Attack rates and states are unchanged (they were unchanged without the part too). Open: the 1.13c twin of `0x500a40`
+was not found in 1.14d `Game.exe`, so whether 1.13c also stacked them is not known. The HD orbs left at the old spot are bug #500,
+which the part does not change.

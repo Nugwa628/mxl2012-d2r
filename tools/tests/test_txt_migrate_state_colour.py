@@ -1,5 +1,5 @@
-"""Bug #496: Median's state meslayer (Veil King) has colorshift 1. Classic draws it through the identity colour-shift table (the
-unit's own colours), D2R's HD renderer draws index 1 bright green. The build writes 0 (identity in classic too, no tint in HD)."""
+"""Bugs #496 / #506: Median's states with colorshift 1 (meslayer, the Veil King, and 48 curses, auras and buffs). Classic draws
+them in the unit's own colours, D2R's HD renderer draws index 1 bright green. The build writes 0 (no tint in HD either)."""
 import importlib.util
 import sys
 import unittest
@@ -18,9 +18,14 @@ HEADER = ["state", "*ID", "overlay1", "colorpri", "colorshift"]
 class StateColourShift(unittest.TestCase):
     def test_meslayer_gets_shift_zero_and_others_stay(self):
         rows = [["meslayer", "232", "slayercloud", "80", "1"], ["unfortunate", "58", "", "85", "1"],
-                ["cold", "11", "", "90", "108"]]
-        self.assertEqual(tm.state_colour_shift_fix(HEADER, rows), ["meslayer"])
-        self.assertEqual([r[4] for r in rows], ["0", "1", "108"])
+                ["cold", "11", "", "90", "108"], ["somestate", "400", "", "50", "1"]]
+        self.assertEqual(tm.state_colour_shift_fix(HEADER, rows), ["meslayer", "unfortunate"])
+        self.assertEqual([r[4] for r in rows], ["0", "0", "108", "1"])
+
+    def test_every_entry_goes_from_one_to_zero_with_a_reason(self):
+        for name, (old, new, why) in tm.STATE_COLOUR_SHIFTS.items():
+            self.assertEqual((old, new), ("1", "0"), name)
+            self.assertTrue(why.strip(), name)
 
     def test_a_changed_value_is_left_alone(self):
         rows = [["meslayer", "232", "slayercloud", "80", "73"]]

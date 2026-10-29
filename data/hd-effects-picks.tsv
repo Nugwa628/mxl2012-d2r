@@ -37,8 +37,8 @@ missile	laughingghost	expansion_baaldeathghostie_01	auto	medium	a flying ghost (
 missile	expansion/deathsentrymissile	expansion_throwing_star_missile	auto	high	small spinning shuriken (Fairy Ring); was a flying skull
 missile	extra/missileflamesword	fire_arrow	auto	high	small flaming blade, the size of a fire arrow; one row (Pillar of Faith) had the Fire Nova burst
 missile	extra/spikefiendmamamissle	spike_fiend_missle	auto	high	a flying quill (Quill Storm); was a plain arrow. D2R's spike fiend quill is the same kind
-overlay	mooncast	necro/cast_familiar	auto	high	white sparkle cast flash (Magic Missiles and most druid / necromancer casts); was the warlock's orange fire cast
-overlay	slayercloud	monster/fetishdeath_2	auto	medium	grey smoke cloud (Slayer, Dark King); was the druid's orange fire cast
+overlay	mooncast	sorceress/teleport	auto	medium	white sparkle cast flash (Magic Missiles and most druid / necromancer casts); was the warlock's orange fire cast, then necro/cast_familiar (an empty D2R stub: drew nothing, lane hdgreen)
+overlay	slayercloud	druid/cyclonearmor_1back	auto	medium	pale smoke cloud round the unit (Slayer, Dark King, Veil King); was the druid's orange fire cast, then monster/fetishdeath_2 (an empty D2R stub: drew nothing, lane hdgreen)
 overlay	poisondark	common/poisonhit	auto	medium	green-yellow poison cloud (Miasma); was the Confuse curse's sparkles
 overlay	expansion/steamthick_a	common/ice_explode	auto	low	pale cyan cloud; was a psychic hammer flash (weak stand-in)
 overlay	extra/frogsplash	monster/vulturedemonfeathers	auto	medium	grey splash of small bits; was an orange fire burst (weak stand-in)

@@ -32,6 +32,7 @@ results (localconfig.reference_dir(): MXL_REFERENCE or machine.json reference_ch
 """
 import argparse
 import colorsys
+import copy
 import csv
 import hashlib
 import json
@@ -650,6 +651,32 @@ def write_json(path: Path, obj) -> None:
     path.write_text(json.dumps(obj, separators=(",", ":")), encoding="utf-8")
 
 
+# D2R units with a vfx whose particles stay in the world where the unit was made: D2R's own unit never moves, but a Median
+# monster drawn with it that a skill moves (Bend the Shadows, the pet spread) leaves that vfx at its cast spot until it dies.
+# The lightning spire's ambient ball holds the glass shell of its orb (bug #500, lane hdgreen: attached to bone Root it still
+# stays; the nfrost copies of the particle draw missing-texture squares). Skill summons drawn with such a unit get a copy without
+# that vfx: the spire without its orb; Ids nothing moves (quest crystals, monster totems) keep D2R's unit as it is.
+WORLD_VFX = {"lightningspire": "fx_lightningspire_ambient_ball"}
+
+
+def skill_summons(excel: Path) -> set[str]:
+    """monstats Ids a skill summons (skills.txt `summon`): the monsters a player's skill can move."""
+    return {r["summon"] for r in read_rows(excel / "skills.txt") if r.get("summon")}
+
+
+def without_world_vfx(unit: dict, particle: str, name: str) -> dict:
+    """Copy of a D2R unit without the vfx entities that draw `particle` (and without its dependency)."""
+    d = copy.deepcopy(unit)
+    d["name"] = name
+    gone = [e for e in d["entities"] if any(c["type"] == "VfxDefinitionComponent" and particle in c.get("filename", "")
+                                             for c in e["components"])]
+    if not gone:
+        raise SystemExit(f"{name}: D2R's unit has no vfx entity with {particle} (WORLD_VFX is stale)")
+    d["entities"] = [e for e in d["entities"] if e not in gone]
+    d["dependencies"]["particles"] = [p for p in d["dependencies"]["particles"] if particle not in p["path"]]
+    return d
+
+
 def part_vmap(rows: list | None, slots: dict) -> dict | None:
     """The prior provenance rows as {(Median part, variant): (donor part, variant)}, kept for slots this Id draws."""
     if not rows:
@@ -919,6 +946,19 @@ def build(paths: Paths, out: Path | None = None) -> dict:
         d, nn = hu.build_unit(u["donor"], uname, u["slots"], u["scale"], None, None, u["basew"], sm_name, vp, u["vmap"])
         notes.update(nn)
         write_json(hdc / "enemy" / f"{uname}.json", d)
+    summons = skill_summons(paths.mod / "excel")
+    moved = {}
+    for unit, particle in WORLD_VFX.items():
+        ids = sorted(m for m, u in hd_json.items() if u == unit and m in summons and m in ctx.ms)
+        if ids:
+            name = f"mxl_{unit}_moved"
+            write_json(hdc / "enemy" / f"{name}.json",
+                       without_world_vfx(hu.load_json(ctx.paths.d2r / "data/hd/character/enemy" / f"{unit}.json"), particle, name))
+            for m in ids:
+                hd_json[m] = name
+            moved[name] = ids
+    rows = [(r[0], r[1], r[2], hd_json[r[0]], *r[4:7], r[7] + "; skill summon: unit without its world-space vfx (#500)")
+            if r[0] in hd_json and hd_json[r[0]] in moved else r for r in rows]
     (hdc / "monsters.json").parent.mkdir(parents=True, exist_ok=True)
     (hdc / "monsters.json").write_text(json.dumps(hd_json, indent=2), encoding="utf-8")
     rep = ["# HD monster stand-ins (tools/hd_monsters.py build)", "",
@@ -926,6 +966,8 @@ def build(paths: Paths, out: Path | None = None) -> dict:
            f"({len(set(shared))} stand-in colours, close ones share a table: COLOUR_SHARE_TOL {COLOUR_SHARE_TOL}), {len(sms)} adapted "
            f"state machines. Part notes: {dict(notes)}", "",
            "Stand-in tables with the classic TransLvl colours (bug #435): " + ("; ".join(level_notes) or "none"), "",
+           "Skill summons drawn without a world-space vfx (bug #500): "
+           + ("; ".join(f"{n} {', '.join(i)}" for n, i in sorted(moved.items())) or "none"), "",
            "Clips a donor lacks, bound to one it has: " + ("; ".join(f"{d} {f}" for d, f in sorted(fills.items())) or "none"), "",
            "Modes a donor has no state for, given a copy of state (stateId): "
            + ("; ".join(f"{d} {f}" for d, f in sorted(state_fills.items())) or "none"), "",
@@ -934,7 +976,7 @@ def build(paths: Paths, out: Path | None = None) -> dict:
     (out.parent / "hd_monsters.md").write_text("\n".join(rep) + "\n", encoding="utf-8")
     ctx.save()
     return {"ids": len(rows), "units": len(units), "variants": len(variants), "state_machines": len(sms), "clip_fills": len(fills),
-            "state_fills": len(state_fills),
+            "state_fills": len(state_fills), "moved": {n: len(i) for n, i in moved.items()},
             "notes": dict(notes), "classes": dict(Counter(r[2] for r in rows))}
 
 

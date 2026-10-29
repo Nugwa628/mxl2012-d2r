@@ -936,7 +936,34 @@ its own per index and draws **1 bright green** whatever the unit's variant table
 Warlock's bound demons) for index 1 was tried and is **not** used: still green. `meslayer` (Median 186, built 232) now has
 colorshift 0: identity in classic, no tint in HD. Every unit with the state changes the same way (bugs.md #496 lists them;
 Belial, #436, was one). 48 more Median states use colorshift 1 (curses, auras, buffs such as `ongoing_typhoidmary`,
-`banished`, `vindicated`): they still draw HD green; not changed here, each needs its own in-game look.
-Not done: `slayercloud` (the pale cloud around the Veil King in legacy) has an HD pick (`monster/fetishdeath_2`) that does not
-show around it in HD.
+`banished`, `vindicated`): all changed by lane hdgreen (section 15).
 
+## 15. All colorshift-1 states, totem orbs, empty overlay stubs (lane hdgreen, 2026-10-30, bugs #500, #506, #507)
+
+**The other 48 colorshift-1 states (bug #506).** All 48 now have colorshift 0, like `meslayer`: one table in
+`tools/txt_migrate.py` (`STATE_COLOUR_SHIFTS`, state -> old, new, what applies it). Why 0 for every one: 1.14d picks the
+colour of the active state with the highest `colorpri` (`STATES_UpdateColorShiftAndLight`, 0x4d97f0) and recolours through
+that index's table; in Median's `Pal.pl2` table 1 is the identity but for 76 of 256 entries that move one hue step (reds a
+touch more orange), so classic shows the unit in its own colours. HD draws index 1 neon green. No state needs a tint index
+instead. The priority winner does not change (colorpri is kept), so a lower state's colour (cold, poison) stays hidden under
+these states as in classic. In game (slot 1, `mxl2012-runs/hdgreen/g1/`, `g2/`, sheets `sheet_*.png`): 39 of the 49 states
+were put on the client by real casts (class skills on Hdg* characters, monster skills given to a Necromancer); before, every
+HD shot is green and every legacy shot is the unit's own colours; after, HD shows no green. The 10 not seen on the client
+(`careforabloodbath`, `broadsided`, `behindenemylines`, `tritonstate`, `trapratstate`, `barbaricheal`, `caution`,
+`goodberries`, `lionheartstate`, `burnedbyburn`: cast refused or the state lands elsewhere) use the same index, so the same
+rule holds.
+
+**Moved totems leave their orb (bug #500).** D2R's `lightningspire` unit draws its glass orb with a vfx entity
+(`fx_lightningspire_ambient_ball.particles`) whose particles live in world space: the spire never moves in vanilla. Tried
+(`mxl2012-runs/hdgreen/tot1/`, `tot2/`): attaching the vfx to bone Root (the shell still stays), the nfrost copies of the
+particle (missing-texture squares), and other units' glows on the spire (willowisp: white smoke; skmage wrist: a small flame,
+both move with it). The build now gives the 12 skill-summoned Ids drawn with `lightningspire` (`WORLD_VFX` and
+`skill_summons` in `tools/hd_monsters.py`: totem1, 3-9, A, Z, QQ, HOWL) the unit `mxl_lightningspire_moved`, a copy without
+that vfx entity: the spire, its lightning and its death are kept, the glass orb is gone. Ids nothing moves (quest crystals,
+monster-only totems) keep D2R's unit with its orb.
+
+**Overlay picks on empty D2R stubs (bug #507).** D2R ships 86 HD overlay definitions with no components (e.g.
+`monster/fetishdeath_2`, `necro/cast_familiar`); a stand-in copied from one draws nothing. That is why `slayercloud` (the
+Veil King's pale cloud) was not seen in HD. Hand picks fixed: `slayercloud` -> `druid/cyclonearmor_1back` (pale swirling
+bands; `veil2/`), `mooncast` -> `sorceress/teleport`. `tools/effects_hd.py` now stops on a hand pick that is an empty stub.
+22 picks from the reference mapping still point at empty stubs (listed in bugs.md #507).

@@ -429,5 +429,33 @@ class DocRoundTrip(unittest.TestCase):
         self.assertEqual(text[text.index(b) + len(b):text.index(e)], "\n\n" + hm.token_table(mapping) + "\n")
 
 
+class WorldVfx(unittest.TestCase):
+    """Bug #500: a moved totem left the lightning spire's glass orb (a world-space particle) at its cast spot."""
+
+    UNIT = {"name": "lightningspire", "entities": [
+        {"name": "root", "components": [{"type": "ModelDefinitionComponent", "filename": "spire.model"}]},
+        {"name": "vfx", "components": [{"type": "VfxDefinitionComponent",
+                                        "filename": "data/hd/vfx/fx_lightningspire_ambient_ball.particles"}]},
+        {"name": "zap", "components": [{"type": "VfxDefinitionComponent", "filename": "data/hd/vfx/zap.particles"}]}],
+        "dependencies": {"particles": [{"path": "data/hd/vfx/fx_lightningspire_ambient_ball.particles"},
+                                       {"path": "data/hd/vfx/zap.particles"}]}}
+
+    def test_copy_drops_only_the_world_space_vfx(self):
+        d = hm.without_world_vfx(self.UNIT, "fx_lightningspire_ambient_ball", "mxl_lightningspire_moved")
+        self.assertEqual(d["name"], "mxl_lightningspire_moved")
+        self.assertEqual([e["name"] for e in d["entities"]], ["root", "zap"])
+        self.assertEqual(d["dependencies"]["particles"], [{"path": "data/hd/vfx/zap.particles"}])
+        self.assertEqual(len(self.UNIT["entities"]), 3)   # D2R's unit itself is left alone
+
+    def test_a_stale_particle_name_fails(self):
+        with self.assertRaises(SystemExit):
+            hm.without_world_vfx(self.UNIT, "no_such_ball", "x")
+
+    def test_skill_summons_reads_the_summon_column(self):
+        with tempfile.TemporaryDirectory() as t:
+            tsv(Path(t) / "skills.txt", ["skill", "*Id", "summon"], [["Deaths Fury Totem", "488", "totem1"], ["Fire", "1", ""]])
+            self.assertEqual(hm.skill_summons(Path(t)), {"totem1"})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -677,6 +677,12 @@ def hand_pick(picks: dict, kind: str, m: "Prof", cands: list["Prof"], no_scale: 
     return c, scale, hp["conf"], f"hand pick (data/hd-effects-picks.tsv): {hp['why']}; D2R {c.name} ({c.art_name})"
 
 
+def empty_definition(d: dict) -> bool:
+    """A D2R HD definition whose entities have no components: D2R ships 86 such overlay stubs (e.g. monster/fetishdeath_2,
+    necro/cast_familiar) for effects it draws some other way; a stand-in copied from one draws nothing."""
+    return not any(e.get("components") for e in d.get("entities", []))
+
+
 def no_tint(*_args, **_kw):
     """--no-tint: no gradient tint (a recolour falls through to the nearest-colour scoring, a pick stays untinted)."""
     return None
@@ -1011,6 +1017,9 @@ def main() -> int:
                    f"({c.art_name}); score {sc:.1f}, margin {margin:.1f}; " + ", ".join(parts))
         res("overlay", m, cls, f"{c.folder}/{norm_key(c.name)}", scale, conf, why, c, art_in=art_in)
         d = scaled_definition(load_json(HDO / c.folder / f"{norm_key(c.name)}.json"), norm_key(name), scale)
+        if cls == "hand" and empty_definition(d):
+            raise SystemExit(f"data/hd-effects-picks.tsv line {hpl['line']}: overlay {m.art_name}: D2R's {c.folder}/{norm_key(c.name)} "
+                             "is an empty stub (no components): it draws nothing in HD (lane hdgreen, bug #507)")
         spec = ptint if cls == "hand" else pv["tint"] if cls == "provenance" else None
         if spec:
             d = hr.recolour_overlay(out, d, spec)

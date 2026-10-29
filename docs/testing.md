@@ -9,8 +9,8 @@ functions it installed.
 Lane skills5 (2026-10-29, slot 3, background input, dev DLL): player bugs #490-#493, #496 (docs/bugs.md). Seen with the harness:
 Signet of Gold text (#490) in HD; Bane Hunter's HD overlay (#492) calm after the `firecrown` pick. Still to check: the #490 line in
 legacy (hover the signet in the classic inventory) and on the other 15 rows (Life / Mana packs, the other signets); the
-`firecrown` glow by a player's eye (x0.6 is faint); #491 (leap skills) needs the player's `d2rloader.log`; #493 and #496 wait on
-the owner and the player. Scripts and evidence: `mxl2012-runs/skills5/` (`leapstress.py`, `lab.py`, `signet.py`).
+`firecrown` glow by a player's eye (x0.6 is faint); #491 (leap skills) needs the player's `d2rloader.log`; #496 waits on
+the owner and the player (#493: section "Lane totems"). Scripts and evidence: `mxl2012-runs/skills5/` (`leapstress.py`, `lab.py`, `signet.py`).
 
 Lane hditems (2026-10-29): **HD item picture quality** (docs/hd-icons.md "Picture quality"; graphics check, seen with the harness,
 not a player-path verification). `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mxl2012 hdit_icons`:
@@ -3455,3 +3455,58 @@ The checks: `MXL_RUN=<lock> MXL_SLOT=N MXL_SOUND_TRACE=<file> py -3 tools/game_c
 (each makes its own character: SndBarb, SndAma). Without the trace `snd_spirits` judges by the plugin's skip count only
 (PARTIAL). Not judged: what the speakers play (no audio capture on this PC); a stackable javelin cannot be put in the hand by the
 harness, so the charges sit on a ring (the same stat 204).
+## Lane totems: totems after Bend the Shadows (bug #493, 2026-10-29, slot 3, background mode, build of lane/totems)
+
+The player said: "Totems slow / lose effects after Shadow Blink". The owner ruled that the totems keep warping with the player but
+must not stack or slow. Scripts and evidence (the check runs copied too) are in `mxl2012-runs/totems/`. Lab `totemlab.py`
+(`MXL_RUN=<lock> MXL_SLOT=N py -3 totemlab.py <worktree> <out> [hd,legacy] [windows]`; `MXL_CONTROL=petspread` gives a control run
+with the part off). It runs in each graphics mode:
+- 4 totems (488, 495, 493, 497) cast by `cast` on spawned zombie corpses 3 sub-tiles apart;
+- 3 windows of 8 s, each with a zombie (life 400000) 6 sub-tiles away. Per window: `missiles reset` / `missiles` (one
+  spawner per totem shot), totem attack episodes, time to the first attack, dummy states;
+- Bend the Shadows by a background right click on the first totem;
+- the same 3 windows again.
+It records positions and server / client states, with shots `totem_<mode>_before_*`, `_after_*` and `_end`.
+
+New check `totem_spread` (tools/game_checks.py):
+- Command: `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<new throwaway> MXL_CHAR_CLASS=necromancer py -3 tools/game_checks.py all totem_spread`.
+- Shortcut (so PARTIAL at best): skill levels, level 120 and Tank are set by the harness, and the totems are cast by `cast`.
+- Player path: Bend the Shadows on the right button, a background right click on the first totem.
+- PASS needs:
+  - the player moved;
+  - all totems within 8 sub-tiles;
+  - no two totems on one sub-tile, and none on the player's;
+  - the `mxl2012` `petspread` line counting a spread.
+- Shots: `totem_spread_before.png`, `totem_spread_after.png`.
+
+| Run | Build | Result |
+|---|---|---|
+| `base1/` (lab) | lane build, `petspread` off | **bug seen**: after the blink all 4 totems are on the player's sub-tile (distance 0) in HD and legacy and stay there. Legacy draws one totem; HD draws one spire plus bare orbs, and orbs are also left at the cast spots. **No slowdown**: missiles per totem per window 3.3 / 2.7 (HD) and 2.7 / 3.3 (legacy) before / after; first attack 0.07-0.64 s; states 105 / 122 / 234 unchanged |
+| `fix1/` (lab) | first `petspread`: only the pet warp `0x596d40` hooked | still stacked. Check `checks-20261029-230013-s3` showed "pet warps 0": Bend the Shadows does not use `0x596d40` |
+| `checks-20261029-230437-s3` | `0x500a40` / `0x501df0` hooked, collision test only | spread 4, but 1 sub-tile apart round (+3,+3): D2R's collision test does not see a totem placed a moment earlier |
+| `checks-20261029-230717-s3` | + spots of the same gather kept 3 apart | **PARTIAL (pass)**: (+3,+3) (-3,+3) (-3,-3) (+3,-3) round the player; "owner moves with pets 1, onto the owner 4, spread 4" |
+| `fix2/` (lab) | same | HD and legacy: four separate spires at (+3,+3) (-3,+3) (-3,-3) (+7,-7), the last one where the 3 and 5 rings were blocked. Missiles per totem per window 2.7 / 3.7 (HD) and 2.7 / 3.0 (legacy); states unchanged; the gather is kept. HD still shows two bare orbs at the cast spots (#500) |
+
+The cause and fix are in docs/bugs.md #493 and docs/plugin-plan.md section 26. The dummy's damage does not show a rate: the
+totems took 350k-400k of its 400k life in every window. Not run:
+- other warp pets after an owner move (mercenary, golems: they now start a few sub-tiles off instead of on the player);
+- a waypoint or level change with totems;
+- the `0x596d40` path (pets left in an inactive room).
+By hand: cast four totems, then Bend the Shadows onto one of them. The totems appear round you, not on you.
+
+## Lane hdgreen: colorshift-1 states, moved totem orbs, empty overlay stubs (bugs #500, #506, #507, 2026-10-30, slot 1, background mode, build of lane/hdgreen with lane/totems merged)
+
+Lab scripts in `mxl2012-runs/hdgreen/` (harness set-up, kept outside the repo). `greenlab.py`: `MXL_RUN=hdgreen MXL_SLOT=1 py -3
+greenlab.py <worktree> <out> [modes] [groups] [state ids]`; per group (a class's skills on its own Hdg* character; `mon`: monster
+skills given to a Necromancer with `setskill`) and graphics mode, in the Blood Moor in god mode, each skill is learnt, cast
+(`cast <id> self` / `unit <zombie>`; passives just learnt), then the client's states of player and zombie (`cstates`) and a shot with
+crops. `mksheet.py` makes contact sheets of the crops. `totemlab.py` is lane totems' lab (4 totems, Bend the Shadows by a background
+right click); `veillab.py` is lane veilking's (Summon Veil King). Seen with the harness, not on the player path.
+
+| run | build | result |
+|---|---|---|
+| `g1` | main data (49 states colorshift 1) | 39 of 49 states on the client by real casts; every HD shot neon green, every legacy shot the unit's own colours (`sheet_sor.png`, `sheet_cls.png`, `sheet_mon.png`). Not put on the client: 10 (bugs.md #506) |
+| `tot1`, `tot2` | 4 hand-made copies of the `lightningspire` unit on 4 totems | vfx on bone Root: glass shell still left at the cast spot; nfrost particles: magenta squares; no vfx: nothing left; willowisp glow / skmage wrist on the spire: move with it (smoke, small flame) |
+| `veil2` | + all 49 colorshift 0, `slayercloud` -> `druid/cyclonearmor_1back` | PASS: HD Veil King with pale swirling bands, no green; legacy unchanged (`veil2_sheet.png`) |
+| `g2` | same | PASS: no green in HD for any of the 39 states (neon-green pixel share 0.000 in every crop, 0.007 mean before: `green_metric.txt`; `sheet_after_sor.png`, `sheet_after_all.png`); legacy (Sorceress group) unchanged |
+| `tot3` | + `mxl_lightningspire_moved` for the 12 skill-summoned totems (tools/hd_monsters.py) | PASS: HD spires without the glass orb, after Bend the Shadows nothing left at the cast spots; legacy unchanged (`tot3_sheet.png`) |

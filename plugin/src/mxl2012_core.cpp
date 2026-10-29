@@ -48,6 +48,9 @@
 //      Ancients' HD death roar each time one dies or is cast again (sound_guard.cpp, off word spiritsound, #502);
 //   +  D2R's unit translation event handler skips an event with an unreadable payload (translation_guard.cpp, off word
 //      transguard, crash-audit C14);
+//   +  a pet that D2R brings onto its owner's own sub-tile (the owner's move or the pet warp; Median's immobile totems after
+//      Bend the Shadows) is moved to a free spot of a ring round the owner instead of staying stacked (pet_spread.cpp, off word
+//      petspread, #493);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
@@ -67,6 +70,7 @@
 #include "orig_asserts.h"
 #include "orig_asserts_logic.h"
 #include "other_plugins_logic.h"
+#include "pet_spread.h"
 #include "rune_letters.h"
 #include "skill_remove.h"
 #include "skill_text.h"
@@ -133,7 +137,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -408,6 +412,7 @@ char g_soundGuardReport[256] = "";
 char g_spiritSoundReport[160] = "";
 char g_transGuardReport[192] = "";
 char g_lvlUpUiReport[192] = "";
+char g_petSpreadReport[192] = "";
 char g_harnessReport[192] = "";
 bool g_partsInstalled = false;
 
@@ -549,6 +554,11 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	LevelUpUiCounts(&lvlUpdates, &lvlDraws);
 	std::snprintf(line, sizeof(line), "%s; grey legacy buttons updated %ld times, draws %ld", g_lvlUpUiReport, lvlUpdates, lvlDraws);
 	SayPart(command, "lvlupui", line);
+	long petGathers = 0, petWarps = 0, petStacked = 0, petSpread = 0, petClass = -1;
+	PetSpreadCounts(&petGathers, &petWarps, &petStacked, &petSpread, &petClass);
+	std::snprintf(line, sizeof(line), "%s; owner moves with pets %ld, pet warps %ld, onto the owner %ld, spread %ld (last pet class %ld)",
+	              g_petSpreadReport, petGathers, petWarps, petStacked, petSpread, petClass);
+	SayPart(command, "petspread", line);
 	std::snprintf(line, sizeof(line), "client wall calls %ld", ClientWallCalls());
 	Say(command, line);
 	std::snprintf(line, sizeof(line), "testharness %s", g_harnessReport[0] != '\0' ? g_harnessReport : "off");
@@ -711,6 +721,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("lvlupui")) {
 		InstallLevelUpUi(context, g_lvlUpUiReport, sizeof(g_lvlUpUiReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_lvlUpUiReport);
+		context->LogInfo(line);
+	}
+	if (!Off("petspread")) {
+		InstallPetSpread(context, g_petSpreadReport, sizeof(g_petSpreadReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_petSpreadReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cltdostub")) {

@@ -182,12 +182,65 @@ def conversion_calcs(header: list[str], rows: list[list[str]]) -> list[str]:
     return done
 
 
-# states.txt colorshift cells D2R's HD renderer draws far from classic (bug #496, lane veilking). Classic recolours a unit
-# through the act palette's colour-shift table of the index; tables 0 and 1 are both the identity (the unit's own colours).
-# HD has a built-in colour per index and draws index 1 bright green (a variant table's customColorShiftEntries for index 1 is
-# not used: tried in game), index 0 not at all. Median's meslayer (Veil King, Slayer bosses' Dark King / Gift of Shadows)
-# uses 1: 0 draws the same in classic and the unit's own colours in HD. {state: (Median's value, the value written)}
-STATE_COLOUR_SHIFTS = {"meslayer": ("1", "0")}
+# states.txt colorshift cells D2R's HD renderer draws far from classic (bug #496 lane veilking, bug #506 lane hdgreen). The
+# 1.14d client (STATES_UpdateColorShiftAndLight 0x4d97f0) takes the state of the highest colorpri the unit has and uses its
+# colorshift as the unit's palette shift index; 0 is no shift. Median's index-1 table is near the identity (Pal.pl2 hue
+# variation 1: 76 of 256 entries one hue step on, reds a little more orange) and every legacy shot shows the unit's own colours.
+# HD has a built-in colour per index and draws index 1 bright neon green (a variant table's customColorShiftEntries for index 1
+# is not used: tried in game). 0 keeps the classic look and draws no tint in HD; the colorpri winner stays the same state, so a
+# lower state's colour (cold, poison) is still hidden as in classic. Every Median row with 1 is here, with what puts it on:
+# {state: (Median's value, the value written, what applies it)}. Seen in game: docs/testing.md "Lane hdgreen".
+STATE_COLOUR_SHIFTS = {
+    "careforabloodbath": ("1", "0", "Innate Bloodbath (65), monster aura"),
+    "elementalfury": ("1", "0", "Elemental Fury (654, 703, 743), monster buffs"),
+    "earthwaterairfire": ("1", "0", "Sorceress Firedance (527)"),
+    "unfortunate": ("1", "0", "Barbarian Fortress (440)"),
+    "eatsyou": ("1", "0", "Black Curse (700), monster curse"),
+    "beaconsavengerstate": ("1", "0", "Assassin Beacon (623), mercenary Beacon (1070)"),
+    "shamanstrance": ("1", "0", "Barbarian Shamanic Trance (627), item Trance (789)"),
+    "broadsided": ("1", "0", "Assassin Broadside (345)"),
+    "electricshield": ("1", "0", "Lightning Shield (660, 1055), monster aura"),
+    "zeraesavengerstate": ("1", "0", "Amazon War Spirit (936), Dark Spirit (986, 987)"),
+    "bladesoflight": ("1", "0", "Blades of Light (952), monster aura"),
+    "ongoing_thunderdome": ("1", "0", "Lightning Arena (236), monster"),
+    "killed3": ("1", "0", "More Mess (1011), monster aura on its targets"),
+    "behindenemylines": ("1", "0", "Paladin Colosseum (502)"),
+    "hellfireaura": ("1", "0", "Hellfire Aura (1103), monster aura"),
+    "ongoing_tezla": ("1", "0", "Sorceress Nova Charge (537)"),
+    "ongoing_napalm": ("1", "0", "Path of Flames (827), monster"),
+    "qqstate": ("1", "0", "Sorceress Moonstrike (543)"),
+    "totemicslow": ("1", "0", "totem auras (899, 980)"),
+    "totemicheal": ("1", "0", "totem auras (135, 900, 981)"),
+    "deathlordstate": ("1", "0", "Necromancer Deathlord form (487)"),
+    "totemicvoodoo": ("1", "0", "totem auras (902, 983)"),
+    "queenofthemoon": ("1", "0", "Amazon Moon Queen passive (307), item (705)"),
+    "totemicattack": ("1", "0", "totem auras (903, 984)"),
+    "totemicmanatide": ("1", "0", "totem auras (923, 985)"),
+    "cloak_of_shadows": ("1", "0", "Darkness Falls (112), monster aura"),
+    "meslayer": ("1", "0", "Veil King, Slayer bosses' Dark King / Gift of Shadows (bug #496)"),
+    "tritonstate": ("1", "0", "Druid Treewarden form (463)"),
+    "barbaricheal": ("1", "0", "Gift of Inner Fire (569, 586, 842, 957), monster / mercenary aura"),
+    "innerbeast": ("1", "0", "Gift of the Wild / Mark of the Wild (570, 850, 1109), monster aura"),
+    "darkpowered": ("1", "0", "Dark Power (669), monster aura"),
+    "bloodlusted": ("1", "0", "Bloodlust (96, 99, 619), monster / mercenary aura"),
+    "caution": ("1", "0", "Cautious Strike (672, 924)"),
+    "banished": ("1", "0", "Banish (598), monster curse"),
+    "artofwar": ("1", "0", "Barbarian Mountain King (442), Sorceress Supernature (922), passives"),
+    "goodberries": ("1", "0", "Goodberry potion (b@b)"),
+    "runforyourlife": ("1", "0", "Demonic Speed (600), monster"),
+    "ongoing_typhoidmary": ("1", "0", "Sorceress Swarm (542)"),
+    "lion_hearts": ("1", "0", "Amazon Lioness passive (319)"),
+    "shower_of_rox": ("1", "0", "Barbarian Shower of Rocks (354, 616, 1102) on its targets"),
+    "trapratstate": ("1", "0", "Druid Trap Rat form (448)"),
+    "vindicated": ("1", "0", "Vindicate (52, 131), monster / mercenary curse"),
+    "charm_crushing": ("1", "0", "Thrill of the Hunt (716, 852)"),
+    "lionheartstate": ("1", "0", "Paladin Lionheart (501, 825)"),
+    "bloodfountain": ("1", "0", "Bloody Mary (663), monster aura"),
+    "purifyingspring": ("1", "0", "Pagan Heart (664), monster aura"),
+    "akaratisgoingtodie": ("1", "0", "Weakening Nova (592, 657), monster"),
+    "burnedbyburn": ("1", "0", "Paladin Searing Light (508), Dazzle / Sunburn curses (72, 760, 996)"),
+    "cowdisguise": ("1", "0", "Cow Disguise (67), monster form"),
+}
 
 
 def state_colour_shift_fix(header: list[str], rows: list[list[str]]) -> list[str]:
