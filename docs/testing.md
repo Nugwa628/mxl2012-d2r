@@ -3598,3 +3598,27 @@ docs/bugs.md have the details.
 | #504 in Trap Rat Form | Not tested: the harness cast of 448 is refused at level 1 (no gear); the morph has no voice sound in its rows | `run1` |
 | #505 cave snappers | Median's design: hpregen 2180/256 per frame (~213 life/s) on the Sleeping Cave Snapper, 328/256 on the Cave Snapper; Fire Bolt hurts the Cave Snapper and does not get past the sleeping one's regeneration; no damage reduction | `run4`, `run5` |
 | #508 boss / soldier lines | Listed from the tables only (vo.json keys), not tested | none |
+
+## Lane fxpick: overlays on empty D2R HD stubs (bug #507, 2026-10-30, slot 4, background mode, build of lane/fxpick with main's plugin e8d4422)
+
+Lab scripts in `mxl2012-runs/fxpick/` (harness set-up, kept outside the repo; made from lane hdgreen's `greenlab.py`).
+`fxlab.py`: `MXL_RUN=fxpick MXL_SLOT=N py -3 fxlab.py <worktree> <out> [modes] [groups] [state ids]`; per entry (built skill and
+state ids) the skill is learnt and cast on an Fxp* character (`mon`: monster skills given to a Necromancer), shots 0.3 s (cast
+overlays) and 1.5 s / 2.3 s (state overlays) after the cast, crops round the player (and the zombie for unit casts), the client's
+states. `fxlab2.py` adds Bend the Shadows at a Death's Fury totem (background right click) and spawned attackers for `slowed`.
+`mksheet.py` makes the sheets; `render.py` the offline classic frames (`src_classic.png`, candidates `cand_*.png`). Seen with the
+harness, not on the player path. The plugin was not rebuilt (data-only change; `build_plugin.ps1` was not run in this lane).
+
+| run | build | result |
+|---|---|---|
+| `r1` | 16 picks | stopped: Median's skill ids used, the build renumbers them |
+| `r2` | 16 picks | HD: Holy Armor pale blue globe, Thundergod white ring, Firedance flames, Poison Flash green flash, Lightning Shield cast white crackle, Blood Fury gold rays, abolishcurse green flash on the target. Not seen: War Spirit (`srfirehit`, one-shot), Pagan Heart after the cast (`frozenarmor_hit`, one-shot), Amazing Grace after 0.3 s (`ice_explode`, one-shot). Legacy unchanged (Thundergod, Pagan Heart, Amazing Grace, War Spirit, Firedance). `sheet_r2.png` |
+| `r3`, `r4` | War Spirit -> `sorceress/enchant` | not seen on the Amazon (drawn on the weapon); the same state with `common/burning` swapped in by hand on the slot: flames (`sheet_r4.png`), so the state does draw overlays in HD. Bend the Shadows / `slowed`: see below |
+| `r5` | War Spirit -> `common/burning` | PASS: HD purple cast, then flames; legacy Median's flaming swipe (`sheet_r5_full.png`) |
+| `r6` | Pagan Heart -> `paladin/aura_resistcold`, Amazing Grace -> `sorceress/frozenarmor` | Pagan Heart PASS: HD blue ring at 1.5 s and 2.3 s, legacy unchanged. Amazing Grace: hardly visible (a distortion) (`sheet_r6.png`) |
+| `r7` | Amazing Grace and `shiversoverlay` -> `common/shrine_resist_cold` | PASS: HD a pale blue sparkle over the unit, still there at 1.5 s; legacy unchanged (`sheet_r7.png`) |
+
+Not seen: `baaldeathhead01` (Bend the Shadows blinks the player to the totem in both modes, but no skull shows in legacy either at
+0.3 / 1.5 s), `extra/shiverscast` / `shiversoverlay` (state `slowed` never landed: Spider Lay refused, Vine Attack on the zombie
+and spawned plague poppies / spiders gave no `slowed` in 15 s). The four unused arts (`extra/aurablue`, `aurared`, `aurast_bl`,
+`aurast_rd`) keep the stub. Unit tests: `test_overlay_picks_not_empty`, `test_no_stub_stand_ins` (tools/test_effects_hd.py).

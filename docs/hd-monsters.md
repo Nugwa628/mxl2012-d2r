@@ -966,4 +966,10 @@ monster-only totems) keep D2R's unit with its orb.
 `monster/fetishdeath_2`, `necro/cast_familiar`); a stand-in copied from one draws nothing. That is why `slayercloud` (the
 Veil King's pale cloud) was not seen in HD. Hand picks fixed: `slayercloud` -> `druid/cyclonearmor_1back` (pale swirling
 bands; `veil2/`), `mooncast` -> `sorceress/teleport`. `tools/effects_hd.py` now stops on a hand pick that is an empty stub.
-22 picks from the reference mapping still point at empty stubs (listed in bugs.md #507).
+The 20 overlays the reference mapping still pointed at empty stubs were done by lane fxpick (2026-10-30): 16 hand picks
+(bugs.md #507 lists them), 4 arts no skill or state uses keep the stub (`extra/aurablue`, `aurared`, `aurast_bl`, `aurast_rd`).
+**A state overlay loops, so its stand-in must loop too:** a one-shot D2R effect (a hit or burst such as
+`sorceress/frozenarmor_hit`, `common/ice_explode`, `sorceress/srfirehit`) shows once when the state starts and then nothing,
+where classic keeps drawing the overlay; aura rings, `common/burning` and the shrine glows loop. `sorceress/enchant` draws on the
+weapon only and `sorceress/frozenarmor` is a distortion: neither is seen on another unit. Tests: `test_overlay_picks_not_empty`,
+`test_no_stub_stand_ins` (tools/test_effects_hd.py).

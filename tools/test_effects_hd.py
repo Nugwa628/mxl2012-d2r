@@ -254,6 +254,16 @@ class Picks(unittest.TestCase):
             self.assertTrue(any((root / rel).exists() for root in (fxpaths.MXL, fxpaths.D2R_DATA / "global")),
                             f"{kind} {art}: no art file")
 
+    def test_overlay_picks_not_empty(self):
+        """No overlay pick names one of D2R's empty HD stubs (bug #507: it draws nothing in HD)."""
+        picks = e.load_picks(fxpaths.PICKS_TSV)
+        n = 0
+        for (kind, art, *_row), hp in picks.items():
+            if kind == "overlay":
+                n += 1
+                self.assertFalse(e.empty_definition(e.load_json(e.HDO / f"{hp['effect']}.json")), f"{art}: {hp['effect']}")
+        self.assertGreaterEqual(n, 23)  # 7 before lane fxpick + its 16 (bug #507)
+
 
 @unittest.skipUnless((fxpaths.MOD / "effects_hd.md").exists() and fxpaths.MAP_TSV.exists(),
                      "no finished run of tools/build_effects.py")
@@ -271,6 +281,15 @@ class Output(unittest.TestCase):
                  ("missile", "no_such_art"): dict(x, effect="ice_bolt", line=2),   # no row
                  ("missile", "teethexplode", "magicmissile"): dict(x, effect="ice_bolt", line=3)}  # row pick not applied
         self.assertEqual(len(build_effects.check_picks(by_key, wrong, fxpaths.MOD)), 3)
+
+    def test_no_stub_stand_ins(self):
+        """Only D2R's own (exact) rows and the arts no skill / state uses may draw an empty D2R stub (bug #507)."""
+        import build_effects
+        unused = {"extra/aurablue", "extra/aurared", "extra/aurast_bl", "extra/aurast_rd"}  # bloodthorned* / fury* rows: no state
+        bad = [r["art"] for r in build_effects.read_map(fxpaths.MAP_TSV)
+               if r["kind"] == "overlay" and r["class"] != "exact" and r["effect"] and r["art"] not in unused
+               and e.empty_definition(e.load_json(e.HDO / f"{r['effect']}.json"))]
+        self.assertEqual(bad, [])
 
     def test_in_use_arts_decided(self):
         """Every in-use missile / overlay art (a row of the mod's tables with an art file) is D2R's own or in the table."""
