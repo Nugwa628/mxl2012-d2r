@@ -5,6 +5,34 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+Nothing yet.
+
+## D2R-XL 2012
+
+### 0.1.2 (2026-10-29)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.2:**
+
+- Legacy graphics (G): the red + buttons light up again after a level-up.
+- Signet of Gold shows its gold value ("Gold in Bank: ...").
+- Bane Hunter no longer flickers in HD.
+- The Veil King has an HD look close to his legacy one (a gold-bronze crowned skeleton knight) and no neon green glow;
+  Belial and a few other monsters lost the same green.
+- Elvensong converts monsters again, as in the original.
+- The inventory trophy names Median XL 2012 v005 (it said v004).
+- Warlock: classic (legacy) art in Reign of the Warlock games, and the G toggle works there. **Updating from an older
+  version** and keeping your `mods\mxl2012\d2rloader\config\d2rloader.toml`: add `always_enable_rotw_legacy_graphics_keybind = true`
+  under `[d2rcore.player]` in it (new installs have it).
+
+**Known:** the Glacial Trail exit stands on a ledge; from the low pocket below it, clicking does nothing. Walk round
+through the other rooms.
+
+**Also in this alpha (since 0.1.0):**
+
 - Sacred amulets, rings, arrows and bolts and Anya's reward amulets get their automatic magic properties again, as in the
   original. The "upgrade dark ring" recipe takes its five items plus any sixth item, as it does in the original.
   docs/median-rules-audit.md (items)
