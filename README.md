@@ -20,6 +20,9 @@ You need your own Diablo II: Resurrected 3.3 and D2RLoader 1.3.1. Each release's
 explain the install step by step; the D2R-XL 2012 Downloader keeps the mod up to date. Characters live in their own save
 folder and do not touch your normal D2R characters.
 
+Works with **Reign of the Warlock (RotW)**: with the expansion on your Battle.net account you can also play the Warlock,
+its skills rescaled to Median XL 2012's rules (still lightly tested). Legacy graphics (G) work in RotW games too.
+
 This is an **alpha**: playable, but expect bugs. Known issues are listed in each release's notes and in
 [docs/bugs.md](docs/bugs.md). Report bugs with the issue templates (include `d2rloader.log` after a crash).
 
