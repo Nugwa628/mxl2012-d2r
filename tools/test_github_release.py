@@ -55,7 +55,7 @@ class ChangelogTests(unittest.TestCase):
         self.assertIn("https://files.werdegames.com/mxl2012/launcher/0.3.1/D2R-XL-2012-Downloader.exe", body)
         self.assertIn("https://files.werdegames.com/mxl2012/releases/0.2.0/D2R-XL-2012-0.2.0.7z", body)
         self.assertIn("mods\\mxl2012", body)
-        self.assertIn("build 93847", body)
+        self.assertIn("Resurrected 3.3", body)
         self.assertNotIn("/mxl/", body)  # another product's folder
 
     def test_dry_run_prints_the_tag_and_text(self):

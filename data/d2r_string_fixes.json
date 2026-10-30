@@ -3,5 +3,10 @@
     "key": "d2r:Lilith",
     "text": "Pandora",
     "why": "bugs.md #18: D2R names the Uber Tristram monsters (classes 704-709) by class, not by the monstats NameStr; class 707 (uberandariel, Median's Pandora) always reads D2R's key Lilith. Median 2012 uses no other D2R Lilith string."
+  },
+  {
+    "key": "d2r:baallaugh1",
+    "text": "LOL",
+    "why": "bugs.md #508 (owner ruling 2026-10-30): Median reuses Baal's laugh (voice file baallaugh1) as a sound on many skills and missiles (Spawn Edyrem of dark_master1/2 and evil4spw, Spawn Dragon, Belial Volcano ...); D2R prints its vo.json line as \"Baal says: *Laughing*\" each time. The owner wants \"Baal says: LOL\" (also Baal's own laugh in the Throne); plugin part vochat limits the line to once every 30 s."
   }
 ]

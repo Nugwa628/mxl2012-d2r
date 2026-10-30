@@ -3797,3 +3797,20 @@ SET-UP: god mode, the harness travels, spawns and makes items, so PARTIAL at bes
 | `-013028-s3`, `-013441-s3` (horned) | hornedgods beside enemies (class 1, lane fixes2's recipe) lives in mode 1 in both modes (`mon id=24 class=1715 mode=1`), drawn in neither: its monprop `fade` hides it; nothing on the player path spawns it. PARTIAL (pass) |
 
 Not run: the RotW playtest for the Warlock numbers (no slot account owns RotW).
+
+## Lane baallol: "Baal says: LOL" at most once every 30 s (bug #508, 2026-10-30, slot 4, background mode, build of lane/baallol, plugin `build_plugin.ps1 -Release`)
+
+Lab script in `mxl2012-runs/baallol/` (kept outside the repo, made from lane fxleft's `lab.py`):
+`MXL_RUN=baallol MXL_SLOT=4 MXL_SOUND_TRACE=<file> py -3 lab.py <worktree> <out> [modes] [groups]` on a new Necromancer "BlolNecro" in
+the Blood Moor, debug mode and god mode. Groups: `click` Spawn Edyrem (998) by a background right click next to the player at 0, 6,
+12, 18, 24, 32 and 38 s, two shots per cast (0.8 s and 2.5 s after); `master` a `dark_master1` (class 1294) next to the player for
+45 s, a shot every 3 s. Before and after each group: the `vochat` line of `mxl2012` (lines printed / left out) and the sound trace
+of sounds rows 4631 / 10239 (the two rows with the file `baallaugh1`). `sheet.py` makes chat crop sheets.
+
+| run | groups | result |
+|---|---|---|
+| `r1` | HD: click, master; legacy: click | HD click: "Baal says: LOL" at 0 s, none at 6-32 s (24 s: "Soldier says: Over here!" alone), "Baal says: LOL" at 38 s; counters printed 2, left out 2; trace 4631 +4 (3 of the 7 casts played no laugh). HD master: 29 laughs (trace +29), 1 line printed (about 20 s in, 30 s after the click's last), 28 left out. Legacy (the `dark_master1` still casting): 51 laughs, 1 line (between 21 and 27 s), 50 left out. 0 asserts (`asserttrace`, d2rloader.log), no crash file; `mxl2012-core.log`: "vochat on" |
+
+Evidence: `mxl2012-runs/baallol/sheet_click_hd.png`, `sheet_master_hd.png`, `sheet_click_legacy.png`, shots and `lab.json` in `r1/`,
+`r1/sndtrace.txt`, `r1/d2rloader.log`, `r1/mxl2012-core.log`. Lessons: a chat line stays on screen about 10 s; a click cast of Spawn
+Edyrem does not play the laugh every time; with a `dark_master1` near, "Soldier says: Over here!" fills the chat (one per summon).

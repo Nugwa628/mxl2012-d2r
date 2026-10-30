@@ -5,7 +5,7 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-Nothing yet.
+- "Baal says: *Laughing*" from Median's skills now reads "Baal says: LOL", at most once every 30 seconds.
 
 ## D2R-XL 2012
 

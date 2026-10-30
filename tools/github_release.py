@@ -47,7 +47,7 @@ def release_body(version: str, section: str, downloader_version: str = "") -> st
     lines += ["", f"**Manual install:** [D2R-XL-2012-{version}.7z]({SITE}releases/{version}/D2R-XL-2012-{version}.7z), unpacked into "
               "your D2R `mods` folder (see the README).",
               "",
-              "Needs Diablo II: Resurrected build 93847 (Battle.net) and D2RLoader 1.3.1. "
+              "Needs Diablo II: Resurrected 3.3 (Battle.net) and D2RLoader 1.3.1. "
               "Known bugs: [docs/bugs.md](https://github.com/Nugwa628/mxl2012-d2r/blob/main/docs/bugs.md)."]
     return "\n".join(lines) + "\n"
 

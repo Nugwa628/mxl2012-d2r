@@ -52,6 +52,11 @@ class FixTests(unittest.TestCase):
             self.assertTrue(f["text"] and f["why"], f)
         self.assertIn("d2r:Lilith", [f["key"] for f in json.loads(m.FIXES.read_text("utf-8"))])
 
+    def test_baal_laugh_reads_lol(self):
+        # bugs.md #508: the vo.json key of Baal's laugh (voice file baallaugh1), "Baal says: LOL"
+        fixes = {f["key"]: f["text"] for f in json.loads(m.FIXES.read_text("utf-8"))}
+        self.assertEqual(fixes.get("d2r:baallaugh1"), "LOL")
+
 
 if __name__ == "__main__":
     unittest.main()

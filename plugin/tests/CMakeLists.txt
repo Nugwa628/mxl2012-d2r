@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(mxl2012_core_tests LANGUAGES CXX)
 
-set(names buildguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests appleuse_tests)
+set(names buildguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests appleuse_tests vochat_tests)
 add_executable(buildguard_tests EXCLUDE_FROM_ALL build_guard_test.cpp)
 add_executable(otherplugins_tests EXCLUDE_FROM_ALL other_plugins_test.cpp)
 add_executable(envguard_tests EXCLUDE_FROM_ALL env_guard_test.cpp)
@@ -29,6 +29,7 @@ add_executable(transguard_tests EXCLUDE_FROM_ALL translation_guard_test.cpp)
 add_executable(lvlupui_tests EXCLUDE_FROM_ALL lvlup_ui_test.cpp)
 add_executable(petspread_tests EXCLUDE_FROM_ALL pet_spread_test.cpp)
 add_executable(appleuse_tests EXCLUDE_FROM_ALL apple_use_test.cpp)
+add_executable(vochat_tests EXCLUDE_FROM_ALL vo_chat_test.cpp)
 add_custom_target(tests DEPENDS ${names})
 
 foreach(t ${names})

@@ -462,6 +462,7 @@ PluginVersion 0.1.0. Build: `cmake -S plugin -B build/plugin -A x64 -DMXL2012_PL
 | + sound guard | `sound_guard.cpp`, `sound_guard_logic.h` (`Skips`, `CheckTable`, row counts) | `soundguard` | docs/crash-audit.md C17. Inline hooks at the entry of the client unit sound wrapper `0x107dd0` (15 bytes; an id outside the table returns null) and of the five sound record readers `0xd8c70` (+0xc7), `0xd9180` (+0xb0), `0xd9030` (path), `0xd9e60` / `0xda360` (variant pick), which check the id against the row count (`0x3b20c0`) but go on with a null record; a skipped id gets the empty-table answer (0, an empty path, the id). After each table load (D2RLoader's DataTablesLoaded listener) the loaded row count is compared with ours: below it (D2RLoader's table-cache start, D2R's own 11913 rows) a log warning and the screen notice "Close the game and start it again". Ours: `ModSoundRows` 12119 (expansion bank), `ModSoundRowsBase` 12101 (base/); the check takes the smaller. `tools/tests/test_sound_rows.py` compares them to the built tables (skipped without a build). `mxl2012` prints rows and skipped ids. Dev switch `MXL_SOUNDGUARD_TEST=1/2` (Neutral id -1). Not yet game-checked |
 | + spirit summon sound | `sound_guard.cpp` (`InstallSpiritSound`), `sound_guard_logic.h` (`SkipsSpiritDeath`, `AncientDeathHd`, `SpiritFirst` / `SpiritLast`) | `spiritsound` | Bug #502. The Barbarian's spirit summons (Guardian / Defender / Protector Spirit, skills 433-435, monsters 1085-1087) are drawn in HD with D2R's Ancients (`monsters.json`: `ancientbarb2` / `ancientbarb1` / `ancientbarb3`); the Ancients' HD death timeline plays `ancient_death_hd` (sounds.txt `*Index` 6754) through the client play `0x1a0780` (sound id, unit, ...; 13 entry bytes) each time a spirit dies or is cast again. An inline hook at `0x1a0780` returns 0 (nothing played) for that id when the unit is a monster (type 1) of class 1085-1087; everything else goes on to D2R. The real Ancients and the quest NPCs on the same units keep the sound. Legacy never played it (only the monsounds death sound `barbarian_death_1`, Median's). `tools/tests/test_sound_rows.py` checks the id and the classes against the built tables. `mxl2012` prints the skipped plays. With `MXL_SOUND_TRACE=<file>` (dev builds) the guard's hooks and this one count every sound id they see into the file (lane sound) |
 | + translation guard | `translation_guard.cpp`, `translation_guard_logic.h` (`EventSound`, `InRegion`, `ReadableProtect`) | `transguard` | docs/crash-audit.md C14 (`D2R.exe+0x7761DC` at a character switch after a Druid morph). Inline hook at the entry of the UnitTranslationLayer event type 0x10 handler `0x775fc0` (16 bytes): `*event`, `[*event+0x70]` and its `+0x870` byte must be readable (`VirtualQuery`: committed, no `PAGE_NOACCESS` / `PAGE_GUARD`, inside the region), else the event is skipped, counted and logged (first 8, with the payload words). `mxl2012` prints events seen / skipped; `TranslationGuardProbe` is there for a harness verb (not wired). Not yet game-checked |
+| + Baal laugh chat line | `vo_chat.cpp`, `vo_chat_logic.h` (`PathKeyIs`, `LineAllowed`) | `vochat` | Bug #508, section 27. Inline hook at the entry of D2R's voice subtitle `0x1a0da0` (19 bytes): the "Baal says: ..." line of the voice file `baallaugh1` is left out when the last one was printed less than 30 s ago; the sound is not touched |
 | G harness (dev) | `harness_cmds.cpp`, `harness_cmds_logic.h` (`ParseSlotTable`, `WatchableTable`), `testharness.cpp` | - | verbs of 10.1 (lane triage: `watch`, a counting wrapper on one cltdo / srvhit entry, written and restored with `PatchWriteU64` and its expected old value); the harness itself hooks the server frame `0x406550` |
 | `d2r.h` | trimmed to the v0.1 calls and the five function tables | - | summon / pet / melee / seed helpers of the skeleton removed |
 
@@ -857,3 +858,27 @@ was not found in 1.14d `Game.exe`, so whether 1.13c also stacked them is not kno
 which the part does not change. Lane apple (totems only, 2026-10-30): `totem_spread` still spreads the four totems, and
 `pet_keep` shows a Kashya mercenary and a Summon Shadows pet left to D2R after Bend the Shadows and after a waypoint
 (`spread` +0, `other pets left` +2 / +4).
+
+## 27. Baal's laugh in the chat (lane baallol, 2026-10-30; bug #508)
+
+Owner ruling (2026-10-30): Median's skills and missiles that play Baal's laugh (voice file `baallaugh1`) print "Baal says: LOL"
+instead of "Baal says: \*Laughing\*", at most once every 30 seconds; the sound keeps playing every time. The text is data: the
+`d2r:baallaugh1` record of `data/d2r_string_fixes.json` (D2R's `vo.json` key; `merge_string_overrides.py` folds it into
+`overrides.json`, so there is no second copy of the key, bug #1). It also changes Baal's own laugh in the Throne (accepted).
+
+D2R's subtitle, read in the dump:
+
+| What | Address | Notes |
+|---|---|---|
+| client play | `0x1a0780(sound id, unit, ...)` | starts the sound; then, when `0xd2e490` (subtitles on) and the flag at `rbp+0x7f` is 0, calls the subtitle at `0x1a0bc3` with `(id, 0)`; the return is not used |
+| voice subtitle | `0x1a0da0(sound id, flag)` | sounds record `0xd96a0(id, 0, 0)`, path at `+0x32`; `0x1a0210` makes the key (copy of at most 0x9b bytes, no extension, no trailing `_hd`, lower case, file name only); `0x3e2b724` (D2RLoader's key -> id) and `0x3e2b730` (id -> text). With flag 0 and a key that is not `strMissingString` it finds the speaker through a map at `0x2357de0` (the player's class names, `Hireables`, `Cain`, else a speaker string; not read further) and writes `DialogSpeakerFormatString` ("%s says: %s") into the chat (`0x3e2b7f0`). One caller. Entry `4c 8b dc 55 53 49 8d ab 08 ff ff ff 48 81 ec e8 01 00 00` |
+
+**Part `vochat`** (`vo_chat.cpp`, `vo_chat_logic.h`, test `vochat_tests`, off word `vochat`): an inline hook at `0x1a0da0` reads the
+sound's path the way the subtitle does. For the key `baallaugh1` (`PathKeyIs`: file name, no extension, no `_hd`, any case) it
+returns without printing when the last line went out less than 30 s ago (`LineAllowed`, `GetTickCount64`); otherwise it notes
+the time and calls D2R's function. Every other voice line and every sound are unchanged. `mxl2012` prints "Baal laugh lines
+printed N, left out N". The same test on another key would extend it to the soldiers' "Over here!" (`sol_overhere`) and "Help
+us!" (`sol_helpus`): a list of keys with a time each instead of one key (not done: owner ruling, they stay as they are).
+
+Checked in game (docs/testing.md "Lane baallol", slot 4, HD and legacy): "Baal says: LOL" from Spawn Edyrem right clicks at 0 s, none until 30 s, then once
+more at 38 s; a `dark_master1` laughed 29 times in 45 s and printed one line; the sound trace counts every laugh; 0 asserts.

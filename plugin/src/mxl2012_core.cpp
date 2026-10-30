@@ -53,6 +53,8 @@
 //      pets keep D2R's placement (pet_spread.cpp, off word petspread, #493);
 //   +  misc pSpell 10 items other than the Book of Skill (Median's Apple) cast skill 47 `Apple Healing Spell` on the user as
 //      1.13c's item spell 10, where D2R runs its Book of Skill and refuses them (apple_use.cpp, off word appleuse, #499);
+//   +  "Baal says: ..." (the voice file baallaugh1, which Median gives to many skills and missiles) goes into the chat at most
+//      once every 30 s; the laugh itself still plays (vo_chat.cpp, off word vochat, #508);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
@@ -83,6 +85,7 @@
 #include "whirlwind.h"
 #include "merc_equip.h"
 #include "translation_guard.h"
+#include "vo_chat.h"
 
 #include <windows.h>
 #include <tlhelp32.h>
@@ -140,7 +143,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -417,6 +420,7 @@ char g_transGuardReport[192] = "";
 char g_lvlUpUiReport[192] = "";
 char g_petSpreadReport[192] = "";
 char g_appleUseReport[192] = "";
+char g_voChatReport[160] = "";
 char g_harnessReport[192] = "";
 bool g_partsInstalled = false;
 
@@ -567,6 +571,10 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	AppleUseCounts(&appleCasts, &appleRefused, &appleBooks);
 	std::snprintf(line, sizeof(line), "%s; casts %ld, refused %ld, Books of Skill left to D2R %ld", g_appleUseReport, appleCasts, appleRefused, appleBooks);
 	SayPart(command, "appleuse", line);
+	long voPrinted = 0, voDropped = 0;
+	VoChatCounts(&voPrinted, &voDropped);
+	std::snprintf(line, sizeof(line), "%s; Baal laugh lines printed %ld, left out %ld", g_voChatReport, voPrinted, voDropped);
+	SayPart(command, "vochat", line);
 	std::snprintf(line, sizeof(line), "client wall calls %ld", ClientWallCalls());
 	Say(command, line);
 	std::snprintf(line, sizeof(line), "testharness %s", g_harnessReport[0] != '\0' ? g_harnessReport : "off");
@@ -739,6 +747,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("appleuse")) {
 		InstallAppleUse(context, g_appleUseReport, sizeof(g_appleUseReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_appleUseReport);
+		context->LogInfo(line);
+	}
+	if (!Off("vochat")) {
+		InstallVoChat(context, g_voChatReport, sizeof(g_voChatReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voChatReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cltdostub")) {
