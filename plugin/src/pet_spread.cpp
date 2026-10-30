@@ -65,6 +65,13 @@ volatile LONG g_stacked = 0;  // pets of either left on the owner's spot
 volatile LONG g_spread = 0;   // ... moved to a ring spot
 volatile LONG g_kept = 0;     // pets on the owner's spot that are no totem: left to D2R
 volatile LONG g_lastClass = -1;
+volatile LONG g_shifted = 0;       // spread totems the move landed more than one sub-tile from the asked spot (kept, bug #509)
+volatile LONG g_secondPass = 0;    // totems spread by pass 2 (the move asked for spots the spot test refused, bug #509)
+volatile LONG g_missed = 0;        // totems no ring spot took: left where the last try put them
+volatile LONG g_triesTaken = 0;    // ring spots skipped: within 2 sub-tiles of a pet of the same gather
+volatile LONG g_triesBlocked = 0;  // ... refused by the spot test
+volatile LONG g_triesStill = 0;    // moves that left the pet where it was
+volatile LONG g_triesOff = 0;      // moves that landed it on a spot it could not keep
 
 // The pets 0x501df0 sets during one 0x500a40 call on this thread (the game's server thread); moved after it returns.
 constexpr int MaxPets = 32;
@@ -88,6 +95,29 @@ auto IsTotem(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet) noexcept -> bool
 	return list != nullptr && pet_spread::Listed(*list, d2r::At<uint32_t>(pet, UnitId));
 }
 
+// The tries of the first totems that needed pass 2 or that no spot took (bug #509), for the log: "dx,dy" asked, then B (blocked),
+// T (taken by a pet of the same gather), = (the move left the pet where it was) or ">dx,dy" the spot it landed on, as offsets
+// from the owner; "|" starts pass 2.
+const D2RL::PluginContext* g_context = nullptr;
+volatile LONG g_logged = 0;
+constexpr LONG MaxLogs = 8;
+
+void Trace(char* buf, size_t size, size_t* used, const char* fmt, int32_t a, int32_t b, int32_t c = 0, int32_t d = 0) noexcept {
+	if (*used + 1 < size) {
+		const int n = std::snprintf(buf + *used, size - *used, fmt, a, b, c, d);
+		*used = n > 0 ? (*used + static_cast<size_t>(n) < size ? *used + static_cast<size_t>(n) : size - 1) : *used;
+	}
+}
+
+void Log(d2r::Unit* pet, const char* what, int32_t x, int32_t y, int32_t ox, int32_t oy, int placed, const char* trace) noexcept {
+	if (g_context != nullptr && InterlockedIncrement(&g_logged) <= MaxLogs) {
+		char line[1024];
+		std::snprintf(line, sizeof(line), "petspread: totem class %d %s at %d,%d (owner %d,%d, %d placed before); tries:%s",
+		              d2r::At<int32_t>(pet, d2r::UnitClass), what, x, y, ox, oy, placed, trace);
+		g_context->LogInfo(line);
+	}
+}
+
 // `taken` / `count`: the spots earlier pets of the same gather got (nullptr for a single warp); the new spot is added.
 void Spread(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, pet_spread::Spot* taken, int* count) noexcept {
 	int32_t ox = 0, oy = 0, px = 0, py = 0;
@@ -100,25 +130,68 @@ void Spread(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, pet_spread::Spot*
 		InterlockedIncrement(&g_kept);
 		return;
 	}
-	for (const auto& o : pet_spread::Ring) {
-		const int32_t x = ox + o.dx, y = oy + o.dy;
-		if (taken != nullptr && pet_spread::Taken(x, y, taken, *count)) {
-			continue;
+	const int n = count != nullptr ? *count : 0;
+	char trace[960];
+	size_t used = 0;
+	trace[0] = '\0';
+	// Pass 1 moves only to spots `0x350a20` calls free. Next to rocks that test and the move's own free-spot search (`0x362f90`,
+	// the unit's footprint) disagree (bug #509, seen in game): spots at 5 and 7 were refused as blocked on open ground, and the one
+	// spot it let through put the totem 1 sub-tile from its owner. So pass 2 asks the move for every ring spot not taken and keeps
+	// where D2R's own search landed the totem.
+	for (int pass = 1; pass <= 2; ++pass) {
+		if (pass == 2) {
+			Trace(trace, sizeof(trace), &used, " |", 0, 0);
 		}
-		if (Fn<SpotBlockedFn>(RvaSpotBlocked)(pet, x, y, pet_spread::SpotMask) != 0) {
-			continue;
-		}
-		Fn<MoveFn>(RvaMove)(game, pet, nullptr, x, y, 0, 0);
-		int32_t nx = 0, ny = 0;
-		if (d2r::UnitXY(pet, &nx, &ny) && pet_spread::Landed(nx, ny, x, y)) {
-			Fn<SetTeleportedFn>(RvaSetTeleported)(pet, 1);
-			InterlockedIncrement(&g_spread);
-			if (taken != nullptr && *count < MaxPets) {
-				taken[(*count)++] = {nx, ny};
+		for (const auto& o : pet_spread::Ring) {
+			const int32_t x = ox + o.dx, y = oy + o.dy;
+			if (taken != nullptr && pet_spread::Taken(x, y, taken, n)) {
+				if (pass == 1) {
+					InterlockedIncrement(&g_triesTaken);
+					Trace(trace, sizeof(trace), &used, " %d,%dT", o.dx, o.dy);
+				}
+				continue;
 			}
-			return;
+			if (pass == 1 && Fn<SpotBlockedFn>(RvaSpotBlocked)(pet, x, y, pet_spread::SpotMask) != 0) {
+				InterlockedIncrement(&g_triesBlocked);
+				Trace(trace, sizeof(trace), &used, " %d,%dB", o.dx, o.dy);
+				continue;
+			}
+			int32_t bx = 0, by = 0;
+			d2r::UnitXY(pet, &bx, &by);
+			Fn<MoveFn>(RvaMove)(game, pet, nullptr, x, y, 0, 0);
+			int32_t nx = 0, ny = 0;
+			if (!d2r::UnitXY(pet, &nx, &ny)) {
+				return;
+			}
+			if (pet_spread::Keep(nx, ny, ox, oy, taken, n)) {
+				Fn<SetTeleportedFn>(RvaSetTeleported)(pet, 1);
+				InterlockedIncrement(&g_spread);
+				if (!pet_spread::Landed(nx, ny, x, y)) {
+					InterlockedIncrement(&g_shifted);
+				}
+				if (taken != nullptr && *count < MaxPets) {
+					taken[(*count)++] = {nx, ny};
+				}
+				if (pass == 2) {
+					InterlockedIncrement(&g_secondPass);
+					Trace(trace, sizeof(trace), &used, " %d,%d>%d,%d kept", o.dx, o.dy, nx - ox, ny - oy);
+					Log(pet, "spread by pass 2", nx, ny, ox, oy, n, trace);
+				}
+				return;
+			}
+			if (nx == bx && ny == by) {
+				InterlockedIncrement(&g_triesStill);
+				Trace(trace, sizeof(trace), &used, " %d,%d=", o.dx, o.dy);
+			} else {
+				InterlockedIncrement(&g_triesOff);
+				Trace(trace, sizeof(trace), &used, " %d,%d>%d,%d", o.dx, o.dy, nx - ox, ny - oy);
+			}
 		}
 	}
+	InterlockedIncrement(&g_missed);
+	int32_t ex = 0, ey = 0;
+	d2r::UnitXY(pet, &ex, &ey);
+	Log(pet, "left", ex, ey, ox, oy, n, trace);
 }
 
 void SpreadGuarded(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, pet_spread::Spot* taken, int* count) noexcept {
@@ -175,6 +248,7 @@ auto PetWarpHook(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet) noexcept -> 
 
 auto InstallPetSpread(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int {
 	g_base = context->exeBase;
+	g_context = context;
 	// the place hook first: the gather hook relies on it to see the pets
 	const bool place = context->InstallInlineHook(RvaPlace, PlaceEntry, sizeof(PlaceEntry), reinterpret_cast<void*>(&PlaceHook),
 	                                              reinterpret_cast<void**>(&g_place));
@@ -194,4 +268,14 @@ void PetSpreadCounts(long* gathers, long* warps, long* stacked, long* spread, lo
 	*spread = g_spread;
 	*kept = g_kept;
 	*lastClass = g_lastClass;
+}
+
+void PetSpreadTries(long* shifted, long* secondPass, long* missed, long* taken, long* blocked, long* still, long* off) noexcept {
+	*shifted = g_shifted;
+	*secondPass = g_secondPass;
+	*missed = g_missed;
+	*taken = g_triesTaken;
+	*blocked = g_triesBlocked;
+	*still = g_triesStill;
+	*off = g_triesOff;
 }

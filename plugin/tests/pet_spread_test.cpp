@@ -57,6 +57,21 @@ int main() {
 	}
 	Check(apart, "the 8 first-ring spots do not take each other");
 
+	// bug #509 (run checks-20261030-020328-s3): owner at 5739,5628 next to rocks and a torch; a move landed the first totem at
+	// +2,+3 although +0,+3 was asked. Such a spot is kept; the owner's spot, a spot next to a placed pet and a far one are not.
+	const Spot gather[] = {{5741, 5631}, {5736, 5631}, {5742, 5625}};
+	Check(Keep(5741, 5631, 5739, 5628, gather, 0), "a move shifted off the asked spot is kept");
+	Check(Keep(5736, 5625, 5739, 5628, gather, 3) && Keep(5744, 5628, 5739, 5628, gather, 3), "free spots round the owner are kept");
+	Check(!Keep(5739, 5628, 5739, 5628, gather, 3) && !Keep(5740, 5627, 5739, 5628, gather, 3), "the owner's spot is never kept");
+	Check(!Keep(5739, 5631, 5739, 5628, gather, 3) && !Keep(5743, 5626, 5739, 5628, gather, 3), "next to a placed pet is not kept");
+	Check(Keep(5748, 5628, 5739, 5628, gather, 3) && !Keep(5749, 5628, 5739, 5628, gather, 3) && !Keep(5739, 5618, 5739, 5628, nullptr, 0),
+	      "farther than the ring reaches is not kept");
+	bool ringKept = true;
+	for (int i = 0; i < RingSize; ++i) {
+		ringKept = ringKept && Keep(Ring[i].dx, Ring[i].dy, 0, 0, nullptr, 0);
+	}
+	Check(ringKept, "every ring spot itself is kept");
+
 	// only totems: the owner's `totemic` list (pettype row 34) decides; a node has the unit id at +4 and the next node at +0x18
 	Check(TotemicPetType == 34, "totemic is pettype row 34");
 	struct Node {

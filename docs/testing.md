@@ -3913,3 +3913,25 @@ Left behind: slot 3's shared stash page 1 holds 11 test items, `RuneTabbccb` in 
 
 **For a RotW account (owner / user):** put Ith and a few other runes, gems and a rejuvenation potion into the runes / gems
 tabs by drag and Ctrl-click; take them back out; Save and Exit.
+
+## Lane totem509: one totem left on the player after Bend the Shadows (bug #509, 2026-10-30, slot 3, background mode)
+
+Build: lane/totem509 from main 0.1.4, `tools/build.py` (validate 0 errors), `tools/build_plugin.ps1 -Release -Tests`, dev DLL
+installed by `install_mod.py --slot 3` (slot 2 was taken by another lane when the build was ready). New Necromancer `Totemnec`.
+`totem_spread` now blinks `MXL_TS_ROUNDS` times (default 6), each time by a right click onto the next totem, and fails a totem
+within one sub-tile of the player or a `missed` count on the `petspread` line. The totems stand south-west of the Blood Moor
+arrival, next to the rocks there. Evidence: `mxl2012-runs/totem509/` (run folders, `run1.log`..`run3.log`, `petspread-tries.log`).
+
+| Run | Build | Blinks | Result |
+|---|---|---|---|
+| `checks-20261030-155003-s3` | first try: a move kept wherever D2R's search landed it (`Keep`), plus the try log | 6 | **FAIL (bug reproduced)**: blinks 4 and 5 left the fourth totem at +1,-1 from the player; "missed 2". Its tries: the spot test refused every free spot at 5 and 7 sub-tiles and most at 3, the 3-ring spots left were next to placed totems, and the move turned the one spot let through (+3,-3) into +1,-1 |
+| `checks-20261030-155355-s3` | fix: pass 2 (move to every ring spot not taken, keep by `Keep`) | 10 | **PARTIAL (pass)**: 4 of 4 spread after every blink, none within one sub-tile of the player; "spread 40, shifted 2, pass 2 0, missed 0" |
+| `checks-20261030-155548-s3` | the same | 20 | **PARTIAL (pass)**: 4 of 4 spread after every blink; "spread 80, pass 2 3, missed 0". Pass 2 placed the fourth totem at -3,0, +2,0 and +3,0 at the spots of run 1's misses; -3,0 and +3,0 had been refused by the spot test and the move put the totem exactly there |
+
+Not on the player path: skill levels, level 120, Tank, the corpses (spawned zombies) and the totems cast by `cast` (as in
+"Lane totems"). Engine log: only the known shutdown pool asserts at game exit, no crash file, real-input watchdog clean in every run.
+
+By hand:
+1. Cast four totems next to rocks or a wall, then Bend the Shadows onto one of them, several times.
+2. After every blink the totems stand round you and none is on you.
+

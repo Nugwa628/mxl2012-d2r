@@ -74,4 +74,15 @@ constexpr auto Taken(int32_t x, int32_t y, const Spot* spots, int count) noexcep
 	return false;
 }
 
+// True when a move left the pet where the spread can keep it (bug #509): at least 2 sub-tiles off its owner's spot, not farther
+// than the ring reaches (7, plus 2 for the move's own free-spot search), and not within 2 sub-tiles of a pet the same gather
+// already placed. Next to rocks or a torch the move may land the pet a few sub-tiles from the asked spot; that spot is kept.
+inline constexpr int32_t KeepMin = 2;
+inline constexpr int32_t KeepMax = 9;
+constexpr auto Keep(int32_t x, int32_t y, int32_t ownerX, int32_t ownerY, const Spot* spots, int count) noexcept -> bool {
+	const int32_t ax = x >= ownerX ? x - ownerX : ownerX - x, ay = y >= ownerY ? y - ownerY : ownerY - y;
+	const int32_t d = ax > ay ? ax : ay;
+	return d >= KeepMin && d <= KeepMax && !Taken(x, y, spots, count);
+}
+
 }  // namespace pet_spread

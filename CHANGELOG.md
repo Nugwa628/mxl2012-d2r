@@ -5,6 +5,9 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Totems no longer stay on the player after Bend the Shadows next to rocks: when the free-spot test refuses the ring
+  round the player, the totem is placed where the game's own move finds room (#509).
+
 ## D2R-XL 2012
 
 ### 0.1.4 (2026-10-30)

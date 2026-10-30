@@ -10,13 +10,13 @@ The numbers in the progress column are our own estimate of each phase, not a mea
 |---|---|---|---|
 | 0 | Setup | 98 % | every item done (toolchain checked by `tools/lane_setup.py` 2026-10-29); left: CI's `assets` job runs only after the owner's asset-pack upload + secret (OWNER-QUESTIONS #28) |
 | 1 | Tools | 98 % | full `tools/build.py` runs end to end (lane phase3 rebuild 2026-10-29: 8 min, validate 0 errors); asset pack `assets-1` built and pinned in assets.lock; left: the owner's upload of it (same blocker as phase 0) |
-| 2 | Data port | 90 % | all 86 tables migrated, validate 0 errors; boots, all five act towns load; saves round-trip (lane savefmt); D2R additions removed; open bugs left (2026-10-29): #434 (medium, Hratli out of reach) and lows #17, #292, #392, #399, #432, #436, #484, plus the player reports #487-#498 of other lanes |
+| 2 | Data port | 97 % | all 86 tables migrated, validate 0 errors; boots, all five act towns load; saves round-trip (lane savefmt); D2R additions removed; RotW stash tabs take runes / gems (#510, 0.1.4). Left (2026-10-30): #512 (save cancelled when a character has too many items, lane savecap); old unreproduced lows #17, #392, #432 |
 | 3 | Triage of engine differences | 100 % | every row has an in-game or static verdict (engine-triage.md section 7: same 13, ported 15, unported 2); #16 (`rprunes`), #18 (`cubeclasses`) and #24 (`rpsignets`, lane phase3) confirmed on the player path; #24's Apple needed engine work: plugin part `appleuse` (plugin-plan.md section 25, bug #499, lane apple) |
 | 4 | Plugin | 90 % | v0.1 built and in game; first game pass done (all plugin-plan 10.1 checks run, bugs #4 / #5 fixed) and its failures ported (#6 `cltnomis`, #14, #15, #16); later parts (whirlwind, ilvl, runeletter, cubedupe, lvlupui, ...) in. Apple part `appleuse` in (lane apple, bug #499). Left: whirlwind feel by eye (human visual review) |
-| 5 | Graphics | 65 % | HD stand-ins (monsters, effects, maps floors, icons, UI) and classic Median art in the build; map walls and custom art open |
-| 6 | Test and release | 50 % | game checks in tools/game_checks.py (acts, cube, rules, saves); alpha package tool (tools/cut_alpha.ps1); release scripts and owner server steps ready (docs/hosting.md); 0.1.0 to 0.1.2 published (2026-10-29), downloader with it; public GitHub mirror live; signing and open bugs left |
+| 5 | Graphics | 90 % | HD stand-ins (monsters, effects, map floors, icons, UI), classic Median art, HD walls on all 17 Median maps, map light colours, Rainbow Stones in D2R HD art (0.1.4). Left: Khalimgrad cathedral arches and roofs, downtown's 126 cells without an HD wall, Ancient Tunnels void (drawn as floor), better monster stand-ins (hd-monsters.md section 16), ~87 upscaled item pictures, upscaled skill-tree pages |
+| 6 | Test and release | 85 % | game checks in tools/game_checks.py; alpha package and release scripts; 0.1.0 to 0.1.4 published (stable 0.1.4, 2026-10-30), downloader, public GitHub mirror and releases. Left: #511 / #292 crash on area change with a mercenary (lane uppass), #509, #481, Acts 2-5 only lightly tested, Warlock in play (needs RotW), downloader signing |
 
-Overall: roughly 80 % (2026-10-29 evening, lane phase3: phases 0-4 audited; 78 % earlier that day, 72 % on 2026-10-28 evening).
+Overall: roughly 92 % (2026-10-30, after 0.1.4; 80 % on 2026-10-29 evening, 72 % on 2026-10-28 evening).
 
 ## Phase 0: Setup
 - [x] Repo on the forge (private), `.gitignore` forbids game content; public GitHub mirror since 2026-10-29
@@ -76,5 +76,6 @@ Overall: roughly 80 % (2026-10-29 evening, lane phase3: phases 0-4 audited; 78 %
 ## Phase 6: Test and release
 - [x] Game checks on slots 2/3 (tools/game_checks.py; lanes boot, harness, datafix, qa)
 - [ ] All open bugs in docs/bugs.md triaged/fixed; Warlock in-game check (needs a RotW account)
-- [ ] Release package, publish to files.werdegames.com/mxl2012/, downloader signing
+- [x] Release package, publish to files.werdegames.com/mxl2012/ (0.1.0 to 0.1.4)
+- [ ] Downloader signing
 - [x] GitHub mirror and issue templates live (2026-10-29: https://github.com/Nugwa628/mxl2012-d2r, public; fresh history, one snapshot commit per mirror run)

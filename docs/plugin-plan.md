@@ -842,7 +842,7 @@ The totems cannot walk (monstats2 `barbtotem`: modes DT / NU / A1), so they stay
   - not within 2 sub-tiles of a pet this gather already placed. D2R's collision test did not see a totem placed a moment
     earlier: in the first build all four ended 1 sub-tile apart.
 - The ring is 8 spots at 3 sub-tiles, then 16 at 5 and 16 at 7.
-- The move is the unit move `0x491ca0(game, pet, 0, x, y, 0, 0)`. If the pet landed within one sub-tile of the asked spot, it
+- The move is the unit move `0x491ca0(game, pet, 0, x, y, 0, 0)`. If the pet landed where `Keep` allows (see #509 below), it
   is flagged teleported (`0x34f490`).
 - A pet that `0x596d40` leaves on the owner's spot gets the same treatment (without the list).
 - The gather itself is unchanged, and pets that are already off the owner's spot are left alone.
@@ -850,7 +850,13 @@ The totems cannot walk (monstats2 `barbtotem`: modes DT / NU / A1), so they stay
   `totemic` (row 34: the necromancer's five totems and Median's other `totemic` summons). The list is the one the gather walks:
   `0x5013f0(dataFlag, root, 34)`, root = `*(0x34b240(owner) + 0x98)`, for a player owner. Mercenaries and every other warp pet
   (Median 2012 gives players no golem) keep D2R's placement on the owner's spot and walk off by themselves.
-- `mxl2012` prints "owner moves with pets N, pet warps N, onto the owner N, spread N, other pets left N (last pet class N)".
+- **Bug #509 (lane totem509):** next to rocks the spot test `0x350a20` and the move's own free-spot search (`0x362f90`) disagree: the
+  test refused free spots at 5 and 7, and the move turned the one it let through into a spot next to the owner. So a move is
+  kept wherever D2R's search landed the totem when that is 2 to 9 sub-tiles from the owner and not within 2 of a totem the same
+  gather placed (`Keep`); when pass 1 keeps nothing, pass 2 asks the move for every ring spot not taken, without the test.
+- `mxl2012` prints "owner moves with pets N, pet warps N, onto the owner N, spread N, other pets left N (last pet class N); shifted
+  N, pass 2 N, missed N (ring tries taken N, blocked N, not moved N, moved off N)"; the first 8 totems that needed pass 2 or were
+  missed are logged with their tries.
 
 Checked in game (docs/testing.md "Lane totems", "Lane apple"): the four totems end on four ring spots (diagonals at 3) round the player, in HD
 and legacy. Attack rates and states are unchanged (they were unchanged without the part too). Open: the 1.13c twin of `0x500a40`

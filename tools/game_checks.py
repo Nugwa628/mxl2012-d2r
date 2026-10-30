@@ -11501,18 +11501,36 @@ def ts_totems():
     return (p.get("x"), p.get("y")), tms
 
 
+def ts_judge(ox, oy, after, tag):
+    """The problems of one gather: totems sharing a sub-tile, one on or next to the player's sub-tile (within one, the plugin's
+    "on the owner"; bug #509 left one at +1,-1), one not gathered."""
+    bad, spots = [], [(x, y) for _c, _i, x, y in after]
+    if len(set(spots)) != len(spots):
+        bad.append("%s: totems share a sub-tile" % tag)
+    on = [(x - ox, y - oy) for x, y in spots if max(abs(x - ox), abs(y - oy)) <= 1]
+    if on:
+        bad.append("%s: a totem is on the player's spot %s" % (tag, on))
+    far = [(x, y) for x, y in spots if max(abs(x - ox), abs(y - oy)) > 9]
+    if far:
+        bad.append("%s: totems not gathered: %s" % (tag, far))
+    return bad
+
+
 def check_totem_spread():
     """Bug #493 (player: "Totems slow / lose effects after Shadow Blink"; owner ruling 2026-10-29: they still warp with the
     player but must not stack). A Necromancer casts the four totems on zombie corpses 3 sub-tiles apart, then Bend the Shadows
-    (486) by a background right click on the first totem. D2R's pet warp (0x596d40) puts every gathered totem on the player's own
-    sub-tile; the plugin part `petspread` moves each to a free ring spot round the player. PASS when all totems were gathered
-    (none farther than 8 sub-tiles), no two share a sub-tile, none is on the player's sub-tile, and the `petspread` line counts
-    spread warps. SHORTCUT: skill levels, level 120 and Tank by the harness, corpses from spawned zombies, the totems cast by `cast`."""
+    (486) by a background right click on the first totem. D2R's gather (0x500a40) puts every totem on the player's own sub-tile;
+    the plugin part `petspread` moves each to a free spot round the player. Bug #509: next to the rocks and torch of the Blood Moor
+    spot one totem stayed on the player now and then, so the check blinks `MXL_TS_ROUNDS` times (default 6), each time onto the
+    next totem, which stands on a ring spot near the rocks. PASS when after every blink all totems were gathered (none farther than
+    9 sub-tiles), no two share a sub-tile, none is within one sub-tile of the player, and the `petspread` line counts spread totems and
+    no missed one. SHORTCUT: skill levels, level 120 and Tank by the harness, corpses from spawned zombies, the totems cast by `cast`."""
     mark, log, shots, notes, bad = engine_mark(), [], [], [], []
     ln = mxl_part(mxl_text().splitlines(), "petspread")
     notes.append("plugin: %s" % (ln[:200] or "no petspread line"))
     if not ln or "FAILED" in ln or ln.startswith("petspread off"):
         bad.append("petspread not on")
+    rounds = max(1, int(os.environ.get("MXL_TS_ROUNDS", "6")))
     goto(2)
     with Tank(), Level(120):
         for sid in TS_TOTEMS + (TS_BLINK,):
@@ -11536,28 +11554,38 @@ def check_totem_spread():
         if len(before) < 4:
             bad.append("only %d totems cast" % len(before))
         Hl("skill right %d" % TS_BLINK, log)
-        p0 = player_xy()
-        if before:
-            click_unit(before[0][1], button="right")
-        time.sleep(1.5)
-        (ox, oy), after = ts_totems()
-        notes.append("Bend the Shadows: player %s -> %s; after: %s" % (p0, (ox, oy), [(c, x, y) for c, _i, x, y in after]))
-        shots.append(sh("totem_spread_after"))
-        if (ox, oy) == p0:
+        after, blinks = before, 0
+        for r in range(rounds):
+            if not after:
+                break
+            p0 = player_xy()
+            target = after[r % len(after)]
+            click_unit(target[1], button="right")
+            time.sleep(1.5)
+            (ox, oy), after = ts_totems()
+            notes.append("blink %d onto %d: player %s -> %s; after: %s" % (r + 1, target[0], p0, (ox, oy),
+                                                                          [(x - ox, y - oy) for _c, _i, x, y in after]))
+            if r == 0:
+                shots.append(sh("totem_spread_after"))
+            if (ox, oy) == p0:
+                notes.append("blink %d: the right click did not blink the player" % (r + 1))
+                continue
+            blinks += 1
+            got = ts_judge(ox, oy, after, "blink %d" % (r + 1))
+            if got:
+                shots.append(sh("totem_spread_bad_%d" % (r + 1)))
+            bad += got
+        if blinks == 0:
             bad.append("the right click did not blink the player")
-        spots = [(x, y) for _c, _i, x, y in after]
-        if len(set(spots)) != len(spots):
-            bad.append("totems share a sub-tile")
-        if any((x, y) == (ox, oy) for x, y in spots):
-            bad.append("a totem is on the player's sub-tile")
-        far = [(x, y) for x, y in spots if max(abs(x - ox), abs(y - oy)) > 8]
-        if far:
-            bad.append("totems not gathered: %s" % far)
+        notes.append("blinks %d of %d" % (blinks, rounds))
         ln = mxl_part(mxl_text().splitlines(), "petspread")
-        notes.append("plugin after: %s" % ln[-80:])
+        notes.append("plugin after: %s" % ln[ln.find("onto the owner"):])
         m = re.search(r"spread (\d+)", ln)
         if not m or int(m.group(1)) == 0:
             bad.append("petspread counted no spread")
+        m = re.search(r"missed (\d+)", ln)
+        if m and int(m.group(1)) > 0:
+            bad.append("petspread missed %s totem(s)" % m.group(1))
         for _c, i, _x, _y in after:
             H("kill %d" % i)
     note = "; ".join(notes) + ("; PROBLEMS: " + "; ".join(bad) if bad else "")

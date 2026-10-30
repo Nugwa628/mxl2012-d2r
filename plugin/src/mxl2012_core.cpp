@@ -460,7 +460,7 @@ DWORD WINAPI LogOtherPluginsLater(LPVOID) {
 
 // A status line for `mxl2012`: "<part> <report>" or "<part> off: left out by mxl2012-core-off.txt".
 void SayPart(const D2RL::ConsoleCommandContext* command, const char* part, const char* report) noexcept {
-	char line[320];
+	char line[448];
 	std::snprintf(line, sizeof(line), "%s %s", part, Off(part) ? OffNote : (report[0] != '\0' ? report : "not installed"));
 	Say(command, line);
 }
@@ -566,6 +566,11 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	PetSpreadCounts(&petGathers, &petWarps, &petStacked, &petSpread, &petKept, &petClass);
 	std::snprintf(line, sizeof(line), "%s; owner moves with pets %ld, pet warps %ld, onto the owner %ld, spread %ld, other pets left %ld (last pet class %ld)",
 	              g_petSpreadReport, petGathers, petWarps, petStacked, petSpread, petKept, petClass);
+	long petShifted = 0, petSecond = 0, petMissed = 0, triesTaken = 0, triesBlocked = 0, triesStill = 0, triesOff = 0;
+	PetSpreadTries(&petShifted, &petSecond, &petMissed, &triesTaken, &triesBlocked, &triesStill, &triesOff);
+	const size_t petLen = std::strlen(line);
+	std::snprintf(line + petLen, sizeof(line) - petLen, "; shifted %ld, pass 2 %ld, missed %ld (ring tries taken %ld, blocked %ld, not moved %ld, moved off %ld)",
+	              petShifted, petSecond, petMissed, triesTaken, triesBlocked, triesStill, triesOff);
 	SayPart(command, "petspread", line);
 	long appleCasts = 0, appleRefused = 0, appleBooks = 0;
 	AppleUseCounts(&appleCasts, &appleRefused, &appleBooks);

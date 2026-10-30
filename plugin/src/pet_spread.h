@@ -12,3 +12,6 @@ auto InstallPetSpread(const D2RL::PluginContext* context, char* report, size_t r
 // Since load: owner moves that set pets on the owner, single pet warps, pets of either left on the owner's spot, the totems among
 // them spread, the other pets left to D2R; the pet class of the last stacked pet (-1 none).
 void PetSpreadCounts(long* gathers, long* warps, long* stacked, long* spread, long* kept, long* lastClass) noexcept;
+// Since load (bug #509): totems kept where the move's free-spot search landed them (more than one sub-tile off the asked ring spot),
+// totems spread by the second pass (moves to the spots the spot test refused), totems no ring spot took, and the ring tries skipped as taken / blocked or whose move left the pet in place / on a spot not kept.
+void PetSpreadTries(long* shifted, long* secondPass, long* missed, long* taken, long* blocked, long* still, long* off) noexcept;
