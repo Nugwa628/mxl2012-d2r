@@ -7,7 +7,7 @@
     "mxl_<pettype>; legacy draws data/global/ui/hireables/mxl_<pettype>.dc6, a byte copy of the DC6 Median's row named, so",
     "legacy looks exactly as before. `enabled` (file and entry): owner rule, a changed look waits for the owner's review sheet."
   ],
-  "enabled": false,
+  "enabled": true,
   "pets": {
     "shadowspet":     {"icon": "shadowassassin",   "sat": 0.15, "val": 0.55, "hue": 0,   "why": "Summon Shadows: a shadow figure (Assassin's shadow, greyed and darkened)"},
     "darklingspet":   {"icon": "revivedicon",      "hue": 70,  "sat": 1.0, "val": 0.9, "why": "Summon Darklings: glowing eyes in the dark (the Revive icon turned violet)"},

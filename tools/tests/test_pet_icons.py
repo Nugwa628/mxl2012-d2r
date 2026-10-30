@@ -71,9 +71,10 @@ class ChosenTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             P.chosen(self.SPEC, "zz")
 
-    def test_committed_file_is_off(self):
+    def test_committed_file_is_on(self):
         spec = P.load_spec()
-        self.assertFalse(spec["enabled"])  # owner rule: the owner sees the review sheet first
+        self.assertTrue(spec["enabled"])  # owner approved the review sheet (2026-10-31)
+        self.assertEqual(len(P.chosen(spec)), 15)
         for k, e in spec["pets"].items():
             self.assertTrue(e.get("icon") and e.get("why"), k)
 
