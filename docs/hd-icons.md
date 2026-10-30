@@ -270,6 +270,50 @@ Size: each sprite keeps its item's cells, so it is the size of D2R's own picture
 the reused ones are at most D2R's (D2R's chipped gems are 100 x 100, ours 98 x 98). Total item sprites 6,059,720 ->
 6,011,620 bytes (230 -> 228 files). Sprites are cached by modification time against their DC6 and the converting tools.
 
+### Picture review (`tools/item_art_review.py`, `tools/item_art_sheets.py`; lane itemart, 2026-10-30)
+
+Of the 2429 item codes, about 1,700 already use D2R's own HD art by invfile and 23 pictures are D2R HD sprites recoloured
+(`hd_reuse` above); the 92 upscales are what looks soft. **Owner rule (2026-10-30): the owner sees new item pictures
+before any goes into the build.** So nothing here changes the build: the candidates are written down in
+`tools/data/item_art_proposals.json` with `"enabled": false` for the file and for every entry. `item_hd` does not use them
+yet; it only lists them in `item_hd_report.json` `picture_proposals` ("off: owner review"). A later round switches on the
+approved ones and wires them in (`item_art_review.enabled_proposals` gives only the entries switched on under an enabled
+file).
+
+**Ranking** (`py -3 -I tools/item_art_review.py rank --top 0`): how often players see a picture, summed over the items that
+show it: expected drops per kill over every enabled monster row and the three difficulties through the treasureclassex tree
+(a rough count, no area densities), sold by a vendor, cubemain outputs, kept in the inventory (charm, crystal, rune, gem,
+signet, Mega Ring types) and level <= 30; score = log10(1 + 1e4 drop) + 2 sold + log2(1 + cube) + 2 kept + 1 low. Top 25:
+`jbscross` (200 shrine items), the four arcane crystals `pearl1-4` (174 items: Arcane Crystals and the Crystal of ... affix
+items), `catal3`, `sigil1b`, `realapple`, `shiniewhite` (clue gems), the Rainbow Stones `og3-5`, then 13 of Median's runes
+(`r-a-05` .. `r-a-17`, Sha .. Rha). The other runes, `og1`, `og2` and the rest follow.
+
+**Candidates**, tried in this order per picture (judged by eye on the sheets):
+
+1. *A D2R HD sprite of the same kind of object* (`item_art_sheets.loose_candidates`: mask IoU of the two tight crops
+   stretched to one box, times exp(-2 |log aspect ratio|); all 444 D2R HD inventory sprites; then scaled to the area of
+   Median's picture and recoloured). Accepted only for the **Rainbow Stones** (`og1-5`, type `gemx`, Median's art is a D2R
+   gem cut in many colours): D2R's sapphire of the same cut and grade with Median's colours *by position*
+   (`colour_by_position`: Median's hue and saturation, smoothed and stretched over the D2R picture, D2R's brightness scaled to
+   Median's mean; a single hue shift cannot give a rainbow). `og2`'s flawed cut is wider than Median's upright oval.
+   Rejected: faceted D2R gems for the arcane crystals (they are smooth glowing orbs and would read as gems, which Median also
+   has); D2R's sorceress orbs (each sits in a claw or on a stick); skulls for the clue gems (silhouette only); D2R runes for
+   Median's runes (another glyph names another rune).
+2. *Another upscale setting* (`item_art_sheets.VARIANTS`, run on the same hybrid code with other module settings):
+   `hybrid-smooth` (Scale2x on the outline only, edge contrast 150..250, sharpen 0.3) for the four **arcane crystals**: the
+   hybrid's Scale2x stepped their round shading; `hybrid-crisp` (edge contrast 20..60, sharpen 0.8) for the 17 **Median runes**
+   (`r-a-01..03`, `05..18`: the glyph reads clearer), `sigil1b` (Signet of Learning) and `realapple` (Apple).
+3. *Keep*: `jbscross`, `catal3`, `shiniewhite` (no D2R object of their kind; the variants were no better).
+
+Would only look right with new art: Median's runes (D2R's HD stones carry D2R's glyphs), the arcane crystals (no plain D2R
+sphere), the shrine cross, the catalysts, the signets, the clue gems and the apple.
+
+**Review sheets** (`py -3 -I tools/item_art_review.py sheets <out_dir> --top 25`): one row per picture, Median classic
+(legacy look: nearest x3.5) | current HD upscale | candidate, at D2R's HD size (98 px per cell) on an inventory-like cell
+grid, the picture key, item names and codes under the row; at most 8 rows per sheet, each also at 2x (`_2x.png`). Pictures
+with a proposal first (sheets 1-4), then the top-25 pictures kept as they are (sheet 5). Game art: written outside git
+(`mxl2012-runs/itemart/review/`). In game: check `itemart_pics` (docs/testing.md "Lane itemart").
+
 ### Check (`tools/item_icon_check.py`)
 
 468 invfiles are referenced (invfile, uniqueinvfile, setinvfile of weapons/armor/misc, invfile of uniques/sets): 100 have a mod DC6,
@@ -295,7 +339,8 @@ Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not fail
 - **Repeated unique/set names.** The maps are keyed by name; Median reuses one name on many bases (231 unique names on several
   rows, 350 rows `Cornerstone of the Roflworld`, 195 `SkillsdLastSkillEver` placeholders). The first row's picture is used for all
   rows of a name; only 5 names (2 unique, 3 set) have rows with another picture.
-- **Art quality.** 92 pictures (78 Median, 14 D2R classic without an HD picture) are still upscales (the hybrid above):
+- **Art quality.** 92 pictures (78 Median, 14 D2R classic without an HD picture) are still upscales (the hybrid above;
+  28 better candidates wait for the owner: "Picture review"):
   crisp, but pixel-art detail next to D2R's painted HD items. No new HD redraw. Skill icon sheets use the hybrid too (item 4). Seen in game with the harness (check `hdit_icons`, slot 4,
   2026-10-29, docs/testing.md): 16 items in HD and legacy, drawn as intended.
 - **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees").
@@ -324,6 +369,7 @@ The tools, what they were built from and what changed:
 | `tools/shared_icons.py`, `tools/tests/test_shared_icons.py` | new (lane hdicons2) | shared sheet in pairs: plan, table rewrite, classic DC6; 9 unit tests |
 | `tools/data/item_skill_icons.tsv`; `shared_icons.py`, `skill_icon_check.py`, `test_shared_icons.py` | new / changed (lane procicons) | closest icon of the item skills on the "?" (donor table, its resolution, the strip limit), renamed `_mxl` skills by their Median name, per-bank table check; 6 more unit tests |
 | `tools/hd_polish_sheet.py`, `tools/tests/test_hdpolish.py` | new (lane hdpolish) | comparison sheets (skill icons, panels, classic 225-254), 9 unit tests |
+| `tools/item_art_review.py`, `tools/item_art_sheets.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | new (lane itemart) | visibility ranking of the upscaled pictures, loose silhouette / colour-by-position candidates, upscale variants, review sheets, the proposal list (off), 20 unit tests; `item_hd.py` lists the proposals in its report |
 
 Not copied: `state_icons.py` (no state icon art in 1.13c, see Gaps), `dcc.py`, `hd-effects.md` / `item-tooltips.md` (no state icons in the mod; DCC art and tooltips are
 other lanes).

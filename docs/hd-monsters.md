@@ -973,3 +973,27 @@ The 20 overlays the reference mapping still pointed at empty stubs were done by 
 where classic keeps drawing the overlay; aura rings, `common/burning` and the shrine glows loop. `sorceress/enchant` draws on the
 weapon only and `sorceress/frozenarmor` is a distortion: neither is seen on another unit. Tests: `test_overlay_picks_not_empty`,
 `test_no_stub_stand_ins` (tools/test_effects_hd.py).
+
+## 16. Most-seen Median-only stand-ins that look most wrong (lane itemart, 2026-10-30, report only)
+
+Ranked by the number of areas whose levels.txt `mon` / `nmon` / `umon` columns name the monster (monstats `Code`, lower
+case, against the tokens of `hd_monsters`), then the 21 most-seen Median-only rows looked at in HD (check `itemart_mons`,
+`hm_monsters` far / near / fight / death shots, slot 4; the first 13 also in legacy). Nothing changed; suggestions for a
+later round (owner picks):
+
+| # | Id (areas) | HD stand-in now | what looks wrong | suggestion |
+|---|---|---|---|---|
+| 1 | `9!` Centaur (24) | pale serpent `clawviper1` | a snake for a horse-bodied spear fighter | `goatman1` pale tint, or new art |
+| 2 | `!2` Dark Fey (17) | slender horned reddish staff figure | Median's art: a small green-haired fey woman | `succubus1` green tint; the table names `councilmember1`, which it does not look like: check |
+| 3 | `&b` Deathwing (7) | dark brown vulture | Median's art is bone white | `batdemon1` (pale, as for the gargoyle) |
+| 4 | `0n` Onyx Knight (10, Act 1 Catacombs) | thin brown sand raider | a heavy black knight | `doomknight1` dark tint |
+| 5 | `2(` Fungus (8, from level 10) | teal furry `thornhulk` | a mushroom biped | smaller scale, or new art |
+| 6 | `(l` Magma Demon (18) | plain brown `deathmauler` | no lava colour | a lava tint (check the classic colours) |
+| 7 | `08` Fell Fiend (11) | putrid defiler | legacy: orange-red crawler | hand colour |
+| 8 | `5$` Porkchop (7) | siege beast with its tower | the tower | `overseer1` |
+| 9 | `g7` Pest (8) | brown yeti `brute2` | not checked against the art | look again |
+| 10 | `b#` Crystal (5, `cantor1`) | not seen in the HD shots | maybe drawn invisible | check |
+
+Bosses `#m` Belial, `#q` Enforcer, `$f` Rathma are the known FAILs of section 12. Not judged: `runepriest1`, `treeppl1`
+(hidden in the shots). Shots and sheets: `mxl2012-runs/itemart/monsters/` (`mon_sheet_1-4.png` legacy+HD, `mon_hd_1-4.png`,
+`mon_hd_near.png`; game art, outside git).

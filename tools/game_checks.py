@@ -11869,6 +11869,80 @@ def ua_look():
 CHECKS += [("ua_look", ua_look)]
 
 
+# lane itemart: candidate HD item pictures (docs/hd-icons.md "Picture review"). A graphics check with harness set-up, not a
+# player-path verification: run it on a slot whose installed sprites carry the candidates (mxl2012-runs/itemart/trial.py,
+# restored afterwards); the screenshots are judged by hand next to the D2R items in the same backpack.
+ITEMART_SETS = [
+    ("crystals", ["qus", "qut", "quy", "qux", "zkq", "dog", "yo1", "yo2", "yo3", "yo4", "yo5",
+                  "gsb", "gpb", "gpw", "jew", "rin", "amu"]),
+    ("runes", ["r34", "r35", "r36", "r37", "r38", "r39", "r40", "r41", "r42", "r43", "r44", "r45", "r46", "r47",
+               "r48", "r49", "r50", "r01", "r10", "r26"]),
+]
+
+
+def itemart_pics():
+    """Lane itemart: the candidate pictures (arcane crystals, signet, apple, rainbow stones, Median runes) in the backpack
+    with D2R's own gems / charm / jewel / ring / amulet / runes, one backpack per set, shot in HD and in legacy graphics (G).
+    PASS: every item made, the game alive; the pictures are judged by hand (itemart_<set>_hd.png against _legacy.png)."""
+    mark = engine_mark()
+    log, shots, bad = [], [], []
+    goto(1)
+    for name, codes in ITEMART_SETS:
+        Hl("packclear", log)
+        for code in codes:
+            _ok, ln = Hl("item %s inv" % code, log)
+            if not any(("code=%s " % code) in x for x in ln):
+                bad.append("%s not made" % code)
+        if not set_graphics("hd"):
+            bad.append("graphics mode hd not reached")
+        if not right_panel_open():
+            g.press("i")
+            time.sleep(1.5)
+        shots.append(sh("itemart_%s_hd" % name))
+        close_right_panel()
+        time.sleep(1.0)
+        if not set_graphics("legacy"):
+            bad.append("graphics mode legacy not reached")
+        time.sleep(1.5)
+        g.press("i")
+        time.sleep(2.0)
+        shots.append(sh("itemart_%s_legacy" % name))
+        g.press("i")
+        time.sleep(1.0)
+        set_graphics("hd")
+        close_right_panel()
+    if not game_alive():
+        bad.append("the game died")
+    Hl("packclear", log)
+    finish("itemart_pics", not bad, "sets: " + ", ".join("%s (%d items)" % (n, len(c)) for n, c in ITEMART_SETS)
+           + ("; PROBLEMS: " + "; ".join(bad) if bad else ""),
+           mark, shots, log, partial="the pictures in itemart_*_hd.png / itemart_*_legacy.png are judged by hand")
+
+
+CHECKS += [("itemart_pics", itemart_pics)]
+
+# lane itemart (report only, no monster change): the most-seen Median-only monster stand-ins not judged by lane hdmonlook,
+# ranked by the number of areas whose levels.txt mon / nmon / umon columns name them (docs/hd-monsters.md section 16).
+ITEMART_MONSTERS = [(2, "centaur1", "clawviper1, `9!`, 24 areas"), (2, "darkfey1", "councilmember1, `!2`, 17 areas"),
+                    (2, "creepshow1", "clawviper1, `#5`, 10 areas"), (2, "onyxknight1", "sandraider1, `0n`, 10 areas"),
+                    (2, "fellfiend1", "warputriddefiler, `08`, 11 areas"), (2, "wyrdwolf1", "wolf, `^3`, 10 areas"),
+                    (2, "fungus1", "thornhulk1, `2(`, 8 areas"), (2, "runepriest1", "councilmember1, `9(`, 8 areas"),
+                    (2, "cavetroll1", "brute2, `~2`, 7 areas"), (2, "porkchop_elite2", "siegebeast1, `5$`, 7 areas"),
+                    (2, "treeppl1", "thornhulk1, `!8`, 6 areas"), (2, "sarandesh1", "fetishblow1, `!7`, 5 areas"),
+                    (2, "l4dwitch", "wraith1, `@1`, 4 areas"), (2, "magmademon1", "deathmauler1, `(l`, 18 areas"),
+                    (2, "gargoylebeast1", "batdemon1, `!a`, 15 areas"), (2, "berserk1", "brute2, `(o`, 9 areas"),
+                    (2, "flit1", "druidhawk, `(g`, 8 areas"), (2, "pest1", "brute2, `g7`, 8 areas"),
+                    (2, "bugbear1", "brute2, `@f`, 8 areas"), (2, "crystal1", "cantor1, `b#`, 5 areas"),
+                    (2, "deathwing1", "vulture1, `&b`, 7 areas")]
+
+
+def itemart_mons():
+    """Lane itemart: hm_monsters over ITEMART_MONSTERS (MXL_ITEMART_MODES=hd,legacy for both looks); judged by hand."""
+    hm_monsters("itemart", ITEMART_MONSTERS)
+
+
+CHECKS += [("itemart_mons", itemart_mons)]
+
 if __name__ == "__main__":
     main()
 

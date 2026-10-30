@@ -1,0 +1,166 @@
+{
+ "enabled": false,
+ "note": "Lane itemart proposals (2026-10-30). OFF: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd does not read this file yet. Switch on one entry and the file's switch to use it.",
+ "pictures": {
+  "mxl/og1": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/chipped_saphire",
+    "colour": "by position"
+   },
+   "enabled": false,
+   "why": "Median's Chipped Rainbow Stone is a D2R gem cut in many colours: D2R's HD chipped saphire (same cut and grade), Median's colours by position"
+  },
+  "mxl/og2": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_saphire",
+    "colour": "by position"
+   },
+   "enabled": false,
+   "why": "Median's Flawed Rainbow Stone is a D2R gem cut in many colours: D2R's HD flawed saphire (same cut and grade), Median's colours by position"
+  },
+  "mxl/og3": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/saphire",
+    "colour": "by position"
+   },
+   "enabled": false,
+   "why": "Median's Rainbow Stone is a D2R gem cut in many colours: D2R's HD saphire (same cut and grade), Median's colours by position"
+  },
+  "mxl/og4": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawless_saphire",
+    "colour": "by position"
+   },
+   "enabled": false,
+   "why": "Median's Flawless Rainbow Stone is a D2R gem cut in many colours: D2R's HD flawless saphire (same cut and grade), Median's colours by position"
+  },
+  "mxl/og5": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/perfect_saphire",
+    "colour": "by position"
+   },
+   "enabled": false,
+   "why": "Median's Perfect Rainbow Stone is a D2R gem cut in many colours: D2R's HD perfect saphire (same cut and grade), Median's colours by position"
+  },
+  "mxl/pearl1": {
+   "method": "hybrid-smooth",
+   "enabled": false,
+   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+  },
+  "mxl/pearl2": {
+   "method": "hybrid-smooth",
+   "enabled": false,
+   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+  },
+  "mxl/pearl3": {
+   "method": "hybrid-smooth",
+   "enabled": false,
+   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+  },
+  "mxl/pearl4": {
+   "method": "hybrid-smooth",
+   "enabled": false,
+   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+  },
+  "mxl/r-a-01": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-02": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-03": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-05": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-06": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-07": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-08": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-09": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-10": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-11": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-12": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-13": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-14": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-15": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-16": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-17": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/r-a-18": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+  },
+  "mxl/realapple": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "crisper highlight and leaf; no D2R apple"
+  },
+  "mxl/sigil1b": {
+   "method": "hybrid-crisp",
+   "enabled": false,
+   "why": "line art (key, ring): crisper; no D2R item of this kind"
+  }
+ }
+}

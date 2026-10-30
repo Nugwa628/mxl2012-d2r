@@ -72,7 +72,8 @@ What we know is wrong or different. Please don't report these again, unless you 
 - **Median's own maps show D2R's walls in HD.** The 17 maps that Median added or changed have D2R's own walls in Median's
   layout in HD, lit in each map's own colour as in legacy mode; 3 of them show only part of their walls (Hole Level 2, Ancient Tunnels, and
   Khalimgrad's cathedral). Legacy graphics (G) show them as Median drew them.
-- **Item pictures in HD:** most are Median's classic pictures scaled up, so they look softer than D2R's own.
+- **Item pictures in HD:** most items use D2R's own HD pictures; about 90 Median-only ones are Median's classic pictures
+  scaled up, so they look softer.
 - **Skill trees in HD** are Median's classic page art scaled up.
 - **A few names** that Median XL 2012 itself never wrote (some potions, monsters and objects) show a name we gave them.
 - **Chronicle:** making some runewords (for example Kyrie) names the base item in the chat message; the item itself is right.

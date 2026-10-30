@@ -6,6 +6,7 @@ version being released (docs/release.md).
 ## Unreleased
 
 - "Baal says: *Laughing*" from Median's skills now reads "Baal says: LOL", at most once every 30 seconds.
+- Release notes: the line on HD item pictures now says about 90 Median-only ones are upscaled classic pictures.
 
 ## D2R-XL 2012
 

@@ -293,6 +293,12 @@ def find_reuse(plan: Plan) -> dict:
     return item_reuse.find(sources, library, D2R_ITEMS)
 
 
+def proposals_report() -> dict:
+    """tools/data/item_art_proposals.json as listed in the report (lane itemart; not used by the build yet)."""
+    import item_art_review
+    return item_art_review.report_entry(item_art_review.load_proposals())
+
+
 def build() -> Plan:
     import fxpaths
     names = ("weapons", "armor", "misc", "uniqueitems", "setitems")
@@ -323,6 +329,7 @@ def main() -> int:
         {"items": len(items), "uniques": len(uniques), "sets": len(sets), "how": dict(sorted(plan.how.items())),
          "sprites": dict(n), "missing_assets": bad,
          "hd_reuse": {k: m.label() for k, m in sorted(plan.reuse.items())}, "hd_reuse_direct": plan.direct,
+         "picture_proposals": proposals_report(),
          **plan.report}, indent=1), "utf-8")
     print(f"items.json {len(items)}, uniques.json {len(uniques)}, sets.json {len(sets)}; sprites: "
           + ", ".join(f"{k} {v}" for k, v in sorted(n.items())) + "; " + ", ".join(f"{k} {v}" for k, v in sorted(plan.how.items())))

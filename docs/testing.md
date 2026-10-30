@@ -3814,3 +3814,26 @@ of sounds rows 4631 / 10239 (the two rows with the file `baallaugh1`). `sheet.py
 Evidence: `mxl2012-runs/baallol/sheet_click_hd.png`, `sheet_master_hd.png`, `sheet_click_legacy.png`, shots and `lab.json` in `r1/`,
 `r1/sndtrace.txt`, `r1/d2rloader.log`, `r1/mxl2012-core.log`. Lessons: a chat line stays on screen about 10 s; a click cast of Spawn
 Edyrem does not play the laugh every time; with a `dark_master1` near, "Soldier says: Over here!" fills the chat (one per summon).
+
+## Lane itemart: the upscaled item pictures and the most-seen monster stand-ins (2026-10-30, slot 4, background mode, build of lane/itemart)
+
+Picture ranking, candidates and review sheets: docs/hd-icons.md "Picture review" (owner rule: nothing switched on; the
+candidates were tried only by copying their sprites over the slot's installed mod, `mxl2012-runs/itemart/trial.py`, which
+backs up and restores the files with a sha256 manifest; 56 files verified after). Checks (new in `tools/game_checks.py`):
+`itemart_pics` (Rainbow Stones, arcane crystals, signet, apple, clue gem, jewel, ring, amulet; and 20 runes: Median's next to
+D2R's; HD and legacy inventory shots) and `itemart_mons` (`hm_monsters` over `ITEMART_MONSTERS`, docs/hd-monsters.md
+section 16).
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-112538-s4` | itemart_pics with `cm1` | FAIL: `cm1` is not made in Median and set off the engine assert `Inventory.cpp:1668`; removed from the set |
+| `checks-20261030-112813-s4` | itemart_pics, candidates copied in | PARTIAL (shots only), 0 asserts |
+| `checks-20261030-114557-s4` | itemart_pics, the build's pictures | PARTIAL, 0 asserts |
+| `checks-20261030-115003-s4` | itemart_mons | BLOCKED: no `work/mod` tables in the worktree (copied from the slot's install, then rerun) |
+| `checks-20261030-115135-s4` | itemart_mons, 13 rows HD + legacy | PARTIAL, 0 asserts, no crash |
+| `checks-20261030-120008-s4` | itemart_mons, 8 rows HD | PARTIAL, 0 asserts, no crash |
+
+HD: the Rainbow Stones change visibly, the crystals and runes a little; legacy pictures are the same before and after (only
+`.sprite` files differ). Ring, amulet and jewel pictures differ between runs: D2R picks one of its pictures at random. Not
+tested: the stash (the harness `item` verb places in inv / cube / ground only). Evidence: `mxl2012-runs/itemart/review/`
+(`sheet_01.png` .. `sheet_05.png` and `_2x`, `ingame/before_*`, `after_*`, `compare_*`), `mxl2012-runs/itemart/monsters/`.
