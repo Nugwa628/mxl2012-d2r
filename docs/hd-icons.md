@@ -329,7 +329,7 @@ grid, the picture key, item names and codes under the row; at most 8 rows per sh
 with a proposal first (sheets 1-4), then the top-25 pictures kept as they are (sheet 5). Game art: written outside git
 (`mxl2012-runs/itemart/review/`). In game: check `itemart_pics` (docs/testing.md "Lane itemart").
 
-### D2R HD art of the same kind (lane itemart3, 2026-10-30; 59 ON, the signets off)
+### D2R HD art of the same kind (lane itemart3, 2026-10-30; all 66 ON)
 
 The owner liked the Rainbow Stones and wants as much HD as possible, with D2R's own HD art only (no new 3D models, no new
 drawing: D2R's 2D pictures recoloured or recomposed). For each of the 87 upscaled pictures (`rank --top 0`, all but og1..og5)
@@ -344,23 +344,46 @@ they are signets / emblems"). `item_hd` makes them with `candidate` at HD and lo
 64 pictures from proposals (54 `mxl`, 10 `classic`), 24 `mxl` and 4 `classic` pictures stay upscales (the 21 unmatched and the
 7 signets). In game: docs/testing.md "Lane itemart3".
 
+**Round 3 (owner, 2026-10-30): the 23 runes off again** ("they aren't sharp, Qor is supposed to be a skull, everything is too
+blobby / muddled, they should look like chiselled runes but still be legible"; the same for the signets' signs). The build
+makes **41 pictures from proposals** (31 `mxl`, 10 `classic`: og1..og5 and 36 of lane itemart3); 47 `mxl` and 4 `classic`
+stay upscales. Two owner colour notes are on: the Sunstone of Thunder `invgmw` retinted clear yellow and the Oil of Jewelcraft
+`zelixir7` clear pink (reuse key `tint`, `item_art_sheets.tint`: the pixels of a hue range take the new hue and at least a
+saturation, the brightest highlights stay near white).
+
+**Redrawn signs (round 3; on since round 4):** every rune and signet sign is redrawn by hand as clean strokes in
+`tools/item_glyphs.py` (`RUNES`, `SIGNETS`: polylines, rings, drilled dots, sunk polygons over the classic picture's pixel grid,
+following Median's glyph pixel for pixel where it is clear and its intended shape where 23 px are too few: Thur is a 3, Ix an X
+over a stem, Sha'ad a lightning bolt, Qor a skull and crossbones, the Gold signet Saturn's sign). `item_glyphs.chisel` cuts
+a sign in at the output size, supersampled 4 x 4 and never blurred: a V cut whose wall facing the light (top left, as D2R's
+runes) is lit, the near wall in shadow, a dark floor and a thin lit lip outside the far edge. Runes: reuse `"glyph": "chisel"`
+(`engrave_rune` on D2R's blank Ist stone); signets: `"seal": "chisel"` (the seal above, the sign engraved on the enamel); both
+with `"sign"` = the picture key. Review sheets: `py -3 -I tools/item_art_review.py sheets <dir> --round3`
+(`item_art_sheets.write_round3`: Median classic | round 2 | round 3 | round 3 at 1920 x 1080; and `overview_2x.png`, classic |
+round 3 for all 32), in `mxl2012-runs/itemart3/review-r3/`.
+
+**Round 4 (owner, 2026-10-30: "the new ones look great, ship em"): the 23 runes and the 7 signets on**, with the redrawn,
+chiselled signs (runes on D2R's stone, signets engraved on the gold seal); the yellow Sunstone of Thunder and the pink Oil of
+Jewelcraft stay on. The build makes **71 pictures from proposals** (61 `mxl`, 10 `classic`: og1..og5 and all 66 of lane
+itemart3); 17 `mxl` and 4 `classic` pictures stay upscales (the 21 unmatched). In game: docs/testing.md "Lane itemart3".
+
 **Signets, second try (off, lane `itemart3-signets`):** a seal instead of a jewel: D2R's flat gold Crown Shield disc
 (`armor/shield/crown_shield`) as the stamped metal, its centre (half the radius) enamelled in the colours of Median's centre disc
 (the sign filled out from around it, smoothed, D2R's shading kept faintly) and Median's own sign stamped in (its dark strokes
 against their surroundings, stretched, cut in as a dark groove with a light lip): `item_art_sheets.seal`, reuse key
 `"seal": "median"`. Sheet: `py -3 -I tools/item_art_review.py sheets <dir> --lane itemart3-signets`
-(`mxl2012-runs/itemart3/review-signets/sheet_01.png`). The signets stay upscaled until the owner decides.
+(`mxl2012-runs/itemart3/review-signets/sheet_01.png`). On since round 4 with the engraved sign (`"seal": "chisel"`).
 
 | picks | pictures | D2R picture | colour |
 |---|---|---|---|
 | 1-15 (best) | Horadric Malus `invhmr`, scepter `invscp`, Jolly Roger `hardmode`, scroll pair `invhscr2`, Token of Absolution `pot04`, Sunless Crystal Bird `bird4`, the four Sunstones `invgm[rbwv]` and the Class Rewards `invgmy`, Shadowfang `invbla`, New2LilithsBelt `invblt`, I Am Rich `redgem`, Multi Shards `gemcontainer` | D2R's Horadric Malus, scepter, skull, Horadric scroll pair, green flask (self-resurrect scroll), golden bird, flawless ruby / sapphire / diamond / amethyst / emerald (round cut), Shadowfang, light belt, flawed ruby, soul stone | by position or mean |
 | 16-27 | Ingredient Rings 1-5 `ring01/03/06/07/09`; the seven oils `zelixir1,2,4-8` | D2R's rings `ring2` / `ring`; D2R's round potion flask (`full_rejuv_potion`; the oils' skull stopper is lost) | by position |
-| 28-50 | the 23 Median runes `r-a-01..03, 05..18`, `r-d-02, 04, 05, 07, 11, 12` | **recomposed**: D2R's Ist rune stone with its glyph taken out (`blank_stone`) and Median's glyph cut in (`glyph_mask`, `carve`; reuse key `"glyph": "median"`) | D2R's stone |
-| 51-57 | the seven signets `sigil1b-6b`, `sigilxl` | round 1: D2R's gem in a gold setting (`perfect_diamond6`), rejected by the owner (reads as a jewel); now the seal above, off | by position |
+| 28-50 | the 23 Median runes `r-a-01..03, 05..18`, `r-d-02, 04, 05, 07, 11, 12` | **recomposed**: D2R's Ist rune stone with its glyph taken out (`blank_stone`) and Median's glyph cut in (round 2: `glyph_mask`, `carve`, reuse key `"glyph": "median"`, too blobby; round 3: the redrawn sign chiselled, `"glyph": "chisel"`, on since round 4) | D2R's stone |
+| 51-57 | the seven signets `sigil1b-6b`, `sigilxl` | round 1: D2R's gem in a gold setting (`perfect_diamond6`), rejected by the owner (reads as a jewel); then the seal above (round 3: the redrawn sign engraved), on since round 4 | by position |
 | 58-63 | the six clue gem colours `shinie*` | D2R's flawed gem of the colour (rough stone); they may read as D2R flawed gems | by position |
 | 64-66 (weakest) | Boss Junket `scroll11`, Scroll of Kings `invscb2`, Fool's Gold `invgldm` | D2R's parchments; D2R's gold coins (Median draws lumps, not coins) | mean |
 
-The rune glyph: Median's stroke pixels by hysteresis (darker than 0.70 x the stone's median brightness, grown into the
+The round-2 rune glyph (kept for the comparison sheets, not used): Median's stroke pixels by hysteresis (darker than 0.70 x the stone's median brightness, grown into the
 connected ones darker than 0.86 x, 3 px inside the rim), stretched over D2R's stone with a bicubic resize, a blur and a soft
 threshold (`GLYPH_EDGE`), cut in as a dark groove with a lighter lower-right lip. Median's glyphs are 2-3 px strokes in a 23 px
 picture, so the bold ones (Thur, Nas, Kra, Yul, Rha, Vith, the `r-d` signs) come out clean and the fine ones (Lah, Kur, Lai,
@@ -381,8 +404,8 @@ the lane's entries by `pick`, four columns: Median classic (legacy look) | curre
 468 invfiles are referenced (invfile, uniqueinvfile, setinvfile of weapons/armor/misc, invfile of uniques/sets): 100 have a mod DC6,
 366 only a D2R classic DC6, **2 have no DC6 anywhere**. Checked: all 228 generated sprites against their DC6 (size = whole cells
 holding the picture, opaque fraction, colour; the 22 made from D2R's HD art within the looser `REUSE_*` limits, opaque
-fraction 0.15 and colour 25, as D2R's redraw is not the classic picture; the 128 made from a picture proposal switched on
-(64 pictures, HD and lowend) must be the approved candidate pixel for pixel, `check_proposal_sprite`, since several approved
+fraction 0.15 and colour 25, as D2R's redraw is not the classic picture; the 142 made from a picture proposal switched on
+(71 pictures, HD and lowend) must be the approved candidate pixel for pixel, `check_proposal_sprite`, since several approved
 D2R pictures have another outline than Median's, e.g. coins for Fool's Gold; 0 problems), every one of the 2429 codes in `items.json` and every unique / set name
 in its map with an existing asset (D2R sprite or generated; 0 missing), every item using a mod picture points at it or, for an exact copy, at D2R's asset (0 not used).
 Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not failed.
@@ -403,9 +426,10 @@ Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not fail
 - **Repeated unique/set names.** The maps are keyed by name; Median reuses one name on many bases (231 unique names on several
   rows, 350 rows `Cornerstone of the Roflworld`, 195 `SkillsdLastSkillEver` placeholders). The first row's picture is used for all
   rows of a name; only 5 names (2 unique, 3 set) have rows with another picture.
-- **Art quality.** 28 pictures (24 Median, 4 D2R classic without an HD picture) are still upscales (the hybrid above;
+- **Art quality.** 21 pictures (17 Median, 4 D2R classic without an HD picture) are still upscales (the hybrid above;
   the five Rainbow Stones are D2R's HD gems since lane itemart2; lane itemart3 found D2R HD art of the same kind for 66 of
-  them and 59 are on since 2026-10-30, the signets off: "D2R HD art of the same kind"; so 28 remain upscales):
+  them and all 66 are on since 2026-10-30, the runes and signets with redrawn, chiselled signs: "D2R HD art of
+  the same kind"; so 21 remain upscales):
   crisp, but pixel-art detail next to D2R's painted HD items. No new HD redraw. Skill icon sheets use the hybrid too (item 4). Seen in game with the harness (check `hdit_icons`, slot 4,
   2026-10-29, docs/testing.md): 16 items in HD and legacy, drawn as intended.
 - **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees").
@@ -436,7 +460,7 @@ The tools, what they were built from and what changed:
 | `tools/hd_polish_sheet.py`, `tools/tests/test_hdpolish.py` | new (lane hdpolish) | comparison sheets (skill icons, panels, classic 225-254), 9 unit tests |
 | `tools/item_art_review.py`, `tools/item_art_sheets.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | new (lane itemart) | visibility ranking of the upscaled pictures, loose silhouette / colour-by-position candidates, upscale variants, review sheets, the proposal list (off), 20 unit tests; `item_hd.py` lists the proposals in its report |
 | `tools/item_hd.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_icon_check.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart2) | the build makes the pictures of the proposals switched on (`candidate` at HD and lowend cell size), report `proposal_on`, the check's reuse limits for them; og1..og5 on; 3 more unit tests |
-| `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart3) | rune stone recomposition (`blank_stone`, `glyph_mask`, `carve`, reuse key `glyph`), lane sheets with an in-game size column (`write_lane`, `sheets --lane`), 66 proposals; round 2: 59 on, the signet seal (`seal`, reuse key `seal`, off), `item_icon_check.check_proposal_sprite`, `game_checks` sets `itemart3a` / `itemart3b`; 8 more unit tests |
+| `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart3) | rune stone recomposition (`blank_stone`, `glyph_mask`, `carve`, reuse key `glyph`), lane sheets with an in-game size column (`write_lane`, `sheets --lane`), 66 proposals; round 2: 59 on, the signet seal (`seal`, reuse key `seal`, off), `item_icon_check.check_proposal_sprite`, `game_checks` sets `itemart3a` / `itemart3b`; round 3: the runes off, the signs redrawn (`tools/item_glyphs.py`, `chisel`, `engrave_rune`, reuse keys `"chisel"` + `sign`), `tint`, `sheets --round3`; round 4: the runes and signets on, `game_checks` sets `itemart4a` / `itemart4b`; 7 more unit tests |
 
 Not copied: `state_icons.py` (no state icon art in 1.13c, see Gaps), `dcc.py`, `hd-effects.md` / `item-tooltips.md` (no state icons in the mod; DCC art and tooltips are
 other lanes).

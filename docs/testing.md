@@ -4001,6 +4001,34 @@ Not tested in game: the signets (off), the stash and the cube (same sprite). Evi
 checks-20261030-161712-s1/` (`itemart_itemart3a_hd.png`, `_legacy.png`, `itemart_itemart3b_hd.png`, `_legacy.png`). Signets,
 second try (off): `mxl2012-runs/itemart3/review-signets/sheet_01.png`. Unit tests: `test_itemart.py` 30 OK (new:
 `SealTests`, `check_proposal_sprite` against a matching and a wrong sprite, 59 on / signets off).
+
+**Round 3 (owner verdict, 2026-10-30; no game run): the 23 runes off, the rune and signet signs redrawn, two retints.** The
+runes are off again (too blobby); every rune and signet sign is redrawn as strokes (`tools/item_glyphs.py`) and chiselled in
+crisp (off, for review); the Sunstone of Thunder is retinted yellow and the Oil of Jewelcraft pink (on). Build
+`py -3 tools/build.py`: validate 0 errors; item icon check 0 sprite problems (the 82 proposal sprites, 41 pictures in HD and
+lowend, equal to their candidates); `hd_icons` "picture proposals used: 41". Unit tests: `test_itemart.py` 37 OK (new:
+`ChiselTests`: every sign well formed and inside its picture, the signed distance, the chisel's dark floor / lit far wall /
+shadowed near wall / hard edge, `engrave_rune`, the seal with strokes, `tint`, `_round2`). Review sheets
+(`py -3 -I tools/item_art_review.py sheets mxl2012-runs/itemart3/review-r3 --round3`): `mxl2012-runs/itemart3/review-r3/
+sheet_01..04.png` (+ `_2x`) and `overview_2x.png`. The retints were not looked at in game (same sprite path as round 2's
+run).
+
+**Round 4 (owner verdict, 2026-10-30: "the new ones look great, ship em"): the 23 runes and 7 signets on, slot 1, background
+mode, build of lane/itemart3 (data only).** Build `py -3 tools/build.py`: validate 0 errors; item icon check 0 sprite problems
+(228 sprites; the 142 proposal sprites, 71 pictures in HD and lowend, equal to their candidates); `item_hd_report.json`
+`proposal_on` 71. Install `MXL_SLOT=1 MXL_RUN=itemart3 py -3 tools/install_mod.py --slot 1` (data only, 3387 files). Check:
+`MXL_RUN=itemart3 MXL_SLOT=1 MXL_CHAR=ItemArtFour MXL_ITEMART_SETS=itemart4a,itemart4b py -3 tools/game_checks.py all
+itemart_pics` (new sets: `itemart4a` = the 23 runes `r34`..`r56`; `itemart4b` = the seven signets, the Sunstone of Thunder
+`x3x`, the Oil of Jewelcraft `7o^`).
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-174311-s1` | itemart_pics, sets itemart4a (23 items) and itemart4b (9 items) | PARTIAL (shots judged by hand; the check's FAIL is the engine line below): all 32 made. HD: the 23 runes on D2R's stone with sharp, chiselled signs (Thur a 3, Sha'ad a bolt, Qor a skull), the seven signets as gold seals with the engraved sign on blue / green / teal / orange enamel, the Sunstone of Thunder yellow, the Oil of Jewelcraft pink; legacy (G): Median's classic pictures, unchanged. Engine: `wPrefix != 0 \|\| wSuffix != 0` once, while the harness made the signets (all items quality 2): harness artifact, bug #35 (round 2 hit it on `hdm`). 0 crash files, 0 mxl2012-core errors; the real-input watchdog saw the user's own mouse, no foreground change |
+
+Evidence: `mxl2012-runs/itemart3/ingame-r4/checks-20261030-174311-s1/` (`itemart_itemart4a_hd.png`, `_legacy.png`,
+`itemart_itemart4b_hd.png`, `_legacy.png`). Unit tests: `test_itemart.py` 37 OK (5 + 59 + 7 on, the runes and signets on with
+their `chisel` signs).
+
 ## Lane savecap: cancelled saves, "Character has too many items" (bug #512, 2026-10-30, slot 3, background mode)
 
 Build: `tools/build_plugin.ps1 -Release -Tests` (all plugin tests pass, `savemode_tests` new). Slot 3 data = lane runetab's install.

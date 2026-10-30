@@ -1,6 +1,6 @@
 """Unit tests of the item picture review tools (item_art_review: visibility ranking, the proposal switch; item_art_sheets:
 loose silhouette match, colour match, colour by position, upscale variants, sheet drawing, the rune stone
-recomposition of lane itemart3; item_hd / item_art: the build
+recomposition of lane itemart3, the redrawn signs and the chisel of round 3 (item_glyphs), the retint; item_hd / item_art: the build
 makes the pictures of the proposals switched on) on synthetic data, plus one check of og4 against lane itemart's review
 sheet (skipped without the game files and the sheet). Run: py -3 -I -m unittest discover -s tools/tests -p "test_itemart.py" """
 import json
@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import item_art_review as R  # noqa: E402
 import item_art_sheets as S  # noqa: E402
+import item_glyphs as G  # noqa: E402
 import upscale  # noqa: E402
 
 
@@ -102,11 +103,10 @@ class ProposalTests(unittest.TestCase):
     def test_the_committed_proposals_are_well_formed_and_the_approved_ones_are_on(self):
         data = json.loads(R.PROPOSALS.read_text("utf-8"))
         self.assertTrue(data["enabled"])
-        # owner, 2026-10-30: og1..og5 (lane itemart2) and lane itemart3's entries except the signets; Median's runes off
-        # again until their signs are sharp (owner, same day)
-        approved = lambda k, v: k.startswith("mxl/og") or (v.get("lane") == "itemart3" and not k.startswith("mxl/sigil")
-                                                           and v["reuse"].get("glyph") != "median")
-        self.assertEqual(len(R.enabled_proposals(data)), 5 + 59 - 23)
+        # owner, 2026-10-30: og1..og5 (lane itemart2), lane itemart3's 59 entries and its 7 signets (round 4: the runes
+        # and signets with the redrawn signs)
+        approved = lambda k, v: k.startswith("mxl/og") or v.get("lane") in ("itemart3", "itemart3-signets")
+        self.assertEqual(len(R.enabled_proposals(data)), 5 + 59 + 7)
         for k, v in data["pictures"].items():
             self.assertRegex(k, r"^(mxl|classic)/[\w\-]+$")
             self.assertEqual(v["enabled"], approved(k, v), k)
@@ -118,19 +118,28 @@ class ProposalTests(unittest.TestCase):
                 self.assertTrue({"folder", "asset"} <= set(v["reuse"]), k)
 
 
-    def test_lane_itemart3_proposals_are_on_in_pick_order_and_the_signets_a_separate_off_try(self):
+    def test_lane_itemart3_proposals_in_pick_order_the_runes_and_signets_on_with_redrawn_signs(self):
         pics = R.load_proposals()["pictures"]
         lane = {k: v for k, v in pics.items() if v.get("lane") == "itemart3"}
         self.assertEqual(len(lane), 59)
-        self.assertTrue(all(v["enabled"] != (v["reuse"].get("glyph") == "median") for v in lane.values()))
         self.assertEqual(len({v["pick"] for v in lane.values()}), 59)
         runes = [k for k in lane if k.startswith(("mxl/r-a-", "mxl/r-d-"))]
         self.assertEqual(len(runes), 23)
-        self.assertTrue(all(lane[k]["reuse"].get("glyph") == "median" for k in runes))
+        self.assertTrue(all(v["enabled"] for v in lane.values()))
+        for k in runes:
+            self.assertEqual((lane[k]["reuse"].get("glyph"), lane[k]["reuse"].get("sign")), ("chisel", k))
         signets = {k: v for k, v in pics.items() if v.get("lane") == "itemart3-signets"}
         self.assertEqual(sorted(signets), sorted(f"mxl/{k}" for k in (
             "sigil1b", "sigil2b", "sigil3b", "sigil4b", "sigil5b", "sigil6b", "sigilxl")))
-        self.assertTrue(all(not v["enabled"] and v["reuse"].get("seal") == "median" for v in signets.values()))
+        for k, v in signets.items():
+            self.assertTrue(v["enabled"], k)
+            self.assertEqual((v["reuse"].get("seal"), v["reuse"].get("sign")), ("chisel", k))
+        self.assertEqual(sorted(G.RUNES), sorted(runes))
+        self.assertEqual(sorted(G.SIGNETS), sorted(signets))
+        # owner's colour notes (round 3): Sunstone of Thunder yellow, Oil of Jewelcraft pink; both stay on
+        self.assertEqual(pics["classic/invgmw"]["reuse"]["tint"]["hue"], 52)
+        self.assertEqual(pics["mxl/zelixir7"]["reuse"]["tint"]["hue"], 330)
+        self.assertTrue(pics["classic/invgmw"]["enabled"] and pics["mxl/zelixir7"]["enabled"])
 
     def test_report_entry_says_off_or_on(self):
         data = {"enabled": False, "pictures": {"mxl/a": {"method": "hybrid-crisp", "enabled": True},
@@ -233,6 +242,88 @@ class SealTests(unittest.TestCase):
         blue = out[45, 25, :3].astype(int)                   # in the enamel, off the sign
         self.assertGreater(blue[2], blue[0] + 60)
         self.assertLess(out[45, 44:46, :3].mean(), 40)       # the sign, stamped dark
+
+
+class ChiselTests(unittest.TestCase):
+    """item_glyphs (lane itemart3 round 3): Median's signs as strokes, cut in crisp with a lit and a shadowed wall."""
+
+    def test_every_sign_is_well_formed_and_inside_its_classic_picture(self):
+        kinds = {"line", "loop", "ring", "dot", "fill"}
+        for k, g in G.GLYPHS.items():
+            self.assertTrue(g, k)
+            self.assertTrue(all(p[0] in kinds for p in g), k)
+            size = 24 if k in G.RUNES else 26
+            y, x = np.mgrid[0:size * 4, 0:size * 4] / 4.0
+            sd = G.signed_distance(g, x, y)
+            self.assertTrue(np.isfinite(sd).all(), k)
+            self.assertGreater((sd < 0).mean(), 0.02, k)   # something is cut
+            self.assertLess((sd < 0).mean(), 0.35, k)      # strokes, not a blob
+            self.assertFalse((sd[:, :4] < 0).any() or (sd[:, -4:] < 0).any(), k)  # off the picture's edge
+
+    def test_signed_distance_of_a_line_a_dot_and_a_fill(self):
+        x, y = np.array([5.5, 5.5, 9.0]), np.array([5.5, 7.0, 5.5])
+        line = G.signed_distance([("line", [(2, 5), (8, 5)], 2.0)], x, y)
+        self.assertAlmostEqual(line[0], -1.0)                 # on the centre line, half the width in
+        self.assertGreater(line[1], 0)                        # 1.5 px off it: outside
+        dot = G.signed_distance([("dot", (5, 5, 1.0))], x, y)
+        self.assertAlmostEqual(dot[0], -1.0)
+        fill = G.signed_distance([("fill", [(3, 3), (8, 3), (8, 8), (3, 8)])], x, y)
+        self.assertAlmostEqual(fill[0], -2.0)               # 2 px from the nearest edge (corners at +0.5)
+        self.assertGreater(fill[2], 0)
+
+    def test_chisel_cuts_a_dark_floor_lit_far_wall_and_shadowed_near_wall(self):
+        rgb = np.full((40, 40, 3), 150.0)
+        out, cut = G.chisel(rgb, [("line", [(10, 2), (10, 18)], 4.0)], lambda x, y: (x / 2, y / 2))
+        row = out[20, :, 0]
+        self.assertLess(row[20:22].mean(), 40)                # the floor (centre line x = 21 px)
+        self.assertGreater(row[23:26].max(), 160)             # the right wall faces the light: lit
+        self.assertLess(row[16:19].min(), 120)                # the left wall: shadow
+        self.assertTrue((out[:, :8] == 150).all())            # untouched off the cut
+        self.assertTrue(cut[20, 21] and not cut[20, 5])
+        self.assertGreater(np.abs(np.diff(row)).max(), 60)    # a hard edge, no blur ramp
+
+    def test_engrave_rune_cuts_the_sign_inside_the_stone(self):
+        stone = np.zeros((98, 98, 4), np.uint8)
+        stone[10:90, 10:90] = (150, 150, 150, 255)
+        out = S.engrave_rune(stone, stone[::4, ::4].copy(), [("line", [(10, 2), (10, 18)], 2.0)])
+        self.assertTrue((out[..., 3] == stone[..., 3]).all())
+        self.assertLess(out[50, 48:52, :3].mean(), 60)
+        self.assertTrue((out[50, 15:30] == stone[50, 15:30]).all())
+
+    def test_seal_with_strokes_engraves_them_on_the_enamel(self):
+        disc = np.zeros((90, 90, 4), np.uint8)
+        r = np.hypot(*(np.mgrid[0:90, 0:90] - 44.5))
+        disc[r < 45] = (200, 170, 60, 255)
+        src = np.zeros((26, 26, 4), np.uint8)
+        sr = np.hypot(*(np.mgrid[0:26, 0:26] - 12.5))
+        src[sr < 13] = (180, 140, 40, 255)
+        src[sr < 7] = (40, 80, 230, 255)
+        out = S.seal(disc, src, [("line", [(12.5, 9), (12.5, 16)], 1.6)])
+        self.assertLess(out[45, 44:46, :3].mean(), 70)       # the stroke, engraved dark
+        blue = out[45, 30, :3].astype(int)                    # the enamel off the stroke
+        self.assertGreater(blue[2], blue[0] + 60)
+        self.assertTrue((out[5, 45] == disc[5, 45]).all())
+
+    def test_tint_moves_the_chosen_hues_and_keeps_the_rest(self):
+        a = np.zeros((2, 2, 4), np.uint8)
+        a[..., 3] = 255
+        a[0, 0, :3] = (120, 40, 160)   # purple: in range
+        a[0, 1, :3] = (200, 150, 60)   # cork brown: out of range
+        a[1, 0, :3] = (128, 128, 128)  # grey: below min_sat
+        out = S.tint(a, {"hue": 330, "sat": 0.5, "from": [250, 345], "min_sat": 0.2})
+        h, _s, _v = S._hsv(out[..., :3])
+        self.assertAlmostEqual(h[0, 0] * 360, 330, delta=3)
+        self.assertTrue((out[0, 1] == a[0, 1]).all() and (out[1, 0] == a[1, 0]).all())
+        grey = S.tint(a, {"hue": 52, "sat": 0.8})            # no range: every pixel, grey too
+        h, s, _v = S._hsv(grey[1:, :1, :3])
+        self.assertAlmostEqual(h[0, 0] * 360, 52, delta=3)
+        self.assertGreater(s[0, 0], 0.7)
+
+    def test_round2_of_a_round3_entry_is_the_carved_classic_glyph_untinted(self):
+        p = {"reuse": {"folder": "misc", "asset": "rune/ist_rune", "glyph": "chisel", "sign": "mxl/r-a-01",
+                       "tint": {"hue": 1, "sat": 1}}, "enabled": False}
+        self.assertEqual(S._round2(p)["reuse"], {"folder": "misc", "asset": "rune/ist_rune", "glyph": "median"})
+        self.assertEqual(p["reuse"]["glyph"], "chisel")
 
 
 class RuneStoneTests(unittest.TestCase):

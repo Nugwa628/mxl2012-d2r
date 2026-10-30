@@ -5,6 +5,9 @@ most, side-by-side sheets for the owner, and the proposal list of better picture
   py -3 -I tools/item_art_review.py sheets <out_dir> [--top N]   review sheets: Median classic | current HD | candidate
   py -3 -I tools/item_art_review.py sheets <out_dir> --lane L    sheets of lane L's proposals by their "pick" (best
                                                                  first), with the proposal at in-game size too
+  py -3 -I tools/item_art_review.py sheets <out_dir> --round3    lane itemart3 round 3: the redrawn rune / signet signs
+                                                                 and the retints (classic | round 2 | round 3 | in game)
+                                                                 and overview_2x.png
 
 Visibility of a picture (the sum over the items that show it) is built from the tables:
   drop     expected drops per kill, summed over every enabled monster row (TreasureClass1 of normal / nightmare / hell),
@@ -202,8 +205,10 @@ def report_entry(data: dict) -> dict:
     for k, v in sorted(data.get("pictures", {}).items()):
         r = v.get("reuse")
         if r:
-            what = f"D2R {r['folder']}/{r['asset']}" + (", Median's glyph" if r.get("glyph") == "median" else "") + (
-                ", a seal with Median's enamel and sign" if r.get("seal") == "median" else "") + (
+            what = f"D2R {r['folder']}/{r['asset']}" + (", Median's glyph" if r.get("glyph") == "median" else (
+                ", Median's sign chiselled" if r.get("glyph") == "chisel" else "")) + (
+                ", a seal with Median's enamel and sign" if r.get("seal") in ("median", "chisel") else "") + (
+                ", retinted" if r.get("tint") else "") + (
                 ", colours by position" if r.get("colour") == "by position" else "")
         else:
             what = f"upscale {v.get('method')}"
@@ -223,6 +228,8 @@ def build_ranking():
 
 def main(argv: list[str]) -> int:
     top, lane = 25, None
+    round3 = "--round3" in argv
+    argv = [a for a in argv if a != "--round3"]
     if "--lane" in argv:
         i = argv.index("--lane")
         lane = argv[i + 1]
@@ -242,6 +249,8 @@ def main(argv: list[str]) -> int:
         import item_art_sheets
         plan, ranked = build_ranking()
         props = load_proposals()
+        if round3:
+            return item_art_sheets.write_round3(Path(argv[1]), plan, ranked, props)
         if lane:
             return item_art_sheets.write_lane(Path(argv[1]), plan, ranked, props, lane)
         return item_art_sheets.write_all(Path(argv[1]), plan, review_order(ranked, top, props), props)

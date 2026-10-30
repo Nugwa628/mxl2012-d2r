@@ -11912,6 +11912,10 @@ ITEMART_SETS = [
     ("itemart3a", ["hdm", "129", "yq7", "yqe", "toa", "yq1", "az!", "!@6", "a58", "a68", "u@v", "qum", "x01"]),
     ("itemart3b", ["x1x", "x2x", "x3x", "x4x", "l@l", "m@m", "q@q", "1o^", "5o^", "8o^", "r35", "r36", "r38", "r39",
                    "r41", "r46", "01-", "35-", "27-", "20-"]),
+    # lane itemart3 round 4: all 23 Median runes with the redrawn, chiselled signs / the seven signets (engraved seal),
+    # the Sunstone of Thunder (yellow) and the Oil of Jewelcraft (pink)
+    ("itemart4a", [f"r{n}" for n in range(34, 57)]),
+    ("itemart4b", ["zkq", "zkx", "zkw", "!@B", "zku", "zkr", "zky", "x3x", "7o^"]),
 ]
 
 

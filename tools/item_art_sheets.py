@@ -8,6 +8,9 @@ A candidate for a picture is, in this order (docs/hd-icons.md "Picture review"):
            (blank_stone) and Median's glyph cut in instead (glyph_mask, carve): the stone is D2R's, the sign is Median's
   seal     (a `reuse` entry with "seal": "median", lane itemart3 round 2) a round D2R gold disc as a signet: its centre
            enamelled in the colours of Median's centre disc and Median's sign stamped in (seal)
+  chisel   (round 3: "glyph": "chisel" / "seal": "chisel" with "sign": <picture key>) as glyph / seal, but the sign is
+           Median's redrawn as clean strokes (item_glyphs) and cut in at the output size with crisp V-cut edges
+           (engrave_rune, seal with `sign`) instead of the classic pixels scaled up
   method   another upscale setting (upscale.METHODS, or the hybrid with other edge / sharpen values: VARIANTS)
   keep     the current hybrid upscale
 Sheet row: Median classic (legacy look: nearest x3.5) | current HD upscale | candidate, all at D2R's HD size (98 px per
@@ -26,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import upscale  # noqa: E402
 from colour_shift import shift_pixels  # noqa: E402
 from dc6 import decode_frame, palette, read_dc6, read_sprite  # noqa: E402
+import item_glyphs  # noqa: E402
 from item_art import CELL_CLASSIC, CELL_HD, D2R_ITEMS, MOD_ITEMS, asset_size  # noqa: E402
 
 PER_SHEET = 8
@@ -190,6 +194,24 @@ def render_reuse(hd: np.ndarray, src: np.ndarray, out_w: int, out_h: int, shift:
     return upscale.place(a, out_w, out_h)
 
 
+def tint(img: np.ndarray, t: dict) -> np.ndarray:
+    """`img` (RGBA) retinted (owner's colour notes, lane itemart3 round 3): the pixels whose hue lies in t["from"]
+    (degrees, [lo, hi], may wrap past 360; default all) and whose saturation is over t.get("min_sat", 0) take hue
+    t["hue"] and at least saturation t["sat"] (less on the brightest highlights, which stay near white); brightness kept
+    (times t.get("val", 1))."""
+    h, s, v = _hsv(img[..., :3])
+    lo, hi = t.get("from", [0, 360])
+    hd = h * 360
+    sel = ((hd >= lo) & (hd <= hi)) if lo <= hi else ((hd >= lo) | (hd <= hi))
+    sel &= (s >= t.get("min_sat", 0.0)) & (img[..., 3] > 0)
+    h2 = np.where(sel, t["hue"] / 360.0, h)
+    s2 = np.where(sel, np.maximum(s, t["sat"]) * (1 - 0.55 * v ** 6), s)
+    v2 = np.where(sel, np.clip(v * t.get("val", 1.0), 0, 1), v)
+    out = img.copy()
+    out[..., :3] = _rgb(h2, s2, v2)
+    return out
+
+
 def hd_sprite(hd_items: Path, folder_asset: str) -> np.ndarray:
     return upscale.rows_to_array(read_sprite(Path(hd_items) / f"{folder_asset}.sprite")[0])
 
@@ -299,6 +321,26 @@ def carve(blank: np.ndarray, g: np.ndarray, depth: float = 0.85) -> np.ndarray:
     return out
 
 
+def engrave_rune(img: np.ndarray, src: np.ndarray, sign: list) -> np.ndarray:
+    """A blank D2R rune stone `img` (RGBA at its output size) with `sign` (item_glyphs strokes over Median's classic
+    rune crop) cut in, the crop stretched over the stone's opaque box, crisp at this size."""
+    op = img[..., 3] > 0
+    ys, xs = np.nonzero(op)
+    c = crop(src)
+    if not len(ys) or not c.size:
+        return img
+    y0, x0 = ys.min(), xs.min()
+    h, w = ys.max() + 1 - y0, xs.max() + 1 - x0
+    ch, cw = c.shape[:2]
+
+    def to_classic(x, y):
+        return (x - x0) / w * cw, (y - y0) / h * ch
+    out, _cut = item_glyphs.chisel(img[..., :3], sign, to_classic, inside=_erode(op, max(1, max(h, w) // 30)))
+    res = img.copy()
+    res[..., :3] = np.clip(np.rint(out), 0, 255).astype(np.uint8)
+    return res
+
+
 # -- signets: a D2R gold disc as the seal, Median's enamel and sign (lane itemart3, round 2) ------------------------
 SEAL_SRC_R = 0.55   # Median's signet: its coloured centre disc, as a fraction of the picture's radius
 SEAL_INNER = 0.5    # the enamel centre on the D2R disc, as a fraction of its radius
@@ -318,11 +360,12 @@ def _sample(img: np.ndarray, sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
             + img[y1, x1] * fx * fy)
 
 
-def seal(disc: np.ndarray, src: np.ndarray) -> np.ndarray:
+def seal(disc: np.ndarray, src: np.ndarray, strokes: list | None = None) -> np.ndarray:
     """A round D2R picture `disc` (cropped RGBA, the disc filling its box) made into Median's signet `src`: its centre
     (SEAL_INNER of the radius) enamelled with the colours of Median's centre disc (the sign filled out from around it,
     smoothed; D2R's shading kept faintly, a slight dome), and Median's sign (the dark strokes of the centre against their
-    surroundings) stamped in as a dark groove with a lighter lower-right lip."""
+    surroundings) stamped in as a dark groove with a lighter lower-right lip; with `strokes` (item_glyphs) that
+    sign is engraved instead, crisp (item_glyphs.chisel)."""
     h, w = disc.shape[:2]
     c = crop(src)
     if not h or not w or not c.size:
@@ -350,6 +393,13 @@ def seal(disc: np.ndarray, src: np.ndarray) -> np.ndarray:
         1.1 - 0.25 * np.clip(r / SEAL_INNER, 0, 1) ** 2)
     m = np.clip((SEAL_INNER - r) / 0.04, 0, 1)[..., None]
     out = disc[..., :3].astype(np.float64) * (1 - m) + np.clip(enamel * shade[..., None], 0, 255) * m
+    if strokes is not None:
+        def to_classic(x, y):
+            return ((x - w / 2) / (w / 2) * k + 1) / 2 * sw, ((y - h / 2) / (h / 2) * k + 1) / 2 * sh
+        out, _cut = item_glyphs.chisel(out, strokes, to_classic, wall=0.5, floor=0.22, inside=r < SEAL_INNER - 0.02)
+        res = disc.copy()
+        res[..., :3] = np.clip(np.rint(out), 0, 255).astype(np.uint8)
+        return res
     g = np.clip((blur(_sample(sign.astype(np.float64), px, py) * inside, max(w, h) / 110) - SEAL_EDGE) / 0.15, 0, 1)
     n = max(1, round(max(w, h) / 70))
     shifted = np.zeros_like(g)
@@ -372,15 +422,23 @@ def candidate(prop: dict | None, src: np.ndarray, out_w: int, out_h: int, hd_ite
         hd = hd_sprite(hd_items, asset)
         if r.get("glyph") == "median":
             hd = carve(blank_stone(hd), glyph_mask(src))
+        elif r.get("glyph") == "chisel":
+            hd = blank_stone(hd)
         img = render_reuse(hd, src, out_w, out_h, shift, r.get("colour") == "by position", cell)
-        if r.get("seal") == "median":
+        if r.get("tint"):
+            img = tint(img, r["tint"])
+        if r.get("glyph") == "chisel":
+            img = engrave_rune(img, src, item_glyphs.GLYPHS[r["sign"]])
+        if r.get("seal") in ("median", "chisel"):
             ys, xs = np.nonzero(img[..., 3] > 0)
             if len(ys):
                 y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
                 img = img.copy()
-                img[y0:y1, x0:x1] = seal(img[y0:y1, x0:x1], src)
-        how = (", Median's glyph" if r.get("glyph") == "median" else "") + (
-            ", a seal with Median's enamel and sign" if r.get("seal") == "median" else "") + (
+                img[y0:y1, x0:x1] = seal(img[y0:y1, x0:x1], src,
+                                         item_glyphs.GLYPHS[r["sign"]] if r.get("seal") == "chisel" else None)
+        how = (", Median's glyph" if r.get("glyph") == "median" else ", Median's sign chiselled" if r.get(
+            "glyph") == "chisel" else "") + (", a seal with Median's enamel and sign" if r.get("seal") in (
+            "median", "chisel") else "") + (", retinted" if r.get("tint") else "") + (
             ", Median's colours" if r.get("colour") == "by position" else ", Median's mean colour" if shift else "")
         return img, f"D2R {r['asset'].split('/')[-1]}{how}"
     if prop and prop.get("method"):
@@ -542,6 +600,72 @@ def write_lane(out: Path, plan, ranked: list, proposals: dict, lane: str) -> int
                  f"real pixel size (98 px per cell)")
         written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
     Path(out).mkdir(parents=True, exist_ok=True)
+    (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
+    for w in written:
+        print(w)
+    return 0
+
+
+def _round2(prop: dict) -> dict:
+    """The round-2 form of a round-3 proposal: the classic glyph carved (not the redrawn sign), no tint."""
+    r = {k: v for k, v in prop["reuse"].items() if k not in ("sign", "tint")}
+    for k in ("glyph", "seal"):
+        if r.get(k) == "chisel":
+            r[k] = "median"
+    return {**prop, "reuse": r}
+
+
+def write_round3(out: Path, plan, ranked: list, proposals: dict) -> int:
+    """Lane itemart3 round 3: sheets of the redrawn signs (runes, then signets, by pick) and the retinted pictures,
+    PER_SHEET rows each: Median classic | round 2 | round 3 | round 3 at in-game size; and overview_2x.png, every one
+    of them as Median classic | round 3 at 2x."""
+    pal = palette(Path(__file__).resolve().parent.parent / "work" / "d2r-baseline" / "palette" / "pal.dat")
+    rank_of = {p.key: p for p in ranked}
+    pics = proposals.get("pictures", {})
+
+    def group(k, v):
+        r = v.get("reuse", {})
+        return 0 if r.get("glyph") == "chisel" else 1 if r.get("seal") == "chisel" else 2 if r.get("tint") else None
+    picks = sorted((group(k, v), v.get("pick", 999), k, v) for k, v in pics.items()
+                   if group(k, v) is not None and k in rank_of)
+    rows, tiles = [], []
+    for g, pick, key, prop in picks:
+        p = rank_of[key]
+        src = classic_rgba(key, pal)
+        cw, ch = asset_size(src.shape[1], src.shape[0], *plan.needs[(p.folder, *key.split("/", 1))])
+        W, H = cw * CELL_HD, ch * CELL_HD
+        old, _ = candidate(_round2(prop), src, W, H, plan.hd_items)
+        new, label = candidate(prop, src, W, H, plan.hd_items)
+        classic = upscale.place(nearest(src, CELL_HD / CELL_CLASSIC), W, H)
+        what = ("rune" if g == 0 else "signet" if g == 1 else "retint") + (f" {pick}" if g < 2 else "")
+        rows.append({"cells": (cw, ch), "caption": f"{what}: {caption(p)}. {'ON' if prop.get('enabled') else 'off'}",
+                     "images": [classic, old, new, in_game(new, cw, ch)],
+                     "labels": ["Median classic (legacy)", "round 2" + (" (the current picture)" if g == 2 else ""),
+                                f"round 3: {label}", "round 3 at 1920x1080 (49 px per cell)"]})
+        tiles.append((p, classic, new))
+    written = []
+    for k, i in enumerate(range(0, len(rows), PER_SHEET), 1):
+        title = (f"D2R-XL 2012 item pictures, lane itemart3 round 3, sheet {k}: Median's signs redrawn as clean strokes "
+                 f"and chiselled in (runes, signets: off until approved); retints (on); real pixel size (98 px per cell)")
+        written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
+    per_row, z = 4, 2
+    tw = max(t[1].shape[1] for t in tiles) * z
+    th = max(t[1].shape[0] for t in tiles) * z
+    f = _font(15)
+    cols = per_row * (2 * tw + 3 * PAD)
+    im = Image.new("RGBA", (cols + PAD, PAD + -(-len(tiles) // per_row) * (th + 24 + PAD)), (*BG, 255))
+    d = ImageDraw.Draw(im)
+    for n, (p, classic, new) in enumerate(tiles):
+        x, y = PAD + (n % per_row) * (2 * tw + 3 * PAD), PAD + (n // per_row) * (th + 24 + PAD)
+        name = sorted({u["name"] for u in p.users})[0] if p.users else p.key
+        d.text((x, y), name, (*TEXT, 255), font=f)
+        for j, img in enumerate((classic, new)):
+            big = Image.fromarray(np.ascontiguousarray(img), "RGBA").resize((img.shape[1] * z, img.shape[0] * z),
+                                                                             Image.Resampling.NEAREST)
+            im.alpha_composite(big, (x + j * (tw + PAD), y + 22))
+    ov = Path(out) / "overview_2x.png"
+    im.save(ov)
+    written.append(ov)
     (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
     for w in written:
         print(w)

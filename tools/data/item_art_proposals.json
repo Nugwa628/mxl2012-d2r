@@ -1,6 +1,6 @@
 {
  "enabled": true,
- "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off.",
+ "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off. Round 3 (2026-10-30): the 23 runes are off again (owner: too blobby, not sharp) and, with the signets (still off), use Median's sign redrawn as strokes (tools/item_glyphs.py), cut in crisp: reuse \"glyph\" / \"seal\": \"chisel\" with \"sign\" = the picture key. \"tint\" retints a picture (item_art_sheets.tint): Sunstone of Thunder yellow, Oil of Jewelcraft pink. ON (owner, 2026-10-30, round 4: \"the new ones look great, ship em\"): the 23 runes and the 7 signets with the redrawn signs.",
  "pictures": {
   "mxl/og1": {
    "reuse": {
@@ -71,205 +71,205 @@
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-01"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 41,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 41
   },
   "mxl/r-a-02": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-02"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 43,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 43
   },
   "mxl/r-a-03": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-03"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 44,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 44
   },
   "mxl/r-a-05": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-05"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 28,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 28
   },
   "mxl/r-a-06": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-06"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 29,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 29
   },
   "mxl/r-a-07": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-07"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 30,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 30
   },
   "mxl/r-a-08": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-08"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 31,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 31
   },
   "mxl/r-a-09": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-09"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 32,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 32
   },
   "mxl/r-a-10": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-10"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 33,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 33
   },
   "mxl/r-a-11": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-11"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 34,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 34
   },
   "mxl/r-a-12": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-12"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 35,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 35
   },
   "mxl/r-a-13": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-13"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 36,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 36
   },
   "mxl/r-a-14": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-14"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 37,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 37
   },
   "mxl/r-a-15": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-15"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 38,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 38
   },
   "mxl/r-a-16": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-16"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 39,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 39
   },
   "mxl/r-a-17": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-17"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 40,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 40
   },
   "mxl/r-a-18": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-a-18"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 42,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 42
   },
   "mxl/realapple": {
    "method": "hybrid-crisp",
@@ -280,12 +280,13 @@
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigil1b"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 1,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "classic/invhmr": {
    "reuse": {
@@ -385,11 +386,16 @@
    "reuse": {
     "folder": "misc",
     "asset": "gem/flawless_diamond",
-    "colour": "by position"
+    "colour": "by position",
+    "tint": {
+     "hue": 52,
+     "sat": 0.85,
+     "val": 1.1
+    }
    },
    "enabled": true,
    "lane": "itemart3",
-   "why": "a round brilliant-cut gem: D2R's HD flawless diamond (round cut), Median's colours by position",
+   "why": "a round brilliant-cut gem: D2R's HD flawless diamond (round cut), Median's colours by position; retinted clear yellow (owner, 2026-10-30: Thunder should be more yellow)",
    "pick": 9
   },
   "classic/invgmv": {
@@ -578,11 +584,21 @@
    "reuse": {
     "folder": "misc",
     "asset": "potion/full_rejuv_potion",
-    "colour": "by position"
+    "colour": "by position",
+    "tint": {
+     "hue": 330,
+     "sat": 0.55,
+     "from": [
+      150,
+      350
+     ],
+     "min_sat": 0.2,
+     "val": 1.2
+    }
    },
    "enabled": true,
    "lane": "itemart3",
-   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost; the liquid retinted clear pink (owner, 2026-10-30: Jewelcraft should be more pink)",
    "pick": 26
   },
   "mxl/zelixir8": {
@@ -600,139 +616,145 @@
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-d-02"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 45,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 45
   },
   "mxl/r-d-05": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-d-05"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 46,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 46
   },
   "mxl/r-d-11": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-d-11"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 47,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 47
   },
   "mxl/r-d-07": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-d-07"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 48,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 48
   },
   "mxl/r-d-04": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-d-04"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 49,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 49
   },
   "mxl/r-d-12": {
    "reuse": {
     "folder": "misc",
     "asset": "rune/ist_rune",
-    "glyph": "median"
+    "glyph": "chisel",
+    "sign": "mxl/r-d-12"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
-   "pick": 50,
-   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
+   "pick": 50
   },
   "mxl/sigil4b": {
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigil4b"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 2,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "mxl/sigil3b": {
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigil3b"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 3,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "mxl/sigil5b": {
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigil5b"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 4,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "mxl/sigil2b": {
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigil2b"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 5,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "mxl/sigil6b": {
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigil6b"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 6,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "mxl/sigilxl": {
    "reuse": {
     "folder": "armor",
     "asset": "shield/crown_shield",
-    "seal": "median"
+    "seal": "chisel",
+    "sign": "mxl/sigilxl"
    },
-   "enabled": false,
+   "enabled": true,
    "lane": "itemart3-signets",
    "pick": 7,
-   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc, the centre enamelled in Median's colours, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and engraved, crisp (round 3)"
   },
   "mxl/shiniewhite": {
    "reuse": {
