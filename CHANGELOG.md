@@ -5,15 +5,27 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-- HD: the Rainbow Stones use D2R's crisp HD gem pictures in Median's colours.
-- Reign of the Warlock stash: runes (Ith and all others), gems, skulls, rejuvenation potions and the Token of Absolution
-  can now be put into the runes / gems tabs.
+## D2R-XL 2012
+
+### 0.1.4 (2026-10-30)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.4:**
+
+- Reign of the Warlock stash: runes (Ith and all others), gems (Chipped Topaz and all others), skulls, rejuvenation
+  potions and the Token of Absolution can now be put into the runes / gems tabs.
 - "Baal says: *Laughing*" from Median's skills now reads "Baal says: LOL", at most once every 30 seconds.
-- Release notes: the line on HD item pictures now says about 90 Median-only ones are upscaled classic pictures.
+- HD: the Rainbow Stones use D2R's crisp HD gem pictures in Median's colours.
 - HD walls: Hole Level 2 has its stairs at the arrival, and Khalimgrad's cathedral has its Fortress walls in place (they
   floated several tiles off before) with many more of them drawn; downtown and glados get more walls too.
+- Release notes: the line on HD item pictures now says about 90 Median-only ones are upscaled classic pictures.
 
-## D2R-XL 2012
+**Known:** now and then one totem stays on your own spot after Bend the Shadows (often next to rocks); cast again or step
+aside. In HD, the Ancient Tunnels void around the platform is drawn as floor, and Khalimgrad's cathedral has no arches and
+roofs yet.
 
 ### 0.1.3 (2026-10-30)
 
