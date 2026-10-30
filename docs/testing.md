@@ -4329,3 +4329,23 @@ stopped startup ("String tables are unavailable", MonType.txt); `trial.sh` delet
 Evidence: `mxl2012-runs/skillhd/review/` (static sheets), `mxl2012-runs/skillhd/ingame/ingame_<cls>.png` (per class: legacy |
 HD now | A | B | C from the shots, rows = tabs) and the run folders above (copied to `mxl2012-runs/skillhd/ingame/runs/`). Owner: pick A, B, C
 or none; switching one on is `enabled: true` + `method` in `tools/data/skill_tree_proposals.json`.
+
+## Lane peticons: pet icons by the portrait (bug #514, 2026-10-30, slots 1 and 2, background mode)
+
+Lab (outside git) `mxl2012-runs/peticons/lab.py <worktree> <out> [nec,other] [hd,legacy]`: Necromancer `PetIconsNec`
+(`mxl2012-s1` / `-s2`), level 120 and tanked by the harness, a Kashya mercenary hired (`hire_in`), a real waypoint to Cold
+Plains (the mercenary comes along), god mode, then `cast` of the Necromancer / item summons 473 474 475 476 477 631 856 801
+83 661 (stage `nec`) and of other classes' summons 433 438 469 472 532 544 507 322 706 (stage `other`), learnt by
+`ensure_learned`; after each stage a shot per mode with the debug overlay off, plus a crop of the left side.
+
+| Run | Slot / build | Result |
+|---|---|---|
+| `before` | 1, the mod build installed there at 22:43 (pettype as on main) | HD: all Necromancer pets show the Necromancer's face; names run together ("Guardian SpiThunderbear"); the row stops at 9 icons. Legacy: the same faces (Median's look), names staggered, 14 icons cut at the screen edge. The mercenary was killed by the lab's `clear_monsters` in this run |
+| `trial1` | 1, D2R's layout with `nextIconOffsetSecondSet` 110 and `nameAlternationSecondSetY` 30 copied in by hand (removed after) | still 9 icons: a count limit, not the width; names staggered and readable; at 110 the 120-unit health bars touch |
+| `trial2` | 1, the same with `summonsUseSecondSet` false, `nextIconOffset` 170 | all pets in a column down the left edge, 12 seen to the window's bottom: no 9 limit there |
+| `normal` | 2, the normal build of this branch (icons off) | names staggered, Median's class faces kept, the mercenary first; 0 assert lines |
+| `after` | 2, this branch with `pet_icons.py build --try all` (data only) | **PASS (judged on the shots):** the mercenary first, then each pet type with its own icon (Shadow, Darkling, Rampagor, Lamia, Void Archon, Overlord, Siren, Jinn; Acid Fiend and Guardian Spirit keep Median's faces, they have no entry), names staggered; legacy unchanged (class faces, Median's names); the HD row still stops at 9 with the mercenary; d2rloader.log 0 assert lines, no crash file |
+
+Evidence: `mxl2012-runs/peticons/{before,trial1,trial2,after}/` (`nec_hd.png`, `nec_legacy.png`, `other_*.png`, `crop_*`),
+the review sheet `mxl2012-runs/peticons/sheet_peticons.png` (legacy, HD now, HD proposed, per pet type). Slot 2 got the
+normal build of this branch again at the end (icons off, the names staggered).

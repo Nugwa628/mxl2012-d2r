@@ -42,6 +42,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
                      (MXL2012_HD_OUT=work/mod; the baseline copy is work/d2r-baseline)
   hd_ui.py baseline + build      skill tree pages (the mod's own page art), inventory / cube panels, layouts, ui_check
                      (MXL2012_UI_OUT=work/mod; writes skill_tab_titles.json for merge_string_overrides.py)
+  pet_icons.py build  the HD pet icon row's names staggered (hireablespanelhd.json); own pet icons per pettype when
+                     tools/data/pet_icons.json is enabled (bug #514, docs/hd-icons.md "Pet icons")
   maps_hd.py build work/mod/data   HD scenes for the maps D2R lacks + Median's tiles with the .ds1 monster ids renumbered
   walls_hd.py build work/mod/data  wall scenes of D2R's own wall models for Median's 17 own maps (docs/maps-hd.md
                      "Walls"; D2R's scenes come from the shared cache, MXL_SLOT=2..5 fills it once)
@@ -121,6 +123,7 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["build_effects.py", "--check-only"],
              ["hd_icons.py", "baseline", str(D2R_EXTRACT)], ["hd_icons.py", "build", {"MXL2012_HD_OUT": str(MOD)}],
              ["hd_ui.py", "baseline", str(D2R_EXTRACT)], ["hd_ui.py", "build", {"MXL2012_UI_OUT": str(MOD)}],
+             ["pet_icons.py", "build", "--mod", str(MOD)],
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them

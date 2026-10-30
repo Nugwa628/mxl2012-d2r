@@ -6,6 +6,7 @@ version being released (docs/release.md).
 ## Unreleased
 
 - HD: the Boss Killer Ring and the Upgraded Boss Killer Ring show their picture again (they showed an empty cell) (#513).
+- HD: the names under the pet icons by the portrait no longer run into each other (#514).
 
 ## D2R-XL 2012
 

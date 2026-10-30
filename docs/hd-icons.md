@@ -494,6 +494,28 @@ D2R pictures have another outline than Median's, e.g. coins for Fool's Gold; 0 p
 in its map with an existing asset (D2R sprite or generated; 0 missing), every item using a mod picture points at it or, for an exact copy, at D2R's asset (0 not used).
 Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not failed.
 
+## Pet icons (`tools/pet_icons.py`, lane peticons, 2026-10-30; bug #514)
+
+D2R draws one icon per pet type the player has, by the portrait: `pettype.txt` `baseicon` names the picture, legacy
+`data/global/ui/hireables/<baseicon>.dc6`, HD `data/hd/global/ui/hireables/<baseicon>.sprite` (120 x 120, a 10-pixel gold
+frame; `.lowend.sprite` 60 x 60), placed by `data/global/ui/layouts/hireablespanel[hd].json`. Median XL 2012 has no pet icon
+art of its own: its rows name vanilla files, mostly a class face (`necromancericon` for all ten Necromancer pet types:
+Shadows, Darklings, Rampagor, Lamia, Void Archon, Veil King, Jinn, Sirens, Totembound, totems; also Overlord), so "all
+Necromancer pets have the same icon" is Median's own look, in legacy too.
+
+- **Layout (always on).** D2R's HD summon row is 175 units per icon with each name on one line under its icon
+  (`nameAlternationSecondSetY` 0); Median's longer names ran into each other ("Guardian SpiThunderbear"). The mod's
+  `hireablespanelhd.json` (D2R's, one field changed) staggers every other name by 30 units, as the legacy panel does.
+- **Own HD icons (`tools/data/pet_icons.json`, 15 entries, OFF: owner rule, the look waits for the review sheet).** An
+  entry gives its pettype baseicon `mxl_<pettype>`: HD is D2R's HD pet icon `icon` with the frame kept and the picture
+  inside shifted in hue / saturation / value; legacy is `mxl_<pettype>.dc6`, a byte copy of the DC6 the row named, so legacy
+  draws exactly what Median drew. Sheet: `py -3 tools/pet_icons.py sheet OUT.png`; a trial build of some or all:
+  `py -3 tools/pet_icons.py build --try all` after `build.py` (rebuild to undo, the tables are edited in place).
+- **D2R limit, not changed:** the HD summon row shows at most 9 icons, the mercenary included (it sits first in that row),
+  whatever the spacing (175 or 110 units: 9 both times). The legacy row has no count limit but ends at the 800-pixel
+  screen edge (14 seen). With `summonsUseSecondSet` false D2R puts every pet in the vertical first set down the left edge
+  instead (12 seen to the bottom of a 1600 x 900 window at 170 units): an option for the owner, not taken (another look).
+
 ## Gaps (also in `docs/unported.md`)
 
 - **Unresolved item references (2).** `stoneearth` (Mana Pack, `zoh`) and `stonemars` (Life Pack, `zog`): no DC6 in the mod
