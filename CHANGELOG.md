@@ -5,11 +5,29 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-- HD: the Boss Killer Ring and the Upgraded Boss Killer Ring show their picture again (they showed an empty cell) (#513).
-- HD: the names under the pet icons by the portrait no longer run into each other, and the Necromancer's summons (and a few other pets) have their own pet icons (#514).
-- HD: new skill tree pages for all seven classes in D2R's own HD style (D2R's stone and carved sockets on Median's layout, each tree's colour as a rim).
-
 ## D2R-XL 2012
+
+### 0.1.7 (2026-10-31)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.7:**
+
+- HD: the Boss Killer Ring and the Upgraded Boss Killer Ring show their picture again (they showed an empty cell) (#513).
+- HD: the names under the pet icons by the portrait no longer run into each other (#514).
+
+**New in HD:**
+
+- The Necromancer's summons (and the Overlord, Blood and Ice Elementals, Thunder Bear and Wolf Companion) have their own
+  pet icons instead of all sharing the Necromancer's face (#514).
+- New skill tree pages for all seven classes in D2R's own HD style: D2R's stone and carved sockets on Median's layout,
+  each tree's colour as a rim round its sockets.
+
+**Known:** in HD, Median's runes still show their classic pictures scaled up, the Ancient Tunnels void around the
+platform is drawn as floor, Khalimgrad's cathedral has no tall pointed arch and long roofed walls yet, and the HD pet
+row shows at most 9 icons (D2R's own limit).
 
 ### 0.1.6 (2026-10-30)
 
