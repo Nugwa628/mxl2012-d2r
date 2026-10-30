@@ -3837,3 +3837,22 @@ HD: the Rainbow Stones change visibly, the crystals and runes a little; legacy p
 `.sprite` files differ). Ring, amulet and jewel pictures differ between runs: D2R picks one of its pictures at random. Not
 tested: the stash (the harness `item` verb places in inv / cube / ground only). Evidence: `mxl2012-runs/itemart/review/`
 (`sheet_01.png` .. `sheet_05.png` and `_2x`, `ingame/before_*`, `after_*`, `compare_*`), `mxl2012-runs/itemart/monsters/`.
+## Lane walls3: the three maps with partial HD walls (2026-10-30, slot 2, background mode, build of lane/walls3, data only)
+
+Build: `py -3 tools/build.py` (validate 0 errors), install `MXL_SLOT=2 MXL_RUN=walls3 py -3 tools/install_mod.py --slot 2` (data
+only, no plugin change). Check (harness travel and god mode, new level-1 character WallsThree):
+`MXL_RUN=walls3 MXL_SLOT=2 MXL_CHAR=WallsThree MXL_CACHE_POLL=3 MXL_WALL_LEVELS=15,65,127,95,18 py -3 tools/game_checks.py all
+wall_maps`. The method (ground heights of raised D2R maps, generic walls for bare partial keys, pieces on no cell hung on the
+rarest key next to them, the Arcane terrain mesh that did not work) is in docs/maps-hd.md items 9-12; tests in
+`tools/tests/test_walls_hd.py` (GroundTest, AnchorTest, PartialFallbackTest, TerrainTest).
+
+| run | maps | result |
+|---|---|---|
+| `checks-20261030-120504-s2` | caveroom4, belial, charismatic, glados, downtown (with the belial terrain mesh) | all 5 reached in HD and classic. caveroom4: the stairs at the arrival as in classic (absent before). charismatic: Fortress walls, gargoyle pillars and columns along classic's walls (before: a few pillars and walls floating off their cells); arches and roofs still missing. belial: unchanged, floor over the void. glados: more Travincal/Mesa walls, nothing out of place; downtown: no visible change. 0 ERROR/ASSERT lines in d2rloader.log, no crash file; VariantTransformTable peak 107/128, ModelAsset 1401/2750. Load screens HD 1.67 s (caveroom4; before 1.59), 2.15 (belial; 2.25), 2.24 (charismatic; 2.0), 3.02 (glados; 2.43), 1.81 (downtown; 2.03) |
+| `checks-20261030-121037-s2` | belial, its installed scene patched with sancte's terrain physics body | still floor over the void, no assert: the terrain mesh is not used for this floor, so it is left out of the build (`TERRAIN_MAPS = {}`) |
+| `checks-20261030-121747-s2` | caveroom4, belial, charismatic (the committed build) | as the first run; 0 asserts, no crash file, VariantTransformTable 101/128 |
+
+Evidence: `mxl2012-runs/walls3/sheets/sheet_<map>.png` (before HD | after HD | legacy G; before = hdwalls2 run
+`checks-20261030-005953-s1` for caveroom4 and belial, maptint `run2-checks-20261030-033400-s4` for the retextured maps),
+`sheets_final/` for the last run, the run folders `run1-…`, `run2-…`, `run3-…` next to them. Open: belial's void (what paints
+the HD floor of a level larger than its preset), charismatic's arches and roofs (no D2R model, custom art).

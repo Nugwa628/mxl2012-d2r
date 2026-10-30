@@ -357,5 +357,172 @@ class LearnLibraryTest(unittest.TestCase):
         self.assertTrue(all(m.endswith(".ds1") for m in walls_hd.STOCK))
 
 
+def _inside(pos, t, x, z):
+    a, b, c = (pos[i] for i in t)
+    d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2])
+    u = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d
+    v = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d
+    return u > 0 and v > 0 and u + v < 1
+
+
+def _template():
+    """D2R's sancte terrain model from the D2R extraction or the shared cache, None without them."""
+    try:
+        import fxpaths
+        rel = "data/hd/env/preset/act2/arcane/sancte/terrain_lod0.model"
+        for p in (fxpaths.D2R / rel, fxpaths.D2R_CACHE / rel):
+            if p.exists():
+                return p.read_bytes()
+    except Exception:   # noqa: BLE001  (no local D2R paths configured)
+        return None
+    return None
+
+
+TEMPLATE = _template()
+
+
+def raised(model, x, y, z, name="e"):
+    e = entity(model, x, z, name=name)
+    e["components"][0]["position"]["y"] = y
+    return e
+
+
+class GroundTest(unittest.TestCase):
+    """D2R's terrain heights and the entities moved down to the gameplay plane (lane walls3)."""
+
+    def slope(self):
+        # two triangles over x, z in 0..20: y = x (a ramp), and a vertex at y = 7 far from it
+        pos = [(0.0, 0.0, 0.0), (20.0, 20.0, 0.0), (20.0, 20.0, 20.0), (0.0, 0.0, 20.0), (60.0, 7.0, 60.0)]
+        return walls_hd.Ground(pos, [(0, 2, 1), (0, 3, 2)])
+
+    def test_height_inside_outside_and_far(self):
+        g = self.slope()
+        self.assertAlmostEqual(g.height(5.0, 5.0), 5.0)
+        self.assertAlmostEqual(g.height(15.0, 2.0), 15.0)
+        self.assertAlmostEqual(g.height(65.0, 60.0), 7.0)     # no triangle: the nearest vertex within 15 units
+        self.assertEqual(g.height(200.0, 200.0), 0.0)        # nothing near: flat
+
+    def test_highest_triangle_wins(self):
+        pos = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (0.0, 0.0, 10.0), (0.0, 4.0, 0.0), (10.0, 4.0, 0.0), (0.0, 4.0, 10.0)]
+        self.assertAlmostEqual(walls_hd.Ground(pos, [(0, 1, 2), (3, 4, 5)]).height(2.0, 2.0), 4.0)
+
+    def test_wall_entities_move_down_the_isometric_diagonal(self):
+        g = walls_hd.Ground([(0.0, 35.0, 0.0), (100.0, 35.0, 0.0), (0.0, 35.0, 100.0)], [(0, 1, 2)])
+        scene = {"entities": [raised(WALL, 45.0, 35.0, 40.0)]}
+        (e, x, z), = walls_hd.wall_entities(scene, g)
+        self.assertEqual((x, z), (10.0, 5.0))
+        self.assertEqual(walls_hd.transform(e)["position"], {"x": 10.0, "y": 0.0, "z": 5.0})
+        self.assertEqual(walls_hd.transform(scene["entities"][0])["position"]["x"], 45.0)    # the scene is not changed
+        (_e, x, z), = walls_hd.wall_entities(scene)                                            # no ground: as it is
+        self.assertEqual((x, z), (45.0, 40.0))
+
+    def test_learn_with_ground_puts_raised_walls_on_their_tile(self):
+        g = walls_hd.Ground([(0.0, 30.0, 0.0), (100.0, 30.0, 0.0), (0.0, 30.0, 100.0)], [(0, 1, 2)])
+        key = (("act4/fort", 1, 2, 0),)
+        lib = walls_hd.Library()
+        lib.learn("m", {(1, 1): key}, {"entities": [raised(WALL, 45.0, 30.0, 42.0)]}, g)    # drawn 3 tiles off its cell
+        self.assertEqual(lib.pick(key), (((WALL, 5.0, 2.0),), "exact"))
+
+    def test_terrain_mesh_decodes_int16_positions(self):
+        class O(dict):
+            def __init__(self, d=None, obj=None):
+                super().__init__(d or {})
+                self.obj = obj
+
+        vert = [O({"Position": [32767, 0, 16384, 0]}), O({"Position": [0, 32767, 0, 0]}), O({"Position": [0, 0, 32767, 0]})]
+        mesh = O({"ExtendedData": O(obj=O({"VertexScale": 50.0})), "PrimaryVertexData": O({"Vertices": O(obj=vert)}),
+                  "PrimaryTopology": O({"Indices16": [O({"Int16": i}) for i in (0, 1, 2)]})})
+        pos, tris = walls_hd.terrain_mesh({"Meshes": [mesh]})
+        self.assertEqual(tris, [(0, 1, 2)])
+        self.assertEqual([round(c, 2) for c in pos[0]], [50.0, 0.0, 25.0])
+        self.assertEqual([round(c, 2) for c in pos[1]], [0.0, 50.0, 0.0])
+
+    def test_terrain_path(self):
+        scene = {"terrain": {"components": [{"type": "ModelDefinitionComponent",
+                                             "filename": "data/hd/env/preset/act2/arcane/sanctE/terrain.model"}]}}
+        self.assertEqual(walls_hd.terrain_path(scene), "data/hd/env/preset/act2/arcane/sancte/terrain_lod0.model")
+        self.assertIsNone(walls_hd.terrain_path({"terrain": {}}))
+        self.assertIsNone(walls_hd.terrain_path({}))
+        self.assertIsNone(walls_hd.d2r_ground("x", {"terrain": {}}))
+
+
+STAIRS = "data/hd/env/model/act1/caves/act1_caves_walls/back_stairs01.model"
+
+
+class AnchorTest(unittest.TestCase):
+    """Pieces that stand on no learnt cell hang on the rarest key next to them (lane walls3: the caves' stairs)."""
+
+    def lib(self, maps=3, with_stairs=3):
+        lib = walls_hd.Library()
+        floor, stairs = (("act1/caves", 0, 5, 0),), (("act1/caves", 0, 3, 8),)
+        for n in range(maps):
+            cells = {(x, y): floor for x in range(6) for y in range(4)}
+            cells[(5, 2)] = stairs
+            del cells[(3, 1)]                            # the void cell the stairs model stands on
+            ents = [raised(STAIRS, 32.0, 0.0, 18.0)] if n < with_stairs else []
+            lib.learn("m%d" % n, cells, {"entities": ents})
+        lib.anchor()
+        return lib, floor, stairs
+
+    def test_homeless_piece_hangs_on_the_rare_key(self):
+        lib, floor, stairs = self.lib()
+        self.assertEqual([(walls_hd.model_of(e), dx, dz) for e, dx, dz in lib.anchored[stairs]], [(STAIRS, -18.0, -2.0)])
+        self.assertNotIn(floor, lib.anchored)
+        self.assertEqual(lib.maps, {})
+        text, st = walls_hd.build_scene({(4, 4): floor, (7, 3): stairs}, lib, "act1_caves")
+        self.assertEqual((st["anchored"], st["entities"]), (1, 1))
+        p = walls_hd.transform(json.loads(text)["entities"][0])["position"]
+        self.assertEqual((p["x"], p["z"]), (52.0, 28.0))
+
+    def test_too_rare_or_too_few_stay_out(self):
+        self.assertEqual(self.lib(maps=2, with_stairs=2)[0].anchored, {})       # fewer than SET_PIECE_CELLS
+        self.assertEqual(self.lib(maps=10, with_stairs=3)[0].anchored, {})      # on 3 of 10 cells of the key
+
+
+class PartialFallbackTest(unittest.TestCase):
+    def test_a_bare_partial_wall_gets_the_generic_wall(self):
+        lib = walls_hd.Library()
+        a, b, c = ("act4/fort", 1, 4, 0), ("act4/fort", 1, 4, 3), ("act4/fort", 1, 1, 0)
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): (a, ("act4/fort", 8, 3, 0)), (1, 0): (c,)}, {"entities": [entity(WALL, 12, 2)]})
+        self.assertEqual(lib.pick((a, b)), (((WALL, 2.0, 2.0),), "generic"))    # shares a bare key only: the tile set's wall
+        self.assertEqual(lib.pick((a, ("act4/fort", 8, 3, 0))), ((), "exact"))  # D2R draws that one bare: stays bare
+
+
+class TerrainTest(unittest.TestCase):
+    def test_terrain_cells_drop_lone_corner_tiles(self):
+        cells = {(0, 0), (5, 5), (5, 6), (6, 6), (47, 47)}
+        self.assertEqual(walls_hd.terrain_cells(cells), {(5, 5), (5, 6), (6, 6)})
+
+    def test_terrain_entity_and_dependency(self):
+        path = "data/hd/env/preset/act2/arcane/belial/terrain.model"
+        scene = json.loads(walls_hd.add_terrain(walls_hd.scene_json("act2_arcane", []), path))
+        self.assertEqual(scene["terrain"]["name"], "terrain")
+        types = [c["type"] for c in scene["terrain"]["components"]]
+        self.assertEqual(types, ["TransformDefinitionComponent", "TerrainDefinitionComponent", "ModelDefinitionComponent"])
+        self.assertIn({"path": path}, scene["dependencies"]["other"])
+        self.assertEqual(walls_hd.terrain_path(scene), "data/hd/env/preset/act2/arcane/belial/terrain_lod0.model")
+
+    def test_half_floats(self):
+        self.assertEqual((walls_hd._half(1.0), walls_hd._half(0.5), walls_hd._half(0.0)), (15360, 14336, 0))
+
+    @unittest.skipUnless(TEMPLATE, "D2R's sancte terrain model is in neither the D2R extraction nor the cache")
+    def test_terrain_model_over_the_cells(self):
+        import d2r_model
+        out = walls_hd.terrain_model(TEMPLATE, {(3, 4), (4, 4), (4, 5)}, 13, 13)
+        tree = d2r_model.parse_tree(d2r_model.Gr2File.read(out))
+        pos, tris = walls_hd.terrain_mesh(tree)
+        self.assertEqual((len(tris), len(pos)), (6, 8))                     # corners shared
+        self.assertEqual({round(p[1], 3) for p in pos}, {0.0})
+        for x, z in ((35.0, 45.0), (45.0, 55.0)):
+            self.assertTrue(any(_inside(pos, t, x, z) for t in tris), (x, z))
+        self.assertFalse(any(_inside(pos, t, 35.0, 55.0) for t in tris))   # (3, 5) is not covered
+        ed = tree["Meshes"][0]["ExtendedData"].obj
+        self.assertEqual([round(v, 2) for v in ed["bbMin"] + ed["bbMax"]], [30.0, 0.0, 40.0, 50.0, 0.0, 60.0])
+        self.assertEqual(tree["Models"][0]["InitialPlacement"].position, (65.0, 0.0, 65.0))
+        for a, b, c in tris:                                                # wound as D2R's
+            p, q, r = pos[a], pos[b], pos[c]
+            self.assertLess((q[0] - p[0]) * (r[2] - p[2]) - (q[2] - p[2]) * (r[0] - p[0]), 0)
+
 if __name__ == "__main__":
     unittest.main()

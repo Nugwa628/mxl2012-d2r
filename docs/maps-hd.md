@@ -126,6 +126,39 @@ With both, the self-check on D2R's own maps went from 43% to 55% of their wall e
 (cypherpunk 5,825 -> 10,166 placed pieces, still capped at 4,423; glados 850 -> 3,698, mostly Travincal trench and Kurast
 stairs on floor tiles). The 17 scenes are 21.9 MB together; none is above the cap.
 
+**The three partial maps** (lane walls3, 2026-10-30). Why caveroom4, belial and charismatic showed only part of their walls,
+the three changes that fix what data could fix (for all 17 maps), and one that did not work:
+
+9. **Raised D2R maps** (`Ground`, `d2r_ground`). D2R's HD camera is orthographic at the true isometric angle, so a piece that
+   stands on terrain raised by g is drawn at (x + g, y + g, z + g) to stay over its tile. Most D2R maps are flat, but the
+   Fortress interior stands about 35 units up (Travincal, Kurast, the Arcane and the caves a few units): learnt as they were,
+   the Fortress walls sat 3-4 tiles off the wall cells they belong to and floated 35 units over Median's flat maps. The
+   tool now reads each D2R map's baked terrain mesh (the preset's `terrain` entity, `terrain_lod0.model`: world-space
+   positions, `terrain_mesh`) and moves every learnt piece to (x - g, y - g, z - g), the same spot on screen at ground level.
+   charismatic (Fortress tiles) went from 366 wall cells without a model to 213, 424 -> 646 placed pieces.
+10. **Bare partial walls** (`Library.pick`). charismatic's Fortress walls of style 4 (41 cells of one pair alone) are on no
+   learnt cell in D2R; they shared a tile with a key that D2R draws bare and so got nothing. A wall key whose only match is
+   such a bare key now gets the tile set's generic wall (`generic_pick`; a key D2R itself draws bare stays bare). charismatic
+   213 -> 81 wall cells without a model, 646 -> 887 placed pieces (Fortress walls, gargoyle pillars, columns). The same rule
+   fills 170 more downtown cells with Harrogath walls and 114 glados cells with Travincal/Mesa walls.
+11. **Pieces on no cell** (`Library.anchor`). D2R's artists place a model where it looks right, not on the tile it belongs
+   to. The Act 1 caves' stairs (`back_stairs01`) stand on the void cell beside the stairs tiles (style 3, sequences 8-17) in
+   all 21 cave maps that have them, so they were never learnt: caveroom4's arrival (and epicwhiners') had no stairs. A piece
+   on no learnt cell is now counted on the rarest learnt key within 2 cells at its offset from it, and placed with that key
+   when it is there in at least a third of the key's cells and in 3 or more. Learnt: 135 such pieces on 55 keys; caveroom4 and
+   epicwhiners get the stairs, belial 22 Arcane edge pieces (straight walls, corners, trims, gargoyles under the platform
+   edge, hidden under the HD floor as long as the void is floor: item 12), dungrm6a 54 broken arches, glados 33 Travincal
+   fades. (Hanging also the pieces a cell's own pick leaves out raised
+   the self-check from 55% to 71%, but pushed glados, desertpeak and epicwhiners past the cap with props: not done.)
+12. **A terrain mesh for the Arcane: tried, no effect** (`TERRAIN_MAPS`, `terrain_model`, left empty). belial's starry void is
+   floor in HD, and that floor hides the arches that hang under the platform edges. D2R's own Arcane maps have a terrain
+   mesh over their platforms only (sancte: 482 flat triangles at y = 0), while maps_hd's minimal scene has `"terrain": {}`.
+   The tool can now write a `terrain_lod0.model` from sancte's (its mesh replaced by flat quads over the map's floor cells,
+   positions and UV as D2R's) and give the scene D2R's `terrain` entity naming it. In game (slot 2, run
+   `checks-20261030-120504-s2`, and again with sancte's physics body added) belial loaded with no assert, but HD still drew
+   floor over the whole void, the same as before. So the HD floor there does not come from the preset's terrain entity
+   (perhaps the level's own ground, Ancient Tunnels being a larger level than the 48x48 preset); open, not shipped.
+
 **Floors** (lane wallsfix, `tools/maps_hd.py`). HD paints a floor tile from the biome's terrain layers through the biome's
 tile mask (`data/hd/env/tilemasks/*.json`), keyed by .dt1 path; a tile no mask names gets the base layer. Median's new .dt1
 are in no mask, so before this lane every Median floor got its biome's base layer: Kurast's, chosen for cypherpunk by its
@@ -163,28 +196,28 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 
 | map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | floor cells (with models) | set pieces left out | placed | capped | models in scene | distinct models | scene size |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 306 | 2 | 1012 | 0 | 13435 (63) | 17 | 2905 | 0 | 2905 | 40 | 2246 KB |
-| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 760 | 5 | 1109 | 0 | 9039 (966) | 11 | 10166 | 5743 | 4423 | 83 | 3821 KB |
-| expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 395 | 0 | 445 | 1 | 6911 (1300) | 5 | 3698 | 0 | 3698 | 53 | 3183 KB |
-| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2203 | 693 | 256 | 797 | 126 | 32292 (0) | 1 | 2367 | 0 | 2367 | 18 | 1766 KB |
-| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 212 | 74 | 126 | 11 | 49 | 1 | 308 (62) | 1 | 538 | 0 | 538 | 105 | 510 KB |
-| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 312 | 3 | 36 | 1 | 774 (25) | 3 | 2442 | 0 | 2442 | 74 | 2517 KB |
-| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 356 | 20 | 28 | 18 | 1 | 1128 (0) | 31 | 568 | 0 | 568 | 20 | 437 KB |
-| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 402 | 22 | 366 | 1 | 1173 (94) | 126 | 424 | 0 | 424 | 12 | 323 KB |
-| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 209 | 5 | 572 (87) | 0 | 484 | 0 | 484 | 67 | 756 KB |
+| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 292 | 16 | 994 | 0 | 13435 (46) | 17 | 2924 | 0 | 2924 | 42 | 2246 KB |
+| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 756 | 9 | 867 | 0 | 9039 (836) | 11 | 11475 | 7052 | 4423 | 73 | 3672 KB |
+| expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 281 | 114 | 320 | 1 | 6911 (1322) | 109 | 4157 | 0 | 4157 | 49 | 3511 KB |
+| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2203 | 523 | 426 | 627 | 126 | 32292 (0) | 1 | 2603 | 0 | 2603 | 24 | 1952 KB |
+| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 212 | 74 | 124 | 13 | 43 | 1 | 308 (59) | 2 | 494 | 0 | 494 | 103 | 463 KB |
+| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 312 | 3 | 18 | 1 | 774 (57) | 1 | 1241 | 0 | 1241 | 57 | 1066 KB |
+| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 356 | 20 | 28 | 18 | 1 | 1128 (0) | 31 | 570 | 0 | 570 | 21 | 439 KB |
+| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 270 | 154 | 81 | 1 | 1173 (21) | 99 | 887 | 0 | 887 | 23 | 657 KB |
+| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 209 | 5 | 572 (87) | 0 | 533 | 0 | 533 | 66 | 1049 KB |
 | act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
 | act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
-| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 1 | 84 (19) | 0 | 21 | 0 | 21 | 16 | 18 KB |
-| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 331 | 68 | 1709 (95) | 5 | 1873 | 0 | 1873 | 97 | 1561 KB |
-| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 3 | 96 (96) | 0 | 662 | 0 | 662 | 16 | 546 KB |
-| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 442 | 14 | 449 | 1 | 4412 (190) | 546 | 3988 | 0 | 3988 | 86 | 3031 KB |
+| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 1 | 84 (17) | 0 | 20 | 0 | 20 | 15 | 17 KB |
+| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 330 | 68 | 1709 (112) | 5 | 1823 | 0 | 1823 | 90 | 1410 KB |
+| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 3 | 96 (96) | 0 | 679 | 0 | 679 | 17 | 560 KB |
+| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 423 | 33 | 423 | 1 | 4412 (189) | 546 | 4000 | 0 | 4000 | 86 | 3038 KB |
 | act1/cathedrl/inarius.ds1 | act1_cathedral | 110 | 110 | 0 | 0 | 16 | 0 | 145 (0) | 1 | 245 | 0 | 245 | 35 | 202 KB |
-| expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 3 | 0 | 3556 (440) | 0 | 542 | 0 | 542 | 47 | 888 KB |
-| all | | 15842 | 11821 | 3471 | 341 | 4840 | 209 | 75996 (3437) | 747 | 31627 | 5743 | 25884 | | 22446 KB |
+| expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 3 | 0 | 3556 (481) | 0 | 532 | 0 | 532 | 45 | 748 KB |
+| all | | 15842 | 11821 | 3016 | 796 | 3949 | 209 | 75996 (3323) | 823 | 32887 | 7052 | 25835 | | 21672 KB |
 
-Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 41748 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
+Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 44269 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
 
-Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 of the learnt D2R maps have 3503 of their 6361 wall entities (55%; same model within 1.5 units).
+Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 of the learnt D2R maps have 3477 of their 6363 wall entities (55%; same model within 1.5 units).
 
 <!-- walls_hd:end -->
 
@@ -200,16 +233,18 @@ crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #
 |---|---|---|---|
 | act3/jungle/dungrm6a | 90 Flayer Dungeon 3 | yes | stone walls, arches and the iron gate follow the classic layout |
 | act3/temple/temple5, temple6 | 96 Forgotten Reliquary (one of the two, identical in Median) | yes | temple walls and pillars as in classic; the HD floor is the Kurast biome's grass where classic has temple stone (biome, not walls) |
-| act1/caves/caveroom4 | 15 Hole Level 2 | partial | cave rock walls where classic has walls; classic's stairs at the arrival have no HD model (Median's map has 87 floor cells, D2R's 400; 21 pieces) |
+| act1/caves/caveroom4 | 15 Hole Level 2 | yes (walls3) | cave rock walls where classic has walls, and the stairs at the arrival as in classic (lane walls3: D2R's `back_stairs01`, item 11). The room is small: 3 wall cells, 84 floor cells, 20 pieces |
 | act3/kurast/excelsior3 | 84 Spider Cave | yes | Kurast walls, stairs and the courtyard as in classic; 68 wall cells stay without (43 tiles no file of the level type has, 25 Kurast corner halves) |
-| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is drawn as floor in HD (biome terrain) and classic's arches under the platform edge are missing |
+| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is still drawn as floor in HD, and classic's arches under the platform edge stay hidden under it (lane walls3: 22 edge pieces are placed there now, but a terrain mesh over the platform only did not change the floor, item 12; open) |
 | expansion/morework/epicwhiners | 13 Cave Level 2 | yes | cave walls, stalagmites and rock mounds roughly where classic has them |
 | act1/cathedrl/inarius | 14 Underground Passage Level 2 | yes | cathedral walls, arches and windows as in classic |
 | expansion/icecave/rockisdead | 116 Drifter Cavern | yes | ice cave walls and ledges where classic has walls (classic is Median's brown cave colour) |
-| the 8 retextured maps | 60, 59, 95, 18, 98, 126, 125, 127 | yes (charismatic partial) | as in lanes walls / wallsfix; glados and cypherpunk now also show Kurast stairs and Travincal trench pieces on floor tiles; charismatic still statues, pillars and building walls but not classic's arches and roofs |
+| the 8 retextured maps | 60, 59, 95, 18, 98, 126, 125, 127 | yes (charismatic partial) | as in lanes walls / wallsfix; glados and cypherpunk now also show Kurast stairs and Travincal trench pieces on floor tiles; charismatic (lane walls3, items 9-10): the Fortress walls, gargoyle pillars and columns now stand along classic's walls (before they floated 3-4 tiles off) and 81 wall cells are left without a model (was 366); classic's cathedral arches and roofs have no D2R model (custom art) |
 
-Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 3 show only part of them (caveroom4,
-belial, charismatic) and all 17 show D2R's stock walls, not Median's colours.
+Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 2 show only part of them (belial:
+the void drawn as floor; charismatic: no arches and roofs) and all 17 show D2R's stock walls, not Median's colours. Lane
+walls3 (2026-10-30, slot 2, runs `checks-20261030-120504-s2` and `checks-20261030-121747-s2`, docs/testing.md "Lane walls3")
+re-checked caveroom4, belial, charismatic, glados and downtown in HD and classic.
 
 ## Median's look on the 8 retextured maps (lane maptint, 2026-10-30)
 

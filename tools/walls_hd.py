@@ -49,6 +49,7 @@ import maps_hd  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 SET_PIECE_CELLS = 3              # see Library.set_piece()
 MIN_MODEL_SHARE = 1 / 3          # see choose()
+ANCHOR_RADIUS = 2                # see Library.anchor()
 TILE = 10.0                      # world units per tile in D2R's scenes
 WALL_ORIENTATIONS = set(range(1, 10))   # .dt1 orientations 1-9: walls and their corners/ends (10+: specials, shadow, tree, roof)
 # The cap (cache lane, bug #360 asset cache overflow): no generated scene above D2R's largest map scene, act3/docktown/docktown3
@@ -71,6 +72,13 @@ STOCK = ["act3/jungle/dungrm6a.ds1", "act3/temple/temple5.ds1", "act3/temple/tem
          "act3/kurast/excelsior3.ds1", "act2/arcane/belial.ds1", "expansion/morework/epicwhiners.ds1",
          "act1/cathedrl/inarius.ds1", "expansion/icecave/rockisdead.ds1"]
 MAPS = RETEXTURED + STOCK   # every map tools/maps_hd.py gives a minimal scene (17): each gets a wall scene from stock models
+# Maps whose HD scene gets its own terrain mesh over its floor and wall cells only (lane walls3): -> the D2R map whose terrain
+# model is the template. Without a terrain entity the engine paints the biome's floor over the whole map rectangle; in the
+# Arcane Sanctuary that put floor where classic has the starry void, and hid the arches that hang under the platform edges.
+# D2R's own Arcane maps have a mesh over their platforms only (sancte: 482 flat triangles at y = 0). Tried on belial
+# ({"act2/arcane/belial.ds1": "act2/arcane/sancte"}, also with sancte's physics body): the scene loads, no assert, but HD still
+# draws floor over the void (docs/maps-hd.md item 12), so no map uses it yet.
+TERRAIN_MAPS = {}
 KEEP_COMPONENTS = {"TransformDefinitionComponent", "ModelDefinitionComponent", "ModelVariationDefinitionComponent",
                    "ModelPlatformTierComponent", "WallTransparencyComponent"}
 # Decoration that D2R's artists put on and around walls (plants, rubble, bones, stains): not part of the wall, and copied per
@@ -213,16 +221,187 @@ def is_decor(e) -> bool:
     return bool(DECOR.search(m)) and not STRUCTURE.search(m)
 
 
-def wall_entities(scene: dict):
-    """The scene's entities that carry a model and are neither the baked terrain nor decoration: [(entity, x, z)]."""
+def wall_entities(scene: dict, ground=None):
+    """The scene's entities that carry a model and are neither the baked terrain nor decoration: [(entity, x, z)].
+
+    With `ground` (a Ground of the scene's terrain), every entity is moved down to the gameplay plane: D2R's HD camera is an
+    orthographic one at the true isometric angle, so a piece standing on terrain raised by g is drawn at (x + g, y + g, z + g)
+    to stay over its tile (the Fortress interior stands about 35 units up and its walls sit 3-4 tiles off their wall cells;
+    lane walls3). (x - g, y - g, z - g) is the same spot on screen at ground level: the tile it belongs to, and the height
+    it needs in a scene without D2R's terrain (Median's maps are flat). The entity is a copy with a new transform then."""
     out = []
     for e in scene.get("entities", ()):
         t, m = transform(e), model_of(e)
         if not t or not m or e.get("name") == "terrain" or any(c.get("type") == "TerrainDefinitionComponent" for c in e["components"]) or is_decor(e):
             continue
         p = t.get("position", {})
-        out.append((e, float(p.get("x", 0.0)), float(p.get("z", 0.0))))
+        x, z = float(p.get("x", 0.0)), float(p.get("z", 0.0))
+        g = ground.height(x, z) if ground is not None else 0.0
+        if abs(g) >= 0.01:
+            t2 = dict(t, position=dict(p, x=round(x - g, 3), y=round(float(p.get("y", 0.0)) - g, 3), z=round(z - g, 3)))
+            e = dict(e, components=[t2 if c is t else c for c in e["components"]])
+            x, z = x - g, z - g
+        out.append((e, x, z))
     return out
+
+
+# ---- D2R's terrain (heights of its baked terrain mesh) ------------------------------------------------------------------
+class Ground:
+    """Height of a D2R map's baked terrain: the preset's `terrain` entity draws one GR2 mesh (terrain_lod0.model), in world
+    units like the entities. height(x, z): the highest triangle over the point; outside the mesh (Arcane void, a cliff
+    foot) the nearest vertex within `near` units, else 0."""
+
+    def __init__(self, pos, tris, near=15.0):
+        self.pos, self.tris, self.near = pos, tris, near
+        self.cells = collections.defaultdict(list)
+        for n, (a, b, c) in enumerate(tris):
+            xs, zs = (pos[a][0], pos[b][0], pos[c][0]), (pos[a][2], pos[b][2], pos[c][2])
+            for cx in range(int(min(xs) // TILE), int(max(xs) // TILE) + 1):
+                for cz in range(int(min(zs) // TILE), int(max(zs) // TILE) + 1):
+                    self.cells[(cx, cz)].append(n)
+
+    def height(self, x: float, z: float) -> float:
+        best = None
+        for n in self.cells.get((int(x // TILE), int(z // TILE)), ()):
+            a, b, c = (self.pos[i] for i in self.tris[n])
+            d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2])
+            if abs(d) < 1e-9:
+                continue
+            u = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d
+            v = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d
+            if u < -1e-6 or v < -1e-6 or u + v > 1 + 1e-6:
+                continue
+            y = u * a[1] + v * b[1] + (1 - u - v) * c[1]
+            best = y if best is None else max(best, y)
+        if best is not None:
+            return best
+        d2, y = min(((p[0] - x) ** 2 + (p[2] - z) ** 2, p[1]) for p in self.pos) if self.pos else (0.0, 0.0)
+        return y if d2 <= self.near ** 2 else 0.0
+
+
+def terrain_mesh(tree):
+    """(positions [(x, y, z)], triangles [(a, b, c)]) of every mesh of a parsed terrain model (tools/d2r_model.py tree):
+    BinormalInt16 positions scaled by the mesh's VertexScale."""
+    pos, tris = [], []
+    for m in tree["Meshes"]:
+        ed = m["ExtendedData"].obj if m.get("ExtendedData") is not None else None
+        scale = float(ed["VertexScale"]) if ed is not None and ed.get("VertexScale") else 1.0
+        base = len(pos)
+        for v in m["PrimaryVertexData"]["Vertices"].obj:
+            p = v["Position"]
+            pos.append(tuple(float(p[i]) / 32767 * scale for i in range(3)) if isinstance(p[0], int) else tuple(float(p[i]) for i in range(3)))
+        topo = m["PrimaryTopology"]
+        idx = [o["Int16"] for o in topo.get("Indices16") or ()] or [o["Int32"] for o in topo.get("Indices") or ()]
+        tris += [(base + idx[i], base + idx[i + 1], base + idx[i + 2]) for i in range(0, len(idx) - 2, 3)]
+    return pos, tris
+
+
+def terrain_path(scene: dict):
+    """The game path of the scene's terrain mesh: 'data/hd/env/preset/act2/arcane/sanctE/terrain.model' names
+    data/hd/env/preset/act2/arcane/sancte/terrain_lod0.model (the engine adds the LOD; CASC names are lower case)."""
+    comp = next((c for c in (scene.get("terrain") or {}).get("components", ()) if c.get("type") == "ModelDefinitionComponent"), None)
+    if not comp or not comp.get("filename", "").endswith(".model"):
+        return None
+    return comp["filename"].lower()[:-len(".model")] + "_lod0.model"
+
+
+def d2r_ground(key: str, scene: dict):
+    """Ground of a D2R map's scene, None without a terrain mesh (read like d2r_scene: extraction, cache, slot CASC)."""
+    import d2r_model
+    rel = terrain_path(scene)
+    data = d2r_bytes(rel) if rel else None
+    if not data:
+        return None
+    pos, tris = terrain_mesh(d2r_model.parse_tree(d2r_model.Gr2File.read(data)))
+    return Ground(pos, tris)
+
+
+def terrain_cells(cells) -> set:
+    """The cells a generated terrain covers: every floor or wall cell with a floor or wall cell next to it (the lone corner
+    tiles that mark a preset's extent, (0, 0) and (w-1, h-1) in the Arcane maps, stay bare, as in D2R's sancte)."""
+    have = set(cells)
+    return {(x, y) for x, y in have if {(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)} & have}
+
+
+def terrain_model(template: bytes, cells, width: int, height: int) -> bytes:
+    """A terrain_lod0.model: the template (a D2R terrain model: one rigid mesh 'terrainShape', vertices Position int16[4],
+    Normal, Tangent, half-float UV) with its mesh replaced by flat quads at y = 0 over `cells` (tile coordinates). As in D2R's
+    own: world positions, UV = position / map size, the bone and the model placed at the map's centre, the bone binding's box
+    in bone space, the reflective plane the mesh's bounds, triangles wound as D2R's (clockwise seen from above)."""
+    import math
+    import d2r_model as dm
+    gr2 = dm.Gr2File.read(template)
+    tree = dm.parse_tree(gr2)
+    corners, tris = {}, []
+
+    def corner(x, z):
+        return corners.setdefault((x, z), len(corners))
+    for x, z in sorted(cells, key=lambda c: (c[1], c[0])):
+        a, b, c, d = corner(x, z), corner(x + 1, z), corner(x + 1, z + 1), corner(x, z + 1)
+        tris += [(a, c, b), (a, d, c)]
+    if not tris or len(corners) > 65535:
+        raise ValueError("terrain_model: %d cells, %d corners" % (len(cells), len(corners)))
+    pos = sorted(corners, key=corners.get)
+    xs, zs = [p[0] * TILE for p in pos], [p[1] * TILE for p in pos]
+    scale = max(max(xs), max(zs), 1.0)
+    w = int(round(math.log2(scale) / 13 * 32767))
+    mesh = tree["Meshes"][0]
+    vertices = mesh["PrimaryVertexData"]["Vertices"]
+    vtd = vertices.obj[0].td
+    sx, sz = width * TILE, height * TILE
+    vertices.obj = [dm.Obj(vtd, {
+        "Position": [int(round(x / scale * 32767)), 0, int(round(z / scale * 32767)), w],
+        "Normal": [0, 127, 0, 0], "Tangent": [127, 0, 0, -127],
+        "TextureCoordinates0": [_half(x / sx), _half(z / sz)]}) for x, z in zip(xs, zs)]
+    topo = mesh["PrimaryTopology"]
+    itd = topo["Indices16"][0].td
+    topo["Indices16"] = [dm.Obj(itd, {"Int16": i}) for t in tris for i in t]
+    topo["Groups"] = topo["Groups"][:1]
+    topo["Groups"][0]["TriFirst"], topo["Groups"][0]["TriCount"] = 0, len(tris)
+    lo, hi = [min(xs), 0.0, min(zs)], [max(xs), 0.0, max(zs)]
+    centre = (sx / 2, 0.0, sz / 2)
+    ed = mesh["ExtendedData"].obj
+    ed["bbMin"], ed["bbMax"], ed["VertexScale"] = lo, hi, float(scale)
+    for plane in ed.get("ReflectivePlanes") or ():
+        plane["Position"] = [(lo[0] + hi[0]) / 2, 0.0, (lo[2] + hi[2]) / 2]
+        plane["Size"] = [hi[0] - lo[0], 0.0, hi[2] - lo[2]]
+    for bind in mesh["BoneBindings"]:
+        bind["OBBMin"] = [lo[i] - centre[i] for i in range(3)]
+        bind["OBBMax"] = [hi[i] - centre[i] for i in range(3)]
+    for bone in tree["Skeletons"][0]["Bones"]:
+        bone["InverseWorldTransform"] = list(bone["InverseWorldTransform"][:12]) + [-centre[0], 0.0, -centre[2], 1.0]
+    for model in tree["Models"]:
+        p = model["InitialPlacement"]
+        model["InitialPlacement"] = dm.Transform(p.flags, centre, p.orientation, p.scale_shear)
+    out = dm.Writer(gr2).build(tree).write()
+    dm.parse_tree(dm.Gr2File.read(out))      # well formed
+    return out
+
+
+def _half(f: float) -> int:
+    import struct
+    return struct.unpack("<H", struct.pack("<e", f))[0]
+
+
+def terrain_entity(path: str) -> dict:
+    """The scene's `terrain` for a generated mesh at game path `path` (…/terrain.model; the file is …/terrain_lod0.model):
+    D2R's own terrain entity (sancte's) without the physics body (classic does the collision; no physics file to ship)."""
+    name = "terrain"
+    return {"type": "Entity", "name": name, "id": 1449264087, "components": [
+        {"type": "TransformDefinitionComponent", "name": name + "_TransformDefinitionComponent", "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+         "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}, "scale": {"x": 1.0, "y": 1.0, "z": 1.0}, "inheritOnlyPosition": False},
+        {"type": "TerrainDefinitionComponent", "name": name + "_TerrainDefinitionComponent"},
+        {"type": "ModelDefinitionComponent", "name": name + "_ModelDefinitionComponent", "filename": path, "visibleLayers": 1,
+         "lightMask": 19, "shadowMask": 3, "ghostShadows": False, "floorModel": False, "terrainBlendEnableYUpBlend": False,
+         "terrainBlendMode": 1}]}
+
+
+def add_terrain(text: str, path: str) -> str:
+    """A scene_json() text with terrain_entity(path) as its terrain (also named in the dependencies, as D2R's are)."""
+    scene = json.loads(text)
+    scene["terrain"] = terrain_entity(path)
+    scene["dependencies"]["other"] = scene["dependencies"].get("other", []) + [{"path": path}]
+    return json.dumps(scene, separators=(",", ":"))
 
 
 def strip_entity(e: dict) -> dict:
@@ -248,14 +427,20 @@ class Library:
         self.model_cells = collections.Counter()                    # model -> D2R wall cells it stands on
         self.generic = collections.defaultdict(collections.Counter)  # (tile set folder or act, orientation) -> Counter(signature)
         self._generic = {}
+        self.maps = {}                                             # map -> (cells, [(entity, x, z) on no cell]) until anchor()
+        self.anchored = {}                                         # key -> [(entity, dx, dz)] anchor() hangs on it
 
-    def learn(self, name: str, cells: dict, scene: dict):
-        """cells: wall_cells() of a D2R map; scene: its preset json."""
-        per_cell = collections.defaultdict(list)
-        for e, x, z in wall_entities(scene):
+    def learn(self, name: str, cells: dict, scene: dict, ground=None):
+        """cells: wall_cells() of a D2R map; scene: its preset json; ground: its Ground (wall_entities)."""
+        per_cell, homeless = collections.defaultdict(list), []
+        for e, x, z in wall_entities(scene, ground):
             xy = (int(x // TILE), int(z // TILE))
             if xy in cells:
                 per_cell[xy].append((e, round(x - xy[0] * TILE, 3), round(z - xy[1] * TILE, 3)))
+            else:
+                homeless.append((strip_entity(e), x, z))
+        if homeless:
+            self.maps[name] = (cells, homeless)
         for ents in per_cell.values():
             for e, _dx, _dz in ents:
                 self.model_cells[model_of(e)] += 1
@@ -273,6 +458,36 @@ class Library:
                     self.generic[(key[0][0], key[0][1])][sig] += 1
                     self.generic[(act_of(key[0][0]), key[0][1])][sig] += 1
             self.sources[name] += 1
+
+    def anchor(self, radius=ANCHOR_RADIUS, share=MIN_MODEL_SHARE):
+        """Hang the pieces that stand on no learnt cell on the rarest key next to them. D2R's artists place a model where it
+        looks right, not on the tile it belongs to: the Act 1 caves' stairs (back_stairs01) stand on the void cell beside the
+        stairs tiles in all 21 cave maps that have them, so they were never learnt and caveroom4's arrival had no stairs (lane
+        walls3). Such an entity is counted on the rarest learnt key within `radius` cells, at its offset from that cell; a
+        (model, offset) found on at least `share` of that key's cells, and on SET_PIECE_CELLS of them, is placed with the key
+        from then on (build_scene). (Hanging also the pieces a cell's own pick() leaves out raised the self-check from 55% to
+        71%, but grew glados, cypherpunk and desertpeak past the cap with props: not done.)"""
+        total = {k: sum(c.values()) for k, c in self.seen.items()}
+        counts, items = collections.defaultdict(collections.Counter), {}
+        for cells, homeless in self.maps.values():
+            for e, x, z in homeless:
+                xy = (int(x // TILE), int(z // TILE))
+                near = [(total[cells[n]], max(abs(n[0] - xy[0]), abs(n[1] - xy[1])), n)
+                        for n in ((xy[0] + i, xy[1] + j) for i in range(-radius, radius + 1) for j in range(-radius, radius + 1))
+                        if cells.get(n) in total]
+                if not near:
+                    continue
+                n = min(near)[2]
+                m, off = model_of(e), (round(x - n[0] * TILE, 1), round(z - n[1] * TILE, 1))
+                counts[cells[n]][(m, off)] += 1
+                items.setdefault((cells[n], m, off), e)
+        self.anchored = {}
+        for k, c in counts.items():
+            keep = [(items[(k, m, off)], off[0], off[1]) for (m, off), n in sorted(c.items())
+                    if n >= share * total[k] and n >= SET_PIECE_CELLS]
+            if keep:
+                self.anchored[k] = keep
+        self.maps = {}
 
     def set_piece(self, model) -> bool:
         """A model D2R puts on fewer than SET_PIECE_CELLS wall cells in all its maps (Tal Rasha's chamber in duriel.ds1, a
@@ -296,6 +511,10 @@ class Library:
                 common = len(tiles & set(k))
                 if common > score:
                     best, score = choose(c), common
+            if best == ():   # ... bare there: weaker than a wall of the tile set (charismatic's Fortress walls of style 4, lane walls3)
+                best = self.generic_pick(key) or ()
+                if best:
+                    return best, "generic"
         if best is not None:
             return best, "partial"
         best = self.generic_pick(key)
@@ -402,9 +621,12 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
     ents, stats = [], collections.Counter()
     for serial, (xy, key) in enumerate(sorted(cells.items(), key=lambda t: (t[0][1], t[0][0]))):
         sig, how = lib.pick(key)
+        extra = list(lib.anchored.get(key, ())) if how == "exact" else []
+        stats["anchored"] += len(extra)
         if is_floor(key):          # floor-only cells: counted apart, never 'uncovered' (most floors are bare ground)
             stats["floor_cells"] += 1
             if not sig:
+                ents += place(extra, xy[0], xy[1], serial)
                 continue
             stats["floor_walls"] += 1
         elif sig is None:
@@ -417,7 +639,7 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
         variant = lib.variants.get(sig, [])
         keep = [v for v in variant if not lib.set_piece(model_of(v[0]))]
         stats["set_pieces"] += len(variant) - len(keep)
-        ents += place(keep, xy[0], xy[1], serial)
+        ents += place(keep + extra, xy[0], xy[1], serial)
     kept = cap(ents, limit)
     text = scene_json(biome, kept)
     while len(text.encode("utf-8")) > max_bytes and kept:
@@ -435,19 +657,18 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
 _CASC = []
 
 
-def d2r_scene(key: str):
-    """D2R's preset json of a map key (no .ds1): the D2R extraction, else the shared cache (fxpaths.D2R_CACHE), else read once
-    from a game slot's CASC (MXL_SLOT, read-only, one storage handle for the whole run) into the cache, as fxpaths.d2r_file does.
-    None when the scene is in none of them."""
+def d2r_bytes(rel: str):
+    """A D2R file (rel = 'data/hd/...'): the D2R extraction, else the shared cache (fxpaths.D2R_CACHE), else read once from a
+    game slot's CASC (MXL_SLOT, read-only, one storage handle for the whole run) into the cache, as fxpaths.d2r_file does.
+    None when it is in none of them."""
     import os
     import fxpaths
-    rel = "data/hd/env/preset/%s.json" % key
     for p in (fxpaths.D2R / rel, fxpaths.D2R_CACHE / rel):
         if p.exists():
-            return json.loads(p.read_text("utf-8"))
+            return p.read_bytes()
     if not os.environ.get("MXL_SLOT") and not os.environ.get("MXL_D2R_GAME"):
-        raise SystemExit("walls_hd: D2R's scene %s is in neither the D2R extraction nor the cache (%s); run once with MXL_SLOT=2..5 "
-                         "to read D2R's scenes from that slot's CASC into the shared cache" % (rel, fxpaths.D2R_CACHE))
+        raise SystemExit("walls_hd: D2R's %s is in neither the D2R extraction nor the cache (%s); run once with MXL_SLOT=2..5 "
+                         "to read D2R's scenes and terrain from that slot's CASC into the shared cache" % (rel, fxpaths.D2R_CACHE))
     import d2r_game
     import native
     if not _CASC:
@@ -461,7 +682,17 @@ def d2r_scene(key: str):
     tmp = cache.with_name(cache.name + ".%d.tmp" % os.getpid())   # a shared cache: readers never see half a file
     tmp.write_bytes(data)
     os.replace(tmp, cache)
-    return json.loads(data.decode("utf-8"))
+    return data
+
+
+def d2r_scene(key: str):
+    """D2R's preset json of a map key (no .ds1), read by d2r_bytes. None when the scene is nowhere or not json (two of D2R's
+    own, kurastbazaar_02 and trav1a, are not)."""
+    data = d2r_bytes("data/hd/env/preset/%s.json" % key)
+    try:
+        return json.loads(data.decode("utf-8-sig")) if data is not None else None
+    except ValueError:
+        return None
 
 
 def needed_stock(maps_by_key, donors):
@@ -473,7 +704,7 @@ def learns_from(files, needed_dirs) -> bool:
     return any(maps_hd.tiledir(f) in needed_dirs for f in files)
 
 
-def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=None):
+def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=None, ground_of=d2r_ground):
     """Library from every D2R map with a scene whose header names a tile file of one of the `needed` folders."""
     tiles = tiles or maps_hd.parse_tiles(inp.d2r_tiles)
     lib = Library()
@@ -487,24 +718,25 @@ def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=No
         scene = scene_of(key)
         if scene is None:
             continue
-        lib.learn(key, map_cells(ds, files, tiles.get), scene)
+        lib.learn(key, map_cells(ds, files, tiles.get), scene, ground_of(key, scene))
+    lib.anchor()
     return lib
 
 
-def recall(cells: dict, scene: dict, lib: Library, near=1.5):
+def recall(cells: dict, scene: dict, lib: Library, near=1.5, ground=None):
     """Self-check on one of D2R's own maps: the share of its wall entities (on wall cells, decor dropped) that the library's
     scene for the same cells has too (same model within `near` units). -> (found, total)."""
-    want = [(model_of(e), x, z) for e, x, z in wall_entities(scene) if (int(x // TILE), int(z // TILE)) in cells]
+    want = [(model_of(e), x, z) for e, x, z in wall_entities(scene, ground) if (int(x // TILE), int(z // TILE)) in cells]
     have = collections.defaultdict(list)
     for xy, key in cells.items():
-        sig, _how = lib.pick(key)
-        for m, dx, dz in sig or ():
+        sig, how = lib.pick(key)
+        for m, dx, dz in list(sig or ()) + [(model_of(e), dx, dz) for e, dx, dz in (lib.anchored.get(key, ()) if how == "exact" else ())]:
             have[m].append((xy[0] * TILE + dx, xy[1] * TILE + dz))
     found = sum(1 for m, x, z in want if any(abs(x - hx) <= near and abs(z - hz) <= near for hx, hz in have[m]))
     return found, len(want)
 
 
-def self_check(inp: maps_hd.Inputs, lib: Library, sample=40, scene_of=d2r_scene):
+def self_check(inp: maps_hd.Inputs, lib: Library, sample=40, scene_of=d2r_scene, ground_of=d2r_ground):
     """recall() over every n-th learnt map (at most `sample`). -> (found, total, maps)."""
     tiles = maps_hd.parse_tiles(inp.d2r_tiles)
     keys = sorted(lib.sources)
@@ -512,9 +744,16 @@ def self_check(inp: maps_hd.Inputs, lib: Library, sample=40, scene_of=d2r_scene)
     f = t = 0
     for key in keys:
         ds = ds1_remap.Ds1(inp.d2r_tiles.read(key + ".ds1"))
-        a, b = recall(map_cells(ds, header_dt1(ds), tiles.get), scene_of(key), lib)
+        scene = scene_of(key)
+        a, b = recall(map_cells(ds, header_dt1(ds), tiles.get), scene, lib, ground=ground_of(key, scene))
         f, t = f + a, t + b
     return f, t, len(keys)
+
+
+def floor_tiles(inp: maps_hd.Inputs, name: str) -> set:
+    """The cells of a Median map with a floor tile in any floor layer (walls standing over the void have none)."""
+    ds = ds1_remap.Ds1(inp.mod_tiles.read(name))
+    return {(i % ds.width, i // ds.width) for lay in ds.floor_layers() for i, c in enumerate(lay) if c}
 
 
 def median_cells(inp: maps_hd.Inputs, entry: dict, donors: dict, tiles: dict):
@@ -522,7 +761,7 @@ def median_cells(inp: maps_hd.Inputs, entry: dict, donors: dict, tiles: dict):
     return map_cells(ds, entry["dt1_files"], tiles.get, lambda p: donors[p]["donor"] if p in donors else p)
 
 
-def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene):
+def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground):
     """-> (maps entries, {map: cells}, Library)."""
     maps, _dt1s, _levels = maps_hd.plan(inp)
     stock = maps_hd.parse_tiles(inp.d2r_tiles)
@@ -533,14 +772,17 @@ def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene):
     donors = maps_hd.donor_table(new, stock)
     wanted = [e for e in maps if e["map"] in (only or MAPS)]
     cells = {e["map"]: median_cells(inp, e, donors, tiles) for e in wanted}
-    lib = learn_library(inp, needed_stock(cells, donors), scene_of, stock)
+    lib = learn_library(inp, needed_stock(cells, donors), scene_of, stock, ground_of)
     return wanted, cells, lib
 
 
-def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None):
+def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None):
     """Write the wall scenes. -> {map: stats + bytes}. biomes: {map: biome name}; None = the biome of the scene maps_hd's
     build wrote into data_dir (a generated floor biome, maps_hd.floor_biomes), else the plan's. The maps of map_tint.TINTS get a
-    copy of that biome with their own key light (tools/map_tint.py); read(rel) -> D2R json for it (default fxpaths)."""
+    copy of that biome with their own key light (tools/map_tint.py); read(rel) -> D2R json for it (default fxpaths).
+    The maps of TERRAIN_MAPS also get their terrain mesh (terrain_model; d2r_read(rel) -> the template's bytes, default
+    d2r_bytes), next to the scene as <map>/terrain_lod0.model, over floors[map] (floor_tiles; default: the map's cells);
+    the map's size is its cells' extent (the corner tiles)."""
     out = {}
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
@@ -548,6 +790,15 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None):
         text, st = build_scene(cells[e["map"]], lib, biome)
         dest = Path(data_dir) / "hd" / "env" / "preset" / (e["map"][:-4] + ".json")
         dest.parent.mkdir(parents=True, exist_ok=True)
+        if e["map"] in TERRAIN_MAPS:
+            mc = cells[e["map"]]
+            template = (d2r_read or d2r_bytes)("data/hd/env/preset/%s/terrain_lod0.model" % TERRAIN_MAPS[e["map"]])
+            ground = terrain_cells((floors or {}).get(e["map"]) or mc)
+            model = terrain_model(template, ground, max(x for x, _ in mc) + 1, max(y for _, y in mc) + 1)
+            (dest.parent / dest.stem).mkdir(exist_ok=True)
+            (dest.parent / dest.stem / "terrain_lod0.model").write_bytes(model)
+            text = add_terrain(text, "data/hd/env/preset/%s/terrain.model" % e["map"][:-4])
+            st = dict(st, terrain_cells=len(ground), terrain_bytes=len(model))
         dest.write_text(text, encoding="utf-8")
         out[e["map"]] = dict(st, bytes=len(text.encode("utf-8")), biome=biome)
     return out
@@ -600,7 +851,7 @@ def main(argv=None):
     if a.cmd != "build":     # no maps_hd build in this folder: write the floor biomes here too
         maps, dt1s, _levels = maps_hd.plan(inp)
         biomes = maps_hd.floor_biomes(data_dir, maps, dt1s)
-    stats = build(data_dir, wanted, cells, lib, biomes)
+    stats = build(data_dir, wanted, cells, lib, biomes, floors={m: floor_tiles(inp, m) for m in TERRAIN_MAPS if m in cells})
     table = md_table(stats, lib)
     if a.cmd in ("report", "docs"):
         f, t, n = self_check(inp, lib)
