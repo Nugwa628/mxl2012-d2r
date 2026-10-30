@@ -8,9 +8,12 @@ CelFile, tools/effects_hd.py per row) cannot give a row without art a stand-in. 
   1. general repairs: a stray ".dcc" / ".dc6" in the name is dropped when the file without it exists (Median writes
      "extra\\firesmoke.dcc"; the engine adds the extension itself), and the "|" Median's table conversion left in
      place of the path separator ("expansion|baaldeathghostie01") becomes "\\";
-  2. REDIRECT: what is still missing is read from this table (lowercase name -> existing file, D2R's or Median's),
-     chosen by element / shape words, colour and size of the row (docs/hd-effects.md section 7);
-  3. anything left is reported and fails validate.py ("art": missing animation).
+  2. DRAW_NOTHING (owner 2026-10-29): a row with missing art that no player skill (class or item-given) and no monster
+     skill reaches keeps Median's result, nothing drawn: its art becomes D2R's empty "null" (classic draws nothing, the HD
+     effect maps give it none);
+  3. REDIRECT: what is still missing (rows a skill uses) is read from this table (lowercase name -> existing file, D2R's
+     or Median's), chosen by element / shape words, colour and size of the row (docs/hd-effects.md section 5);
+  4. anything left is reported and fails validate.py ("art": missing animation).
 
 The new CelFile / Filename is a D2R file wherever one fits, so missile_hd.py and effects_hd.py (which run next) find the
 exact HD model of that D2R row. Median-only art (blackpentacle) goes through effects_hd.py's closest-effect scoring.
@@ -34,6 +37,25 @@ EXCEL = OUT / "data" / "global" / "excel"
 # table -> (art column, art folder under data/global)
 TABLES = {"missiles": ("CelFile", "missiles"), "overlay": ("Filename", "overlays")}
 
+# Rows whose art exists nowhere and that nothing a player or monster casts reaches (lane unporteda, 2026-10-29: skills.txt
+# srv/clt missile and overlay columns, missiles.txt sub / hit / explosion chains, states' overlays, monstats Skill1-8 and
+# Miss*, item properties by skill name or id; docs/hd-effects.md section 5). Lowercase row name -> why.
+DRAW_NOTHING = {
+    "missiles": {
+        "combatshotarrow": "no skill names it (TeethExplodeYellow)",
+        "whyaretherealways": "only snakeshieldspawner's chain, which no skill fires (XXXXX)",
+        "twinklesmash": "no skill names it (LazBloodMissile)",
+        "mythalexplode": "no skill names it (DopplezonExplodeX)",
+        "cherubcenter": "only Mon Cherub Avatar, which no monster, item or skill has (cherub)",
+    },
+    "overlay": {
+        "laststandhit": "no skill or state names it (DopplezonExplodeBlue)",
+        "mortalstrikehit": "no skill or state names it (DopplezonExplodeLilac)",
+        "cc_dust": "no skill or state names it (CeilingChunkVanish01)",
+        "gorecarpet": "no skill or state names it (gore20)",
+    },
+}
+
 # Lowercase name as written in the table -> existing art (without extension, backslashes as D2R's own tables).
 # Missile art: data/global/missiles; overlay art: data/global/overlays.
 REDIRECT = {
@@ -41,8 +63,8 @@ REDIRECT = {
         "poisonspark": "poisonsparks",                                   # D2R's file is plural
         "expansion\\baaldeathghostie01": "expansion\\baaldeathghostie01",  # (the "|" repair, kept for the report)
         "greenflare": "fireball",                                        # searing_orb_missile: orange orb, 16 directions
-        "teethexplodeyellow": "teethexplode",
-        "dopplezonexplodex": "dopplezonexplode",
+        "teethexplodeyellow": "teethexplode",                            # sunspear2 (Sunspear, runeword Dragonfly)
+        "dopplezonexplodex": "dopplezonexplode",                         # seismicfieldexplode (Seismic Field)
         "extra\\spikefiendmamamissile": "extra\\spikefiendmamamissle",   # D2R's own spelling
         "extra\\icestormimpactvar3": "extra\\icestormimpactvar03",
         "kabraxis_horadric": "horadriclightbeamstreaks",                 # blue looping beam, 1 direction
@@ -51,22 +73,15 @@ REDIRECT = {
         "scosblizzard": "blizzard",
         "nul": "null",                                                   # vanilla's dead row; D2R draws nothing for null
         # Median XL 2012 v005 rows (lane boot):
-        "xxxxx": "null",                                                 # whyaretherealways: placeholder name, dead row
-        "cherub": "yellowballglow2",                                     # cherubcenter: yellow light, 1 direction
-        "lazbloodmissile": "bloodlarge01",                               # twinklesmash: red blood splash
         "andarielflamedeath2": "andarielflamedeath",                     # nephalemweapons: D2R has the first variant only
     },
     "overlay": {
-        "dopplezonexplodeblue": "dopplezonappear",
-        "dopplezonexplodelilac": "dopplezonappear",
         "extra\\auraresistcoldcast": "auraresistcoldcast",
         "pentacle": "blackpentacle",                                     # Median's own file
         "extra\\genericsplash": "extra\\generic_splash",
-        "ceilingchunkvanish01": "expansion\\seigebeast_dust",            # D2R has the chunk as a missile, not an overlay
         "lazblood": "bloodripple",
         "whiteblinding": "extra\\whiteflash",
         "threeflames": "firecast_for_sorceress",
-        "gore20": "bloodripple",                                         # vanilla's dead row
         "zombiesparx": "extra\\goohit",
         "spoverlray2": "holyshockhit",
     },
@@ -99,8 +114,9 @@ def art_exists(table: str, name: str) -> str | None:
     return None
 
 
-def resolve(table: str, name: str) -> tuple[str, str]:
-    """(new name, how): 'ok' already exists, 'repaired' by the general rules, 'redirected', 'missing'."""
+def resolve(table: str, name: str, row: str = "") -> tuple[str, str]:
+    """(new name, how): 'ok' already exists, 'repaired' by the general rules, 'draws nothing' (DRAW_NOTHING), 'redirected',
+    'missing'."""
     if not name or art_exists(table, name):
         return name, "ok"
     fixed = name.replace("|", "\\")
@@ -109,6 +125,8 @@ def resolve(table: str, name: str) -> tuple[str, str]:
             fixed = fixed[:-len(ext)]
     if fixed != name and art_exists(table, fixed):
         return fixed, "repaired"
+    if row.lower() in DRAW_NOTHING[table]:
+        return "null", "draws nothing"
     target = REDIRECT[table].get(norm(fixed))
     if target and art_exists(table, target):
         return target, "redirected"
@@ -136,7 +154,7 @@ def main() -> int:
             for r in rows:
                 if not r or not r[0]:
                     continue
-                new, how = resolve(table, r[c])
+                new, how = resolve(table, r[c], r[0])
                 if how == "missing":
                     missing += 1
                     report.append(f"| {table} | {r[0]} | `{r[c]}` | | **missing, no redirect** |")

@@ -97,6 +97,11 @@ No game run was possible here (the game accounts don't own Reign of the Warlock)
    duplicates)? The flat part is most of Cleave's damage (316 of 428 per hit at slvl 20, 1,274 of 1,423 at slvl 40): if D2R's
    function 164 ignores `calc2`, Cleave is 4x too weak at slvl 20 and 10x at slvl 40. Report it; the fallback is to put the
    flat part into the weapon damage % (numbers only).
+   **Static read (lane unporteda, 2026-10-29, `mxl2012-runs/unporteda/fn164.md`):** function 164 (`0x521750`) hands every target to
+   D2R's shared melee damage builder `0x567070` (also Bash's start function 32), which evaluates `calc2` (record +0x194) and adds it
+   as flat physical damage (`add [hit+0x18], calc2 << 8`); function 166 (`0x522e70`) calls the same builder per melee attack, which
+   adds the EType / EMin / EMax block (`0x437d00`) and `calc2`. So the flat parts reach the hit; still to see in a playtest (the
+   ranged path of 166, `0x523370`, was not traced).
 2. **Skill-point gate:** a new Warlock at clvl 1-12. A reqlevel-1 skill takes its 2nd hard point at clvl 1, refuses the 3rd
    before clvl 6 and the 4th before clvl 12 (the + button gives no point). The "Base Skill Level (Maximum ...)" line reads x / y with the right y. A `+skill_more` item
    (Median's) raises it by 1.

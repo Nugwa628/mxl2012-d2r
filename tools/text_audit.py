@@ -37,6 +37,10 @@ mod's `d2r:` overrides, plus the Median-only keys of `mxl2012/median.json`; Engl
                    (strings_ns.D2R_COLOURS): D2R prints it as text (bug #398: Median's `ÿc/` read "*/" in HD and "Ø/" in classic
                    on 706 skill descriptions); tbl2json maps the known ones (strings_ns.COLOUR_MAP); or a code that ends a line,
                    which D2R drops (1.14d colours the next line with it; tbl2json moves it behind the line break)
+  text-words       a text of the mod's own (the long tooltips, item and skill descriptions, dialogue) whose own words carry a
+                   key instead of words: a qualified key (`mxl2012:...`, `d2r:...`), "Missing string", a snake_case token, or a
+                   CamelCase token that is another string's key (lane unporteda: the cells are parsed by the checks above, the
+                   words inside a text were not)
 
 Texts of D2R's own keys that the mod does not replace are D2R's business and skipped (D2R's own `fissure`, a blank guild
 stone), unless the cell is blank. Rows the mod keeps on purpose go into data/text_audit_allow.tsv (kind, table, column, key,
@@ -445,6 +449,28 @@ def audit_colours(strings: Strings) -> list[Finding]:
     return found
 
 
+WORD = re.compile(r"[A-Za-z0-9_:]+")
+
+
+def audit_text_words(strings: Strings) -> list[Finding]:
+    """The mod's own texts whose words name a key: a qualified key, "Missing string", a snake_case token, a CamelCase token
+    that is another key (a key inside a text is drawn as it is, the engine resolves only whole cells)."""
+    found = []
+    for key in sorted(strings.own):
+        text = plain(strings.texts.get(key, ""))
+        bad = []
+        for tok in dict.fromkeys(WORD.findall(text)):
+            low = tok.lower()
+            if low.startswith((ns.PREFIX, ns.D2R_PREFIX)) or (("_" in tok or CAMEL.search(tok)) and low != key
+                                                               and (low in strings.texts or "_" in tok)):
+                bad.append(tok)
+        if "missing string" in text.lower():
+            bad.append("Missing string")
+        if bad:
+            found.append(Finding("text-words", "strings", "text", "string", key, ", ".join(bad)))
+    return found
+
+
 def apply_allow(found: list[Finding], allow: list[dict]) -> tuple[list[Finding], list[str], list[dict]]:
     """-> (findings left, allowed lines for the report, stale allow rows)."""
     used, left, allowed = set(), [], []
@@ -477,6 +503,7 @@ def audit(excel: Path, strings: Strings, layouts: Path | None = None, allow: lis
     if layouts and Path(layouts).exists():
         found += audit_layouts(Path(layouts), strings)
     found += audit_colours(strings)
+    found += audit_text_words(strings)
     left, allowed, stale = apply_allow(found, load_allow() if allow is None else allow)
     report = [f"text_audit: {checked} tables, {len(found)} hits, {len(allowed)} allowed, {len(left)} findings"]
     report += [f"  allowed: {a}" for a in allowed]

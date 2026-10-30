@@ -11668,6 +11668,207 @@ def check_pet_keep():
 CHECKS += [("pet_keep", check_pet_keep)]
 
 
+# ---------------------------------------------------------------- lane unporteda: the class (a) rows of docs/unported.md
+# `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<throwaway> py -3 tools/game_checks.py all ua_look` (MXL_UA=<stages>, default all of
+# `mons ui item maps drop`). Graphics checks seen with the harness (spawn / travel shortcuts, god mode), judged by hand on the shots;
+# `item` reads the tooltip text through `itemdesc` (the inventory tooltip's own builder) and needs no hand.
+# (area, monstats Id, why it is looked at). Not here: the D2R-native Ids without an HD unit (chaoshorde1-4, suckernest1-4, familiar,
+# poisonorb, firebeast, iceglobe) are disabled rows (bugs.md #70): they never spawn, and a harness spawn only asserts.
+UA_MONSTERS = [(2, "quest_butcher", "token BU: Butcher art not shipped, blunderbore1 in HD"),
+               (2, "super_kabraxis", "token BU: megademon1 in HD"),
+               (2, "sarandesh1", "!7: odd-sized s1 / sc COFs"), (2, "psychorbM", "X+: odd-sized dt COF")]
+UA_STAGES = ("mons", "horned", "ui", "item", "maps", "drop")
+# (code, why, {stat: allowed values}): group 401 has two rows of equal frequency per pattern, one with the socket and one without
+UA_ITEMS = [("7@5", "bswd: automagic sockBarSW (str-add 76, sock 1 or none)", {"strength_bonus_wpn": (76,), "item_numsockets": (0, 1)}),
+            ("614", "tors: automagic sockNormal (sock 1 or none)", {"item_numsockets": (0, 1)})]
+UA_AUTOMAP = {84: "excelsior3", 60: "desertpeak"}
+
+
+def ua_stages(env=None):
+    v = (env if env is not None else os.environ).get("MXL_UA", "")
+    want = [s.strip() for s in v.split(",") if s.strip()]
+    return [s for s in UA_STAGES if not want or s in want]
+
+
+def ua_ui(log, shots):
+    """Classic (and HD for comparison) inventory with the weapon swap tabs, and the skill tree's opening page with its tab labels."""
+    for mode in ("legacy", "hd"):
+        goto(1)
+        if not set_graphics(mode):
+            log.append("graphics %s not reached" % mode)
+            continue
+        close_right_panel()
+        g.press("i")
+        time.sleep(1.5)
+        shots.append(sh("ua_inv_%s" % mode))
+        g.press("i")
+        time.sleep(0.8)
+        g.press("t")
+        time.sleep(1.5)
+        shots.append(sh("ua_tree_%s" % mode))
+        g.press("t")
+        time.sleep(0.8)
+        log.append("ui %s: inventory and skill tree shot" % mode)
+
+
+def ua_item(log, shots, rows):
+    """A normal-quality base of each automagic group 401 pattern: the item's stats (`istat`) hold the automagic roll; its tooltip
+    line is judged by hand on the ua_item_* shot (Median's `strength_bonus_wpn` line is white by its own string, ÿc0)."""
+    goto(1)
+    for code, why, want_stats in UA_ITEMS:
+        _, ln = Hl("item %s q=2 inv" % code, log)
+        made = parse_items(ln)
+        if not made:
+            rows.append((code, False, "%s not made" % code))
+            continue
+        it = made[0]
+        got = {}
+        for name in want_stats:
+            _, ln = Hl("istat %d %d" % (it["id"], stat_id(name)), log)
+            got[name] = cube_game.istat_value(ln) or 0
+        rc_open_inventory()
+        hover_px(*inv_px(it["x"], it["y"]))
+        time.sleep(0.8)
+        shots.append(sh("ua_item_%s" % code))
+        close_right_panel()
+        want = all(got[n] in ok for n, ok in want_stats.items())
+        rows.append((code, want, "%s (%s): %s" % (code, why, ", ".join("%s %s" % kv for kv in got.items()))))
+        H("remove %s" % code)
+
+
+def ua_maps(log, shots, rows):
+    """charismatic (127): the preset objects the header act resolved, in HD; automap (Tab) on two Median maps in HD."""
+    st = goto(127, timeout=60)
+    if st["player"].get("area") != 127:
+        rows.append(("charismatic", False, "not reached"))
+    else:
+        time.sleep(5)
+        names = []
+        for o in parse_presets(Hl("presets 2", log)[1]):
+            r = row_of("objects", "*ID", o["class"]) or {}
+            names.append("%d %s" % (o["class"], r.get("Name") or "?"))
+        for o in parse_objects(Hl("objects", log)[1]):
+            r = row_of("objects", "*ID", o["class"]) or {}
+            names.append("near %d %s" % (o["class"], r.get("Name") or "?"))
+        shots.append(sh("ua_charismatic_0"))
+        rows.append(("charismatic", True, "objects: %s" % ", ".join(sorted(set(names)))[:600]))
+    for lv, name in UA_AUTOMAP.items():
+        st = goto(lv, timeout=60)
+        p = st["player"]
+        if p.get("area") != lv:
+            rows.append(("automap " + name, False, "not reached"))
+            continue
+        time.sleep(4)
+        x0, y0 = p.get("x"), p.get("y")
+        for dx, dy in ((10, 0), (10, 10), (0, 10), (0, 0)):  # walk the arrival a little so the automap has cells
+            H("place %d %d" % (x0 + dx, y0 + dy))
+            time.sleep(1.5)
+        g.press("tab")
+        time.sleep(1.2)
+        shots.append(sh("ua_automap_%s" % name))
+        g.press("tab")
+        time.sleep(0.5)
+        rows.append(("automap " + name, True, "Tab shot after a short walk (judged by hand: ua_automap_%s)" % name))
+
+
+def ua_horned(log, shots, rows):
+    """`hornedgods` (8@: 5 COFs of 1 frame against animdata, bugs.md #110) is a Trap-Poison ally that dies at its first tick with no
+    enemy in range (bugs.md #41): monstats class 1 (lane fixes2's `spawn 1 3`) is spawned first, then it beside them. PASS: alive
+    (not a corpse) in both modes. Lane unporteda saw it alive and drawn in neither mode: its monprop `fade` (stat 181) hides it, as
+    the helper it is (pettype hornedgodspet, no summon skill, no preset: nothing on the player path spawns it)."""
+    row = row_of("monstats", "Id", "hornedgods")
+    for mode in ("legacy", "hd"):
+        goto(1)
+        if not set_graphics(mode):
+            rows.append(("hornedgods " + mode, False, "graphics mode not reached"))
+            continue
+        goto(2)
+        px, py = player_xy()
+        Hl("spawn 1 3 %d %d" % (px + 10, py - 10), log)
+        _, sp = Hl("spawn %s 1 %d %d" % (row["*hcIdx"], px + 6, py - 6), log)
+        uid = first(sp, r"id=(\d+)")
+        if uid is None:
+            rows.append(("hornedgods " + mode, False, "not spawned"))
+            continue
+        alive = []
+        for k, wait in enumerate((0.6, 2.0, 3.0)):
+            time.sleep(wait)
+            shots.append(sh("ua_horned_%s_%d" % (mode, k)))
+            st = hstate()
+            alive.append(any(str(m.get("id")) == str(uid) for m in st["mons"]))
+            log.append("hornedgods %s t%d: mons %s; corpses %s" % (mode, k, [(m.get("id"), m.get("class"), m.get("mode")) for m in st["mons"]],
+                                                              [(m.get("id"), m.get("class")) for m in st["corpses"]]))
+            log.extend("hornedgods %s t%d: %s" % (mode, k, ln) for ln in st["lines"] if "id=%s " % uid in ln)
+        H("kill %s" % uid)
+        time.sleep(1.5)
+        shots.append(sh("ua_horned_%s_death" % mode))
+        rows.append(("hornedgods " + mode, alive[0], "unit %s alive at 0.6 / 2.6 / 5.6 s: %s (judged by hand: ua_horned_%s_*)"
+                     % (uid, alive, mode)))
+
+
+def ua_drop():
+    """Owner 2026-10-29: `cougar` dropped (enabled 0): the harness spawn of its row makes no unit. D2R answers a disabled row with
+    one `MONFLAG_ENABLED` assert (bugs.md #70, as for its own disabled rows): that assert is the expected answer here, any other
+    fails the check. Own result `ua_drop`."""
+    mark = engine_mark()
+    log = []
+    goto(2)
+    r = row_of("monstats", "Id", "cougar")
+    if r is None:
+        return add("ua_drop", "FAIL", "the cougar row is missing (it must stay: the ids after it)", (), log)
+    _, sp = Hl("spawn %s 1" % r["*hcIdx"], log)
+    uid = first(sp, r"id=(\d+)")
+    if uid is not None:
+        H("kill %s" % uid)
+    asserts = engine_asserts(mark)
+    other = [m for m, _ in asserts if "MONFLAG_ENABLED" not in m]
+    bad, _known = engine_issues(mark, log)
+    bad = [b for b in bad if "MONFLAG_ENABLED" not in b]
+    ok = uid is None and r.get("enabled") == "0" and not bad
+    add("ua_drop", "PASS" if ok else "FAIL", "cougar row %s enabled=%s; spawn: %s; MONFLAG_ENABLED asserts %d, other engine issues: %s" % (
+        r["*hcIdx"], r.get("enabled"), "no unit" if uid is None else "unit %s" % uid,
+        len(asserts) - len(other), "; ".join(bad) or "none"), (), log)
+
+
+def ua_look():
+    """Lane unporteda: the look / check rows of docs/unported.md class (a). Stages (MXL_UA): `mons` the monsters of UA_MONSTERS in
+    HD and classic (hm_monsters: spawn beside, far / near / fight / death shots, asserts counted); `ui` classic and HD inventory
+    (weapon swap tabs) and skill tree (tab labels); `item` the automagic roll of group 401 bases (istat); `maps`
+    charismatic's objects and the automap of two Median maps; `drop` the dropped cougar row spawns nothing (own result
+    `ua_drop`); `horned` hornedgods beside enemy skeletons (it dies alone, bugs.md #41). SET-UP: god mode, the
+    harness travels, spawns and makes items. PASS needs no engine assert; looks are judged by hand on the ua_* shots."""
+    stages = ua_stages()
+    if "mons" in stages:
+        os.environ.setdefault("MXL_UA_MODES", "hd,legacy")
+        hm_monsters("ua", UA_MONSTERS)
+    if "drop" in stages:
+        ua_drop()
+    if not set(stages) & {"horned", "ui", "item", "maps"}:
+        return
+    mark = engine_mark()
+    log, shots, rows = [], [], []
+    enable_debug()
+    cheat("god 1")
+    if "horned" in stages:
+        ua_horned(log, shots, rows)
+    if "ui" in stages:
+        ua_ui(log, shots)
+    goto(1)
+    set_graphics("hd")
+    if "item" in stages:
+        ua_item(log, shots, rows)
+    if "maps" in stages:
+        ua_maps(log, shots, rows)
+    goto(1)
+    cheat("god 0")
+    rc_finish("ua_look", all(r[1] for r in rows), "; ".join("%s %s: %s" % (r[0], "ok" if r[1] else "BAD", r[2]) for r in rows),
+              mark, shots, log, ["harness item / travel / spawn", "god mode (cheat god 1)"],
+              judged_by_hand="the ua_horned_* / ua_inv_* / ua_tree_* / ua_item_* / ua_automap_* / ua_charismatic_* shots")
+
+
+CHECKS += [("ua_look", ua_look)]
+
+
 if __name__ == "__main__":
     main()
 

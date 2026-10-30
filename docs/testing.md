@@ -3771,3 +3771,29 @@ unlocked. The real-input watchdog stayed clean on every check run (cursor did no
 Engine: across all runs, 0 new crash files and no unknown assert on a player path. The only asserts were the harness `cm1` one
 above and the shutdown pool asserts (`s_StatsPool.IsEmpty()`, `m_allocated == 0`) of the same session at game exit, after it.
 Tests: `unittest` tools/tests 810 OK, tools `test_*.py` 427 OK (1 skipped), `check_docs_links` 0, `check_public` 0.
+## Lane unporteda: the class (a) rows of docs/unported.md and the owner's 2026-10-29 answers (2026-10-30, slot 3, background mode, build of lane/unporteda)
+
+The 12 class (a) rows of docs/unported.md are closed (moved to its "Closed rows" with evidence), together with the three owner answers
+of 2026-10-29: Whirlwind keeps the plugin's classic hit rate per spin (plugin-plan.md; the feel stays on the final human visual
+review list), `cougar` is dropped (`txt_migrate.py` DROPPED_MONSTERS switches the row off in place, the ids after it keep their
+numbers), and missing missile / overlay art draws nothing only on the 9 rows no player or monster skill uses (`art_fix.py`
+DRAW_NOTHING; the 13 used rows keep a similar stand-in, list in hd-effects.md section 5). Closed without a game: Warlock Cleave /
+Mirrored Blades flat damage (a static read of functions 164 / 166: both add `calc2`; the RotW playtest stays for the numbers), the
+D2R-native helper Ids (disabled rows, bugs.md #70), text outside the tables (`text_audit.py` kind `text-words`, docs/text-audit.md).
+Evidence: `mxl2012-runs/unporteda/evidence/` (run folders), contact sheets `ua_mons_*_sheet.png`, `ua_horned_sheet.png`. Unit
+tests: `tools/test_game_checks_unporteda.py`, `tools/tests/test_missile_chains.py` (DroppedMonsterTests), `tools/tests/test_text_audit.py`
+(TextWords).
+
+**`ua_look`** (tools/game_checks.py): `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<throwaway> py -3 tools/game_checks.py all ua_look`
+(`MXL_UA` picks stages from `mons horned ui item maps drop`; `MXL_UA_MODES` default `hd,legacy`, `MXL_UA_ONLY` one monster).
+SET-UP: god mode, the harness travels, spawns and makes items, so PARTIAL at best; looks are judged by hand on the `ua_*` shots.
+`drop` is its own result `ua_drop` (the cougar row's spawn makes no unit; D2R's one `MONFLAG_ENABLED` assert is the expected answer).
+
+| Run | Result |
+|---|---|
+| `checks-20261030-010359-s3` (all stages) | mons PARTIAL: quest_butcher / super_kabraxis (ogre / megademon in HD), sarandesh1, psychorbM spawned, 0 asserts; the classic shots were crowded by the HD round's corpses (rerun alone below). `ua_drop` PASS (row 1770 enabled 0, no unit). ui: classic weapon swap tabs on both arm slots, classic skill tree with Median's labels only. maps: charismatic's objects (chests, stash, shrine, baskets, pillars); automap of excelsior3 drawn, desertpeak blank (as 1.13c: Act 3 wall tiles on the Act 2 tomb level type). item: the check called a harness verb that does not exist (`itemdesc`), fixed below; the shots show both automagic lines |
+| `-011444` ... `-011937-s3` (classic, one monster each) | sarandesh1, psychorbM (death included), quest_butcher, super_kabraxis draw Median's art, fight and die; 0 asserts, no crash file. hornedgods alone: nothing (it dies at its first tick, bugs.md #41) |
+| `-012558-s3` (horned, item, maps) | item PASS: 7@5 strength_bonus_wpn 76 + socket, 614 no socket (group 401 has a row with and one without the socket per pattern) |
+| `-013028-s3`, `-013441-s3` (horned) | hornedgods beside enemies (class 1, lane fixes2's recipe) lives in mode 1 in both modes (`mon id=24 class=1715 mode=1`), drawn in neither: its monprop `fade` hides it; nothing on the player path spawns it. PARTIAL (pass) |
+
+Not run: the RotW playtest for the Warlock numbers (no slot account owns RotW).

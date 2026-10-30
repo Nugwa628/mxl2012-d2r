@@ -29,6 +29,7 @@ missile	scimitar6	mod	new	7	hand	mxl_expansion_bladefury_s180	1.8	medium	1	n/a	m
 missile	sparklez1	mod	exact: exact of expansion/tiger_strike_a	1	hand	dopplezon_explode	1	medium	1	n/a		hand pick (data/hd-effects-picks.tsv): scattered red sparkles (Mythal); was a big red Diablo lightning bolt; D2R dopplezonexplode (dopplezonexplode)
 missile	sparklez2	mod	exact: exact of expansion/tiger_strike_c	2	hand	mxl_expansion_impmissile_01_s140	1.4	medium	1	n/a		hand pick (data/hd-effects-picks.tsv): red star burst; was a blue lightning strike; D2R succubusmiss (expansion\impmissile01)
 missile	swarmhovers	mod	new	1	hand	mxl_poison_sparks_s170	1.7	low	1	n/a	mxl_blue_nova_b_s120	hand pick (data/hd-effects-picks.tsv): faint specks hovering over an area (Swarm, a poison skill); was a bright blue nova glow (weak stand-in); D2R poisonjavcloud (poisonsparks)
+missile	teethexplode	base		19	hand	yellow_ball_133b10	1	medium	2	n/a	teethexplode	hand pick (data/hd-effects-picks.tsv): the magic missiles' own body: classic draws only Teeth's first two frames, a small dot inside the red trail; D2R's Teeth burst made them white-blue (bug #483). Red glow ball; D2R taintedsunball (yellowballglow2); gradient tint red ramp (hand pick)
 missile	teethexplodered	mod	recolour: recolour of teethexplode	5	hand	mxl_yellow_ball_133b10_s180	1.8	medium	1	n/a	mxl_corpse_explode_guts_s70	hand pick (data/hd-effects-picks.tsv): red star flash (the trail of Magic Missiles and the magic bolts, bug #483); Teeth's effect has no colour ramp, so a glow ball in a red ramp; D2R taintedsunball (yellowballglow2); gradient tint red ramp (hand pick)
 missile	tinyflame	mod	new	1	hand	mxl_ground_fire_small_s60	0.6	high	1	n/a	mxl_ground_fire_small_s60	hand pick (data/hd-effects-picks.tsv): small flame on the ground (Colosseum); was a flat lava puddle; D2R catapult meteor fire (groundfiresmall)
 missile	blueshockeffect	mod	new	1	stand-in	expansion_shock_field	1	medium	1	identical		Median-only art; like D2R shock field on ground (expansion\shockfield); score -0.4, margin 0.3; colour 0.25
@@ -170,7 +171,6 @@ missile	bayellshockwave01	base		5	exact	b_a_yell_shock_wave_01	1	high	1	n/a	b_a_
 missile	bigheadlightningexplosion	base		2	exact	bighead_lightning_explosion	1	medium	1	n/a	bighead_lightning_explosion	D2R bigheadexp uses the art (2 models)
 missile	bigheadlightningmissile	base		4	exact	bighead_lightning_missile	1	medium	1	n/a	bighead_lightning_missile	D2R bighead5 uses the art (2 models)
 missile	blessedhammer	base		4	exact	soaringstrike	1	medium	1	n/a	bladedance	D2R echoingstrike uses the art (3 models)
-missile	bloodlarge01	base		1	exact	blood_large_01	1	high	1	n/a	blood_large_01	D2R bigblood1 uses the art
 missile	bloodlarge02	base		3	exact	blood_large_02	1	high	1	n/a	blood_large_02	D2R bigblood2 uses the art
 missile	bluenovab	base		4	exact	blue_nova_b	1	high	1	n/a	blue_nova_b	D2R baal cold maker uses the art
 missile	bonespear	base		3	exact	bone_spear	1	high	1	n/a	bone_spear	D2R bonespear uses the art
@@ -187,7 +187,7 @@ missile	chillbloodpuff	base		5	exact	anyasteam_1	1	medium	2	n/a	anyasteam_1	D2R 
 missile	corpseexplodeguts	base		8	exact	corpse_explode_guts	1	high	1	n/a	corpse_explode_guts	D2R monstercorpseexplode uses the art
 missile	corpseexplodegutspoison	base		1	exact	corpse_explode_guts_poison	1	high	1	n/a	corpse_explode_guts_poison	D2R poisoncorpseexplosion uses the art
 missile	cursearea	base		1	exact	curse_area	1	high	1	n/a	curse_area	D2R curseeffectred uses the art
-missile	dopplezonexplode	base		5	exact	dopplezon_explode	1	high	1	n/a	dopplezon_explode	D2R dopplezonexplode uses the art
+missile	dopplezonexplode	base		4	exact	dopplezon_explode	1	high	1	n/a	dopplezon_explode	D2R dopplezonexplode uses the art
 missile	electricnova	base		4	exact	electric_nova	1	high	1	n/a	electric_nova	D2R nova uses the art
 missile	expansion/armageddon_rock	base		1	exact	expansion_armageddon_rock	1	medium	1	n/a	expansion_armageddon_rock	D2R armageddonrock uses the art (2 models)
 missile	expansion/baaldeathghostie01	base		8	exact	expansion_baaldeathghostie_01	1	high	1	n/a	expansion_baaldeathghostie_01	D2R baalfx spirit 2 uses the art
@@ -308,12 +308,10 @@ missile	soulforgerisingsoul	base		1	exact	soul_forge_rising_soul	1	high	1	n/a	so
 missile	spider_goo_missile	base		1	exact	spider_goo_missile	1	high	1	n/a		D2R spidergoolay uses the art
 missile	spikefiendmissle	base		25	exact	spike_fiend_missle	1	high	1	n/a	spike_fiend_missle	D2R spike5 uses the art
 missile	spikeright	base		9	exact	spike_right	1	high	1	n/a	spike_right	D2R trap spike right uses the art
-missile	teethexplode	base		20	exact	teethexplode	1	high	2	n/a	teethexplode	D2R sucshockfieldmissileexp uses the art
 missile	teleport	base		1	exact	teleport	1	high	1	n/a		D2R teleport uses the art
 missile	unholybolt	base		3	exact	unholy_bolt	1	medium	1	n/a	unholy_bolt	D2R unholybolt1 uses the art (2 models)
 missile	warcryshockwave	base		1	exact	warcry_shockwave	1	medium	1	n/a	warcry_shockwave	D2R warcry uses the art (2 models)
 missile	xbowbolt	base		6	exact	x_bow_bolt	1	high	1	n/a	x_bow_bolt	D2R bolt uses the art
-missile	yellowballglow2	base		1	exact	yellow_ball_glow_2	1	high	1	n/a	yellow_ball_glow_2	D2R taintedsunball uses the art
 missile	yellowballglowintro	base		1	exact	yellow_ball_glow_intro	1	high	1	n/a	yellow_ball_glow_intro	D2R taintedsunflash uses the art
 missile	bloodspear	mod	new	0	unreferenced				0	n/a		no missiles.txt / overlay.txt row uses this file
 missile	bonespiritred	mod	new	0	unreferenced				0	n/a		no missiles.txt / overlay.txt row uses this file
@@ -471,13 +469,12 @@ overlay	auraresistfirefront	base		1	exact	paladin/aura_resistfire	1	high	1	n/a	p
 overlay	bajumplandpuff01	base		1	exact	common/dust	1	high	1	n/a	common/dust	D2R dust uses the art
 overlay	battlecommandstart	base		1	exact	common/battlecommandcast	1	high	1	n/a	common/battlecommandcast	D2R battlecommandcast uses the art
 overlay	battlecry	base		1	exact	common/battlecry	1	high	1	n/a	common/battlecry	D2R battlecry uses the art
-overlay	bloodripple	base		4	exact	common/bloodlust_state	1	high	2	n/a	common/bloodlust_state	D2R bloodlust_state uses the art
+overlay	bloodripple	base		3	exact	monster/tentacleheadbloodripple	1	medium	2	n/a	common/bloodlust_state	D2R tentacleheadbloodripple uses the art
 overlay	bonefetishdeathbones	base		1	exact	monster/fetishdeath_1	1	high	1	n/a	monster/fetishdeath_1	D2R fetishdeath1 uses the art
 overlay	brraisedeadfront	base		1	exact	common/brraisefront	1	high	1	n/a	common/brraisefront	D2R brraisefront uses the art
 overlay	charge	base		1	exact	paladin/charge	1	high	1	n/a	paladin/charge	D2R charge uses the art
 overlay	chillbloodpuff_curse	base		2	exact	common/chillblood	1	high	1	n/a	common/chillblood	D2R chillblood uses the art
 overlay	curserevvampirehit	base		1	exact	common/steallife	1	medium	1	n/a	common/steallife	D2R steallife uses the art
-overlay	dopplezonappear	base		2	exact	monster/dopllezon_appear	1	high	1	n/a	monster/dopllezon_appear	D2R dopllezon_appear uses the art
 overlay	expansion/catadeathovereast	base		2	exact	common/catapult_death_e	1	high	1	n/a	common/catapult_death_e	D2R catapult_death_e uses the art
 overlay	expansion/cloakofshadows	base		1	exact	common/cloaked	1	high	1	n/a	common/cloaked	D2R cloaked uses the art
 overlay	expansion/cobra_strike_c	base		1	exact	assassin/cobrastrike_3	1	high	1	n/a	assassin/cobrastrike_3	D2R cobrastrike3 uses the art
@@ -499,7 +496,6 @@ overlay	expansion/missile_white_c	base		1	exact	common/progressive_lightning_3	1
 overlay	expansion/oak_sage_aura	base		1	exact	common/oak_sage	1	high	1	n/a	common/oak_sage	D2R oak_sage uses the art
 overlay	expansion/on_fire	base		1	exact	common/burning	1	high	1	n/a	common/burning	D2R burning uses the art
 overlay	expansion/painwormcurse	base		1	exact	common/impregnated	1	medium	1	n/a	common/impregnated	D2R impregnated uses the art
-overlay	expansion/seigebeast_dust	base		1	exact	common/siege_beast_dust	1	high	1	n/a	common/siege_beast_dust	D2R siege_beast_dust uses the art
 overlay	expansion/spawnedflames	base		1	exact	common/spawnedflames	1	high	1	n/a	common/spawnedflames	D2R spawnedflames uses the art
 overlay	expansion/succ1deathoverlay	base		1	exact	monster/succubae_death	1	high	1	n/a	monster/succubae_death	D2R succubae_death uses the art
 overlay	expansion/suicide_death_overlay	base		1	exact	common/suicide_death	1	high	1	n/a	common/suicide_death	D2R suicide_death uses the art

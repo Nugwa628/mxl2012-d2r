@@ -75,8 +75,8 @@ Choices of this port:
   its colour gradients shifted to Median's colour (section 5a). Where that is not possible (no colour gradient in the effect,
   or the D2R vfx files are not cached) the nearest-colour scoring decides; the scoring gives the original's own effect a 1.5
   credit (shape match) and adds the original's name to the row's words.
-- **Missing art is a gap, not a stand-in.** The reference set's `art_fix.py` redirected art names that exist nowhere to some D2R file.
-  In 1.13c such a row draws nothing, so the Median-2012-faithful result is no effect; the redirect is listed as a suggestion.
+- **Missing art: nothing where nothing uses it, a stand-in where a skill does** (owner 2026-10-29). In 1.13c a row whose art exists
+  nowhere draws nothing; the port keeps that only for rows no player or monster skill reaches (section 5).
 - **Art-level reuse.** The reference set's rows (4,975 missile rows) have few row names in common with v005, so
   its decisions are reused by art file: byte-identical (SHA-1) Median files and base-game files.
 - Not ported: `missile_hd.py` (its by-CelFile map is a subset of the per-row `exact` rule; only its two hand-picked look-alikes
@@ -175,30 +175,39 @@ These are the only decisions made by this lane's scoring; the rest follow D2R or
 
 ## 5. Gaps
 
-**Unmapped: art that exists nowhere** (21 arts, 25 rows). 1.13c draws nothing for them; the reference set's `art_fix.py` pointed most at some
-D2R file. Not applied; the suggestion is in the table's `reason`.
+**Art that exists nowhere: owner decision 2026-10-29 (lane unporteda).** Median draws nothing for a row whose art file exists
+nowhere. The port keeps that **only for rows that no player skill (class or item-given) and no monster skill reaches**; a row a skill
+uses points at similar existing art so the skill shows something. `tools/art_fix.py` does both before the HD maps run (`DRAW_NOTHING`:
+art `null`, nothing in classic or HD; `REDIRECT`: the stand-in, which `missile_hd.py` / `effects_hd.py` then map like any D2R art).
+Reach was traced through skills.txt (srv / clt missile and overlay columns), the missiles.txt sub / hit / explosion chains, states'
+overlays, monstats Skill1-8 and Miss*, and item properties naming the skill by name or id (uniques, sets, runewords, affixes).
+Typos and conversion slips of an existing file (`expansion|baaldeathghostie01`, `extra\lifedrain.dcc`) are repairs, not missing art.
 
-| Kind | Art | Rows | Suggested redirect |
-|---|---|---:|---|
-| missile | `andarielflamedeath2` | 1 | none |
-| missile | `cherub` | 1 | none |
-| missile | `dopplezonexplodex` | 2 | `dopplezonexplode` |
-| missile | `expansion\|baaldeathghostie01` (a "\|" for the path separator) | 2 | `expansion\baaldeathghostie01` |
-| missile | `extra/icestormimpactvar3` | 1 | `extra\icestormimpactvar03` |
-| missile | `extra/spikefiendmamamissile` | 2 | `extra\spikefiendmamamissle` |
-| missile | `greenflare` | 1 | `fireball` |
-| missile | `lazbloodmissile` | 1 | none |
-| missile | `teethexplodeyellow` | 2 | `teethexplode` |
-| missile | `xxxxx` | 1 | none |
-| overlay | `ceilingchunkvanish01` | 1 | `expansion\seigebeast_dust` |
-| overlay | `dopplezonexplodeblue`, `dopplezonexplodelilac` | 1 + 1 | `dopplezonappear` |
-| overlay | `extra/auraresistcoldcast` | 1 | `auraresistcoldcast` |
-| overlay | `extra/genericsplash` | 1 | `extra\generic_splash` |
-| overlay | `gore20`, `lazblood` | 1 + 1 | `bloodripple` |
-| overlay | `mephistooverlay` | 1 | none |
-| overlay | `pentacle` | 1 | `blackpentacle` |
-| overlay | `threeflames` | 1 | `firecast_for_sorceress` |
-| overlay | `whiteblinding` | 1 | `extra\whiteflash` |
+| Kind | Row | Median's art | Who uses the row | Now |
+|---|---|---|---|---|
+| missile | `combatshotarrow` | `TeethExplodeYellow` | nothing | draws nothing |
+| missile | `whyaretherealways` | `XXXXX` | only `snakeshieldspawner`'s chain, which no skill fires | draws nothing |
+| missile | `twinklesmash` | `LazBloodMissile` | nothing | draws nothing |
+| missile | `mythalexplode` | `DopplezonExplodeX` | nothing | draws nothing |
+| missile | `cherubcenter` | `cherub` | Mon Cherub Avatar, which no monster, item or skill has | draws nothing |
+| overlay | `laststandhit` | `DopplezonExplodeBlue` | nothing | draws nothing |
+| overlay | `mortalstrikehit` | `DopplezonExplodeLilac` | nothing | draws nothing |
+| overlay | `cc_dust` | `CeilingChunkVanish01` | nothing | draws nothing |
+| overlay | `gorecarpet` | `gore20` | nothing | draws nothing |
+| missile | `searingorb` | `GreenFlare` | Searing Orb (unique The Sentinel's Sorrow, Cornerstone; Supernature, Blades of Light) | `fireball` (orange orb, 16 directions) |
+| missile | `sunspear2` | `TeethExplodeYellow` | Sunspear (runeword Dragonfly, Cornerstone) | `teethexplode` (the vanilla burst Median recoloured) |
+| missile | `seismicfieldexplode` | `DopplezonExplodeX` | Seismic Field (Assassin), Enemy Singularity (`l_slayer`) | `dopplezonexplode` |
+| missile | `silverstreak`, `silversecondary` | `extra\SpikeFiendMamaMissile` | Silver Streak (runeword Araboth, set Testament of the Apes, Cornerstone) | `extra\spikefiendmamamissle` (the file Median misspelt) |
+| missile | `freezestormboomexplode` | `Extra\IceStormImpactVar3` | Hailstorm (Izual) | `extra\icestormimpactvar03` (the file Median misspelt) |
+| missile | `nephalemweapons` | `AndarielFlameDeath2` | Nephalem Weapons (Barbarian) | `andarielflamedeath` (D2R has the first variant only) |
+| overlay | `paganheartcast` | `extra\AuraResistColdCast` | state `purifyingspring` of Pagan Heart (runeword Endor, unique Eko Eko, Cornerstone) | `auraresistcoldcast` (the file, without Median's wrong folder) |
+| overlay | `bloodwytch` | `Pentacle` | Lava Pit (Amazon) | `blackpentacle` (Median's own pentacle) |
+| overlay | `splat2` | `extra\GenericSplash` | Angel of Death (Necromancer; `ancientbarb3`) | `extra\generic_splash` (the file Median misspelt) |
+| overlay | `lazblood` | `LazBlood` | Offensive 2 Blink (`l_slayer`) | `bloodripple` (red blood ripple) |
+| overlay | `whiteblinding` | `WhiteBlinding` | Summon Veil King, Summon Void Archon (Necromancer), Summon Overlord (runeword Leviathan, set Satanic Mantra) | `extra\whiteflash` |
+| overlay | `threeflames` | `ThreeFlames` | Seal of Fire (uniques Demonsong, Dragon Tail, Demonlure, set item Warmage's Fireblade, Cornerstone) | `firecast_for_sorceress` |
+
+`mephistooverlay` (overlay rows `mephisto`, `godcloud`) is a D2R classic file with no HD effect: D2R's own business, unchanged.
 
 (`greatermummybreath` and `soulforgenova` are base-game files whose frames are empty; they are mapped.)
 
@@ -304,7 +313,7 @@ missile and overlay art is D2R's own or in the table, every hand pick shows in t
 
 ## 8. Open questions for the owner
 
-1. Missing art (section 5): keep "draws nothing" (faithful to 1.13c) or apply the suggested redirects?
+1. ~~Missing art (section 5)~~ owner 2026-10-29: draws nothing only on rows no player or monster skill uses, a stand-in elsewhere (section 5).
 2. Gradient tints (section 5a) add 8.7 MB of copied particle programs: keep all 15, or only the ones that show (the owner's
    look at `mxl2012-runs/tints/`)?
 3. The 39 DCCs no row references: dead art, or used by a path the tables do not show (skills or monsters by code)?

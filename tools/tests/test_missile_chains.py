@@ -135,5 +135,35 @@ class MissileLoadTests(unittest.TestCase):
         self.assertIn("NOT applied", self.mig.report[-1])
 
 
+
+class DroppedMonsterTests(unittest.TestCase):
+    """Owner 2026-10-29: `cougar` dropped (txt_migrate.dropped_monsters): the row stays in place, switched off and unlinked."""
+    COLS = ["Id", "*hcIdx", "enabled", "isSpawn", "MonProp", "minion1", "SetBoss", "BossXfer", "Code"]
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        tm.OUT = Path(self.temp.name) / "out"
+        self.mig = tm.Migrator.__new__(tm.Migrator)
+        self.mig.report = []
+        for bank in ("base", ""):
+            d = tm.OUT / "data" / "global" / "excel" / bank
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "monstats.txt").write_text(tsv(self.COLS, ["skeleton1", "0", "1", "1", "", "", "", "", "SK"],
+                                                ["cougar", "1", "1", "1", "cougar", "regularamazon", "1", "1", "7$"],
+                                                ["after", "2", "1", "1", "", "", "", "", "XX"]), encoding="utf-8")
+
+    def test_row_kept_and_switched_off(self):
+        self.mig.dropped_monsters()
+        for bank in ("base", ""):
+            h, rows = tm.read_tsv(tm.OUT / "data" / "global" / "excel" / bank / "monstats.txt")
+            got = [dict(zip(h, r)) for r in rows if r and r[0]]
+            self.assertEqual([r["Id"] for r in got], ["skeleton1", "cougar", "after"])  # ids after it do not move
+            c = got[1]
+            self.assertEqual((c["enabled"], c["isSpawn"], c["MonProp"], c["minion1"], c["SetBoss"], c["BossXfer"]),
+                             ("0", "0", "", "", "", ""))
+            self.assertEqual(got[2]["enabled"], "1")
+        self.assertIn("6 cells", self.mig.report[-1])
+
 if __name__ == "__main__":
     unittest.main()

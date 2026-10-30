@@ -48,12 +48,14 @@ class KeyLike(unittest.TestCase):
 
 
 class Tables(unittest.TestCase):
-    def audit(self, tables: dict, allow=None, layouts=None, strings=STRINGS):
+    def audit(self, tables: dict, allow=None, layouts=None, strings=STRINGS, words=False):
+        # the shared STRINGS hold key-shaped texts on purpose; the text-words pass has its own tests (TextWords)
         with tempfile.TemporaryDirectory() as d:
             excel = Path(d) / "excel"
             for (bank, name), (head, rows) in tables.items():
                 write_table(excel / bank if bank else excel, name, head, rows)
-            return ta.audit(excel, strings, layouts, allow=allow if allow is not None else [])
+            found, report = ta.audit(excel, strings, layouts, allow=allow if allow is not None else [])
+            return [f for f in found if words or f.kind != "text-words"], report
 
     def kinds(self, tables, **kw):
         found, _ = self.audit(tables, **kw)
@@ -118,7 +120,26 @@ class Tables(unittest.TestCase):
         for r in ta.load_allow():
             self.assertTrue(r["reason"].strip(), r)
             self.assertIn(r["kind"], {"key-text", "placeholder", "empty-name", "missing-key", "missing-string", "layout-at-key",
-                                       "skill-name", "rune-letter"})
+                                       "skill-name", "rune-letter", "text-words"})
+
+
+class TextWords(unittest.TestCase):
+    """Kind text-words (lane unporteda): a key named inside a text's own words is drawn as it is."""
+    def test_keys_inside_the_words(self):
+        found = {f.key: f.text for f in ta.audit_text_words(STRINGS)}
+        self.assertEqual(found.get("bad"), "Missing string")
+        self.assertEqual(found.get("camel"), "SnakeCase_Word")
+        self.assertEqual(found.get("mxl2012echo"), "mxl2012:Foo")
+        for key in ("bunny", "warn", "to the pandemonium run 1", "tidy", "torch"):
+            self.assertNotIn(key, found)
+
+    def test_only_the_mods_own_texts(self):
+        s = ta.Strings({"Zed": "zed_word", "Own": "Fine words"}, own={"Own"})
+        self.assertEqual(ta.audit_text_words(s), [])
+
+    def test_a_texts_own_key_is_not_flagged(self):
+        s = ta.Strings({"CrystalBall": "CrystalBall"}, own={"CrystalBall"})
+        self.assertEqual(ta.audit_text_words(s), [])
 
 
 class StatLines(unittest.TestCase):

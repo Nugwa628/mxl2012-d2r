@@ -20,3 +20,7 @@ rune-letter	gems	letter	Qor	bug #334: rune r53 (Qor) has no key in D2R's string 
 rune-letter	gems	letter	Krys	bug #334: rune r54 (Krys) has no key in D2R's string namespace (D2R's runes stop at r33L Zod) and D2RLoader rejects a new d2r: key, so its letter line reads 'Missing string' in the static data; in game the plugin part runeletter (rune_letters.cpp) draws the literal cell as 1.14d does
 rune-letter	gems	letter	Auhe	bug #334: rune r55 (Auhe) has no key in D2R's string namespace (D2R's runes stop at r33L Zod) and D2RLoader rejects a new d2r: key, so its letter line reads 'Missing string' in the static data; in game the plugin part runeletter (rune_letters.cpp) draws the literal cell as 1.14d does
 rune-letter	gems	letter	Shaad	bug #334: rune r56 (Shaad) has no key in D2R's string namespace (D2R's runes stop at r33L Zod) and D2RLoader rejects a new d2r: key, so its letter line reads 'Missing string' in the static data; in game the plugin part runeletter (rune_letters.cpp) draws the literal cell as 1.14d does
+text-words	strings	text	descomgzr	Median's joke description of the Darklings (`^_^`, `@_@` are emoticons, not keys)
+text-words	strings	text	descseecubetxt	Median's own words: it names the file m2007_cube.rtf that came with the mod; no table uses the key
+text-words	strings	text	mxl_11078	a Median string whose text is the words 'Missing string' (a placeholder of Median's tbl); no table or layout uses the key
+text-words	strings	text	noteto1e9translators	Median's note to translators (it names the key ModitemStrikeAttack); no table uses the key

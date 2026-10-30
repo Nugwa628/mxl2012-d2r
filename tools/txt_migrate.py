@@ -363,6 +363,12 @@ FORMAT_KEY_FUNCS = {"27": "ItemModifierClassSkill", "28": "ItemModifierNonClassS
 MISSILE_LOAD = {**{f"skullswarm{i}": {"Param1": ("1", "2")} for i in range(5)},
                 "skullswarmimpact": {"NextDelay": ("4", "2")}}
 
+# Monster rows dropped by the owner, row -> column -> (Median's value, ours); Migrator.dropped_monsters. The row stays (every
+# later monstats row keeps its id), but nothing spawns, names or links it any more. `cougar` (owner 2026-10-29): Median's own
+# row is broken (MonStatsEx names no monstats2 row, the author's status column says WERKT NIET, no art in the MPQ) and no
+# level, superunique, skill or monster names it.
+DROPPED_MONSTERS = {"cougar": {"enabled": ("1", "0"), "isSpawn": ("1", "0"), "MonProp": ("cougar", ""),
+                               "minion1": ("regularamazon", ""), "SetBoss": ("1", ""), "BossXfer": ("1", "")}}
 
 read_tsv = idmap.read_tsv  # one record rule for the whole pipeline (tools/idmap.py)
 
@@ -791,6 +797,26 @@ class Migrator:
                         skipped.append(f"{r[0]}.{col}={r[ci]!r} (expected {old})")
             write_tsv(p, h, rows)
         self.report.append(f"\nmissiles: load rules (bug #395) applied {len(done)}: " + ", ".join(done)
+                           + (f"; NOT applied (Median's value changed): {', '.join(skipped)}" if skipped else ""))
+
+    def dropped_monsters(self) -> None:
+        """DROPPED_MONSTERS: the owner's dropped monster rows are switched off in place (enabled 0, no random spawn) and lose
+        their links (monprop row, minion), so the row no longer reaches the game in any way while the ids after it stay. A cell
+        that no longer holds Median's value is left alone and reported."""
+        done, skipped = [], []
+        for bank in ("base", ""):
+            p = OUT / "data" / "global" / "excel" / bank / "monstats.txt"
+            h, rows = read_tsv(p)
+            for r in rows:
+                for col, (old, new) in DROPPED_MONSTERS.get(r[0], {}).items():
+                    ci = h.index(col)
+                    if r[ci].strip() == old:
+                        r[ci] = new
+                        done += [f"{r[0]}.{col} {old}->{new or '(empty)'}"] if bank == "base" else []
+                    elif r[ci].strip() != new and bank == "base":
+                        skipped.append(f"{r[0]}.{col}={r[ci]!r} (expected {old})")
+            write_tsv(p, h, rows)
+        self.report.append(f"\nmonstats: dropped rows (owner) {len(done)} cells: " + ", ".join(done)
                            + (f"; NOT applied (Median's value changed): {', '.join(skipped)}" if skipped else ""))
 
     @property
@@ -2002,6 +2028,7 @@ def main() -> int:
     m.stat_save_add()
     m.missile_slot_report()
     m.missile_load()
+    m.dropped_monsters()
     m.median_stat_wording()
     m.median_skill_wording()
     m.misc_spell_values()

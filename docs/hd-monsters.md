@@ -554,7 +554,7 @@ unit through the same plumbing (unit, variant, state machine) and `model_lod_des
 - **Not done**: weapons and shields of the donor are dropped when Median has no slot for them (18 parts);
   no animation retargeting beyond the donor's own clips (a mode a donor has no clip for plays the nearest clip it has, section 9.1).
 
-Open for the owner: whether the broken `cougar` row (no monstats2 row, author's status "WERKT NIE") should be fixed in the table lane.
+`cougar`: **dropped** (owner 2026-10-29): Median's row is broken (no monstats2 row, author's status "WERKT NIET") and nothing spawns it. `txt_migrate.dropped_monsters` keeps the row (the ids after it stay) but switches it off (`enabled` 0, `isSpawn` 0) and drops its links (MonProp, minion); its `7$` wolf stand-in is now unused (lane unporteda).
 
 ## 8. Per-TransLvl colours (`tools/hd_translvl.py`, lane tints 2026-10-29)
 

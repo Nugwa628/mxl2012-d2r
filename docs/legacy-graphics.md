@@ -128,7 +128,7 @@ Findings go back as rows in `docs/unported.md` (state `verify` -> `approx` / `de
 | 2 Inventory | PASS: Median's `invchar6` frame, 10 x 6 grid, I / II tabs, Median items without pink pixels (`inv_classic.png`, tooltips `sheet_tip_classic.png`) |
 | 3 Character sheet, cube | PASS: Median's sheet, the 10 x 8 cube picture (`char_classic.png`, `cube_classic.png`); the stash is D2R's classic one (`stash_classic.png`) |
 | 4 Skill tree | PASS with a cosmetic deviation (bugs.md #33): Median's sockets, arrows and icons for Barbarian, Sorceress, Necromancer; D2R's title text is drawn over the labels that are part of the art, so the words overlap. **Fixed** (lane monitems, coordinator decision): the classic layout draws no tab title for the seven classic classes, the art's labels carry them (`mxl2012-runs/monitems/sheet_fix33.png`); HD keeps its string titles. Seen again for all seven classes, three tabs each (lane uicheck, 2026-10-30: `uic_legacy_tablabels.png`, `uic_legacy_trees_sheet.png` in `mxl2012-runs/uicheck/checks-20261030-012114-s4/`) |
-| 5 Median monsters | PASS for `quest_lucion` (!1), `giant1` ((s), `shardspawn`, `bronzeguardian1`, `sarandesh1` (!7), `psychorbM` (x+): Median's art draws. `hornedgods` (8@) never appeared (bugs.md #32, its row borrows Andariel's token), `slayer` (e9) spawned without a crash, its D2R look not judged. The other odd-COF tokens (`!K`, `!Z`, `&6`, `8@`) were not seen |
+| 5 Median monsters | PASS for `quest_lucion` (!1), `giant1` ((s), `shardspawn`, `bronzeguardian1`, `sarandesh1` (!7), `psychorbM` (x+): Median's art draws. `hornedgods` (8@) never appeared (bugs.md #32, its row borrows Andariel's token), `slayer` (e9) spawned without a crash, its D2R look not judged. The other odd-COF tokens (`!K`, `!Z`, `&6`, `8@`) were not seen Lane unporteda: hornedgods lives beside enemies but its monprop `fade` hides it in both modes; nothing on the player path spawns it (bugs.md #41) |
 | 6 Median map | PASS: level 60 (`desertpeak`) draws Median's retextured tiles, pillars, a rune circle; its Amazonite / jungle snake monsters are the right classes (`map_desertpeak_classic.png`) |
 | 7 Missiles | PASS (they draw): `rockshock`, `bloodspeakerbolt`, `leapingjumper` in classic and in HD (`sheet_missiles_classic.png`) |
 | 8 Round trip | PASS: 3 x HD -> classic -> HD, no crash, panels in place (`sheet_roundtrip.png`) |
@@ -151,7 +151,7 @@ tests: `tools/tests/test_own_tokens.py`) does it for the monster tokens; `tools/
 | Vanilla missile / overlay names that now draw Median's art | 12 missiles remapped in `hd/missiles/missiles.json` (`missile_hd.py`), same names, the new art is in HD and classic by the same name; not a collision |
 | Monster tokens shared with D2R: `fm` `im` `iw` `oy` `rt` | same token, the same creature, files extend D2R's set and the frame counts agree with animdata: left as they are (section 2.2) |
 | Monster token shared with D2R: `e9` | **collision**, split below |
-| Rows that borrowed a D2R Code for want of a COF (`gfx_placeholders.py`) | `8@` `!4` `ji` have Median art: completed below. the six `haunt_*` rows (AM DZ SO) have no Median art at all and now borrow under their own token HN (below, `borrow`); `cougar` (7$ -> PW) has no Median art at all (no folder in the MPQ): nothing to give their own token, left borrowing |
+| Rows that borrowed a D2R Code for want of a COF (`gfx_placeholders.py`) | `8@` `!4` `ji` have Median art: completed below. the six `haunt_*` rows (AM DZ SO) have no Median art at all and now borrow under their own token HN (below, `borrow`); `cougar` (7$ -> PW) has no Median art at all (no folder in the MPQ) and is dropped (owner 2026-10-29: its row is switched off, docs/hd-monsters.md) |
 
 **Split** (new token, the rows leave the shared one):
 
@@ -186,7 +186,7 @@ as Median's and stops borrowing. Checked by `legacy_art.py` (the completeness ch
 Checked in game (slot 2): the four SC rows draw as bow archers in HD and classic with 0 asserts; `haunt_vasily` / `haunt_amazon` still assert because their Sk1mode is `TH` (bugs.md #74). HD visuals are a placeholder for human review.
 
 Rows still without art of their own are in `docs/unported.md` (section "Legacy graphics"). **Not done:** `haunt_*` (AM DZ SO) and
-`cougar` (nothing to port); Slayer's attack (A1) is D2R's trap animation until someone draws one.
+`cougar` (dropped by the owner 2026-10-29: row switched off); Slayer's attack (A1) is D2R's trap animation until someone draws one.
 
 **Game check** (lane tokens, slot 2, 2026-10-28, 7 launches): no assert, no crash. Spawned `slayer`, `slayer2`, `wakeofdestruction`, `infernosentry` in classic and in HD. Classic shows Median's goat-like Slayer art; HD shows the trap unit `wakeofdestruction` (the HD donor, as designed). `couatlfather1` and `dead3` draw Median-style art in classic. `hornedgods` was not spawned (bug #32). The Slayer / Wake sentries die when spawned unowned (AI `AssassinSentry`), so they were seen with the AI set to `Idle` in the installed copy only (not in the build).
 
