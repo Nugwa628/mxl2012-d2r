@@ -4256,3 +4256,40 @@ closed): `TERRAIN_MAPS` stays empty. No game data changes in this lane.
 
 Evidence: `mxl2012-runs/tunnels/ingame/<run>/` (both runs), `mxl2012-runs/tunnels/jdg_before_grid.png` (HD top, legacy bottom),
 `jdg_after_hd_grid.png`, `jdg_core_zoom.png` (core before / after the texture swap), logs `run1.log`, `run2.log`, `build1.log`.
+
+## Lane rotwstash: the RotW stash pages in classic mode (bug #516, 2026-10-30, slot 3, background mode)
+
+Classic layout + art for the Gems / Materials / Runes stash pages, down-rendered from D2R's HD art (`tools/rotw_stash_legacy.py`,
+docs/legacy-graphics.md section 9). **Kept out of the mod** by default (`work/rotw_stash_legacy/data`); `MXL2012_ROTW_LEGACY=1
+py -3 tools/build.py` puts it in.
+
+| check | result |
+|---|---|
+| `py -3 -I tools/rotw_stash_legacy.py check --out work/rotw_stash_legacy/data --mod work/mod/data` | no problem: 91 slots (gems 35, materials 23, runes 33), 71 codes are Median items with a classic picture that fits, 20 have no item (as in HD) |
+| `tools/tests/test_rotw_stash_legacy.py` | 6 tests OK (DC6 round trip, palette 1-224, classic cell boxes, layout follows HD, unknown `@key`, build + check with a missing picture and an overlap) |
+| review sheets (outside git) | `mxl2012-runs/rotwstash/sheet/rotwstash_{gems,materials,runes}.png` (HD page next to the classic mock-up, x2) and `rotwstash_personal_shared.png` |
+
+**In game (slot 3, an account without RotW).** Character `Rotwstash` (Sorceress, `mxl2012-s3`), stash opened in HD, then G;
+the classic layout in the slot's install swapped by hand for parts of it (lab scripts in the lane's run folder), the slot's
+copy removed at the end.
+
+| classic layout | result |
+|---|---|
+| D2R's own (the shipped state) | PASS: HD stash 2 tabs; G with the stash open fine |
+| the step's full layout | **crash** `D2R.exe+0x23E6A5` (Personal / Shared inside `basicstash_container`) |
+| five tabs + new art, Personal / Shared at top level, no RotW pages | PASS |
+| + the RotW pages with slots (any form: all, one per page, hidden pages, with child text boxes) | **crash** `D2R.exe+0x154AF2` (null + 0x440) |
+| + the pages without slots + the stash cube | no crash; the cube cover and withdraw button draw on Personal, all five tabs show (`mxl2012-runs/rotwstash/flat_noslots_{1hd,2legacy}.png`) |
+
+### Owner test on a RotW account (the slots cannot)
+
+1. Build with `MXL2012_ROTW_LEGACY=1 py -3 tools/build.py` and install. Set `always_enable_rotw_legacy_graphics_keybind = true`
+   in the install's `d2rloader\config\d2rloader.toml` by hand (as in docs/legacy-graphics.md 8.4).
+2. In a RotW game, put a few gems, runes and materials (keys, essences) into the Gems / Materials / Runes tabs in HD. Open the
+   stash on the Personal tab and press **G**. Expected risk: a crash at `D2R.exe+0x23E6A5` (the `basicstash_container`, also seen
+   without RotW). Keep the crash file from `d2rloader\crashes\`.
+3. If it holds: click each of the five tabs in classic. Look for: page art in place, each item in its recess with its count,
+   Personal / Shared widgets not on the RotW pages, the cube window and its cover, the Transmute and Withdraw buttons.
+4. Move an item from the inventory onto a RotW tab in classic (the notify mark), take one out, then press G back to HD with a
+   RotW tab open.
+5. Report to bug #516 with screenshots; the cube's 3 x 4 window vs Median's 10 x 8 cube goes to #515.

@@ -44,7 +44,7 @@ built row against the rule and that each panel's layout, the mod's or D2R's own,
 | Horadric Cube (Transmogrify Box) | Transmogrify Box Page 1 / Box2 | 10 x 8 | 3 x 4 | **10 x 8 (Median)** | mod: `horadriccubelayout{hd,}.json` |
 | Personal stash | Big Bank Page 1 / Page2 | 10 x 10 (one page) | 10 x 10 | **10 x 10 (D2R)** | D2R's `bankexpansionlayout{hd,}.json` |
 | Shared stash tabs | Big Bank Page 1 (each tab) | none (PlugY pages were a repack feature) | 10 x 10 per tab, D2R's tab count | **D2R's, unchanged** (owner: "as D2R has it") | D2R's |
-| Materials / gems stack tab (RotW) | - (AdvancedStash slots) | none | D2R's | **D2R's** (owner: keep) | D2R's |
+| Materials / gems stack tab (RotW) | - (AdvancedStash slots) | none | D2R's | **D2R's** (owner: keep) | D2R's (a classic layout + art down-rendered from D2R's HD pages is built but kept out of the mod: it crashes D2R without RotW, docs/legacy-graphics.md section 9) |
 | Classic bank (non-expansion characters) | Bank Page 1 / Page2 | 6 x 4 | 6 x 4 | 6 x 4 (D2R) | D2R's `bankoriginallayout{hd,}.json` |
 | Trade, each side | Trade Page 1 / 2 | 10 x 4 | 10 x 4 | 10 x 4 (D2R) | D2R's |
 | Vendor | Monster | 10 x 10 | 10 x 10 | 10 x 10 (D2R) | D2R's |
