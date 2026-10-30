@@ -10,7 +10,7 @@ D2Sigma art; the files here are rewritten for 2012's 1.13c data and win in this 
 py -3 -I tools/hd_ui.py baseline <extract_dir>                 once: copies what we read of D2R 93847 into work/d2r-baseline/ui
 py -3 -I tools/hd_ui.py build                                 skill trees, panels, layouts, then the check (a few seconds)
 py -3 -I tools/hd_ui.py check                                 only the check
-py -3 -I -m unittest discover -s tools/tests -p "test_ui.py"  18 unit tests on synthetic data (no game files)
+py -3 -I -m unittest discover -s tools/tests -p "test_ui.py"  32 unit tests on synthetic data (no game files)
 ```
 
 `MXL2012_EXTRACT` overrides the extraction folder, `MXL2012_UI_OUT` the output (default `work/hd-ui`). Needs Pillow
@@ -94,6 +94,39 @@ through the harness (`item jew inv|cube` until "no room"): the inventory holds 6
   read from the pictures by eye, cut words written out): e.g. Barbarian "Special / Rage", "Stances / Spirits", "Throw / Melee".
 - Classic mode (G) needs nothing: the 7 `skltree_<x>_back.dc6` are the mod's own (4 sets of four 256/64 x 256/176 tiles, the
   structure D2R's classic layout expects; checked) and ship as they are.
+
+### Skill trees: HD page candidates (`tools/skill_tree_hd.py`, lane skillhd, OFF)
+
+The shipped pages above are Median's page scaled x 2.63 with Lanczos: right place, soft look (a 1 px frame line becomes a
+3 px blur, the column-2 stone stretched 2.8x sideways shows streaks). Lane skillhd (2026-10-30) made three sharper candidates
+for the owner's review; **none ships**: `tools/data/skill_tree_proposals.json` has `enabled: false` (its `method` names the
+one it would ship, today `rebuild-stone`), so a normal build draws `lanczos` as before. The candidates keep median_page's
+geometry exactly (the three parts, the cells on D2R's `skillRow` / `skillColumn`, the moved level boxes, D2R's tab strip),
+only the picture changes; classic mode (G) is not touched.
+
+| Method | What it draws |
+|---|---|
+| `lanczos` | the shipped page (above) |
+| `rebuild` (A) | Median's page; its structure (frames, coloured rims, arrows, box holes, level boxes, the page edge, page 3's passive frame: `structure`, bright / dark / saturated pixels round the cells and the page edge, groups of 40+) rebuilt edge-aware as `rune_hd` does: every colour channel split in 12 tone levels, each level's mask EPX-scaled twice, smoothed and cut with an anti-aliased edge at the HD size, stacked again, the rest between two levels bilinear. Crisp straight edges, Median's colours only. The stone between is Lanczos + unsharp mask (the tone decomposition makes stone look posterised) |
+| `rebuild-stone` (B) | A's structure; the stone between is D2R's own HD stone (`panel_skilltreebg`, the picture behind D2R's tree, at the same place) carrying Median's stone tone: Median's stone low-passed (3 classic px) + D2R's stone high-passed (9 HD px) |
+| `d2r` (C) | D2R's HD skill tree look with Median's layout: the page left transparent so D2R's own stone shows, every skill cell D2R's engraved socket + level box, every arrow of Median's chains D2R's short arrow (both cut from frame 1 of D2R's `soskilltree`, `D2R_ART`), each tree's colour (the coloured rim of Median's boxes, sampled per cell) as a thin rim round the socket, a column without arrows (page 3's passives) in an engraved frame as Median draws it |
+
+```
+py -3 -I tools/skill_tree_review.py <out>                    review sheets: per class legacy | HD now | A | B | C (each tab), 1:1 details, overviews
+py -3 -I tools/skill_tree_art.py --try d2r                   a TRIAL build of the tree sprites with one method (owner review only)
+MXL2012_SKILLTREE_TRY=rebuild-stone py -3 tools/build.py     the same through the whole build (hd_ui.py build)
+```
+
+`hd_ui.py baseline` now also copies `panel_skilltreebg.sprite` (B and the review sheets need it). A trial run of
+`skill_tree_art.py` into `work/mod` writes `skill_tab_titles.json` there again: delete it before an install (the build merges
+it into `overrides.json`; a stray copy stops D2R's string tables loading: "String tables are unavailable", MonType.txt, no
+startup; seen by lane skillhd).
+
+Weak spots: A and B keep Median's stretched column-2 stone tone (A its streaks; B only its low-pass, faint smudges); B's stone
+is lighter and flatter than Median's speckled stone; C drops Median's own box art (bright bevelled frames, the arrow shafts
+through the boxes) for D2R's engraved style, Amazon / Necromancer / Assassin pages without coloured rims look plain; at
+1600 x 900 the page is drawn at about 0.35 x, where the gain of A over the shipped page is small. Review sheets and in-game
+shots: docs/testing.md "Lane skillhd".
 
 ### Inventory and cube panels (`tools/ui_panels.py`)
 

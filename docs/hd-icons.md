@@ -518,7 +518,7 @@ Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not fail
   Median's own pictures, off, "Rebuilt pictures"):
   crisp, but pixel-art detail next to D2R's painted HD items. No new HD redraw. Skill icon sheets use the hybrid too (item 4). Seen in game with the harness (check `hdit_icons`, slot 4,
   2026-10-29, docs/testing.md): 16 items in HD and legacy, drawn as intended.
-- **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees").
+- **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees"); sharper candidates (lane skillhd, off): `skill_tree_hd.py`, docs/hd-ui.md ("Skill trees: HD page candidates").
 - **State icons: nothing to convert.** Median XL 2012 (1.13c) has no buff / state icon art (no DC6 for it in the MPQ, no icon
   column in `states.txt`; a state shows only as its overlay, which the effects tools port), and D2R 3.3 has no state icon bar:
   its only HD "effect icons" are the controller HUD's fixed set (`controller/hud/effecticons`: immunities, desecrated / terror),

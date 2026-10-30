@@ -33,17 +33,23 @@ from the string keys `SkillCategory<Cl><n>` of its layout (`textTab0-2`), which 
 names ("Bow and Crossbow"...). So the titles go into `skill_tab_titles.json` as `d2r:SkillCategory..` override records for
 the strings lane to merge into mxl2012/overrides.json (no sprite or layout edit; Warlock's keys are not touched).
 
-  py -3 -I tools/skill_tree_art.py [--preview DIR]
+Sharper page candidates (lane skillhd, OFF unless tools/data/skill_tree_proposals.json switches one on): skill_tree_hd.py,
+`hd_page`; `--try METHOD` (or MXL2012_SKILLTREE_TRY) makes a trial build for the owner's review.
+
+  py -3 -I tools/skill_tree_art.py [--preview DIR] [--try lanczos|rebuild|rebuild-stone|d2r]
 """
 import argparse
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
+import skill_tree_hd  # noqa: E402
 import ui_art  # noqa: E402
 from icon_paths import col, read_tsv  # noqa: E402
 from ui_paths import BASE_UI, EXCEL, HD_OUT, MOD_UI, OUT, PAL, STRINGS_OUT  # noqa: E402
@@ -94,6 +100,7 @@ LEVEL_BOX = (40, 39, 63, 62)                      # Median's level box (with its
 LEVEL_HD = (163, 105)                             # centre of D2R's level box, relative to the HD icon (frame 1's socket)
 CORNER_W = 13                                     # of the old level box: the icon box's corner (mirrored), then stone
 MEDIAN_COLUMNS = {0, 2}
+TRY_ENV = "MXL2012_SKILLTREE_TRY"                 # a trial build's page method (skill_tree_hd.METHODS)
 
 
 # ---- data ---------------------------------------------------------------------------------------------------------
@@ -199,34 +206,71 @@ def move_level_boxes(page: Image.Image, cells) -> Image.Image:
     return out
 
 
-def median_page(page: Image.Image, cells) -> Image.Image:
-    """One HD tree frame (FW x FH, transparent where D2R's stone shows) from a classic 320 x 432 page set."""
+def median_page(page: Image.Image, cells, scale=None) -> Image.Image:
+    """One HD tree frame (FW x FH, transparent where D2R's stone shows) from a classic 320 x 432 page set. scale(crop,
+    size, pad): how a part is scaled (skill_tree_hd.padded; default Lanczos, the shipped look); each part is cut with
+    skill_tree_hd.PAD classic px of its surroundings, which scale cuts off again."""
+    scale = scale or skill_tree_hd.padded(skill_tree_hd.lanczos)
     page = move_level_boxes(page.crop((0, 0, PAGE_W, page.height)), cells)
     top = SKILL_ROW[0] - ORIGIN[1] - CLASSIC_ROW[0] * K
     im = Image.new("RGBA", (FW, FH))
 
-    def part(x0: int, x1: int) -> Image.Image:
-        return page.crop((x0, 0, x1, page.height)).resize((round((x1 - x0) * K), round(page.height * K)), Image.LANCZOS)
+    def part(x0: int, x1: int, w: int | None = None) -> Image.Image:
+        pad = skill_tree_hd.PAD
+        px0, px1 = max(0, x0 - pad), min(page.width, x1 + pad)
+        return scale(page.crop((px0, 0, px1, page.height)), (w or round((x1 - x0) * K), round(page.height * K)),
+                     (x0 - px0, 0, px1 - x1, 0))
 
     left_x = SKILL_COL[0] - ORIGIN[0] + (LEFT_PART[0] - CLASSIC_COL[0]) * K
     right_x = SKILL_COL[2] - ORIGIN[0] + (RIGHT_PART[0] - CLASSIC_COL[2]) * K
-    left, right, mid = part(*LEFT_PART), part(*RIGHT_PART), part(LEFT_PART[1], RIGHT_PART[0])
+    left, right = part(*LEFT_PART), part(*RIGHT_PART)
     gap = round(right_x) - round(left_x) - left.width                    # column 2's stone, stretched to the HD width
-    im.paste(mid.resize((gap + 2, mid.height), Image.LANCZOS), (round(left_x) + left.width - 1, round(top)))
+    im.paste(part(LEFT_PART[1], RIGHT_PART[0], gap + 2), (round(left_x) + left.width - 1, round(top)))
     im.paste(left, (round(left_x), round(top)))
     im.paste(right, (round(right_x), round(top)))
     return im
 
 
-def median_pages(letter: str, pages: dict, pal) -> list[Image.Image] | None:
-    """The 3 HD frames from the mod's skltree_<letter>_back.dc6, None when it is missing or a cell is off columns 1 / 3."""
+def hd_page(method: str, page: Image.Image, cells, d2r_frame: Image.Image, bg: Image.Image | None, reqs_arrows) -> Image.Image:
+    """One tree frame of the page in the way of skill_tree_hd.METHODS (`lanczos` = the shipped median_page)."""
+    if method == "lanczos":
+        return median_page(page, cells)
+    if method in ("rebuild", "rebuild-stone"):
+        if method == "rebuild-stone" and bg is None:
+            raise SystemExit("rebuild-stone needs D2R's panel_skilltreebg.sprite (py -3 tools/hd_ui.py baseline ...)")
+        moved = move_level_boxes(page.crop((0, 0, PAGE_W, page.height)), cells)
+        crisp = median_page(page, cells, skill_tree_hd.padded(skill_tree_hd.rebuild))
+        # the mask and the stone go through the same cut (their level boxes are moved already: no cells)
+        geo = (cells, CLASSIC_COL, CLASSIC_ROW)
+        mask = median_page(skill_tree_hd.mask_picture(moved, *geo), [])
+        if method == "rebuild":
+            stone = np.asarray(median_page(page, cells, skill_tree_hd.padded(skill_tree_hd.sharp)), np.float64)[..., :3]
+        else:
+            low = np.asarray(median_page(skill_tree_hd.stone_picture(moved, *geo), []), np.float64)[..., :3]
+            stone = low + skill_tree_hd.STONE_GAIN * skill_tree_hd.d2r_grain(bg, (FW, FH))
+        return skill_tree_hd.with_stone(crisp, mask, stone)
+    if method == "d2r":
+        tints = {(r, c): skill_tree_hd.tree_colour(page, CLASSIC_COL[c], CLASSIC_ROW[r]) for r, c in cells}
+        return skill_tree_hd.d2r_page(d2r_frame, list(cells), reqs_arrows, tints, sys.modules[__name__])
+    raise SystemExit(f"unknown skill tree method {method!r}")
+
+
+def median_pages(letter: str, pages: dict, pal, method: str = "lanczos", d2r: Image.Image | None = None,
+                 bg: Image.Image | None = None, reqs: dict | None = None) -> list[Image.Image] | None:
+    """The 3 HD frames from the mod's skltree_<letter>_back.dc6 drawn by `method` (hd_page; d2r: D2R's frame the
+    sockets and arrows are cut from, skill_tree_hd.D2R_ART; bg: D2R's panel_skilltreebg), None when the DC6 is missing or a cell is off columns 1 / 3."""
     path = MOD_UI / "spells" / f"skltree_{letter}_back.dc6"
     if not path.exists() or any(c not in MEDIAN_COLUMNS for cells in pages.values() for _r, c in cells.values()):
         return None
     sets = ui_art.panel_sets(path, pal)
     if len(sets) != TABS + 1:
         return None
-    return [median_page(sets[page_of(tab)], pages.get(page_of(tab), {}).values()) for tab in range(TABS)]
+    out = []
+    for tab in range(TABS):
+        cells = pages.get(page_of(tab), {})
+        out.append(hd_page(method, sets[page_of(tab)], cells.values(), d2r, bg,
+                           page_arrows(cells, reqs or {})))
+    return out
 
 
 def build_class(prefix: str, pages: dict[int, dict[str, tuple[int, int]]], reqs, out_dir: Path,
@@ -268,13 +312,22 @@ def preview(prefix: str, out: Path, frames: list[Image.Image]) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--preview", type=Path, help="also write a PNG of the 3 frames of each class here")
+    ap.add_argument("--try", dest="try_method", default="", choices=("",) + skill_tree_hd.METHODS,
+                    help=f"a TRIAL build with this page method whatever the switch (owner review only; also {TRY_ENV})")
     args = ap.parse_args(argv)
     trees, reqs = load_trees(), load_reqs()
     pal = ui_art.palette(PAL)
+    switch = skill_tree_hd.load_switch()
+    method = skill_tree_hd.used_method(switch, args.try_method or os.environ.get(TRY_ENV, ""))
+    trial = method != skill_tree_hd.used_method(switch)
+    print(f"skill tree pages: {method}" + (" (TRIAL build: owner review only)" if trial else ""))
+    bg_path = BASE_UI / "spells" / "skill_trees" / "panel_skilltreebg.sprite"
+    bg = ui_art.read_sprite(bg_path)[0] if bg_path.exists() else None
+    art = ui_art.read_sprite(BASE_UI / "spells" / "skill_trees" / f"{skill_tree_hd.D2R_ART[0]}skilltree.sprite")
     for cls, (prefix, letter, _key) in CLASSES.items():
-        median = median_pages(letter, trees[cls], pal)
+        median = median_pages(letter, trees[cls], pal, method, art[skill_tree_hd.D2R_ART[1]], bg, reqs)
         skills, arrows = build_class(prefix, trees[cls], reqs, HD_OUT / "spells" / "skill_trees", median)
-        how = f"the mod's page art (skltree_{letter}_back.dc6)" if median else f"D2R's sockets, {arrows} arrows drawn"
+        how = f"the mod's page art (skltree_{letter}_back.dc6, {method})" if median else f"D2R's sockets, {arrows} arrows drawn"
         print(f"{prefix}skilltree: {TABS} frames, {skills} skills, {how}")
         if args.preview:
             preview(prefix, args.preview, ui_art.read_sprite(HD_OUT / "spells" / "skill_trees" / f"{prefix}skilltree.sprite"))

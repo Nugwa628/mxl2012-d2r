@@ -4293,3 +4293,39 @@ copy removed at the end.
 4. Move an item from the inventory onto a RotW tab in classic (the notify mark), take one out, then press G back to HD with a
    RotW tab open.
 5. Report to bug #516 with screenshots; the cube's 3 x 4 window vs Median's 10 x 8 cube goes to #515.
+
+## Lane skillhd: sharper HD skill tree pages, for the owner's review (2026-10-30, slot 2, background mode, build of lane/skillhd)
+
+docs/PLAN.md phase 5 "upscaled skill-tree pages". The shipped HD pages are Median's classic pages scaled with Lanczos (soft).
+Three candidates (tools/skill_tree_hd.py, docs/hd-ui.md "Skill trees: HD page candidates"): **A `rebuild`** (Median's page,
+its frames / rims / arrows / level boxes rebuilt edge-aware by tone levels as tools/rune_hd.py does, stone Lanczos +
+sharpen), **B `rebuild-stone`** (A's structure on D2R's own HD stone carrying Median's stone tone), **C `d2r`** (D2R's HD
+panel: its stone, its engraved sockets and arrows on Median's cells, Median's tree colours as socket rims, page 3's passive
+frame engraved). All **off** (`tools/data/skill_tree_proposals.json` `enabled: false`), so a normal build or install shows
+nothing new; no CHANGELOG line. No Median Warlock pages exist (D2R's `waskilltree` stays as it is).
+
+| check | result |
+|---|---|
+| `py -3 -I tools/skill_tree_review.py ../../mxl2012-runs/skillhd/review` | `sheet_<cls>.png` x 7 (rows = the 3 tabs; legacy, HD now, A, B, C over D2R's tree background, half size), `detail_<cls>.png` x 7 (1:1 HD pixels), `overview_<method>.png` |
+| `tools/tests/test_ui.py` | 32 tests OK (new: `SkillTreeHdTests` x4: the switch ships off and a trial overrides it, rebuild edges crisper than Lanczos with the page's own colours, every candidate keeps the cells (sockets on all 10 cells, the tree colour rim, the passive frame), stone spots are no structure) |
+
+**In game (slot 2, background mode, build of lane/skillhd with slot 2's installed plugin, data only).** `py -3 tools/build.py`
+(switch off), install, then per candidate `MXL2012_UI_OUT=work/mod py -3 -I tools/skill_tree_art.py --try <method>` +
+install. Characters `SkhAma` ... `SkhAss` (level 1, `mxl2012-s2`), per class the tree (T) and its three tabs, cursor parked
+left. Scratch driver (not committed): `mxl2012-runs/skillhd/ingame/` (`drv.py`, `cls.py`, `trial.sh`, `ingame_sheet.py`).
+Afterwards the normal pages were rebuilt and installed again (slot 2 = lane build, switch off).
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-222440-s2` | current build, 7 classes x 3 tabs, HD and legacy (42 shots) | baseline: Median's pages in HD (soft), legacy Median's classic pages |
+| `checks-20261030-230307-s2` | trial B `rebuild-stone`, HD (21 shots) | PASS by eye: every icon in its box, level boxes right of the icons, tabs and titles as before, crisp frames on D2R's grain |
+| `checks-20261030-231050-s2` | trial C `d2r`, HD (21 shots) | PASS by eye: D2R's sockets on Median's 10 cells, tree colour rims (Sorceress red / blue ...), page 3's passive frame, arrows small at this size |
+| `checks-20261030-231900-s2` | trial A `rebuild`, HD (21 shots) | PASS by eye: as the shipped page, frames sharper |
+
+0 crash files, d2rloader.log 0 ERROR / ASSERT lines in the stop of the last run. One failed start in between (not a game bug):
+a trial run of `skill_tree_art.py` into `work/mod` wrote `skill_tab_titles.json` back into `lng/strings/mxl2012`, and D2RLoader
+stopped startup ("String tables are unavailable", MonType.txt); `trial.sh` deletes it before the install now (docs/hd-ui.md).
+
+Evidence: `mxl2012-runs/skillhd/review/` (static sheets), `mxl2012-runs/skillhd/ingame/ingame_<cls>.png` (per class: legacy |
+HD now | A | B | C from the shots, rows = tabs) and the run folders above (copied to `mxl2012-runs/skillhd/ingame/runs/`). Owner: pick A, B, C
+or none; switching one on is `enabled: true` + `method` in `tools/data/skill_tree_proposals.json`.

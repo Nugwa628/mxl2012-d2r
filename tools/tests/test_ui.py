@@ -338,3 +338,69 @@ class MedianTreeArtTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SkillTreeHdTests(unittest.TestCase):
+    """skill_tree_hd (lane skillhd): the sharper page candidates, all behind an off switch."""
+
+    def page(self) -> Image.Image:
+        return MedianTreeArtTests.page(self)
+
+    def test_switch_ships_off(self):
+        import skill_tree_hd
+        data = skill_tree_hd.load_switch()
+        self.assertFalse(data.get("enabled"))
+        self.assertEqual(skill_tree_hd.used_method(data), "lanczos")
+        self.assertIn(data.get("method"), skill_tree_hd.METHODS)
+        self.assertEqual(skill_tree_hd.used_method({"enabled": True, "method": "d2r"}), "d2r")
+        self.assertEqual(skill_tree_hd.used_method(data, "rebuild"), "rebuild")   # a trial build
+        with self.assertRaises(SystemExit):
+            skill_tree_hd.used_method(data, "nope")
+
+    def test_rebuild_edges_are_crisp(self):
+        import numpy as np
+        import skill_tree_hd
+        im = Image.new("RGBA", (20, 20), (40, 40, 40, 255))
+        im.paste((220, 30, 30, 255), (5, 5, 15, 15))
+        lz = np.asarray(skill_tree_hd.lanczos(im, (53, 53)), np.int32)
+        rb = np.asarray(skill_tree_hd.rebuild(im, (53, 53)), np.int32)
+        ramp = lambda a: int(((a[26, :, 0] > 60) & (a[26, :, 0] < 200)).sum())  # noqa: E731  pixels between the two tones
+        self.assertLess(ramp(rb), ramp(lz))
+        self.assertLessEqual(ramp(rb), 4)
+        self.assertEqual(tuple(rb[26, 26, :3]), (220, 30, 30))   # the colours are the page's
+        self.assertEqual(tuple(rb[2, 2, :3]), (40, 40, 40))
+
+    def test_candidates_keep_the_cells(self):
+        import skill_tree_hd
+        cells = [(r, c) for r in range(5) for c in (0, 2)]
+        frame = skill_tree_art.hd_page("rebuild", self.page(), cells, None, None, [])
+        self.assertEqual(frame.size, (skill_tree_art.FW, skill_tree_art.FH))
+        for r, c in cells:
+            x = skill_tree_art.SKILL_COL[c] - skill_tree_art.ORIGIN[0] + 65
+            y = skill_tree_art.SKILL_ROW[r] - skill_tree_art.ORIGIN[1] + 65
+            self.assertGreater(frame.getpixel((x, y))[0], 150)
+        art = Image.new("RGBA", (skill_tree_art.FW, skill_tree_art.FH))
+        dx = skill_tree_art.SKILL_COL[1] - skill_tree_art.SKILL_COL[0]
+        x0, y0, x1, y1 = skill_tree_art.SOCKET_CROP
+        art.paste((0, 0, 0, 120), (x0 + dx, y0, x1 + dx, y1))   # a stand-in socket where D2R's art has one
+        arrows = [((r, 0), (r + 1, 0)) for r in range(4)]
+        d2r = skill_tree_hd.d2r_page(art, cells, arrows, {(0, 0): (200, 0, 0)}, skill_tree_art)
+        for r, c in cells:   # a socket on every cell, nothing between the columns
+            cx, cy = skill_tree_art.cell_centre((r, c))
+            self.assertGreater(d2r.getpixel((cx, cy))[3], 60)
+        self.assertEqual(d2r.getpixel((450, 600))[3], 0)
+        cx, cy = skill_tree_art.cell_centre((0, 0))
+        rim = d2r.getpixel((cx, cy - skill_tree_art.SOCKET_HALF[1] + 1))
+        self.assertGreater(rim[0], rim[2] + 50)   # the tree colour on the socket's rim
+        cx2, _ = skill_tree_art.cell_centre((0, 2))
+        self.assertGreater(d2r.getpixel((cx2 - 74 - 26, cy + 200))[3], 60)   # column 3 has no arrows: the passive frame
+
+    def test_structure_skips_stone_spots(self):
+        import skill_tree_hd
+        im = self.page()
+        im.paste((20, 20, 20, 255), (110, 400, 113, 403))   # a small dark spot on the stone
+        x, y = skill_tree_art.CLASSIC_COL[0], skill_tree_art.CLASSIC_ROW[0]
+        s = skill_tree_hd.structure(im, [(0, 0)], skill_tree_art.CLASSIC_COL, skill_tree_art.CLASSIC_ROW)
+        self.assertTrue(s[y + 20, x + 20])        # the (saturated) box hole
+        self.assertFalse(s[401, 111])
+        self.assertFalse(s[200, 120])

@@ -32,9 +32,9 @@ def baseline(src: Path) -> int:
                          BASE_UI / "layouts" / f"{name}{suffix}.json"))
     for name in CHECK_LAYOUTS + CLASSIC_LAYOUTS:
         jobs.append((src / "data" / "global" / "ui" / "layouts" / f"{name}.json", BASE_UI / "layouts" / f"{name}.json"))
-    for p in CLASS_PREFIXES:
-        jobs.append((src / "data" / "hd" / "global" / "ui" / "spells" / "skill_trees" / f"{p}skilltree.sprite",
-                     BASE_UI / "spells" / "skill_trees" / f"{p}skilltree.sprite"))
+    for name in [f"{p}skilltree" for p in CLASS_PREFIXES] + ["panel_skilltreebg"]:  # bg: lane skillhd's candidates
+        jobs.append((src / "data" / "hd" / "global" / "ui" / "spells" / "skill_trees" / f"{name}.sprite",
+                     BASE_UI / "spells" / "skill_trees" / f"{name}.sprite"))
     for a, b in jobs:
         b.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(a, b)
