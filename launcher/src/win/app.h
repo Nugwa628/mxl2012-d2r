@@ -128,6 +128,7 @@ private:
 	bool FindD2R(std::string& error);
 	bool PrepareTarget(std::string& error);  // marker, writable, not running
 	bool EnsureMod(bool verify, std::string& error);
+	bool EnsureExtendedSaves(const std::wstring& mod, std::string& error);  // docs/bugs.md #512
 	bool LoadState();
 	bool SaveState();
 	void Report(const std::string& text, double fraction = -1);

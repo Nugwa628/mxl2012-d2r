@@ -1,6 +1,6 @@
 {
  "enabled": true,
- "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5.",
+ "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off.",
  "pictures": {
   "mxl/og1": {
    "reuse": {
@@ -68,89 +68,208 @@
    "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
   },
   "mxl/r-a-01": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 41,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-02": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 43,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-03": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 44,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-05": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 28,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-06": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 29,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-07": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 30,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-08": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 31,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-09": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 32,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-10": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 33,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-11": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 34,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-12": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 35,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-13": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 36,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-14": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 37,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-15": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 38,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-16": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 39,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-17": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 40,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/r-a-18": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
    "enabled": false,
-   "why": "the glyph names the rune: a crisper edge weight (contrast 20..60, sharpen 0.8) draws it clearer; D2R's HD rune stones carry other glyphs, so only new art would match D2R's look"
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 42,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
   },
   "mxl/realapple": {
    "method": "hybrid-crisp",
@@ -158,9 +277,567 @@
    "why": "crisper highlight and leaf; no D2R apple"
   },
   "mxl/sigil1b": {
-   "method": "hybrid-crisp",
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
    "enabled": false,
-   "why": "line art (key, ring): crisper; no D2R item of this kind"
+   "lane": "itemart3-signets",
+   "pick": 1,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "classic/invhmr": {
+   "reuse": {
+    "folder": "weapon",
+    "asset": "hammer/horadric_malus",
+    "hue": -0.018,
+    "sat": 0.973,
+    "val": -0.45
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "Median's Horadric Malus / Hammer of the Taan Judges is D2R's classic Malus picture: D2R's own HD Horadric Malus",
+   "pick": 1
+  },
+  "classic/invscp": {
+   "reuse": {
+    "folder": "weapon",
+    "asset": "scepter/scepter",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "the classic scepter picture (gold shaft, red crown): D2R's HD scepter, Median's colours by position",
+   "pick": 2
+  },
+  "mxl/hardmode": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/skull",
+    "hue": 0.035,
+    "sat": 1.566,
+    "val": -0.331
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "Jolly Roger is a big skull: D2R's HD skull (gem) at Median's size, Median's mean colour",
+   "pick": 3
+  },
+  "mxl/invhscr2": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "quest/scroll_of_horadric_quest_info",
+    "hue": -0.006,
+    "sat": 0.948,
+    "val": -0.113
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "two rolled scrolls on wooden rods: D2R's HD Horadric scroll pair, the same composition",
+   "pick": 4
+  },
+  "mxl/pot04": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "quest/scroll_of_self_resurrect",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a green conical flask with a cork: D2R's HD green flask (self-resurrect scroll's picture), Median's colours",
+   "pick": 5
+  },
+  "mxl/bird4": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "quest/gold_bird",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a crystal bird with raised wings: D2R's HD golden bird statuette, Median's purple / white colours by position",
+   "pick": 6
+  },
+  "classic/invgmr": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawless_ruby",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a round brilliant-cut gem (the old classic gem picture): D2R's HD flawless ruby (round cut), Median's colours",
+   "pick": 7
+  },
+  "classic/invgmb": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawless_saphire",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a round brilliant-cut gem: D2R's HD flawless sapphire (round cut), Median's colours by position",
+   "pick": 8
+  },
+  "classic/invgmw": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawless_diamond",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a round brilliant-cut gem: D2R's HD flawless diamond (round cut), Median's colours by position",
+   "pick": 9
+  },
+  "classic/invgmv": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawless_amethyst",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a round brilliant-cut gem: D2R's HD flawless amethyst (round cut), Median's colours by position",
+   "pick": 10
+  },
+  "classic/invgmy": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawless_emerald",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a round brilliant-cut gem: D2R's HD flawless emerald (round cut), Median's yellow-green by position",
+   "pick": 11
+  },
+  "classic/invbla": {
+   "reuse": {
+    "folder": "weapon",
+    "asset": "sword/shadowfang",
+    "hue": 0.024,
+    "sat": 0.461,
+    "val": 0.124
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "the item is Shadowfang, a straight sword: D2R's HD Shadowfang, Median's mean colour",
+   "pick": 12
+  },
+  "classic/invblt": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "belt/light_belt",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a single leather strap with a buckle: D2R's HD light belt, Median's colours by position",
+   "pick": 13
+  },
+  "mxl/redgem": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_ruby",
+    "hue": 0.007,
+    "sat": 1.326,
+    "val": 0.4
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a red cut stone: D2R's HD flawed ruby, Median's mean colour (Median's is more triangular)",
+   "pick": 14
+  },
+  "mxl/gemcontainer": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "quest/mephisto_soul_stone",
+    "hue": -0.085,
+    "sat": 0.571,
+    "val": 0.283
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a pale blue crystal shard: D2R's HD soul stone crystal, Median's mean colour (D2R's lies tilted)",
+   "pick": 15
+  },
+  "mxl/ring01": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "ring/ring2",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a gold band with a red stone: D2R's HD ring (ring2), Median's colours by position",
+   "pick": 16
+  },
+  "mxl/ring06": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "ring/ring2",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a gold band with a purple stone: D2R's HD ring (ring2), Median's colours by position",
+   "pick": 17
+  },
+  "mxl/ring09": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "ring/ring2",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a gold band with a teal stone: D2R's HD ring (ring2), Median's colours by position",
+   "pick": 18
+  },
+  "mxl/ring03": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "ring/ring",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a ring with a green stone: D2R's HD ring, Median's colours by position",
+   "pick": 19
+  },
+  "mxl/ring07": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "ring/ring",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a dark ring with a red stone: D2R's HD ring, Median's colours by position",
+   "pick": 20
+  },
+  "mxl/zelixir1": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 21
+  },
+  "mxl/zelixir2": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 22
+  },
+  "mxl/zelixir4": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 23
+  },
+  "mxl/zelixir5": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 24
+  },
+  "mxl/zelixir6": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 25
+  },
+  "mxl/zelixir7": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 26
+  },
+  "mxl/zelixir8": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "potion/full_rejuv_potion",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an oil flask (round body, gold skull stopper): D2R's HD round potion flask, Median's liquid colour by position; the skull stopper is lost",
+   "pick": 27
+  },
+  "mxl/r-d-02": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 45,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+  },
+  "mxl/r-d-05": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 46,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+  },
+  "mxl/r-d-11": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 47,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+  },
+  "mxl/r-d-07": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 48,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+  },
+  "mxl/r-d-04": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 49,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+  },
+  "mxl/r-d-12": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "rune/ist_rune",
+    "glyph": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3",
+   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone (Ist's, its glyph taken out) with Median's glyph cut in (traced from the 23 px classic picture, so small signs come out simplified); recomposed, not only recoloured",
+   "pick": 50,
+   "owner": "off 2026-10-30: owner wants sharper chiselled signs (lane itemart3 round 3)"
+  },
+  "mxl/sigil4b": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3-signets",
+   "pick": 2,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "mxl/sigil3b": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3-signets",
+   "pick": 3,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "mxl/sigil5b": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3-signets",
+   "pick": 4,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "mxl/sigil2b": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3-signets",
+   "pick": 5,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "mxl/sigil6b": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3-signets",
+   "pick": 6,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "mxl/sigilxl": {
+   "reuse": {
+    "folder": "armor",
+    "asset": "shield/crown_shield",
+    "seal": "median"
+   },
+   "enabled": false,
+   "lane": "itemart3-signets",
+   "pick": 7,
+   "why": "a signet / emblem seal, not a jewel (owner, 2026-10-30): D2R's flat gold Crown Shield disc as the seal, its centre enamelled in Median's centre colours with Median's own sign stamped in (2D only); off until the owner approves (round 1's gem in a gold setting was rejected: it read as a jewel)"
+  },
+  "mxl/shiniewhite": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_diamond",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a rough speckled clue gem: D2R's HD flawed diamond (a rough stone), Median's speckled colours by position; it may read as a D2R flawed gem",
+   "pick": 58
+  },
+  "mxl/shiniegreen": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_emerald",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a rough speckled clue gem: D2R's HD flawed emerald (a rough stone), Median's speckled colours by position; it may read as a D2R flawed gem",
+   "pick": 59
+  },
+  "mxl/shiniepurple": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_amethyst",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a rough speckled clue gem: D2R's HD flawed amethyst (a rough stone), Median's speckled colours by position; it may read as a D2R flawed gem",
+   "pick": 60
+  },
+  "mxl/shiniered": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_ruby",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a rough speckled clue gem: D2R's HD flawed ruby (a rough stone), Median's speckled colours by position; it may read as a D2R flawed gem",
+   "pick": 61
+  },
+  "mxl/shinieyellow": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_topaz",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a rough speckled clue gem: D2R's HD flawed topaz (a rough stone), Median's speckled colours by position; it may read as a D2R flawed gem",
+   "pick": 62
+  },
+  "mxl/shinieblue": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gem/flawed_saphire",
+    "colour": "by position"
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a rough speckled clue gem: D2R's HD flawed saphire (a rough stone), Median's speckled colours by position; it may read as a D2R flawed gem",
+   "pick": 63
+  },
+  "mxl/scroll11": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "scroll/deciphered_bark_scroll",
+    "hue": -0.032,
+    "sat": 1.42,
+    "val": -0.327
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "a curled parchment: D2R's HD parchment, Median's mean colour (Scroll of Kings gets the same kind of parchment)",
+   "pick": 64
+  },
+  "mxl/invscb2": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "quest/bark_scroll",
+    "hue": -0.014,
+    "sat": 0.882,
+    "val": 0.065
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "an open parchment: D2R's HD bark scroll, Median's mean colour",
+   "pick": 65
+  },
+  "classic/invgldm": {
+   "reuse": {
+    "folder": "misc",
+    "asset": "gold/gold",
+    "hue": -0.0,
+    "sat": 1.189,
+    "val": 0.613
+   },
+   "enabled": true,
+   "lane": "itemart3",
+   "why": "Fool's Gold: D2R's HD gold coins; Median's picture is lumps of gold, not coins (shape differs)",
+   "pick": 66
   }
  }
 }

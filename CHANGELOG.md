@@ -5,8 +5,18 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Downloader: when it keeps your own `mods\mxl2012\d2rloader\config\d2rloader.toml` and that file does not ask for the
+  extended save format, it now sets `[d2rcore.save_format] mode = "extended"` (only that key). A copy of the old file is
+  kept as `d2rloader.toml.retail-backup`. Without the key, every save failed while you carried many Median uniques, set items
+  or runewords (#512).
+- No more game close when walking through an area entrance with a mercenary ("Could not get act!", for example into the
+  Underground Passage): the game now waits for the mercenary's new spot to load instead of closing (#511).
 - Totems no longer stay on the player after Bend the Shadows next to rocks: when the free-spot test refuses the ring
   round the player, the totem is placed where the game's own move finds room (#509).
+- HD: 36 more Median item pictures now use D2R's HD art of the same kind in Median's colours instead of a scaled-up classic
+  picture: the Horadric Malus, scepters, Jolly Roger, scrolls, Token of Absolution, Sunless Crystal Bird, the Sunstones and
+  Class Rewards, Shadowfang, the Ingredient Rings, the oils, the clue gems,
+  Fool's Gold and more. Median's runes and the signets keep their current picture for now.
 
 ## D2R-XL 2012
 

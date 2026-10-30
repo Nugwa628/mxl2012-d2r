@@ -11907,6 +11907,11 @@ ITEMART_SETS = [
                "r48", "r49", "r50", "r01", "r10", "r26"]),
     # lane itemart2: the five Rainbow Stones (D2R's HD sapphires in Median's colours) beside D2R's five sapphires and gems
     ("rainbow", ["yo1", "yo2", "yo3", "yo4", "yo5", "gcb", "gfb", "gsb", "glb", "gpb", "gpr", "gpg", "gpy", "gpv", "gpw"]),
+    # lane itemart3: D2R HD art of the same kind (Malus, scepter, Jolly Roger, scrolls, Token, bird, Fool's Gold,
+    # Shadowfang, I Am Rich, Multi Shards, Class Reward) / the Sunstones, rings, oils, runes (Lah, Kur: fine glyphs), clue gems
+    ("itemart3a", ["hdm", "129", "yq7", "yqe", "toa", "yq1", "az!", "!@6", "a58", "a68", "u@v", "qum", "x01"]),
+    ("itemart3b", ["x1x", "x2x", "x3x", "x4x", "l@l", "m@m", "q@q", "1o^", "5o^", "8o^", "r35", "r36", "r38", "r39",
+                   "r41", "r46", "01-", "35-", "27-", "20-"]),
 ]
 
 

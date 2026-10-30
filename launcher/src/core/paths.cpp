@@ -162,6 +162,75 @@ std::string GetTomlKey(const std::string& text, const std::string& section, cons
 	return "";
 }
 
+namespace {
+constexpr const char* SaveFormatSection = "d2rcore.save_format";
+constexpr const char* SaveFormatDotted = "d2rcore.save_format.mode";
+
+// The line of the save format key and the line of the [d2rcore.save_format] header (-1 when missing).
+void FindSaveFormat(const std::vector<std::string>& lines, int& keyLine, int& headerLine, std::string* value) {
+	keyLine = headerLine = -1;
+	std::string section;
+	bool top = true;
+	for (int i = 0; i < int(lines.size()); ++i) {
+		std::string name;
+		if (IsHeader(lines[size_t(i)], &name)) {
+			top = false;
+			section = name;
+			if (name == SaveFormatSection && headerLine < 0)
+				headerLine = i;
+			continue;
+		}
+		if (keyLine < 0 && ((!top && section == SaveFormatSection && KeyLine(lines[size_t(i)], "mode", value, nullptr)) ||
+		                    (top && KeyLine(lines[size_t(i)], SaveFormatDotted, value, nullptr))))
+			keyLine = i;
+	}
+}
+}  // namespace
+
+std::string SaveFormatMode(const std::string& text) {
+	std::string t = text.rfind("\xEF\xBB\xBF", 0) == 0 ? text.substr(3) : text;
+	int keyLine = 0, headerLine = 0;
+	std::string value;
+	FindSaveFormat(Lines(t), keyLine, headerLine, &value);
+	return keyLine < 0 ? "" : TomlUnquote(value);
+}
+
+std::string SetExtendedSaveFormat(const std::string& text) {
+	if (SaveFormatMode(text) == "extended")
+		return text;
+	bool bom = text.rfind("\xEF\xBB\xBF", 0) == 0;
+	std::string t = bom ? text.substr(3) : text;
+	auto lines = Lines(t);
+	std::string eol = t.find("\r\n") != std::string::npos ? "\r" : "";
+	bool noFinalNewline = !t.empty() && t.back() != '\n';
+	int keyLine = 0, headerLine = 0;
+	FindSaveFormat(lines, keyLine, headerLine, nullptr);
+	if (keyLine >= 0) {
+		std::string& l = lines[size_t(keyLine)];
+		std::string comment;
+		bool dotted = KeyLine(l, SaveFormatDotted, nullptr, &comment);
+		if (!dotted)
+			KeyLine(l, "mode", nullptr, &comment);
+		bool cr = !l.empty() && l.back() == '\r';
+		l = l.substr(0, l.find_first_not_of(" \t")) + (dotted ? SaveFormatDotted : "mode") + " = \"extended\"" + comment + (cr ? "\r" : "");
+	} else if (headerLine >= 0) {
+		if (noFinalNewline && headerLine == int(lines.size()) - 1) {  // the header is the last line: it gets its newline
+			lines[size_t(headerLine)] += eol;
+			noFinalNewline = false;
+		}
+		lines.insert(lines.begin() + headerLine + 1, "mode = \"extended\"" + eol);
+	} else {
+		std::string out = SetTomlKey(t, SaveFormatSection, "mode", "\"extended\"");
+		return bom ? "\xEF\xBB\xBF" + out : out;
+	}
+	std::string out = bom ? "\xEF\xBB\xBF" : "";
+	for (const auto& l : lines)
+		out += l + "\n";
+	if (noFinalNewline)
+		out.pop_back();  // keep a missing final newline missing
+	return out;
+}
+
 bool PathIsOrUnder(const std::string& path, const std::string& dir) {
 	std::string p = NormPath(path), d = NormPath(dir);
 	if (d.empty() || (p + "/").find("/../") != std::string::npos || p.rfind("../", 0) == 0)

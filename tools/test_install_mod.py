@@ -66,5 +66,27 @@ class InstallSlotTests(unittest.TestCase):
             setup.assert_not_called()
 
 
+class SaveFormatKeyTests(unittest.TestCase):
+    """docs/bugs.md #512: a d2rloader.toml without the save format gets D2RLoader's extended mode back."""
+
+    def ensure_all(self, text):
+        for section, key, value, _ in install_mod.TOML_KEYS:
+            text = install_mod.ensure_toml_key(text, section, key, value)
+        return text
+
+    def test_another_mods_file_gets_extended_mode(self):
+        out = self.ensure_all('[d2rloader]\ndefault_mod = "OtherMod"\n')
+        self.assertIn('[d2rcore.save_format]\nmode = "extended"', out)
+        self.assertIn('default_mod = "OtherMod"', out)
+
+    def test_commented_mode_is_replaced(self):
+        out = self.ensure_all('[d2rcore.save_format]\n# mode = "extended"\n')
+        self.assertIn('[d2rcore.save_format]\nmode = "extended"\n', out)
+
+    def test_installed_file_unchanged(self):
+        text = '[d2rcore.save_format]\nmode = "extended"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n'
+        self.assertEqual(self.ensure_all(text), text)
+
+
 if __name__ == "__main__":
     unittest.main()

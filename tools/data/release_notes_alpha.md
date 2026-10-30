@@ -41,6 +41,17 @@ Close the game, delete `<D2R folder>\mods\mxl2012\mxl2012.mpq\data`, then unpack
 as in step 2. Keep `mods\mxl2012\d2rloader\config\d2rloader.toml` if you edited it. Read the new notes first: a new alpha
 may not load characters of an older one.
 
+**Save format.** The mod needs D2RLoader's extended save format. If you keep your old
+`mods\mxl2012\d2rloader\config\d2rloader.toml` (or copied one from another mod), make sure it has these two lines:
+
+```
+[d2rcore.save_format]
+mode = "extended"
+```
+
+From this version on the mod checks this at start: if the lines are missing it adds them (your old file is kept as
+`d2rloader.toml.retail-backup`) and asks you to restart the game once. If a save ever fails, a red line says so.
+
 **Legacy graphics (G) in Reign of the Warlock games** need one line in the mod's own settings. New installs have it. If you update and keep your old `mods\mxl2012\d2rloader\config\d2rloader.toml`, add these two lines to it (or delete that file before unpacking, if you never edited it):
 
 ```
@@ -72,8 +83,8 @@ What we know is wrong or different. Please don't report these again, unless you 
 - **Median's own maps show D2R's walls in HD.** The 17 maps that Median added or changed have D2R's own walls in Median's
   layout in HD, lit in each map's own colour as in legacy mode; 2 of them show only part of their walls (Ancient Tunnels: the void
   around the platform is drawn as floor; Khalimgrad's cathedral: no arches and roofs). Legacy graphics (G) show them as Median drew them.
-- **Item pictures in HD:** most items use D2R's own HD pictures; about 90 Median-only ones are Median's classic pictures
-  scaled up, so they look softer.
+- **Item pictures in HD:** most items use D2R's own HD pictures, many Median-only ones D2R's HD art in Median's colours;
+  about 50 (Median's runes and signets among them) are still Median's classic pictures scaled up, so they look softer.
 - **Skill trees in HD** are Median's classic page art scaled up.
 - **A few names** that Median XL 2012 itself never wrote (some potions, monsters and objects) show a name we gave them.
 - **Chronicle:** making some runewords (for example Kyrie) names the base item in the chat message; the item itself is right.

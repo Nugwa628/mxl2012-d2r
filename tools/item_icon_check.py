@@ -4,8 +4,10 @@ References: invfile / uniqueinvfile / setinvfile of weapons, armor, misc, and in
   - an invfile the mod ships a DC6 for must have its HD sprite (mxl/<invfile>.sprite + .lowend.sprite, right size,
     matching the DC6's opaque fraction and colour) and every item that uses it must point at it; a picture made from
     D2R's HD sprite (item_hd_report.json "hd_reuse", tools/item_reuse.py) is D2R's art, so it is held to the looser
-    REUSE_* limits, and an exact one may point at D2R's asset itself ("hd_reuse_direct"); so is a picture made from a
-    picture proposal switched on ("proposal_on", tools/data/item_art_proposals.json)
+    REUSE_* limits, and an exact one may point at D2R's asset itself ("hd_reuse_direct"); a picture made from a picture
+    proposal switched on ("proposal_on", tools/data/item_art_proposals.json) is the owner-approved candidate, so it must
+    be that candidate pixel for pixel (item_art_sheets.candidate at its size and cell; lane itemart3: several approved
+    D2R pictures have another outline than Median's, e.g. coins for Fool's Gold, and fail any classic-look limit)
   - an invfile with only a D2R classic DC6 resolves through D2R's HD asset or a converted classic/<invfile> sprite
   - an invfile with no DC6 in the mod or in D2R is unresolved (reported with its rows)
   - every base item code / unique / set name is in items.json / uniques.json / sets.json and its asset is a D2R sprite
@@ -58,6 +60,25 @@ def check_sprite(path: Path, dc6: Path, pal: list, cell: int, reused: bool = Fal
     fl, cl = (REUSE_FRACTION_LIMIT, REUSE_COLOUR_LIMIT) if reused else (FRACTION_LIMIT, COLOUR_LIMIT)
     if abs(want[0] - got[0]) > fl or max(abs(a - b) for a, b in zip(want[1:], got[1:])) > cl:
         return [f"{path.name}: differs from the DC6"]
+    return []
+
+
+def check_proposal_sprite(path: Path, dc6: Path, pal: list, cell: int, prop: dict, hd_items: Path) -> list[str]:
+    """Problems of a sprite made from a proposal switched on: whole cells, and pixel for pixel the approved candidate."""
+    import numpy as np
+    import item_art_sheets
+    import upscale
+    if not path.exists():
+        return [f"{path.name}: missing"]
+    info = sprite_info(path)
+    if info["frames"] != 1 or info["strip_width"] % cell or info["height"] % cell:
+        return [f"{path.name}: size {info['strip_width']}x{info['height']} is not one frame of whole cells"]
+    w, h, _x, _y, blk = read_dc6(dc6)[0]
+    want, _label = item_art_sheets.candidate(prop, upscale.rows_to_array(decode_frame(w, h, blk, pal, fill=True)),
+                                             info["strip_width"], info["height"], hd_items, cell)
+    got = upscale.rows_to_array(read_sprite(path)[0])
+    if got.shape != want.shape or np.abs(got.astype(int) - want.astype(int)).max() > 0:
+        return [f"{path.name}: not the approved proposal picture"]
     return []
 
 
@@ -122,7 +143,11 @@ def main() -> int:
     mod_dc6 = {p.stem.lower() for p in MOD_ITEMS.glob("*.dc6")}
     d2r_dc6 = {p.stem.lower() for p in D2R_ITEMS.glob("*.dc6")}
     hd_report = json.loads((OUT / "item_hd_report.json").read_text("utf-8")) if (OUT / "item_hd_report.json").exists() else {}
-    reused = set(hd_report.get("hd_reuse", {})) | set(hd_report.get("proposal_on", []))  # both are D2R's HD art
+    reused = set(hd_report.get("hd_reuse", {}))  # D2R's HD art
+    import fxpaths
+    from item_art_review import enabled_proposals, load_proposals
+    proposals = {k: v for k, v in enabled_proposals(load_proposals()).items() if k in set(hd_report.get("proposal_on", []))}
+    hd_items = fxpaths.D2R_DATA / "hd" / "global" / "ui" / "items"
     report = check_items(tables, maps["items"], maps["uniques"], maps["sets"], sprite_set(BASE / "filelist.txt"), mod_dc6, d2r_dc6,
                          direct=hd_report.get("hd_reuse_direct", {}))
     pal = palette(BASE / "palette" / "pal.dat")
@@ -135,8 +160,12 @@ def main() -> int:
             low = sp.name.endswith(".lowend.sprite")
             inv = sp.name[:-len(".lowend.sprite" if low else ".sprite")]
             checked += 1
-            sprite_problems += check_sprite(sp, group / f"{inv}.dc6", pal, CELL_LOW if low else CELL_HD,
-                                            f"{folder_dir.name}/{inv}" in reused)
+            k = f"{folder_dir.name}/{inv}"
+            if k in proposals:
+                sprite_problems += check_proposal_sprite(sp, group / f"{inv}.dc6", pal, CELL_LOW if low else CELL_HD,
+                                                         proposals[k], hd_items)
+            else:
+                sprite_problems += check_sprite(sp, group / f"{inv}.dc6", pal, CELL_LOW if low else CELL_HD, k in reused)
     report.update({"sprites_checked": checked, "sprite_problems": sprite_problems})
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "item_icon_check.json").write_text(json.dumps(report, indent=1), "utf-8")

@@ -204,6 +204,7 @@ void TestPlan() {
 	                   next, err);
 	std::map<std::string, std::string> disk = {{"same.txt", H1}, {"changed.txt", H1}, {"gone.txt", H1},
 	                                           {"d2rloader/config/d2rloader.toml", H4}, {"d2rloader/logs/x.log", H1},
+	                                           {"d2rloader/config/d2rloader.toml.retail-backup", H1}, {"d2rloader/config/other.toml.retail-backup", H1},
 	                                           {"d2rloader/crashes/c.dmp", H1}, {"stray/own.txt", H1}};
 	auto cur = [&](const std::string& p) { auto it = disk.find(p); return it == disk.end() ? std::string() : it->second; };
 	auto local = [&] { std::vector<std::string> v; for (const auto& [k, _] : disk) v.push_back(k); return v; };
@@ -220,8 +221,9 @@ void TestPlan() {
 	Check(has(plan.fetch, "changed.txt") && has(plan.fetch, "new.txt") && has(plan.fetch, "missing.txt"), "changed, new, missing fetched");
 	Check(hasS(plan.preserved, "d2rloader/config/d2rloader.toml") && !has(plan.fetch, "d2rloader/config/d2rloader.toml"),
 	      "existing preserve file never overwritten");
-	Check(hasS(plan.remove, "gone.txt") && hasS(plan.remove, "stray/own.txt") && plan.remove.size() == 2,
-	      "unlisted files removed, D2RLoader logs / crashes kept");
+	Check(hasS(plan.remove, "gone.txt") && hasS(plan.remove, "stray/own.txt") && hasS(plan.remove, "d2rloader/config/other.toml.retail-backup") &&
+	          plan.remove.size() == 3,
+	      "unlisted files removed, D2RLoader logs / crashes and the preserve file's .retail-backup (#512) kept");
 	Check(plan.fetchBytes == 20 + 30 + 5, "fetch byte count");
 	disk.clear();
 	plan = mxl::PlanInstall(next, local(), cur);
@@ -530,6 +532,46 @@ void TestToml() {
 	Check(mxl::GetTomlKey("[a]\ns = \"a # b\" # c\n", "a", "s") == "\"a # b\"", "# inside quotes is no comment");
 }
 
+// docs/bugs.md #512: the kept mod d2rloader.toml gets [d2rcore.save_format] mode = "extended", nothing else changes.
+void TestSaveFormat() {
+	// The player's file of #512: another mod's settings, no save format table.
+	std::string player = "# other mod settings\n[d2rloader]\ndefault_mod = \"OtherMod\"\n\n[d2rcore.stash]\nadd_shared_tabs = 100  # big stash\n";
+	Check(mxl::SaveFormatMode(player).empty(), "missing table: no save format");
+	std::string fixed = mxl::SetExtendedSaveFormat(player);
+	Check(fixed == player + "\n[d2rcore.save_format]\nmode = \"extended\"\n", "missing table: appended, the rest as it was");
+	Check(mxl::SaveFormatMode(fixed) == "extended", "missing table: extended after the fix");
+	// The table without the key (a commented template stays as a comment).
+	std::string noKey = "[a]\nb = 1\n[d2rcore.save_format]\n# mode = \"retail\"\n[c]\nd = 2\n";
+	Check(mxl::SaveFormatMode(noKey).empty(), "table without key: no save format");
+	Check(mxl::SetExtendedSaveFormat(noKey) == "[a]\nb = 1\n[d2rcore.save_format]\nmode = \"extended\"\n# mode = \"retail\"\n[c]\nd = 2\n",
+	      "table without key: the key goes under the header");
+	Check(mxl::SetExtendedSaveFormat("[d2rcore.save_format]") == "[d2rcore.save_format]\nmode = \"extended\"\n", "header on the last line, no newline");
+	Check(mxl::SetExtendedSaveFormat("[d2rcore.save_format]\r\n[x]\r\ny = 1") == "[d2rcore.save_format]\r\nmode = \"extended\"\r\n[x]\r\ny = 1",
+	      "table without key, CRLF, no final newline");
+	// mode = "retail": only the value changes, its comment and indent stay.
+	std::string retail = "[d2rcore.save_format]\n  mode = \"retail\"  # set by another mod\n[d2rcore.player]\nmode = \"retail\"\n";
+	Check(mxl::SaveFormatMode(retail) == "retail", "retail read");
+	Check(mxl::SetExtendedSaveFormat(retail) == "[d2rcore.save_format]\n  mode = \"extended\" # set by another mod\n[d2rcore.player]\nmode = \"retail\"\n",
+	      "retail replaced in place, another table's mode untouched");
+	Check(mxl::SetExtendedSaveFormat("d2rcore.save_format.mode = 'retail'\n[b]\n") == "d2rcore.save_format.mode = \"extended\"\n[b]\n", "dotted key replaced");
+	Check(mxl::SaveFormatMode("[b]\nd2rcore.save_format.mode = \"extended\"\n").empty(), "a dotted key inside another table does not count");
+	// Already extended: the same bytes back (quotes, comments, BOM, CRLF as written).
+	for (const char* ok : {"[d2rcore.save_format]\nmode = \"extended\"\n", "\xEF\xBB\xBF[d2rcore.save_format]\r\nmode='extended' # Median\r\n",
+	                       "d2rcore.save_format.mode = \"extended\"\n[x]\n"}) {
+		Check(mxl::SaveFormatMode(ok) == "extended", "already extended: read");
+		Check(mxl::SetExtendedSaveFormat(ok) == ok, "already extended: unchanged");
+	}
+	// Comments, CRLF and a BOM are kept.
+	std::string crlf = "\xEF\xBB\xBF# my settings\r\n[d2rloader]\r\ndefault_mod = \"mxl2012\" # mine\r\n\r\n[d2rcore.save_format]\r\nmode = \"retail\"\r\n";
+	Check(mxl::SetExtendedSaveFormat(crlf) ==
+	          "\xEF\xBB\xBF# my settings\r\n[d2rloader]\r\ndefault_mod = \"mxl2012\" # mine\r\n\r\n[d2rcore.save_format]\r\nmode = \"extended\"\r\n",
+	      "BOM, CRLF and comments kept (retail replaced)");
+	std::string crlfMissing = "# my settings\r\n[d2rloader]\r\ndefault_mod = \"mxl2012\" # mine\r\n";
+	Check(mxl::SetExtendedSaveFormat(crlfMissing) == crlfMissing + "\r\n[d2rcore.save_format]\r\nmode = \"extended\"\r\n", "CRLF file gets a CRLF table");
+	Check(mxl::SaveFormatMode(mxl::SetExtendedSaveFormat("")) == "extended", "an empty file gets the table");
+	Check(mxl::SaveFormatMode("[d2rcore.save_format]\n# mode = \"extended\"\n").empty(), "a commented key does not count");
+}
+
 // docs/bugs.md #53: D2RLoader's default mod and stray copies of the plugin.
 void TestEnvironment() {
 	const std::string bs(1, char(92));
@@ -650,6 +692,7 @@ int main() {
 	TestCoexist();
 	TestGameProcessName();
 	TestToml();
+	TestSaveFormat();
 	TestEnvironment();
 	TestSvg();
 	std::printf("%d checks, %d failures\n", checks, failures);

@@ -80,6 +80,7 @@
 #include "other_plugins_logic.h"
 #include "pet_spread.h"
 #include "rune_letters.h"
+#include "save_mode.h"
 #include "skill_remove.h"
 #include "skill_text.h"
 #include "sound_guard.h"
@@ -146,7 +147,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign savemode), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -426,6 +427,7 @@ char g_appleUseReport[192] = "";
 char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
 char g_harnessReport[192] = "";
+char g_saveModeReport[MAX_PATH + 160] = "";
 bool g_partsInstalled = false;
 
 // Start-up log line of the other plugins: D2RLoader loads the game-wide plugins after the mod's, so a one-shot thread waits
@@ -494,6 +496,10 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		Say(command, env);
 		if (std::strcmp(g_envReport, "ok") != 0) {
 			g_context->LogWarn(env);
+		}
+		if (!Off("savemode") && g_saveModeReport[0] != '\0') {
+			std::snprintf(line, sizeof(line), "savemode %s; %d cancelled saves since start", g_saveModeReport, SaveModeFailures());
+			Say(command, line);
 		}
 	}
 	if (!Off("otherplugins")) {
@@ -654,6 +660,18 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!RegisterNotice(context)) {
 		context->LogWarn("mxl2012-core: no overlay service, later warnings (environment, conflicting plugin) are in this log only");
 	}
+	// The save format (D2RLoader's extended format, docs/bugs.md #512) and the watch for cancelled saves; its notice goes over
+	// the environment one: a save that does not reach the disk loses progress.
+	if (!Off("savemode")) {
+		char game[MAX_PATH * 3];
+		ModulePathUtf8(nullptr, game, sizeof(game));
+		if (char* slash = std::strrchr(game, '\\')) {
+			*slash = '\0';
+		}
+		InstallSaveMode(context, g_selfPath, game, g_saveModeReport, sizeof(g_saveModeReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: savemode %s", g_saveModeReport);
+		context->LogInfo(line);
+	}
 	// Parts, each behind its off word. The empty-slot stubs go in last: they take every slot still empty.
 	if (!Off("cltdo22")) {
 		InstallClientSkills(context, g_cltDoReport, sizeof(g_cltDoReport));
@@ -791,5 +809,6 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 
 D2RL_PLUGIN_EXPORT void D2RLoaderUnloadPlugin() noexcept {
 	StopTestHarness();
+	StopSaveMode();
 	g_context = nullptr;
 }

@@ -51,6 +51,21 @@ std::string SetTomlKey(const std::string& text, const std::string& section, cons
 // Value text of `key` in [section] ("" when missing), without a trailing comment.
 std::string GetTomlKey(const std::string& text, const std::string& section, const std::string& key);
 
+// ---- D2RLoader's save format (docs/bugs.md #512). D2R-XL 2012 needs `[d2rcore.save_format] mode = "extended"` in the
+// mod's own d2rloader.toml: in retail format D2R cannot write Median's stats 511+ and every save is cancelled. The release
+// ships the key, but the file is a `preserve` file: the downloader keeps the one a player already has.
+
+// The mod's config, relative to the mod folder (the manifest path). Its backup is <file>.retail-backup (SaveFormatBackupSuffix,
+// manifest.h).
+constexpr const char* ModLoaderConfigRel = "d2rloader/config/d2rloader.toml";
+// The save format the text asks for, unquoted: `mode` of [d2rcore.save_format], or the dotted key
+// `d2rcore.save_format.mode` before the first table. "" when missing (commented lines do not count).
+std::string SaveFormatMode(const std::string& text);
+// The text with the save format set to "extended": an existing `mode` line (or the dotted key) is changed in place (its
+// comment kept), else `mode = "extended"` goes right under an existing [d2rcore.save_format] header, else the table is
+// appended. Every other line, a UTF-8 BOM and the line endings stay as they were; an extended file comes back unchanged.
+std::string SetExtendedSaveFormat(const std::string& text);
+
 // True for a path the official Median XL owns or this downloader must never use: <localAppData>\mxl-launcher (its
 // launcher), <roamingAppData>\MedianXL (its saves), <localAppData>\MedianXL, and a classic Diablo II folder (any path
 // segment named "Diablo II"). Case-insensitive, '\' or '/'.

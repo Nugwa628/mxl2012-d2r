@@ -4,6 +4,10 @@ A candidate for a picture is, in this order (docs/hd-icons.md "Picture review"):
   reuse    a D2R HD sprite of the same kind of object: a looser silhouette match than item_reuse's (loose_candidates:
            mask IoU of the two tight crops stretched to one box, times an aspect penalty), scaled to the size of Median's
            picture and recoloured to its mean hue / saturation / brightness (colour_match); judged by eye on the sheet
+  glyph    (a `reuse` entry with "glyph": "median", lane itemart3) a D2R HD rune stone with its own glyph taken out
+           (blank_stone) and Median's glyph cut in instead (glyph_mask, carve): the stone is D2R's, the sign is Median's
+  seal     (a `reuse` entry with "seal": "median", lane itemart3 round 2) a round D2R gold disc as a signet: its centre
+           enamelled in the colours of Median's centre disc and Median's sign stamped in (seal)
   method   another upscale setting (upscale.METHODS, or the hybrid with other edge / sharpen values: VARIANTS)
   keep     the current hybrid upscale
 Sheet row: Median classic (legacy look: nearest x3.5) | current HD upscale | candidate, all at D2R's HD size (98 px per
@@ -190,6 +194,172 @@ def hd_sprite(hd_items: Path, folder_asset: str) -> np.ndarray:
     return upscale.rows_to_array(read_sprite(Path(hd_items) / f"{folder_asset}.sprite")[0])
 
 
+# -- rune stones: D2R's stone, Median's glyph (lane itemart3) -------------------------------------------------------
+def blur(a: np.ndarray, r: float) -> np.ndarray:
+    """Gaussian blur (sigma r) of a 2D float array, edges repeated."""
+    n = max(1, int(3 * r + 0.5))
+    x = np.arange(-n, n + 1)
+    k = np.exp(-x * x / (2 * r * r))
+    k /= k.sum()
+    p = np.pad(a.astype(np.float64), n, mode="edge")
+    p = sum(k[i] * p[i:i + p.shape[0] - 2 * n] for i in range(2 * n + 1))
+    return sum(k[i] * p[:, i:i + p.shape[1] - 2 * n] for i in range(2 * n + 1))
+
+
+def _erode(m: np.ndarray, n: int, outside: bool = False) -> np.ndarray:
+    """m shrunk by n pixels (4-neighbours); beyond the array counts as `outside`."""
+    for _ in range(n):
+        p = np.pad(m, 1, constant_values=outside)
+        m = m & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+    return m
+
+
+def _dilate(m: np.ndarray, n: int) -> np.ndarray:
+    return ~_erode(~m, n, outside=True)
+
+
+def _diffuse(v: np.ndarray, hole: np.ndarray, steps: int = 300) -> np.ndarray:
+    """v with the pixels under `hole` replaced by the mean of their neighbours, repeated (a smooth fill)."""
+    v = v.copy()
+    v[hole] = v[~hole].mean()
+    for _ in range(steps):
+        p = np.pad(v, 1, mode="edge")
+        v[hole] = ((p[:-2, 1:-1] + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]) / 4)[hole]
+    return v
+
+
+GLYPH_DARK = 80   # a D2R rune glyph: pixels darker than this inside the stone
+GLYPH_EDGE = 0.45  # carve: glyph strength (stretched, blurred) where the groove starts; higher = thinner strokes
+
+
+def blank_stone(a: np.ndarray) -> np.ndarray:
+    """A D2R rune sprite (RGBA) with its glyph taken out: the glyph (dark pixels inside the stone, grown by 2) is filled
+    with a smooth fill of the stone around it plus the stone's own fine texture copied from a nearby spot."""
+    op = a[..., 3] > 200
+    rgb = a[..., :3].astype(np.float64)
+    size = max(a.shape[:2])
+    inner = _erode(op, max(2, size // 25))
+    hole = _dilate((rgb.mean(-1) < GLYPH_DARK) & inner, 2) & op
+    if not hole.any():
+        return a
+    low = np.stack([_diffuse(rgb[..., c], hole) for c in range(3)], -1)
+    fine = rgb - np.stack([blur(rgb[..., c], size / 30) for c in range(3)], -1)
+    tex, got = np.zeros_like(rgb), np.zeros(hole.shape, bool)
+    h, w = hole.shape
+    for s in range(max(3, size // 16), size // 2, max(2, size // 40)):
+        for dy, dx in ((0, s), (0, -s), (s, 0), (-s, 0), (s, s), (-s, -s), (s, -s), (-s, s)):
+            ys, xs = np.nonzero(hole & ~got)
+            yy, xx = ys + dy, xs + dx
+            ok = (yy >= 0) & (yy < h) & (xx >= 0) & (xx < w)
+            ys, xs, yy, xx = ys[ok], xs[ok], yy[ok], xx[ok]
+            ok = inner[yy, xx] & ~hole[yy, xx]
+            tex[ys[ok], xs[ok]] = fine[yy[ok], xx[ok]]
+            got[ys[ok], xs[ok]] = True
+    out = a.copy()
+    out[..., :3][hole] = np.clip(np.rint(low[hole] + tex[hole]), 0, 255).astype(np.uint8)
+    return out
+
+
+def glyph_mask(src: np.ndarray, rim: int = 3, strong: float = 0.70, weak: float = 0.86) -> np.ndarray:
+    """Glyph mask (0 / 1) over the tight crop of Median's rune picture, by hysteresis on the brightness inside the stone
+    (`rim` px in): strokes darker than `strong` x the stone's median brightness, grown into the connected pixels darker
+    than `weak` x it; the stone's darker rim and shading join only where they touch a stroke."""
+    c = crop(src)
+    v = c[..., :3].astype(np.float64).mean(-1)
+    inner = _erode(c[..., 3] > 0, rim)
+    if not inner.any():
+        return np.zeros(v.shape)
+    stone = float(np.median(v[inner]))
+    m, ok = (v < strong * stone) & inner, (v < weak * stone) & inner
+    while True:
+        grown = _dilate(m, 1) & ok | m
+        if (grown == m).all():
+            return m.astype(np.float64)
+        m = grown
+
+def carve(blank: np.ndarray, g: np.ndarray, depth: float = 0.85) -> np.ndarray:
+    """Glyph `g` (glyph_mask) stretched over the stone of `blank` and cut in as D2R draws its glyphs: a dark groove
+    with a lighter lower-right lip; smooth edges from a bicubic stretch, a slight blur and a soft threshold."""
+    ys, xs = np.nonzero(blank[..., 3] > 0)
+    if not len(ys) or not g.size:
+        return blank
+    y0, x0 = ys.min(), xs.min()
+    h, w = ys.max() + 1 - y0, xs.max() + 1 - x0
+    big = np.asarray(Image.fromarray(np.rint(g * 255).astype(np.uint8), "L").resize((w, h), Image.Resampling.BICUBIC))
+    big = np.clip((blur(big / 255.0, max(w, h) / 40) - GLYPH_EDGE) / 0.12, 0, 1)
+    full = np.zeros(blank.shape[:2])
+    full[y0:y0 + h, x0:x0 + w] = big
+    k = max(1, round(max(w, h) / 60))
+    shifted = np.zeros_like(full)
+    shifted[k:, k:] = full[:-k, :-k]
+    lip = np.clip(shifted - full, 0, 1)
+    rgb = blank[..., :3].astype(np.float64) * (1 - depth * full)[..., None] + (60 * lip)[..., None]
+    out = blank.copy()
+    out[..., :3] = np.clip(np.rint(rgb), 0, 255).astype(np.uint8)
+    return out
+
+
+# -- signets: a D2R gold disc as the seal, Median's enamel and sign (lane itemart3, round 2) ------------------------
+SEAL_SRC_R = 0.55   # Median's signet: its coloured centre disc, as a fraction of the picture's radius
+SEAL_INNER = 0.5    # the enamel centre on the D2R disc, as a fraction of its radius
+SEAL_EDGE = 0.3     # sign strength (stretched, blurred) where the stamp starts; higher = thinner strokes
+
+
+def _sample(img: np.ndarray, sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
+    """Bilinear sample of `img` (2D or HxWxC) at float coordinates sx, sy (clamped)."""
+    h, w = img.shape[:2]
+    sx, sy = np.clip(sx, 0, w - 1), np.clip(sy, 0, h - 1)
+    x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
+    x1, y1 = np.minimum(x0 + 1, w - 1), np.minimum(y0 + 1, h - 1)
+    fx, fy = sx - x0, sy - y0
+    if img.ndim == 3:
+        fx, fy = fx[..., None], fy[..., None]
+    return (img[y0, x0] * (1 - fx) * (1 - fy) + img[y0, x1] * fx * (1 - fy) + img[y1, x0] * (1 - fx) * fy
+            + img[y1, x1] * fx * fy)
+
+
+def seal(disc: np.ndarray, src: np.ndarray) -> np.ndarray:
+    """A round D2R picture `disc` (cropped RGBA, the disc filling its box) made into Median's signet `src`: its centre
+    (SEAL_INNER of the radius) enamelled with the colours of Median's centre disc (the sign filled out from around it,
+    smoothed; D2R's shading kept faintly, a slight dome), and Median's sign (the dark strokes of the centre against their
+    surroundings) stamped in as a dark groove with a lighter lower-right lip."""
+    h, w = disc.shape[:2]
+    c = crop(src)
+    if not h or not w or not c.size:
+        return disc
+    sh, sw = c.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    u, t = (xx - (w - 1) / 2) / (w / 2), (yy - (h - 1) / 2) / (h / 2)
+    r = np.hypot(u, t)  # 1 at the rim
+    sy, sx = np.mgrid[0:sh, 0:sw]
+    centre = (np.hypot((sy - (sh - 1) / 2) / (sh / 2), (sx - (sw - 1) / 2) / (sw / 2)) < SEAL_SRC_R) & (c[..., 3] > 0)
+    if not centre.any():
+        return disc
+    rgb = c[..., :3].astype(np.float64)
+    v = rgb.mean(-1)
+    ref = blur(v * centre, 2.0) / np.maximum(blur(centre.astype(np.float64), 2.0), 1e-6)
+    sign = centre & (v < 0.62 * ref)
+    fill = np.stack([_diffuse(rgb[..., i], sign | ~centre, 200) for i in range(3)], -1)
+    k = SEAL_SRC_R / SEAL_INNER  # output coordinates -> Median's
+    px, py = (u * k + 1) / 2 * (sw - 1), (t * k + 1) / 2 * (sh - 1)
+    enamel = np.stack([blur(_sample(fill, px, py)[..., i], max(w, h) / 60) for i in range(3)], -1)
+    _h, _s, bv = _hsv(disc[..., :3])
+    bvs = blur(bv, max(w, h) / 18)
+    inside = r < SEAL_INNER
+    shade = (0.85 + 0.15 * bvs / max(float(bvs[inside].mean()) if inside.any() else 1.0, 1e-6)) * (
+        1.1 - 0.25 * np.clip(r / SEAL_INNER, 0, 1) ** 2)
+    m = np.clip((SEAL_INNER - r) / 0.04, 0, 1)[..., None]
+    out = disc[..., :3].astype(np.float64) * (1 - m) + np.clip(enamel * shade[..., None], 0, 255) * m
+    g = np.clip((blur(_sample(sign.astype(np.float64), px, py) * inside, max(w, h) / 110) - SEAL_EDGE) / 0.15, 0, 1)
+    n = max(1, round(max(w, h) / 70))
+    shifted = np.zeros_like(g)
+    shifted[n:, n:] = g[:-n, :-n]
+    out = out * (1 - 0.85 * g[..., None]) + 50 * np.clip(shifted - g, 0, 1)[..., None]
+    res = disc.copy()
+    res[..., :3] = np.clip(np.rint(out), 0, 255).astype(np.uint8)
+    return res
+
+
 # -- candidates of one picture -------------------------------------------------------------------------------------
 def candidate(prop: dict | None, src: np.ndarray, out_w: int, out_h: int, hd_items: Path,
               cell: int = CELL_HD) -> tuple[np.ndarray, str]:
@@ -199,8 +369,20 @@ def candidate(prop: dict | None, src: np.ndarray, out_w: int, out_h: int, hd_ite
         r = prop["reuse"]
         shift = {k: r[k] for k in ("hue", "sat", "val")} if "hue" in r else None
         asset = f"{r['folder']}/{r['asset']}" + (".lowend" if cell != CELL_HD else "")
-        img = render_reuse(hd_sprite(hd_items, asset), src, out_w, out_h, shift, r.get("colour") == "by position", cell)
-        return img, f"D2R {r['asset'].split('/')[-1]}" + (", Median's colours" if r.get("colour") == "by position" else "")
+        hd = hd_sprite(hd_items, asset)
+        if r.get("glyph") == "median":
+            hd = carve(blank_stone(hd), glyph_mask(src))
+        img = render_reuse(hd, src, out_w, out_h, shift, r.get("colour") == "by position", cell)
+        if r.get("seal") == "median":
+            ys, xs = np.nonzero(img[..., 3] > 0)
+            if len(ys):
+                y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+                img = img.copy()
+                img[y0:y1, x0:x1] = seal(img[y0:y1, x0:x1], src)
+        how = (", Median's glyph" if r.get("glyph") == "median" else "") + (
+            ", a seal with Median's enamel and sign" if r.get("seal") == "median" else "") + (
+            ", Median's colours" if r.get("colour") == "by position" else ", Median's mean colour" if shift else "")
+        return img, f"D2R {r['asset'].split('/')[-1]}{how}"
     if prop and prop.get("method"):
         return upscale.place(upscaled(src, prop["method"], cell), out_w, out_h), prop["method"]
     return upscale.place(upscaled(src, cell=cell), out_w, out_h), "keep (no better)"
@@ -216,19 +398,19 @@ def _font(size: int):
     return ImageFont.load_default()
 
 
-def grid(cw: int, ch: int) -> Image.Image:
-    """An inventory-like cw x ch cell field at HD size (98 px cells)."""
-    im = Image.new("RGBA", (cw * CELL_HD, ch * CELL_HD), (*CELL_BG, 255))
+def grid(cw: int, ch: int, cell: int = CELL_HD) -> Image.Image:
+    """An inventory-like cw x ch cell field (98 px cells: HD size)."""
+    im = Image.new("RGBA", (cw * cell, ch * cell), (*CELL_BG, 255))
     d = ImageDraw.Draw(im)
     for i in range(cw + 1):
-        d.line([(i * CELL_HD - (i == cw), 0), (i * CELL_HD - (i == cw), ch * CELL_HD)], (*CELL_LINE, 255))
+        d.line([(i * cell - (i == cw), 0), (i * cell - (i == cw), ch * cell)], (*CELL_LINE, 255))
     for j in range(ch + 1):
-        d.line([(0, j * CELL_HD - (j == ch)), (cw * CELL_HD, j * CELL_HD - (j == ch))], (*CELL_LINE, 255))
+        d.line([(0, j * cell - (j == ch)), (cw * cell, j * cell - (j == ch))], (*CELL_LINE, 255))
     return im
 
 
 def on_grid(img: np.ndarray, cw: int, ch: int) -> Image.Image:
-    g = grid(cw, ch)
+    g = grid(cw, ch, img.shape[0] // ch)
     g.alpha_composite(Image.fromarray(np.ascontiguousarray(img), "RGBA"))
     return g
 
@@ -247,10 +429,11 @@ def wrap(text: str, font, width: int, draw: ImageDraw.ImageDraw) -> list[str]:
 
 
 def draw_sheet(rows: list[dict], title: str) -> Image.Image:
-    """rows: {"cells": (cw, ch), "images": [3 RGBA arrays at cw*98 x ch*98], "caption": str, "labels": [3 str]}.
-    Columns at least MIN_COL wide (labels wrapped above each picture), the caption wrapped under the row."""
+    """rows: {"cells": (cw, ch), "images": [RGBA arrays at cw*cell x ch*cell, cell 98 or smaller], "caption": str,
+    "labels": [str per image]}. One column per image, at least MIN_COL wide (labels wrapped above each picture), the
+    caption wrapped under the row."""
     col_w = max(MIN_COL, max(r["cells"][0] for r in rows) * CELL_HD)
-    width = PAD + 3 * (col_w + PAD)
+    width = PAD + max(len(r["images"]) for r in rows) * (col_w + PAD)
     f, fs = _font(15), _font(13)
     d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     lay = []
@@ -272,7 +455,7 @@ def draw_sheet(rows: list[dict], title: str) -> Image.Image:
             x = PAD + i * (col_w + PAD)
             for j, line in enumerate(labels[i]):
                 d.text((x, y + 16 * j), line, (160, 150, 128, 255), font=fs)
-            im.alpha_composite(on_grid(img, cw, ch), (x + (col_w - cw * CELL_HD) // 2, y + lab_h))
+            im.alpha_composite(on_grid(img, cw, ch), (x + (col_w - img.shape[1]) // 2, y + lab_h))
         for j, line in enumerate(cap):
             d.text((PAD, y + lab_h + ch * CELL_HD + 6 + 19 * j), line, (*TEXT, 255), font=f)
         y += rh
@@ -319,6 +502,45 @@ def write_all(out: Path, plan, order: list, proposals: dict) -> int:
             k += 1
             title = f"D2R-XL 2012 item pictures {k}: {what}, real pixel size (98 px per cell)"
             written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
+    Path(out).mkdir(parents=True, exist_ok=True)
+    (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
+    for w in written:
+        print(w)
+    return 0
+
+
+IN_GAME = CELL_HD // 2   # px per cell of D2R's inventory at 1920 x 1080 (the HD sprite drawn at half size)
+
+
+def in_game(img: np.ndarray, cw: int, ch: int) -> np.ndarray:
+    """The HD picture `img` (cw x ch cells at 98 px) as D2R draws it at 1920 x 1080: IN_GAME px per cell."""
+    return upscale.resize(img, cw * IN_GAME, ch * IN_GAME)
+
+
+def write_lane(out: Path, plan, ranked: list, proposals: dict, lane: str) -> int:
+    """Review sheets of one lane's proposals (entries with "lane": lane) in the order of their "pick" (best first),
+    PER_SHEET rows each: Median classic (legacy) | current HD upscale | proposal | the proposal at in-game size."""
+    pal = palette(Path(__file__).resolve().parent.parent / "work" / "d2r-baseline" / "palette" / "pal.dat")
+    rank_of = {p.key: (n, p) for n, p in enumerate(ranked, 1)}
+    picks = sorted((v.get("pick", 999), k, v) for k, v in proposals.get("pictures", {}).items()
+                   if v.get("lane") == lane and k in rank_of)
+    rows = []
+    for pick, key, prop in picks:
+        n, p = rank_of[key]
+        src = classic_rgba(key, pal)
+        cw, ch = asset_size(src.shape[1], src.shape[0], *plan.needs[(p.folder, *key.split("/", 1))])
+        W, H = cw * CELL_HD, ch * CELL_HD
+        cand, label = candidate(prop, src, W, H, plan.hd_items)
+        rows.append({"cells": (cw, ch), "caption": f"pick {pick} (rank #{n}) {caption(p)}. {prop.get('why', '')}",
+                     "images": [upscale.place(nearest(src, CELL_HD / CELL_CLASSIC), W, H),
+                                upscale.place(upscaled(src), W, H), cand, in_game(cand, cw, ch)],
+                     "labels": ["Median classic (legacy)", "current HD upscale", f"proposal: {label}",
+                                "proposal at 1920x1080 (49 px per cell)"]})
+    written = []
+    for k, i in enumerate(range(0, len(rows), PER_SHEET), 1):
+        title = (f"D2R-XL 2012 item pictures, lane {lane}, sheet {k}: proposals best first (all OFF until approved), "
+                 f"real pixel size (98 px per cell)")
+        written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
     Path(out).mkdir(parents=True, exist_ok=True)
     (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
     for w in written:

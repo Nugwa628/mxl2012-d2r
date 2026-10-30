@@ -464,6 +464,7 @@ PluginVersion 0.1.0. Build: `cmake -S plugin -B build/plugin -A x64 -DMXL2012_PL
 | + translation guard | `translation_guard.cpp`, `translation_guard_logic.h` (`EventSound`, `InRegion`, `ReadableProtect`) | `transguard` | docs/crash-audit.md C14 (`D2R.exe+0x7761DC` at a character switch after a Druid morph). Inline hook at the entry of the UnitTranslationLayer event type 0x10 handler `0x775fc0` (16 bytes): `*event`, `[*event+0x70]` and its `+0x870` byte must be readable (`VirtualQuery`: committed, no `PAGE_NOACCESS` / `PAGE_GUARD`, inside the region), else the event is skipped, counted and logged (first 8, with the payload words). `mxl2012` prints events seen / skipped; `TranslationGuardProbe` is there for a harness verb (not wired). Not yet game-checked |
 | + Baal laugh chat line | `vo_chat.cpp`, `vo_chat_logic.h` (`PathKeyIs`, `LineAllowed`) | `vochat` | Bug #508, section 27. Inline hook at the entry of D2R's voice subtitle `0x1a0da0` (19 bytes): the "Baal says: ..." line of the voice file `baallaugh1` is left out when the last one was printed less than 30 s ago; the sound is not touched |
 | + unit reassign guard | `reassign_guard.cpp`, `reassign_guard_logic.h` (`Parse`, `Decide`, `BranchBytes`, `StubBytes`) | `reassign` | Bugs #511 / #292. D2R's client handler of server command 0x15 (unit reassign, `0x12ab40`) moves the unit (`0x9bf00`) and, when it then has no client room (`0x34b440`), asserts "Could not get act!" (SCmd.cpp:1254, block `0x12aec0`) and ends the process (fatal stub `0x12557f0`, image +0x1255802); 1.14d does the same (Game.exe `0x45d160`). An inline hook at the handler's entry (15 bytes) keeps the command's fields; the branch `je 0x12aec0` at `0x12addb` goes to the 12 int3 bytes at `0x12aee4` (`movabs rax` / `jmp rax`) and a stub that asks the plugin: a unit other than the local player is left without a room and the handler returns (`0x12ae7e`), the local player goes on to D2R's block. Both are logged (first 16, with unit type / class / id / x, y). `mxl2012` prints commands seen, units left, player ends. (Line 1237, the same text, is command 0x04's own check at `0x129ab1`: not changed) |
+| + save format and cancelled saves | `save_mode.cpp`, `save_mode_logic.h` (`ParseMode`, `Repair`, `CountFailures`, notices) | `savemode` | Bug #512, section 28. No game address: the mod's `d2rloader.toml` must ask for D2RLoader's extended save format (put back when it does not, restart notice); a thread reads `d2rloader.log` and puts a red line on screen for every cancelled save |
 | G harness (dev) | `harness_cmds.cpp`, `harness_cmds_logic.h` (`ParseSlotTable`, `WatchableTable`), `testharness.cpp` | - | verbs of 10.1 (lane triage: `watch`, a counting wrapper on one cltdo / srvhit entry, written and restored with `PatchWriteU64` and its expected old value); the harness itself hooks the server frame `0x406550` |
 | `d2r.h` | trimmed to the v0.1 calls and the five function tables | - | summon / pet / melee / seed helpers of the skeleton removed |
 
@@ -889,3 +890,36 @@ us!" (`sol_helpus`): a list of keys with a time each instead of one key (not don
 
 Checked in game (docs/testing.md "Lane baallol", slot 4, HD and legacy): "Baal says: LOL" from Spawn Edyrem right clicks at 0 s, none until 30 s, then once
 more at 38 s; a `dark_master1` laughed 29 times in 45 s and printed one line; the sound trace counts every laugh; 0 asserts.
+
+## 28. Save format and cancelled saves (lane savecap, 2026-10-30; bug #512)
+
+D2R-XL 2012 needs D2RLoader's **extended** save format: `[d2rcore.save_format] mode = "extended"` in the mod's own
+`mods\mxl2012\d2rloader\config\d2rloader.toml` (written by `tools/install_mod.py`, checked by `tools/verify_package.py`).
+The downloader treats that file as the player's (`preserve`: written only when missing), so a file the player already had, or
+copied from another mod, stays as it is. Without the key D2RLoader writes D2R's retail format. Its stat ids are 9 bits, and
+0x1ff (511) marks the end of the list. Median's saved stats 511-537 (`item_skill_paragon` 511 to `item_hmc_check` 537) therefore
+cannot be written. Properties that give them: `enr-factor`, `enr-factor%`, `pot-rate`, `att-damage`, `res-all-minion`,
+`slow-thorns-r`, `regen/lvl`, `att%-minion`, `runemaster` and others. In the built tables they appear 267 times in
+uniqueitems.txt, 25 in setitems.txt, 384 in runes.txt and 52 in magicprefix.txt. While the character carries such an item
+anywhere (inventory, cube, stash, worn, mercenary), D2R's item writer fails. D2R asserts `!"Character has too many items"`
+(PlrSave.cpp:1980: the writer's failure, not a count), and D2RLoader logs "Character save failed before the disk write ...
+format=retail native-result=3 encoding-error=yes capacity=65535" and cancels the whole save batch. This repeats every 30 s
+until the item is gone; the next save then goes through. Measured on slot 3 (docs/testing.md "Lane savecap").
+
+**Part `savemode`** (`save_mode.cpp`, `save_mode_logic.h`, test `savemode_tests`, off word `savemode`), at load, before the
+engine parts:
+
+- reads `<plugins>\..\config\d2rloader.toml` (`ParseMode`: `mode` of `[d2rcore.save_format]` or the dotted key at the
+  top; commented lines do not count);
+- when the key is missing or not `extended`, it keeps the old file as `d2rloader.toml.retail-backup` (only the first time), then
+  writes `Repair`: it replaces the `mode` line, or puts the line under the existing header, or puts the section at the top.
+  Everything else stays byte for byte. D2RLoader reads the format once at its start ("Changing d2rcore.save_format.mode
+  requires restarting D2RLoader"), so the red line says to restart before playing. If the file cannot be written, the line
+  says which key to add;
+- starts a thread that reads what D2RLoader appends to `<game>\d2rloader\logs\d2rloader.log` every 5 s. Each "Character
+  save failed" or "Shared stash save failed" line counts, and the red line says `SAVE FAILED n times (last hh:mm)` and what to
+  do. It is cleared 90 s after the last failure. `mxl2012` prints the format and the count.
+
+Extended mode reads a retail character. A retail shared stash: see docs/testing.md "Lane savecap". The 65,535-byte save
+buffer is far from reached in extended mode: about 28 bytes per plain item and 57 per ring with six stats; 141 items take 9,046
+bytes.

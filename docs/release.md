@@ -107,7 +107,7 @@ manifest's `launcher` as a self-update). `package_release.py` writes the fields 
 | `modFolder` | every `files[].path` is relative to `<game>/mods/<modFolder>/`, with `/` separators |
 | `saveFolder` | characters live in `Saved Games/Diablo II Resurrected/mods/<saveFolder>` (modinfo.json `savepath`); the downloader never writes there |
 | `preserve` | files the player may edit: write them only when missing, never overwrite |
-| `files` | the complete mod folder, sorted by path. Update = for each entry, download when the local file is missing or its size / sha256 differ; then delete local files under the mod folder that are not listed (except `preserve` entries, and `d2rloader/logs/`, which D2RLoader writes) |
+| `files` | the complete mod folder, sorted by path. Update = for each entry, download when the local file is missing or its size / sha256 differ; then delete local files under the mod folder that are not listed (except `preserve` entries and their `.retail-backup` copies (bug #512), and `d2rloader/logs/`, which D2RLoader writes) |
 | `emptyDirs` | folders of the mod folder that hold no file (`d2rloader/patches`): the downloader creates them, the 7z has them |
 | `archive` | the same content as a solid `.7z`: `format` `"7z"`, `name`, `size`, `sha256`; `archive.path` is where the host has it. The downloader uses it when the objects it would fetch add up to more than `size` (a fresh install): download resumable, check sha256, unpack with the built-in decoder, check every file (docs/launcher.md). Manual installs use it too |
 | `objectsBase` | (published manifests, required by the downloader) where the file bytes are, relative to the site root: `objects/`. The bytes of `files[i]` are at `<root>/<objectsBase><sha256[0:2]>/<sha256>` |

@@ -1146,7 +1146,41 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 	state_.Set("mod", ManifestToJson(feed_));
 	WriteFileAtomic(JoinPath(mod, Wide(InstallMarkerName)), MakeMarker(state_["install_id"].Str(), feed_.version));
 	SaveState();
+	if (!EnsureExtendedSaves(mod, error))
+		return false;
 	Report("D2R-XL 2012 " + feed_.version + " is in " + Utf8(mod) + ". " + HowToPlay);
+	return true;
+}
+
+// docs/bugs.md #512 (owner decision 2026-10-30): the mod's d2rloader.toml is the player's (`preserve`), but without
+// [d2rcore.save_format] mode = "extended" D2RLoader writes retail saves and every save fails while a Median item with stats
+// 511+ is carried. Only that key is set; the old file is kept once as d2rloader.toml.retail-backup (the plugin part savemode
+// uses the same name and repairs it at game start too).
+bool Launcher::EnsureExtendedSaves(const std::wstring& mod, std::string& error) {
+	std::wstring path = JoinPath(mod, Wide(ModLoaderConfigRel));
+	std::string text;
+	if (!ReadWholeFile(path, text))
+		return true;  // not there: nothing kept (the release ships the key)
+	std::string was = SaveFormatMode(text);
+	if (was == "extended")
+		return true;
+	std::wstring backup = path + Wide(SaveFormatBackupSuffix);
+	bool backedUp = CopyFileW(LongPath(path).c_str(), LongPath(backup).c_str(), TRUE) != 0;  // never over an older backup
+	DWORD code = GetLastError();
+	if (!backedUp && !FileExists(backup)) {
+		error = "Cannot keep a copy of " + Utf8(path) + " (" + Utf8(LastErrorText(code)) + ") before setting its save format. Add mode = \"extended\" "
+		        "under [d2rcore.save_format] in it yourself: without it saves fail.";
+		return false;
+	}
+	if (!WriteFileAtomic(path, SetExtendedSaveFormat(text))) {
+		code = GetLastError();
+		error = NotWritable(ParentDir(path), code) + " Add mode = \"extended\" under [d2rcore.save_format] in " + Utf8(path) +
+		        " yourself: without it saves fail.";
+		return false;
+	}
+	Report("Your " + std::string(ModLoaderConfigRel) + " had " + (was.empty() ? std::string("no save format") : "save format \"" + was + "\"") +
+	       ": set [d2rcore.save_format] mode = \"extended\" (D2R-XL 2012 saves need it); nothing else in it changed. " +
+	       (backedUp ? "The old file is " : "An older copy is kept as ") + Utf8(backup) + ".");
 	return true;
 }
 

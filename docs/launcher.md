@@ -65,9 +65,23 @@ package. The stable channel never carries one (`publish_release.py`, `dl_ingest.
 
 **Install / Update** uses `PlanInstall` to fetch missing or changed release files.
 Size/mtime records can skip hashes of unchanged files; **Repair** hashes every file.
-Files absent from the release are removed except manifest `preserve` entries,
-D2RLoader logs/crashes, the install marker and staging. Empty directories are created.
-The marker and state record the completed release.
+Files absent from the release are removed except manifest `preserve` entries (and their
+`.retail-backup` copies, below), D2RLoader logs/crashes, the install marker and staging. Empty
+directories are created. The marker and state record the completed release.
+
+**Save format of a kept config** (bug #512, owner decision 2026-10-30). The mod's
+`d2rloader/config/d2rloader.toml` is a `preserve` file, so a player's copy (an old install, or
+another mod's settings) stays. Without `[d2rcore.save_format] mode = "extended"`, D2RLoader writes
+retail saves, and every save fails while a Median item with stat ids 511+ is carried. After each
+install, update and repair, `EnsureExtendedSaves` reads that file. If it is missing or already
+extended, nothing happens; fresh installs ship the key (`tools/install_mod.py`, checked by
+`tools/verify_package.py`). Otherwise the file is copied once to `d2rloader.toml.retail-backup`
+(never over an older one; the plugin part `savemode` of lane savecap uses the same name). Then only
+that key is set (`SetExtendedSaveFormat`, paths.h): a `mode` line, or the top-level dotted
+`d2rcore.save_format.mode`, gets the new value in place with its indent and comment; else the
+line goes right under an existing header; else the table is appended. Every other line, a BOM,
+and the CRLF/LF endings are unchanged. The panel/log line says what the old value was and where
+the backup is. If the backup or the write fails, the install stops with an error that names the key.
 
 The downloader chooses the release **7z** when the objects needed are larger than the
 archive, otherwise individual **objects**. `--via auto|7z|objects` overrides this choice.
@@ -152,7 +166,7 @@ Tests can also be configured separately with `cmake -S launcher/tests -B build/l
 CI cross-builds with the existing xwin toolchain and runs portable tests on Linux.
 
 Tests cover detection, manifest/installation plans, hashes, marker/path protection,
-7z decoding and corruption, coexistence, TOML preservation, plugin identification,
+7z decoding and corruption, coexistence, TOML preservation, the save format key (`TestSaveFormat`), plugin identification,
 other-mod warnings, and protection of other mods from automatic cleanup. No downloader or
 in-game integration run is required for this cleanup; unit tests do not access a real
 D2R installation. Previous copied documentation's release/game test results are not

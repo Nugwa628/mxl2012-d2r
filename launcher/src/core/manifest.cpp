@@ -305,8 +305,10 @@ InstallPlan PlanInstall(const Manifest& next, const std::vector<std::string>& lo
                         const std::function<std::string(const std::string&)>& current) {
 	InstallPlan plan;
 	std::set<std::string> listed, keep;
-	for (const auto& k : next.preserve)
+	for (const auto& k : next.preserve) {
 		keep.insert(Lower(k));
+		keep.insert(Lower(k + SaveFormatBackupSuffix));
+	}
 	for (const auto& f : next.files) {
 		listed.insert(Lower(f.path));
 		std::string have = current(f.path);

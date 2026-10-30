@@ -107,6 +107,9 @@ bool SafeRelativePath(const std::string& path);
 // output (d2rloader/logs/, d2rloader/crashes/) and the downloader's marker and downloads (mxl2012-install.json,
 // mxl2012-download/).
 bool RuntimeOutput(const std::string& path);
+// The copy of a preserve file kept before its save format is set (docs/bugs.md #512: by the downloader and by the plugin part
+// savemode): <preserve path> + this suffix is the player's too, never removed.
+constexpr const char* SaveFormatBackupSuffix = ".retail-backup";
 
 struct InstallPlan {
 	std::vector<ManifestFile> fetch;      // missing or different: download and install

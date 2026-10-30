@@ -1,5 +1,6 @@
 """Unit tests of the item picture review tools (item_art_review: visibility ranking, the proposal switch; item_art_sheets:
-loose silhouette match, colour match, colour by position, upscale variants, sheet drawing; item_hd / item_art: the build
+loose silhouette match, colour match, colour by position, upscale variants, sheet drawing, the rune stone
+recomposition of lane itemart3; item_hd / item_art: the build
 makes the pictures of the proposals switched on) on synthetic data, plus one check of og4 against lane itemart's review
 sheet (skipped without the game files and the sheet). Run: py -3 -I -m unittest discover -s tools/tests -p "test_itemart.py" """
 import json
@@ -98,13 +99,17 @@ class ProposalTests(unittest.TestCase):
         data["pictures"]["mxl/a"]["enabled"] = False
         self.assertEqual(R.enabled_proposals(data), {})
 
-    def test_the_committed_proposals_are_well_formed_and_only_the_rainbow_stones_are_on(self):
+    def test_the_committed_proposals_are_well_formed_and_the_approved_ones_are_on(self):
         data = json.loads(R.PROPOSALS.read_text("utf-8"))
-        self.assertTrue(data["enabled"])  # owner, 2026-10-30 (lane itemart2): og1..og5 only
-        self.assertEqual(sorted(R.enabled_proposals(data)), [f"mxl/og{i}" for i in range(1, 6)])
+        self.assertTrue(data["enabled"])
+        # owner, 2026-10-30: og1..og5 (lane itemart2) and lane itemart3's entries except the signets; Median's runes off
+        # again until their signs are sharp (owner, same day)
+        approved = lambda k, v: k.startswith("mxl/og") or (v.get("lane") == "itemart3" and not k.startswith("mxl/sigil")
+                                                           and v["reuse"].get("glyph") != "median")
+        self.assertEqual(len(R.enabled_proposals(data)), 5 + 59 - 23)
         for k, v in data["pictures"].items():
             self.assertRegex(k, r"^(mxl|classic)/[\w\-]+$")
-            self.assertEqual(v["enabled"], k.startswith("mxl/og"), k)
+            self.assertEqual(v["enabled"], approved(k, v), k)
             self.assertTrue(v.get("why"), k)
             self.assertEqual(sum(1 for f in ("method", "reuse") if v.get(f)), 1, k)
             if v.get("method"):
@@ -112,6 +117,20 @@ class ProposalTests(unittest.TestCase):
             else:
                 self.assertTrue({"folder", "asset"} <= set(v["reuse"]), k)
 
+
+    def test_lane_itemart3_proposals_are_on_in_pick_order_and_the_signets_a_separate_off_try(self):
+        pics = R.load_proposals()["pictures"]
+        lane = {k: v for k, v in pics.items() if v.get("lane") == "itemart3"}
+        self.assertEqual(len(lane), 59)
+        self.assertTrue(all(v["enabled"] != (v["reuse"].get("glyph") == "median") for v in lane.values()))
+        self.assertEqual(len({v["pick"] for v in lane.values()}), 59)
+        runes = [k for k in lane if k.startswith(("mxl/r-a-", "mxl/r-d-"))]
+        self.assertEqual(len(runes), 23)
+        self.assertTrue(all(lane[k]["reuse"].get("glyph") == "median" for k in runes))
+        signets = {k: v for k, v in pics.items() if v.get("lane") == "itemart3-signets"}
+        self.assertEqual(sorted(signets), sorted(f"mxl/{k}" for k in (
+            "sigil1b", "sigil2b", "sigil3b", "sigil4b", "sigil5b", "sigil6b", "sigilxl")))
+        self.assertTrue(all(not v["enabled"] and v["reuse"].get("seal") == "median" for v in signets.values()))
 
     def test_report_entry_says_off_or_on(self):
         data = {"enabled": False, "pictures": {"mxl/a": {"method": "hybrid-crisp", "enabled": True},
@@ -187,8 +206,78 @@ class SheetTests(unittest.TestCase):
         self.assertEqual(one.width, S.PAD + 3 * (S.MIN_COL + S.PAD))
         self.assertGreater(two.height, one.height + 98)
 
+    def test_sheet_takes_a_fourth_smaller_column(self):
+        img = box(98, 98)
+        row = {"cells": (1, 1), "images": [img, img, img, box(49, 49)], "caption": "c", "labels": ["a", "b", "c", "d"]}
+        self.assertEqual(S.draw_sheet([row], "t").width, S.PAD + 4 * (S.MIN_COL + S.PAD))
+        self.assertEqual(S.in_game(img, 1, 1).shape[:2], (49, 49))
+
 
 # -- the build uses the proposals switched on (item_hd.generate -> item_art.make_asset -> item_art_sheets.candidate) --------
+class SealTests(unittest.TestCase):
+    """seal (lane itemart3 round 2): a D2R gold disc with Median's centre colour and sign."""
+
+    def test_seal_enamels_the_centre_and_stamps_the_sign(self):
+        disc = np.zeros((90, 90, 4), np.uint8)
+        yy, xx = np.mgrid[0:90, 0:90]
+        r = np.hypot(yy - 44.5, xx - 44.5)
+        disc[r < 45] = (200, 170, 60, 255)  # a plain gold disc
+        src = np.zeros((28, 28, 4), np.uint8)
+        sr = np.hypot(*np.mgrid[0:28, 0:28] - 13.5)
+        src[sr < 14] = (180, 140, 40, 255)          # gold ring
+        src[sr < 7] = (40, 80, 230, 255)            # blue centre
+        src[10:18, 13:15] = (5, 5, 5, 255)          # a dark bar: the sign
+        out = S.seal(disc, src)
+        self.assertTrue((out[..., 3] == disc[..., 3]).all())
+        self.assertTrue((out[5, 45] == disc[5, 45]).all())  # the rim stays D2R's gold
+        blue = out[45, 25, :3].astype(int)                   # in the enamel, off the sign
+        self.assertGreater(blue[2], blue[0] + 60)
+        self.assertLess(out[45, 44:46, :3].mean(), 40)       # the sign, stamped dark
+
+
+class RuneStoneTests(unittest.TestCase):
+    """blank_stone / glyph_mask / carve (lane itemart3): D2R's stone, Median's glyph."""
+
+    @staticmethod
+    def stone(n: int = 80, glyph: bool = True) -> np.ndarray:
+        rng = np.random.default_rng(1)
+        a = np.zeros((n, n, 4), np.uint8)
+        a[..., :3] = np.clip(150 + rng.normal(0, 8, (n, n, 1)), 0, 255).astype(np.uint8)
+        a[4:-4, 4:-4, 3] = 255
+        if glyph:
+            a[20:60, 36:44, :3] = 20  # a dark vertical stroke
+        return a
+
+    def test_blank_stone_takes_the_glyph_out_and_keeps_the_rest(self):
+        a = self.stone()
+        b = S.blank_stone(a)
+        self.assertGreater(b[20:60, 36:44, :3].mean(), 120)
+        self.assertTrue((b[..., 3] == a[..., 3]).all())
+        self.assertTrue((b[5:15, 5:15] == a[5:15, 5:15]).all())
+        plain = self.stone(glyph=False)
+        self.assertTrue((S.blank_stone(plain) == plain).all())
+
+    def test_glyph_mask_finds_the_stroke_not_the_rim(self):
+        src = np.zeros((23, 23, 4), np.uint8)
+        src[..., 3] = 255
+        src[..., :3] = 100
+        src[0:2, :, :3] = 60     # Median's darker stone rim
+        src[6:17, 10:12, :3] = 35  # the glyph
+        g = S.glyph_mask(src)
+        self.assertEqual(g[6:17, 10:12].min(), 1.0)
+        self.assertEqual(g[:3].max(), 0.0)
+        self.assertEqual(g.sum(), 22)
+
+    def test_carve_darkens_the_glyph_on_the_stone(self):
+        blank = self.stone(glyph=False)
+        g = np.zeros((10, 10))
+        g[2:8, 4:6] = 1
+        out = S.carve(blank, g)
+        self.assertLess(out[30:50, 38:42, :3].mean(), 60)
+        self.assertGreater(out[10:15, 10:15, :3].mean(), 120)
+        self.assertTrue((out[..., 3] == blank[..., 3]).all())
+
+
 PAL = [(i, (i * 3) % 256, 255 - i) for i in range(256)]
 
 
@@ -265,6 +354,17 @@ class BuildProposalTests(unittest.TestCase):
         n = self.generate()
         self.assertEqual((self.plan.report["proposal_on"], n["mxl upscaled"]), ([], 2))
         self.assertTrue((self.sprite("a") == keep).all())
+
+    def test_the_icon_check_holds_a_proposal_sprite_to_its_candidate(self):
+        import item_icon_check as C
+        self.generate()
+        prop = self.data["pictures"]["mxl/a"]
+        sp = self.out / "global" / "ui" / "items" / "misc" / "mxl"
+        for name, cell in (("a.sprite", 98), ("a.lowend.sprite", 49)):
+            self.assertEqual(C.check_proposal_sprite(sp / name, self.src / "a.dc6", PAL, cell, prop, self.hd_items), [])
+        # the upscale of b is not entry a's picture
+        self.assertEqual(C.check_proposal_sprite(sp / "b.sprite", self.src / "b.dc6", PAL, 98, prop, self.hd_items),
+                         ["b.sprite: not the approved proposal picture"])
 
 
 class Og4AgainstTheReviewSheetTests(unittest.TestCase):

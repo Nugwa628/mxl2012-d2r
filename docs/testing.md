@@ -3965,3 +3965,102 @@ draws it next to the player.
 Evidence: `mxl2012-runs/uppass/evidence/run2-control/` (crash report, d2rloader.log), `evidence/run3/`, `evidence/run6-control/`.
 The run logs are `run2.log` to `run7.log`. Lesson: `graphics_mode` reads "legacy" in the dark caves in HD as well (the round-1
 row of the HD run); the town reading counts.
+## Lane itemart3: D2R HD pictures of the same kind for the upscaled items, for the owner's review (2026-10-30, no game run)
+
+No game run: every new proposal is **off** (owner rule: the owner sees the art first), so a build or an install shows
+nothing new; slots 3 and 4 were busy with other lanes. What was checked instead:
+
+| check | result |
+|---|---|
+| `py -3 -I tools/item_art_review.py sheets ../mxl2012-runs/itemart3/review --lane itemart3` | 9 sheets (+ `_2x`), 66 proposals best first: Median classic, current HD upscale, proposal, proposal at 1920 x 1080 (49 px per cell) |
+| every itemart3 entry through `item_art_sheets.candidate` at HD (98) and lowend (49) cell size, as the build would call it if switched on | 132 pictures, none empty |
+| `py -3 -I tools/hd_icons.py build` | unchanged: `picture proposals used: 5` (og1..og5), item icon check 0 sprite problems; `item_hd_report.json` lists 76 proposals, 5 ON |
+| `tools/tests/test_itemart.py` | 28 tests OK (5 new: `RuneStoneTests` x3, the 66 entries off and in pick order, the 4-column sheet) |
+
+In game once the owner switches some on: the same check as lane itemart2 (`itemart_pics` with a set of the switched-on items,
+HD and legacy), and the stash/cube once. Evidence and scratch: `mxl2012-runs/itemart3/` (`review/sheet_01..09.png`,
+`rank.txt`, `median_all.png` (all 92 upscaled pictures), `d2r_lib_1..4.png` (all 444 D2R HD item sprites), `explore/`
+(the candidates tried, by-position and mean colour side by side)).
+
+**Round 2 (owner verdict, 2026-10-30): 59 switched on, slot 1, background mode, build of lane/itemart3 (data only, the
+slot's own plugin).** All itemart3 proposals except the seven signets are on (docs/hd-icons.md "D2R HD art of the same kind").
+Build `py -3 tools/build.py`: validate 0 errors; item icon check 0 sprite problems (the proposal sprites now checked pixel for
+pixel against their approved candidate: `item_icon_check.check_proposal_sprite`). Install `MXL_SLOT=1 MXL_RUN=itemart3 py -3
+tools/install_mod.py --slot 1` (data only, 3387 files). Check: `MXL_RUN=itemart3 MXL_SLOT=1 MXL_CHAR=ItemArtThree
+MXL_ITEMART_SETS=itemart3a,itemart3b py -3 tools/game_checks.py all itemart_pics` (new sets in `ITEMART_SETS`: `itemart3a` =
+Horadric Malus, Scepter, Jolly Roger, Tome of the Spider (scroll pair), Token of Absolution, Sunless Crystal Bird, Fool's Gold,
+Boss Junket, Scroll of Kings, Shadowfang, I Am Rich, Multi Shards, Amazon Class Reward; `itemart3b` = the four Sunstones,
+Ingredient Rings 1, 2, 5, Oils of Duplication / Renewal / Absolution, runes Lah, Kur (fine glyphs), Thur, Nas, Kra, Rha, clue
+gems 01-, 35-, 27-, 20-).
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-161712-s1` | itemart_pics, sets itemart3a (13 items) and itemart3b (20 items) | PARTIAL (shots judged by hand; the check's FAIL is the engine line below): all 33 made. HD: every item shows its new D2R picture (the Malus, the gold scepter with its red crown, the skull, the bird, Shadowfang, the gems, the soul-stone shard, the coins, the parchments, the green flask, the scroll pair; the runes on D2R's stone with Median's signs, the oils as round flasks, the Sunstones as round-cut gems, the rings, the clue gems); legacy (G): Median's classic pictures, unchanged. Engine: `wPrefix != 0 \|\| wSuffix != 0` once, on the harness's `item hdm` (the generator made the Malus quality 7): harness artifact, bug #35; the exit-only pool asserts (`s_StatsPool.IsEmpty()` and its followers): ignored as before. 0 crash files; the real-input watchdog saw no user input |
+
+Not tested in game: the signets (off), the stash and the cube (same sprite). Evidence: `mxl2012-runs/itemart3/ingame/
+checks-20261030-161712-s1/` (`itemart_itemart3a_hd.png`, `_legacy.png`, `itemart_itemart3b_hd.png`, `_legacy.png`). Signets,
+second try (off): `mxl2012-runs/itemart3/review-signets/sheet_01.png`. Unit tests: `test_itemart.py` 30 OK (new:
+`SealTests`, `check_proposal_sprite` against a matching and a wrong sprite, 59 on / signets off).
+## Lane savecap: cancelled saves, "Character has too many items" (bug #512, 2026-10-30, slot 3, background mode)
+
+Build: `tools/build_plugin.ps1 -Release -Tests` (all plugin tests pass, `savemode_tests` new). Slot 3 data = lane runetab's install.
+For sessions A-C only `mxl2012-core.dll` of this branch was copied in. Slot 3 was locked twice (15:00-15:50 and 15:57-16:08).
+Its mod `d2rloader.toml`, shared stash and DLL were backed up first and put back after each session (`cmp` equal). Left
+behind: test characters `Savecapbfab` and `Savecaprbffj` in `mxl2012-s3`. Scratch drivers (not committed):
+`mxl2012-runs/savecap/` (`drv.py`, `t1.py`-`t4.py`, `sA.py`, `sB.py`, `prep.sh`, `restore.sh`), copies of the run folders in
+`mxl2012-runs/savecap/evidence/`.
+
+**Retail format, by hand** (mod toml with the `mode = "extended"` line commented out). The extended shared stash is refused
+(`Shared stash rejected ...`, `BadHeader`), so it was set aside and D2RLoader restarted. A new Sorceress got items from harness
+`item`; the 30 s autosave was watched in `d2rloader.log` and in the `.d2s` time:
+
+| Run | What | Result |
+|---|---|---|
+| `checks-20261030-150101-s3` | rune `r01`, shrine `A0+` (escape-coded code), plain magic rings x2 | saved (mtime moves, 0 failure lines) |
+| same | ring with stat 511, 514 or 520 | **every save cancelled**: one `!"Character has too many items"` (PlrSave.cpp:1980; the assert dialog shows it once), then per save "Character save failed before the disk write ... format=retail native-result=3 encoding-error=yes ... capacity=65535" and "Save batch cancelled": the player's lines word for word. Item removed: the next save goes through |
+| `checks-20261030-154051-s3` | the retail character in **extended** mode (toml back) | loads with all items (24 = 24); rings with stats 511 / 514 / 520 added, Save and Exit, reload: identical, `d2save.py show` lists the stats, `roundtrip` OK |
+| same | heavy: inventory and cube full of rings with six stats each (514, 520, 511, 516, 523, 39) | 141 items, `.d2s` 9,046 bytes, 0 failures; all 141 in the file after Save and Exit (the harness `state` lists 120 at most) |
+
+**Part `savemode` in game** (plugin of this branch; `mxl2012-core.log` copied to `mxl2012-runs/savecap/sessionABC-mxl2012-core.log`):
+
+| Run | What | Result |
+|---|---|---|
+| `checks-20261030-155840-s3` (A) | start with the mod toml commented out (retail) | **PASS**: at load "savemode the mod's d2rloader.toml has no [d2rcore.save_format] mode ... mode = "extended" written, restart the game"; the file has `mode = "extended"` under the header, the old file is `d2rloader.toml.retail-backup`; this start stays retail |
+| same | ring with stat 514 in the inventory | **PASS**: 2 cancelled saves -> "savemode 1 cancelled save seen", "2 cancelled saves seen ... notice on screen"; ring removed -> 90 s later "no cancelled save for 90 s, notice cleared" |
+| `checks-20261030-160435-s3` (B) | retail again (old file back), reload of the retail character | 20 = 20 items (rune, `A0+`, amulet, starting items), 0 asserts: the player's load asserts are not from these items |
+| `checks-20261030-160523-s3` (C) | the file as `savemode` wrote it (extended) | **PASS**: "savemode save format extended", no notice; the retail character and the retail (empty, 204 bytes) shared stash load, 0 rejected / BadHeader; stat-514 ring, Save and Exit, reload: 21 = 21 items, 0 failures |
+
+**The red line itself is not in the screenshots** (`a0_menu_notice.png`, `a1_fail_notice.png`): D2RLoader's overlay is not part
+of the PrintWindow capture of a background window (as for `bufficons`). The log shows the calls. **By hand (owner / user):** in
+`mods\mxl2012\d2rloader\config\d2rloader.toml`, put `#` before `mode = "extended"`, start the game: a red line at the top says
+the saves were set to retail and to restart. Restart: no line, the file has the key again. Not tested: a retail shared stash
+that holds items (the one tested was empty) and Steam build 94995 (the player's).
+
+## Lane dlsave: the downloader sets the extended save format in a kept d2rloader.toml (bug #512, 2026-10-30, no game run)
+
+Owner decision 2026-10-30: besides the plugin part `savemode` (lane savecap), the downloader repairs the key after install /
+update / repair (docs/launcher.md "Save format of a kept config"). Build: `cmake -S launcher -B build/launcher -A x64`,
+`cmake --build build/launcher --config Release` (MSVC x64 Release, no warnings, unsigned, 2,213,376 bytes);
+`launcher_tests.exe` **231 checks, 0 failures** (new `TestSaveFormat`: missing table, table without the key (also as the last
+line without a newline, and CRLF), `mode = "retail"` with indent and comment, the dotted key, already extended (the same bytes
+back, also with BOM / CRLF / single quotes), BOM + CRLF + comments kept, a CRLF file gets a CRLF table; `TestPlan`: the
+preserve file's `.retail-backup` is not removed, another `.retail-backup` is).
+
+Local update test (`mxl2012-runs/dlsave/update-test.ps1`, log `update-test.log`): a copy of lane launcher's local test site
+(0.0.2-lt1 -> 0.0.3-lt2, `--site <dir>`, channel `test` rewritten per step), a fake D2R folder (`.build.info` 3.3.93847, the
+fake `D2RLoader.exe` 1.3.1-beta) and its own `--data-dir`, all inside `mxl2012-runs/dlsave/`; no real game folder.
+
+| step | what | result |
+|---|---|---|
+| A | fresh `install` of 0.0.2-lt1 | PASS: the shipped toml is `[d2rcore.save_format]` / `mode = "extended"`, untouched, no backup |
+| B | the toml replaced by a #512-like player file (BOM, CRLF, comments, `[d2rloader] default_mod = "OtherMod"`, `[d2rcore.stash]`, no save format), `update` to 0.0.3-lt2 | PASS: "Kept your d2rloader/config/d2rloader.toml", then "... had no save format: set [d2rcore.save_format] mode = "extended" ...; nothing else in it changed. The old file is ...retail-backup"; the file is the player's bytes plus `
+[d2rcore.save_format]
+mode = "extended"
+`; the backup is the player's file byte for byte |
+| C | second `update` | PASS: up to date, the toml not rewritten (same mtime), the backup stays |
+| D | the player sets `mode = "retail"   # test`, `repair` | PASS: "... had save format "retail" ..."; only that line becomes `mode = "extended" # test`; the first backup is kept (not overwritten) |
+
+The first run of the test failed at D: the update in C deleted `d2rloader.toml.retail-backup` as "not part of the release",
+and D then made a new backup of the retail file. Fixed in `PlanInstall` (the `<preserve file>.retail-backup` is the player's
+too); this also keeps the backup the plugin part `savemode` writes. Not done: a run against a real D2R folder, a GUI run, signing,
+publishing.
