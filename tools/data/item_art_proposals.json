@@ -74,7 +74,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-01"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 41
@@ -86,7 +86,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-02"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 43
@@ -98,7 +98,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-03"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 44
@@ -110,7 +110,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-05"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 28
@@ -122,7 +122,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-06"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 29
@@ -134,7 +134,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-07"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 30
@@ -146,7 +146,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-08"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 31
@@ -158,7 +158,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-09"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 32
@@ -170,7 +170,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-10"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 33
@@ -182,7 +182,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-11"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 34
@@ -194,7 +194,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-12"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 35
@@ -206,7 +206,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-13"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 36
@@ -218,7 +218,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-14"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 37
@@ -230,7 +230,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-15"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 38
@@ -242,7 +242,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-16"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 39
@@ -254,7 +254,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-17"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 40
@@ -266,7 +266,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-a-18"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 42
@@ -619,7 +619,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-d-02"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 45
@@ -631,7 +631,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-d-05"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 46
@@ -643,7 +643,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-d-11"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 47
@@ -655,7 +655,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-d-07"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 48
@@ -667,7 +667,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-d-04"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 49
@@ -679,7 +679,7 @@
     "glyph": "chisel",
     "sign": "mxl/r-d-12"
    },
-   "enabled": true,
+   "enabled": false,
    "lane": "itemart3",
    "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
    "pick": 50

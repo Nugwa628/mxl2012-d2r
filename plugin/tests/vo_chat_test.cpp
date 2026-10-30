@@ -24,7 +24,7 @@ int main() {
 	Check(!PathKeyIs("Monster\\baal\\baallaugh2.flac", LimitedKey), "the second laugh is another key");
 	Check(!PathKeyIs("Monster\\baal\\baallaugh10.flac", LimitedKey), "a longer name");
 	Check(!PathKeyIs("Monster\\baal\\baallaugh.flac", LimitedKey), "a shorter name");
-	Check(!PathKeyIs("Monster\\soldier\\sol_overhere.flac", LimitedKey), "the soldiers' lines are left alone");
+	Check(!PathKeyIs("Monster\\soldier\\sol_overhere.flac", LimitedKey), "the soldiers' lines are not Baal's key");
 	Check(!PathKeyIs("Monster\\baal\\.flac", LimitedKey) && !PathKeyIs("", LimitedKey) && !PathKeyIs(nullptr, LimitedKey), "no file name");
 	Check(!PathKeyIs("Monster\\baal\\", LimitedKey), "a folder only");
 
@@ -51,6 +51,15 @@ int main() {
 		}
 	}
 	Check(printed == 3 && at[0] == 1000 && at[1] == 33000 && at[2] == 65000, "casts every 4 s: lines at 1, 33, 65 s");
+
+	// the soldiers' lines: their own keys and 5 s each
+	Check(LimitedIndex("Monster\\baal\\baallaugh1.flac") == 0, "Baal's laugh is entry 0 (30 s)");
+	Check(LimitedIndex("Monster\\soldier\\sol_overhere.flac") == 1 && LimitedIndex("sol_helpus_hd.flac") == 2, "soldier keys");
+	Check(LimitedIndex("Monster\\soldier\\sol_overhere2.flac") == -1 && LimitedIndex("Monster\\baal\\baallaugh2.flac") == -1
+	          && LimitedIndex(nullptr) == -1, "other lines are not limited");
+	Check(LimitedLines[1].cooldownMs == 5000 && LimitedLines[2].cooldownMs == 5000, "soldiers: 5 s");
+	Check(!LineAllowed(5000 + 4999, 5000, SoldierCooldownMs) && LineAllowed(5000 + 5000, 5000, SoldierCooldownMs),
+	      "soldiers: 4.999 s left out, 5 s printed");
 
 	// hook site
 	Check(RvaVoSubtitle == 0x1a0da0 && RvaSoundRecord == 0xd96a0 && RecordPath == 0x32, "rvas and the path offset");

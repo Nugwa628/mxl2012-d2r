@@ -10025,10 +10025,11 @@ def hm2_monsters():
     hm_monsters("hm2", HM2_MONSTERS, HM2_EXTRA)
 
 
-def hm_monsters(tag, monsters, extra=()):
+def hm_monsters(tag, monsters, extra=(), clear=False):
     """The stand-in look check of hm2_monsters / hm3_monsters over a list of (area, monstats Id, what the stand-in is); `extra`
     rows run only when MXL_<TAG>_ONLY names them, MXL_<TAG>_MODES=hd,legacy shoots every mode named (MXL_HM_GRAPHICS=legacy
-    alone, lane hdmonlook's switch, is the same as MXL_<TAG>_MODES=legacy; shots past the first mode are <tag>_<id>_<mode>_*)."""
+    alone, lane hdmonlook's switch, is the same as MXL_<TAG>_MODES=legacy; shots past the first mode are <tag>_<id>_<mode>_*).
+    `clear`: after each monster also kill whatever else it brought (minions, summons) so the next one is seen alone."""
     mark = engine_mark()
     log, rows, bad, shots = [], [], [], []
     only = set(filter(None, (os.environ.get("MXL_%s_ONLY" % tag.upper()) or "").split(",")))
@@ -10072,6 +10073,9 @@ def hm_monsters(tag, monsters, extra=()):
             H("kill %s" % uid)
             time.sleep(1.5)
             shots.append(sh("%s_%s_death" % (tag, stag)))
+            for _ in range(12 if clear else 0):
+                if not Hl("kill nearest", log)[0]:
+                    break
             a1 = pot_asserts()
             n = (a1 - a0) if a0 is not None and a1 is not None else None
             msgs = pot_assert_lines(n or 0)
@@ -12207,6 +12211,24 @@ def check_uppass():
 
 
 CHECKS += [("uppass", check_uppass)]
+# lane standin: the most-seen Median-only monsters of docs/hd-monsters.md section 16 and the boss FAILs of section 12, each with
+# the stand-in a build draws (a trial build, `hd_monsters.py build --try-proposals all`, draws the proposals of
+# tools/data/hd_monster_proposals.json; a normal build the committed mapping). (area, monstats Id, token)
+STANDIN_MONSTERS = [(2, "centaur1", "`9!`"), (2, "darkfey1", "`!2`"), (2, "deathwing1", "`&b`"), (2, "onyxknight1", "`0n`"),
+                    (2, "fungus1", "`2(`"), (2, "magmademon1", "`(l`"), (2, "fellfiend1", "`08`"),
+                    (2, "pest1", "`g7`"), (2, "crystal1", "`b#`"), (2, "belial", "`#m`"), (2, "cube1", "`#q`"),
+                    (2, "rathma_primus", "`$f`"), (2, "porkchop_elite2", "`5$`")]  # last: its huge corpse hid the ones after it
+
+
+def standin_mons():
+    """Lane standin: hm_monsters over STANDIN_MONSTERS (far / near / fight / death shots, engine asserts per monster; what each
+    brought is killed before the next).
+    MXL_STANDIN_ONLY=<id,...> runs a subset, MXL_STANDIN_MODES=hd,legacy both looks. PASS: every monster spawned, no engine
+    assert, the game alive; the look is judged by hand (the owner's review sheets, mxl2012-runs/standin/)."""
+    hm_monsters("standin", STANDIN_MONSTERS, clear=True)
+
+
+CHECKS += [("standin_mons", standin_mons)]
 
 if __name__ == "__main__":
     main()

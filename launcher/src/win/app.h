@@ -16,7 +16,7 @@
 namespace mxl {
 
 #ifndef MXL_LAUNCHER_VERSION
-#define MXL_LAUNCHER_VERSION "0.1.0"  // the downloader version; CMake reads it from here for the version resource
+#define MXL_LAUNCHER_VERSION "0.1.1"  // the downloader version; CMake reads it from here for the version resource
                                       // (cmake -DMXL_LAUNCHER_VERSION=x.y.z overrides both, for tests of the self-update)
 #endif
 constexpr const char* LauncherVersion = MXL_LAUNCHER_VERSION;

@@ -524,5 +524,141 @@ class TerrainTest(unittest.TestCase):
             p, q, r = pos[a], pos[b], pos[c]
             self.assertLess((q[0] - p[0]) * (r[2] - p[2]) - (q[2] - p[2]) * (r[0] - p[0]), 0)
 
+
+def square(x0, x1, y0, y1):
+    """Opaque pixels of a rectangle, as dt1_pixels.tiles gives them."""
+    return [(x, y, 1) for x in range(x0, x1) for y in range(y0, y1)]
+
+
+ARCH = "data/hd/env/model/act4/fort/fortress/arch01.model"
+TREE = "data/hd/env/model/expansion/town/expansion_tree_dead05.model"
+HUT = "data/hd/env/model/act4/fort/fortress/hut_blacksmith01.model"
+
+
+class LookalikeTest(unittest.TestCase):
+    """Lane walls4: a wall tile D2R never has borrows the variant of the learnt tile with the same silhouette."""
+
+    def lib(self):
+        lib = walls_hd.Library()
+        f = "act4/fort"
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): ((f, 1, 3, 1),), (1, 0): ((f, 1, 3, 0),), (2, 0): ((f, 1, 3, 5),)},
+                      {"entities": [entity(ARCH, 2, 2), entity(WALL, 12, 2), entity(WALL, 22, 2)]})
+        arch, wall = square(0, 32, -64, 0), square(64, 96, -64, 0)
+        lib.pixels_of = lambda folder: {(1, 3, 1): arch, (1, 3, 0): wall, (1, 3, 5): wall, (1, 4, 2): arch,
+                                        (1, 4, 3): square(0, 30, -60, 0), (1, 4, 0): square(0, 32, -32, 0)} if folder == f else {}
+        return lib, f
+
+    def test_same_silhouette_gets_the_learnt_variant(self):
+        lib, f = self.lib()
+        self.assertEqual(lib.pick(((f, 1, 4, 2),)), (((ARCH, 2.0, 2.0),), "lookalike"))
+        self.assertEqual(lib.pick(((f, 1, 4, 3),)), (((ARCH, 2.0, 2.0),), "lookalike"))     # IoU 0.88
+
+    def test_other_silhouettes_and_orientations_stay_generic(self):
+        lib, f = self.lib()
+        self.assertEqual(lib.pick(((f, 1, 4, 0),)), (((WALL, 2.0, 2.0),), "generic"))       # IoU 0.5 with the arch
+        self.assertEqual(lib.pick(((f, 2, 4, 2),)), (None, None))                          # nothing of orientation 2
+        lib.pixels_of = None
+        lib._pixels, lib._lookalike = {}, {}
+        self.assertEqual(lib.pick(((f, 1, 4, 2),)), (((WALL, 2.0, 2.0),), "generic"))      # no pixels: as before
+
+    def test_two_layers_draw_both(self):
+        lib, f = self.lib()
+        sig, how = lib.pick(((f, 1, 4, 0), (f, 1, 4, 2)))
+        self.assertEqual((sorted(sig), how), (sorted([(WALL, 2.0, 2.0), (ARCH, 2.0, 2.0)]), "lookalike"))
+        text, st = walls_hd.build_scene({(3, 3): ((f, 1, 4, 0), (f, 1, 4, 2))}, lib, "act4_fort")
+        self.assertEqual((st["lookalike"], st["entities"]), (1, 2))
+
+
+class TreeTest(unittest.TestCase):
+    """Lane walls4: orientation-14 trees get D2R's tree on the trunk tile; crown pieces stay without."""
+    T, TRUNK, CROWN, OTHER = "expansion/town", ("expansion/town", 14, 14, 12), ("expansion/town", 14, 14, 16), ("expansion/town", 14, 15, 3)
+
+    def lib(self, tree_maps=3, maps=3):
+        lib = walls_hd.Library()
+        for n in range(maps):
+            ents = [entity(TREE, 3.8, 1.0)] if n < tree_maps else []
+            lib.learn("m%d" % n, {(0, 0): (self.TRUNK,), (1, 0): (self.CROWN,)}, {"entities": ents})
+        trunk, crown = square(0, 16, -40, -10), square(0, 16, -200, -120)
+        lib.pixels_of = lambda folder: {self.TRUNK[1:]: trunk, self.CROWN[1:]: crown, self.OTHER[1:]: trunk, (14, 14, 17): crown}
+        return lib
+
+    def test_trunk_crown_and_folder_fallback(self):
+        lib = self.lib()
+        self.assertEqual([(walls_hd.model_of(e), dx, dz) for e, dx, dz in lib.tree_pick(self.TRUNK)], [(TREE, 3.8, 1.0)])
+        self.assertEqual(lib.tree_pick(self.CROWN), [])
+        self.assertEqual([(walls_hd.model_of(e), dx, dz) for e, dx, dz in lib.tree_pick(self.OTHER)], [(TREE, 3.8, 1.0)])
+        self.assertEqual(lib.tree_pick(("act2/jungle", 14, 1, 0)), [])
+
+    def test_a_tree_on_too_few_cells_is_not_the_tiles(self):
+        self.assertEqual(self.lib(tree_maps=1, maps=10).tree_pick(self.TRUNK), [])        # 1 of 10 < MIN_MODEL_SHARE
+
+    def test_build_scene_counts_tree_cells(self):
+        crown = (self.T, 14, 14, 17)                                               # keys D2R never has: no exact pick
+        text, st = walls_hd.build_scene({(5, 5): (self.OTHER,), (6, 5): (crown,)}, self.lib(), "expansion_town")
+        self.assertEqual((st["trees"], st["tree_cells"], st["uncovered"], st["entities"]), (1, 2, 0, 1))
+        p = walls_hd.transform(json.loads(text)["entities"][0])["position"]
+        self.assertEqual((p["x"], p["z"]), (53.8, 51.0))
+
+    def test_a_tree_the_variant_has_is_not_doubled(self):
+        lib = self.lib()
+        oak = "data/hd/env/model/act1/graveyard/act1_tree_oak04.model"            # not decor: also in the exact variant
+        lib.seen[(self.TRUNK,)] = collections.Counter({((oak, 3.8, 1.0),): 3})
+        lib.variants[((oak, 3.8, 1.0),)] = [(entity(oak, 0, 0), 3.8, 1.0)]
+        lib.trees[self.TRUNK] = collections.Counter({(oak, 3.8, 1.0): 3})
+        lib.tree_items[(self.TRUNK, oak, 3.8, 1.0)] = entity(oak, 0, 0)
+        lib.model_cells[oak] = 3
+        _text, st = walls_hd.build_scene({(5, 5): (self.TRUNK,)}, lib, "act1_graveyard")
+        self.assertEqual((st["trees"], st["entities"]), (0, 1))
+
+    def test_a_tree_cell_draws_only_its_tree(self):
+        lib = self.lib()
+        seg = "data/hd/env/model/expansion/town/expansion_town_walls/wall_segment_short.model"   # a neighbour's wall
+        lib.seen[(self.TRUNK,)] = collections.Counter({((seg, 9.1, 3.6),): 3})
+        lib.variants[((seg, 9.1, 3.6),)] = [(entity(seg, 0, 0), 9.1, 3.6)]
+        lib.model_cells[seg] = 3
+        text, st = walls_hd.build_scene({(5, 5): (self.TRUNK,)}, lib, "expansion_town")
+        self.assertEqual((st["trees"], st["tree_cells"], st["exact"]), (1, 1, 0))
+        self.assertEqual([walls_hd.model_of(e) for e in json.loads(text)["entities"]], [TREE])
+
+
+class PieceTest(unittest.TestCase):
+    """Lane walls4: one-off D2R pieces (a Fortress hut with its roof) placed where the map repeats the wall tiles under them."""
+    KEYS = [(("act4/fort", 1, 3, n),) for n in range(6)]
+
+    def lib(self):
+        lib = walls_hd.Library()
+        cells = {(2 + n % 3, 2 + n // 3): k for n, k in enumerate(self.KEYS)}
+        lib.learn("fort", cells, {"entities": [entity(HUT, 25, 25)]})
+        lib.learn_pieces(lambda m: ((-5.0, 0.0, -5.0), (25.0, 0.0, 15.0)) if m == HUT else None)
+        return lib
+
+    def test_footprint_turns_with_the_yaw(self):
+        walls = {(x, z): (("f", 1, 1, x * 10 + z),) for x in range(4) for z in range(6)}
+        e = entity(HUT, 5, 35)
+        e["components"][0]["orientation"] = {"x": 0.0, "y": 2 ** -0.5, "z": 0.0, "w": 2 ** -0.5}   # 90 degrees
+        foot = walls_hd.footprint(e, 5.0, 35.0, ((0.0, 0.0, 0.0), (25.0, 0.0, 5.0)), walls)
+        self.assertEqual(set(foot), {(dx, dy) for dx in (0, 1) for dy in (-2, -1, 0)})
+        self.assertIsNone(walls_hd.footprint(e, 5.0, 35.0, None, walls))
+        self.assertIsNone(walls_hd.footprint(entity(HUT, 5, 5), 5.0, 5.0, ((0.0, 0.0, 0.0), (1.0, 0.0, 1.0)), walls))
+
+    def test_learnt_and_fitted(self):
+        lib = self.lib()
+        self.assertEqual(len(lib.pieces), 1)
+        cells = {(10 + n % 3, 7 + n // 3): k for n, k in enumerate(self.KEYS) if n != 5}      # 5 of 6 cells
+        self.assertEqual([(walls_hd.model_of(e), x, y, dx, dz) for e, x, y, dx, dz in lib.fit(cells)], [(HUT, 10, 7, 5.0, 5.0)])
+        text, st = walls_hd.build_scene(cells, lib, "act4_fort")
+        self.assertEqual(st["pieces"], 1)
+        hut = [e for e in json.loads(text)["entities"] if walls_hd.model_of(e) == HUT]
+        self.assertTrue(hut[0]["name"].startswith("mxp_10_7_"))
+        self.assertEqual((walls_hd.transform(hut[0])["position"]["x"], walls_hd.transform(hut[0])["position"]["z"]), (105.0, 75.0))
+
+    def test_too_few_cells_or_keys_do_not_fit(self):
+        lib = self.lib()
+        self.assertEqual(lib.fit({(10 + n, 7): k for n, k in enumerate(self.KEYS[:3])}), [])
+        self.assertEqual(lib.fit({(10 + n % 3, 7 + n // 3): self.KEYS[0] for n in range(6)}), [])
+        self.assertEqual(walls_hd.learn_library.__defaults__[-1], None)                  # no boxes: no set pieces by layout
+
+
 if __name__ == "__main__":
     unittest.main()

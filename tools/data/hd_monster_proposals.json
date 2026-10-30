@@ -1,0 +1,223 @@
+{
+ "enabled": true,
+ "note": "Lane standin proposals (2026-10-30): better D2R stand-ins for the most-seen Median-only monsters (docs/hd-monsters.md section 16) and the boss FAILs of section 12. Owner rule: no new models; D2R's own HD units, scaled and recoloured; the owner sees the review sheets (mxl2012-runs/standin/) first. The build uses an entry only when it and this file are switched on; `hd_monsters.py build --try-proposals all` makes a trial build with all of them.",
+ "tokens": {
+  "9!": {
+   "donor": "goatman1",
+   "scale": 1.4,
+   "adjust": [
+    0.0,
+    -0.6,
+    0.3
+   ],
+   "tint": [
+    0.92,
+    0.92,
+    0.9,
+    0.35
+   ],
+   "confidence": "low",
+   "enabled": true,
+   "before": "clawviper1 x1.3",
+   "why": "Centaur: a pale horse body under a furred, armoured torso with a spear (101x97 px). D2R has no centaur; the Goatman stands on hoofed goat legs with fur and a pole weapon: a beast-legged armed fighter, where the Claw Viper is a snake. Pale grey like the art"
+  },
+  "!2": {
+   "donor": "cr_lancer1",
+   "scale": 0.85,
+   "adjust": [
+    0.45,
+    0.3,
+    0.1
+   ],
+   "tint": [
+    0.25,
+    0.8,
+    0.8,
+    0.55
+   ],
+   "confidence": "medium",
+   "enabled": false,
+   "before": "councilmember1 x0.75",
+   "why": "Dark Fey: a slender teal-skinned woman with green hair, melee (21x54 px). The Dark Spearwoman is D2R's slender wingless woman fighter; teal like the art. The Council Member is a robed man"
+  },
+  "&b": {
+   "donor": "batdemon1",
+   "scale": 1.0,
+   "adjust": [
+    0.0,
+    -0.6,
+    0.5
+   ],
+   "tint": [
+    0.9,
+    0.88,
+    0.8,
+    0.45
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "vulture1 x1.2",
+   "why": "Deathwing: a bone-white skeletal flyer on bat wings (76x58 px). The Desert Wing has the bat wings and the claws; bone white like the art. The Vulture is a feathered bird"
+  },
+  "0n": {
+   "donor": "doomknight1",
+   "scale": 1.2,
+   "adjust": [
+    0.0,
+    -0.2,
+    -0.45
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "confidence": "high",
+   "enabled": true,
+   "before": "sandraider1 x1.15",
+   "why": "Onyx Knight: a heavy black plate knight with gold trim, horned helm and a sword (50x114 px). The Doom Knight is D2R's horned plate knight with a sword; darkened to black with its bronze left as the trim. The Sand Raider is a thin unarmoured raider"
+  },
+  "2(": {
+   "donor": "thornhulk1",
+   "scale": 0.65,
+   "adjust": [
+    0.5,
+    0.2,
+    0.1
+   ],
+   "tint": [
+    0.25,
+    0.4,
+    0.9,
+    0.4
+   ],
+   "confidence": "low",
+   "enabled": false,
+   "before": "thornhulk1 x0.75 (teal)",
+   "why": "Fungus: a dark blue biped under a wide blue mushroom cap (53x86 px). D2R has no mushroom man; the Thorned Hulk's broad bushy head and shoulders are the nearest cap. Kept, smaller and blue like the art instead of teal"
+  },
+  "(l": {
+   "donor": "claygolem",
+   "scale": 1.3,
+   "confidence": "medium",
+   "enabled": false,
+   "before": "deathmauler1 x1.15",
+   "why": "Magma Demon: a hulking golem of dark rock with glowing lava cracks (94x104 px). The Clay Golem is D2R's hulking rock-and-earth golem, the nearest shape. Its colour cannot be changed: a darkened ember table drew it tan as ever in game (trials 1 and 2, like the Iron Golem of section 12), so it stays its own earth-tan. The Fire Golem (all flame) and the Death Mauler (a spined beast) fit the shape worse"
+  },
+  "08": {
+   "donor": "megademon1",
+   "scale": 0.75,
+   "adjust": [
+    0.07,
+    0.1,
+    0.2
+   ],
+   "tint": [
+    1.0,
+    0.55,
+    0.15,
+    0.4
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "warputriddefiler x0.85",
+   "why": "Fell Fiend: an orange-red winged demon with tentacle legs (104x89 px), Median's AI Megademon. The Venom Lord is D2R's winged demon of that AI; shifted from red to orange. The Putrid Defiler has no wings"
+  },
+  "5$": {
+   "donor": "overseer1",
+   "scale": 1.3,
+   "adjust": [
+    0.0,
+    0.2,
+    0.1
+   ],
+   "tint": [
+    1.0,
+    0.5,
+    0.15,
+    0.35
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "siegebeast1 x1.5",
+   "why": "Porkchop: a huge fat man in orange leather with a steel helmet and shoulder plates and a sledgehammer (160x201 px). The Overseer (Act 5) is D2R's fat hunched brute in brown-red leather, warm-tinted towards orange; it carries a whip, not a hammer. The Smith (same fat-man shape, hammer) was tried: it drew grey-blue whatever its table said (trial 2), and Hephasto is the same grey-blue model. The Siege Beast carries a tower on its back"
+  },
+  "g7": {
+   "donor": "fallen1",
+   "scale": 1.0,
+   "adjust": [
+    0.05,
+    -0.4,
+    -0.2
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "brute2 x0.55",
+   "why": "Pest: a small hunched armoured imp with an axe, dark brown (36x54 px). The Fallen is D2R's small hunched imp with a blade; brown instead of red. The Brute is a furred yeti"
+  },
+  "b#": {
+   "donor": "cr_lancer1",
+   "scale": 1.1,
+   "adjust": [
+    0.0,
+    0.2,
+    0.2
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "confidence": "medium",
+   "enabled": false,
+   "before": "cantor1 x1.0",
+   "why": "Crystal: a woman with orange-red hair, green top and red skirt, melee (50x80 px). The Dark Spearwoman is D2R's woman fighter in red; a little brighter. The Cantor is a robed priest"
+  },
+  "#m": {
+   "donor": "baalminion1",
+   "scale": 0.85,
+   "adjust": [
+    0.04,
+    -0.3,
+    -0.25
+   ],
+   "tint": [
+    0.45,
+    0.33,
+    0.22,
+    0.4
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "baalminion1 x0.75 (scored colour)",
+   "why": "Belial (Act 5 Ice Cave boss): a hunched horned demon in black spiked armour with a rat tail and a staff (53x86 px). The Minion of Destruction stays (hunched horned clawed demon; no D2R unit has the tail); since the green state fix (#496) its colour shows, so darker brown-black like the art and a little larger"
+  },
+  "#q": {
+   "donor": "arach1",
+   "scale": 0.9,
+   "adjust": [
+    0.03,
+    0.2,
+    0.6
+   ],
+   "tint": [
+    0.95,
+    0.8,
+    0.3,
+    0.8
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "arach1 x0.85 (shared table, drew dull red-brown)",
+   "why": "Enforcer with Laser: a golden box on long jointed legs (87x72 px). The Arach stays (D2R's long-legged walker); a strong gold tint of its own so it no longer falls on a shared table that kept it red-brown"
+  }
+ }
+}

@@ -21,6 +21,18 @@ inline constexpr uint8_t VoSubtitleEntry[] = {0x4c, 0x8b, 0xdc, 0x55, 0x53, 0x49
 // Baal's laugh: the vo.json key Median's skills and missiles reach (bugs.md #508). Its line is limited to one per Cooldown.
 inline constexpr char LimitedKey[] = "baallaugh1";
 inline constexpr uint64_t CooldownMs = 30000;
+// The Act 5 soldiers' lines Median gives to summon missiles ("Over here!") and deathcoil ("Help us!"): one per 5 s each
+// (owner ruling 2026-10-30).
+inline constexpr char SoldierOverHere[] = "sol_overhere";
+inline constexpr char SoldierHelpUs[] = "sol_helpus";
+inline constexpr uint64_t SoldierCooldownMs = 5000;
+
+struct Limited {
+	const char* key;
+	uint64_t cooldownMs;
+};
+inline constexpr Limited LimitedLines[] = {{LimitedKey, CooldownMs}, {SoldierOverHere, SoldierCooldownMs}, {SoldierHelpUs, SoldierCooldownMs}};
+inline constexpr int LimitedCount = static_cast<int>(sizeof(LimitedLines) / sizeof(LimitedLines[0]));
 
 // True when `path` (a sounds.txt file path, e.g. "Monster\\baal\\baallaugh1.flac") gives the vo.json key `key` the way 0x1a0210
 // builds it: the file name after the last '\\' or '/', up to its last '.', without a trailing "_hd", compared without case.
@@ -57,9 +69,19 @@ constexpr auto PathKeyIs(const char* path, const char* key) noexcept -> bool {
 }
 
 // The cooldown: a line at `now` (ms) goes to the chat when none went out yet (`last` 0) or the last one is at least
-// `CooldownMs` ago. A clock that went back counts as "long ago" (no line is lost for good).
-constexpr auto LineAllowed(uint64_t now, uint64_t last) noexcept -> bool {
-	return last == 0 || now < last || now - last >= CooldownMs;
+// `cooldownMs` (Baal's CooldownMs unless given) ago. A clock that went back counts as "long ago" (no line is lost for good).
+constexpr auto LineAllowed(uint64_t now, uint64_t last, uint64_t cooldownMs = CooldownMs) noexcept -> bool {
+	return last == 0 || now < last || now - last >= cooldownMs;
+}
+
+// The index in LimitedLines of the key `path` gives, or -1 for a line that is not limited.
+constexpr auto LimitedIndex(const char* path) noexcept -> int {
+	for (int i = 0; i < LimitedCount; ++i) {
+		if (PathKeyIs(path, LimitedLines[i].key)) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 }  // namespace vo_chat

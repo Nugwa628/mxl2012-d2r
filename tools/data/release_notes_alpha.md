@@ -82,14 +82,13 @@ What we know is wrong or different. Please don't report these again, unless you 
   picture in HD. Legacy graphics (G) show Median's own classic art where it has one.
 - **Median's own maps show D2R's walls in HD.** The 17 maps that Median added or changed have D2R's own walls in Median's
   layout in HD, lit in each map's own colour as in legacy mode; 2 of them show only part of their walls (Ancient Tunnels: the void
-  around the platform is drawn as floor; Khalimgrad's cathedral: no arches and roofs). Legacy graphics (G) show them as Median drew them.
+  around the platform is drawn as floor; Khalimgrad's cathedral: no tall pointed arch and long roofed walls). Legacy graphics (G) show them as Median drew them.
 - **Item pictures in HD:** most items use D2R's own HD pictures, many Median-only ones D2R's HD art in Median's colours;
-  about 20 (the arcane crystals, catalysts and a few more) are still Median's classic pictures scaled up, so they look softer.
+  about 45 (Median's runes, the arcane crystals, catalysts and a few more) are still Median's classic pictures scaled up, so
+  they look softer.
 - **Skill trees in HD** are Median's classic page art scaled up.
 - **A few names** that Median XL 2012 itself never wrote (some potions, monsters and objects) show a name we gave them.
 - **Chronicle:** making some runewords (for example Kyrie) names the base item in the chat message; the item itself is right.
-- **Totems after Bend the Shadows.** Now and then one totem stays on your own spot after the blink instead of moving
-  beside you (often next to rocks). It still works; cast it again or step aside.
 
 **Plays different from Median XL 2012 (on purpose, D2R's features kept)**
 

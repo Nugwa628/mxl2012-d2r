@@ -104,9 +104,10 @@ class ProposalTests(unittest.TestCase):
         data = json.loads(R.PROPOSALS.read_text("utf-8"))
         self.assertTrue(data["enabled"])
         # owner, 2026-10-30: og1..og5 (lane itemart2), lane itemart3's 59 entries and its 7 signets (round 4: the runes
-        # and signets with the redrawn signs)
-        approved = lambda k, v: k.startswith("mxl/og") or v.get("lane") in ("itemart3", "itemart3-signets")
-        self.assertEqual(len(R.enabled_proposals(data)), 5 + 59 + 7)
+        # and signets with the redrawn signs); the 23 runes off again for 0.1.5 ("we need to work on those more")
+        rune = lambda k: k.startswith(("mxl/r-a-", "mxl/r-d-"))
+        approved = lambda k, v: k.startswith("mxl/og") or (v.get("lane") in ("itemart3", "itemart3-signets") and not rune(k))
+        self.assertEqual(len(R.enabled_proposals(data)), 5 + 36 + 7)
         for k, v in data["pictures"].items():
             self.assertRegex(k, r"^(mxl|classic)/[\w\-]+$")
             self.assertEqual(v["enabled"], approved(k, v), k)
@@ -125,7 +126,7 @@ class ProposalTests(unittest.TestCase):
         self.assertEqual(len({v["pick"] for v in lane.values()}), 59)
         runes = [k for k in lane if k.startswith(("mxl/r-a-", "mxl/r-d-"))]
         self.assertEqual(len(runes), 23)
-        self.assertTrue(all(v["enabled"] for v in lane.values()))
+        self.assertTrue(all(v["enabled"] != (k in runes) for k, v in lane.items()))  # the runes off (owner, 0.1.5)
         for k in runes:
             self.assertEqual((lane[k]["reuse"].get("glyph"), lane[k]["reuse"].get("sign")), ("chisel", k))
         signets = {k: v for k, v in pics.items() if v.get("lane") == "itemart3-signets"}

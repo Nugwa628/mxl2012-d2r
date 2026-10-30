@@ -36,7 +36,9 @@ with MXL_SLOT=2..5 when the cache lacks them). Nothing of D2R's or Median's is w
 import argparse
 import collections
 import copy
+import functools
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -52,6 +54,22 @@ MIN_MODEL_SHARE = 1 / 3          # see choose()
 ANCHOR_RADIUS = 2                # see Library.anchor()
 TILE = 10.0                      # world units per tile in D2R's scenes
 WALL_ORIENTATIONS = set(range(1, 10))   # .dt1 orientations 1-9: walls and their corners/ends (10+: specials, shadow, tree, roof)
+# Trees (lane walls4): .dt1 orientation 14 holds trees drawn over several cells (one trunk tile, crown pieces on the cells
+# next to it). A trunk tile reaches within TRUNK_BASE pixels of its cell's ground; crown pieces float higher. TREE: D2R's tree
+# models (not the jungle treeline walls).
+TREE_ORIENTATION = 14
+TRUNK_BASE = 50
+TREE = re.compile(r"tree(?!line)[^/]*\.model$", re.I)
+# Look-alike tiles (lane walls4, Library.lookalike): a wall tile D2R never puts in a scene borrows the variant of the learnt
+# tile of the same set and orientation whose silhouette (opaque pixels, 4x4 blocks) overlaps it by at least this share
+# (intersection over union). Fortress arcade tiles 1/4/2-4 against D2R's arch tile 1/3/1: 0.80-0.99; arch against wall: 0.35.
+LOOKALIKE_IOU = 0.75
+# Set pieces by layout (lane walls4, Library.fit): a one-off D2R piece (a Fortress hut with its roof) is placed in a Median map
+# where the wall cells under its bounding box repeat: at least PIECE_MIN_CELLS of them with as many distinct keys, and
+# PIECE_SHARE of the footprint, with the same keys at the same offsets.
+PIECE_MIN_CELLS = 4
+PIECE_SHARE = 0.6
+PIECE_CANDIDATES = 50            # entities kept per possible set piece while learning (one-off pieces repeat rarely)
 # The cap (cache lane, bug #360 asset cache overflow): no generated scene above D2R's largest map scene, act3/docktown/docktown3
 # (4,989 entities, 4,423 of them with a model, 679 distinct models, 4,651,080 bytes). cap() drops pieces past these.
 MAX_PLACED = 4423
@@ -229,10 +247,19 @@ def wall_entities(scene: dict, ground=None):
     to stay over its tile (the Fortress interior stands about 35 units up and its walls sit 3-4 tiles off their wall cells;
     lane walls3). (x - g, y - g, z - g) is the same spot on screen at ground level: the tile it belongs to, and the height
     it needs in a scene without D2R's terrain (Median's maps are flat). The entity is a copy with a new transform then."""
+    return _entities(scene, ground, lambda e, m: not is_decor(e))
+
+
+def tree_entities(scene: dict, ground=None):
+    """The scene's trees (TREE; is_decor drops D2R's dead trees with the plants): [(entity, x, z)] as wall_entities."""
+    return _entities(scene, ground, lambda e, m: bool(TREE.search(m)))
+
+
+def _entities(scene: dict, ground, keep):
     out = []
     for e in scene.get("entities", ()):
         t, m = transform(e), model_of(e)
-        if not t or not m or e.get("name") == "terrain" or any(c.get("type") == "TerrainDefinitionComponent" for c in e["components"]) or is_decor(e):
+        if not t or not m or e.get("name") == "terrain" or any(c.get("type") == "TerrainDefinitionComponent" for c in e["components"]) or not keep(e, m):
             continue
         p = t.get("position", {})
         x, z = float(p.get("x", 0.0)), float(p.get("z", 0.0))
@@ -429,6 +456,14 @@ class Library:
         self._generic = {}
         self.maps = {}                                             # map -> (cells, [(entity, x, z) on no cell]) until anchor()
         self.anchored = {}                                         # key -> [(entity, dx, dz)] anchor() hangs on it
+        self.trees = collections.defaultdict(collections.Counter)  # tree tile -> Counter((model, dx, dz)) on its D2R cells
+        self.tree_items = {}                                       # (tile, model, dx, dz) -> entity
+        self.tree_cells = collections.Counter()                    # tree tile -> D2R cells that have it
+        self._cands = collections.defaultdict(list)                 # model -> [(map, entity, x, z)] while it may be a set piece
+        self.wall_maps = {}                                        # D2R map -> {(x, y): wall key} (learn_pieces)
+        self.pieces = []                                           # [(entity, dx, dz, footprint)] (learn_pieces, fit)
+        self.pixels_of = None                                      # folder -> {(o, s, q): [(x, y, index)]} (trunks, masks)
+        self._pixels, self._lookalike = {}, {}
 
     def learn(self, name: str, cells: dict, scene: dict, ground=None):
         """cells: wall_cells() of a D2R map; scene: its preset json; ground: its Ground (wall_entities)."""
@@ -439,11 +474,28 @@ class Library:
                 per_cell[xy].append((e, round(x - xy[0] * TILE, 3), round(z - xy[1] * TILE, 3)))
             else:
                 homeless.append((strip_entity(e), x, z))
+            if self.model_cells.get(model_of(e), 0) < SET_PIECE_CELLS and len(self._cands[model_of(e)]) < PIECE_CANDIDATES:
+                self._cands[model_of(e)].append((name, e, x, z))
         if homeless:
             self.maps[name] = (cells, homeless)
+        self.wall_maps[name] = {xy: k for xy, k in cells.items() if not is_floor(k) and all(t[0] for t in k)}
         for ents in per_cell.values():
             for e, _dx, _dz in ents:
                 self.model_cells[model_of(e)] += 1
+        for m in [m for m in self._cands if self.model_cells.get(m, 0) >= SET_PIECE_CELLS]:
+            del self._cands[m]       # not a set piece after all
+        trees = collections.defaultdict(list)
+        for e, x, z in tree_entities(scene, ground):
+            xy = (int(x // TILE), int(z // TILE))
+            trees[xy].append((e, round(x - xy[0] * TILE, 1), round(z - xy[1] * TILE, 1)))
+        for xy, key in cells.items():
+            for tile in key:
+                if tile[1] != TREE_ORIENTATION or tile[0] is None:
+                    continue
+                self.tree_cells[tile] += 1
+                for e, dx, dz in trees.get(xy, ()):
+                    self.trees[tile][(model_of(e), dx, dz)] += 1
+                    self.tree_items.setdefault((tile, model_of(e), dx, dz), strip_entity(e))
         for xy, key in cells.items():
             if any(k[0] is None for k in key):
                 continue
@@ -496,7 +548,8 @@ class Library:
         return self.model_cells.get(model, 0) < SET_PIECE_CELLS
 
     def pick(self, key):
-        """-> (signature, how) for a cell key: 'exact', 'partial' (a learnt single tile or key sharing a tile) or (None, None)."""
+        """-> (signature, how) for a cell key: 'exact', 'partial' (a learnt single tile or key sharing a tile), 'lookalike',
+        'generic' or (None, None)."""
         if key in self.seen:
             return choose(self.seen[key]), "exact"
         best, score = None, 0
@@ -505,6 +558,10 @@ class Library:
                 best, score = choose(self.single[k]), sum(self.single[k].values())
         if is_floor(key):  # a floor D2R never has: bare ground (no search over every learnt key, no generic wall)
             return (best, "partial") if best is not None else ((), "floor")
+        if best is None:   # a tile that looks like a learnt one (lane walls4: charismatic's arcades got plain walls before)
+            sig = self.compose(key)
+            if sig is not None:
+                return sig, "lookalike"
         if best is None:   # any learnt key that holds one of this cell's tiles
             tiles = set(key)
             for k, c in self.seen.items():
@@ -538,6 +595,161 @@ class Library:
                     return self._generic[g]
         return None
 
+    # ---- lane walls4: look-alike tiles, trees, set pieces by layout --------------------------------------------------------
+    def pixels(self, folder):
+        """{(o, s, q): [(x, y, index)]} of a D2R tile set folder through `pixels_of` (cached; {} without it)."""
+        if folder not in self._pixels:
+            self._pixels[folder] = self.pixels_of(folder) if self.pixels_of and folder else {}
+        return self._pixels[folder]
+
+    def mask(self, tile):
+        """The tile's silhouette: its opaque pixels in blocks of 4 x 4 (None when the tile set has no such tile)."""
+        px = self.pixels(tile[0]).get(tile[1:])
+        return frozenset((x // 4, y // 4) for x, y, c in px if c) if px else None
+
+    def trunk(self, tile) -> bool:
+        """A tree tile that reaches the ground of its cell (TRUNK_BASE): the one cell of a classic tree that gets the model."""
+        px = self.pixels(tile[0]).get(tile[1:]) if tile[1] == TREE_ORIENTATION else None
+        return bool(px) and max(y for _x, y, c in px if c) > -TRUNK_BASE
+
+    def lookalike(self, tile):
+        """The variant of the learnt single tile of the same set and orientation whose silhouette overlaps `tile` most (at least
+        LOOKALIKE_IOU; variants of set pieces or props only are not used), else None. Charismatic's Fortress arcade tiles
+        (exterior 1/4/2-4, 90 cells) are on no D2R cell; D2R's foregate arch 1/3/1 looks the same and has arch01 and its
+        gargoyle columns, where the generic pick put a plain wall."""
+        if tile not in self._lookalike:
+            best, mine = None, self.mask(tile) if tile[0] and tile[1] in WALL_ORIENTATIONS else None
+            if mine:
+                score = LOOKALIKE_IOU
+                for t in sorted(self.single):
+                    if t[0] != tile[0] or t[1] != tile[1] or t == tile:
+                        continue
+                    sig = choose(self.single[t])
+                    if not sig or all(self.set_piece(m) or tier(m) == 0 for m, _dx, _dz in sig):
+                        continue
+                    other = self.mask(t)
+                    s = len(mine & other) / len(mine | other) if other else 0.0
+                    if s >= score:
+                        best, score = sig, s + 1e-9
+            self._lookalike[tile] = best
+        return self._lookalike[tile]
+
+    def compose(self, key):
+        """The signature for a key with at least one look-alike tile: per wall tile its look-alike, else its learnt single
+        variant, else its generic wall (a cell holds a wall and an arcade in two layers: both are drawn); None without any
+        look-alike. The combined variant is registered in `variants`."""
+        parts, found = [], False
+        for tile in key:
+            if tile[0] is None or tile[1] not in WALL_ORIENTATIONS:
+                continue
+            sig = self.lookalike(tile)
+            found = found or bool(sig)
+            if not sig and tile in self.single:
+                sig = choose(self.single[tile])
+            if not sig:
+                sig = self.generic_pick((tile,))
+            for n, item in enumerate(sig or ()):
+                if item not in (p[0] for p in parts):
+                    parts.append((item, self.variants[sig][n]))
+        if not found:
+            return None
+        sig = tuple(p[0] for p in parts)
+        self.variants.setdefault(sig, [p[1] for p in parts])
+        return sig
+
+    def tree_pick(self, tile):
+        """[(entity, dx, dz)] for a trunk tile: the tree D2R puts on that tile's cells (on at least MIN_MODEL_SHARE of them),
+        else the tree learnt most often for another trunk of the same tile set; [] for crown pieces and tiles without one.
+        Downtown's Harrogath trees: D2R has each trunk tile on one cell in Harrogath (townwest), with expansion_tree_dead05 /
+        06 on it; the jungle's tree tiles have no tree on most of their D2R cells (3 of 322) and stay as they were."""
+        if tile[0] is None or not self.trunk(tile):
+            return []
+        own = self._tree(tile)
+        if own:
+            return own
+        kin = [(self.trees[t][(m, dx, dz)], t, m, dx, dz) for t in sorted(self.trees) if t[0] == tile[0] and self.trunk(t)
+               for (m, dx, dz) in [self._tree_key(t)] if m]
+        if not kin:
+            return []
+        _n, t, m, dx, dz = max(kin, key=lambda k: k[0])
+        return [(self.tree_items[(t, m, dx, dz)], dx, dz)]
+
+    def _tree_key(self, tile):
+        c = self.trees.get(tile)
+        if not c:
+            return (None, 0, 0)
+        (m, dx, dz), n = c.most_common(1)[0]
+        return (m, dx, dz) if n >= MIN_MODEL_SHARE * self.tree_cells[tile] else (None, 0, 0)
+
+    def _tree(self, tile):
+        m, dx, dz = self._tree_key(tile)
+        return [(self.tree_items[(tile, m, dx, dz)], dx, dz)] if m else []
+
+    def learn_pieces(self, box_of):
+        """Footprints of the set pieces (set_piece) that cover PIECE_MIN_CELLS wall cells: the wall keys under the model's
+        bounding box (box_of(model) -> ((x0, y0, z0), (x1, y1, z1)) or None; turned by the entity's yaw, scaled) at their
+        offset from the cell the entity stands on. D2R's Fortress hut (hut_blacksmith01: its walls and slate roof in one
+        model, on 1 cell) stands on the same five roof and wall tiles that charismatic repeats for its five huts."""
+        boxes, seen = {}, set()
+        for m in sorted(self._cands):
+            if not self.set_piece(m):
+                continue
+            for name, e, x, z in self._cands[m]:
+                if m not in boxes:
+                    boxes[m] = box_of(m)
+                foot = footprint(e, x, z, boxes[m], self.wall_maps[name])
+                if foot is None:
+                    continue
+                ax, az = int(x // TILE), int(z // TILE)
+                piece = (m, round(x - ax * TILE, 1), round(z - az * TILE, 1), tuple(sorted(foot.items())))
+                if piece not in seen:
+                    seen.add(piece)
+                    self.pieces.append((strip_entity(e), piece[1], piece[2], foot))
+        self._cands = {}
+
+    def fit(self, cells: dict):
+        """[(entity, cell x, cell y, dx, dz)]: every learnt set piece placed where the Median map's wall cells repeat its footprint (PIECE_SHARE
+        of it, at least PIECE_MIN_CELLS cells with as many distinct keys), once per model and spot."""
+        where = collections.defaultdict(list)
+        for xy, key in cells.items():
+            if not is_floor(key):
+                where[key].append(xy)
+        out, done = [], set()
+        for e, dx, dz, foot in self.pieces:
+            votes = collections.defaultdict(set)
+            for (fx, fz), key in foot.items():
+                for x, y in where.get(key, ()):
+                    votes[(x - fx, y - fz)].add((fx, fz))
+            need = max(PIECE_MIN_CELLS, PIECE_SHARE * len(foot))
+            for (ax, az), hit in sorted(votes.items()):
+                if len(hit) < need or len({foot[h] for h in hit}) < PIECE_MIN_CELLS:
+                    continue
+                spot = (model_of(e), round(ax * TILE + dx), round(az * TILE + dz))
+                if spot not in done:
+                    done.add(spot)
+                    out.append((e, ax, az, dx, dz))
+        return out
+
+
+def footprint(e, x: float, z: float, box, walls: dict):
+    """{(dx, dy): wall key} of the cells in `walls` under the entity's bounding box (yaw and scale of its transform), at their
+    offset from the cell (x, z) stands on; None without a box or below PIECE_MIN_CELLS cells and distinct keys."""
+    if not box:
+        return None
+    t = transform(e)
+    q, s = t.get("orientation") or {}, t.get("scale") or {}
+    a = 2 * math.atan2(float(q.get("y", 0.0)), float(q.get("w", 1.0)))
+    sx, sz = float(s.get("x", 1.0)), float(s.get("z", 1.0))
+    pts = [(x + sx * bx * math.cos(a) + sz * bz * math.sin(a), z - sx * bx * math.sin(a) + sz * bz * math.cos(a))
+           for bx in (box[0][0], box[1][0]) for bz in (box[0][2], box[1][2])]
+    ax, az = int(x // TILE), int(z // TILE)
+    x0, x1 = int(min(p[0] for p in pts) // TILE), int(max(p[0] for p in pts) // TILE)
+    z0, z1 = int(min(p[1] for p in pts) // TILE), int(max(p[1] for p in pts) // TILE)
+    foot = {(cx - ax, cz - az): walls[(cx, cz)] for cx in range(x0, x1 + 1) for cz in range(z0, z1 + 1) if (cx, cz) in walls}
+    if len(foot) < PIECE_MIN_CELLS or len(set(foot.values())) < PIECE_MIN_CELLS:
+        return None
+    return foot
+
 
 def choose(seen: collections.Counter):
     """The variant for a key: the most common one with models when D2R gives the tile models in at least MIN_MODEL_SHARE of
@@ -555,15 +767,15 @@ SHORT = {"ModelDefinitionComponent": "m", "TransformDefinitionComponent": "t", "
          "WallTransparencyComponent": "w", "ModelVariationDefinitionComponent": "v"}
 
 
-def place(variant, x: int, y: int, serial: int):
-    """The variant's entities moved onto cell (x, y), with fresh names and ids."""
+def place(variant, x: int, y: int, serial: int, prefix="mxw"):
+    """The variant's entities moved onto cell (x, y), with fresh names (`prefix`_x_y_n) and ids."""
     out = []
     for n, (e, dx, dz) in enumerate(variant):
         e = copy.deepcopy(e)
         t = transform(e)
         t["position"]["x"] = round(x * TILE + dx, 3)
         t["position"]["z"] = round(y * TILE + dz, 3)
-        e["name"] = "mxw_%d_%d_%d" % (x, y, n)
+        e["name"] = "%s_%d_%d_%d" % (prefix, x, y, n)
         e["id"] = 0x6D780000 + (serial * 8 + n) % 0x80000   # unique per scene; D2R's ids are plain 32-bit numbers
         for c in e["components"]:
             if "name" in c:
@@ -623,6 +835,12 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
         sig, how = lib.pick(key)
         extra = list(lib.anchored.get(key, ())) if how == "exact" else []
         stats["anchored"] += len(extra)
+        has = {m for m, _dx, _dz in sig or ()}   # a tree the cell's own variant already has (act1's oaks are not decor)
+        trees = [t for tile in key if tile[1] == TREE_ORIENTATION for t in lib.tree_pick(tile) if model_of(t[0]) not in has]
+        stats["trees"] += len(trees)
+        extra += trees
+        if trees and all(k[1] == TREE_ORIENTATION for k in key):
+            sig = None   # a tree cell draws its tree only: D2R's 14/15/3 cells give it a neighbour's wall segment (3 of 14)
         if is_floor(key):          # floor-only cells: counted apart, never 'uncovered' (most floors are bare ground)
             stats["floor_cells"] += 1
             if not sig:
@@ -630,7 +848,11 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
                 continue
             stats["floor_walls"] += 1
         elif sig is None:
-            stats["uncovered"] += 1
+            if all(k[1] == TREE_ORIENTATION for k in key):   # a tree: its trunk cell holds the model, crown pieces none
+                stats["tree_cells"] += 1
+                ents += place(extra, xy[0], xy[1], serial)
+            else:
+                stats["uncovered"] += 1
             continue
         else:
             stats[how] += 1
@@ -640,6 +862,9 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
         keep = [v for v in variant if not lib.set_piece(model_of(v[0]))]
         stats["set_pieces"] += len(variant) - len(keep)
         ents += place(keep + extra, xy[0], xy[1], serial)
+    for n, (e, x, y, dx, dz) in enumerate(lib.fit(cells)):    # set pieces by layout (lane walls4)
+        ents += place([(e, dx, dz)], x, y, len(cells) + n, "mxp")
+        stats["pieces"] += 1
     kept = cap(ents, limit)
     text = scene_json(biome, kept)
     while len(text.encode("utf-8")) > max_bytes and kept:
@@ -704,10 +929,12 @@ def learns_from(files, needed_dirs) -> bool:
     return any(maps_hd.tiledir(f) in needed_dirs for f in files)
 
 
-def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=None, ground_of=d2r_ground):
-    """Library from every D2R map with a scene whose header names a tile file of one of the `needed` folders."""
+def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=None, ground_of=d2r_ground, box_of=None):
+    """Library from every D2R map with a scene whose header names a tile file of one of the `needed` folders; then its set
+    pieces' footprints (learn_pieces; box_of(model) -> bounding box such as model_box; None: no set pieces by layout)."""
     tiles = tiles or maps_hd.parse_tiles(inp.d2r_tiles)
     lib = Library()
+    lib.pixels_of = functools.partial(tile_pixels, inp.d2r_tiles)
     for key in sorted(k[:-4] for k in inp.d2r_tiles.keys(".ds1")):
         if key not in inp.scenes:
             continue
@@ -720,7 +947,46 @@ def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=No
             continue
         lib.learn(key, map_cells(ds, files, tiles.get), scene, ground_of(key, scene))
     lib.anchor()
+    if box_of is not None:
+        lib.learn_pieces(box_of)
     return lib
+
+
+def tile_pixels(store: maps_hd.TileStore, folder: str) -> dict:
+    """{(o, s, q): [(x, y, index)]} of every tile in a D2R tile set folder (files in path order, the first file of a key
+    wins, as a level type resolves it). A file the pixel decoder cannot read is skipped (one of D2R's has a bad block offset)."""
+    import struct
+    import dt1_pixels
+    out = {}
+    for f in sorted(store.keys(".dt1")):
+        if maps_hd.tiledir(f) == folder:
+            try:
+                tiles = dt1_pixels.tiles(store.read(f))
+            except (struct.error, ValueError, IndexError):
+                continue
+            for k, px in tiles.items():
+                out.setdefault(k, px)
+    return out
+
+
+def model_box(model: str):
+    """((x0, y0, z0), (x1, y1, z1)) of a D2R model's meshes (bbMin / bbMax of its LOD 0 file, read by d2r_bytes), None when
+    the file is not at hand (no extraction, cache or slot: the piece is then left out, as before lane walls4)."""
+    import d2r_model
+    try:
+        data = d2r_bytes(model[:-len(".model")] + "_lod0.model") if model.endswith(".model") else None
+    except SystemExit:
+        return None
+    if not data:
+        return None
+    lo, hi = [float("inf")] * 3, [float("-inf")] * 3
+    for mesh in d2r_model.parse_tree(d2r_model.Gr2File.read(data))["Meshes"]:
+        ed = mesh["ExtendedData"].obj if mesh.get("ExtendedData") is not None else None
+        if ed is None or ed.get("bbMin") is None:
+            continue
+        lo = [min(lo[i], float(ed["bbMin"][i])) for i in range(3)]
+        hi = [max(hi[i], float(ed["bbMax"][i])) for i in range(3)]
+    return (tuple(lo), tuple(hi)) if lo[0] <= hi[0] else None
 
 
 def recall(cells: dict, scene: dict, lib: Library, near=1.5, ground=None):
@@ -761,7 +1027,7 @@ def median_cells(inp: maps_hd.Inputs, entry: dict, donors: dict, tiles: dict):
     return map_cells(ds, entry["dt1_files"], tiles.get, lambda p: donors[p]["donor"] if p in donors else p)
 
 
-def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground):
+def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground, box_of=model_box):
     """-> (maps entries, {map: cells}, Library)."""
     maps, _dt1s, _levels = maps_hd.plan(inp)
     stock = maps_hd.parse_tiles(inp.d2r_tiles)
@@ -772,7 +1038,7 @@ def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground
     donors = maps_hd.donor_table(new, stock)
     wanted = [e for e in maps if e["map"] in (only or MAPS)]
     cells = {e["map"]: median_cells(inp, e, donors, tiles) for e in wanted}
-    lib = learn_library(inp, needed_stock(cells, donors), scene_of, stock, ground_of)
+    lib = learn_library(inp, needed_stock(cells, donors), scene_of, stock, ground_of, box_of)
     return wanted, cells, lib
 
 
@@ -805,31 +1071,36 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
 
 
 def md_table(stats: dict, lib: Library) -> str:
-    lines = ["| map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | floor cells (with models) "
-             "| set pieces left out | placed | capped | models in scene | distinct models | scene size |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| map | biome | wall cells | exact | partial | look-alike | generic | no D2R model | uncovered | tree cells (trees) "
+             "| floor cells (with models) | set pieces left out (placed by layout) | placed | capped | models in scene "
+             "| distinct models | scene size |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     tot = collections.Counter()
     for m in MAPS:
         s = stats.get(m)
         if not s:
             continue
-        lines.append("| %s | %s | %d | %d | %d | %d | %d | %d | %d (%d) | %d | %d | %d | %d | %d | %.0f KB |" % (
-            m, s.get("biome", ""), s["cells"], s.get("exact", 0), s.get("partial", 0), s.get("generic", 0), s.get("empty", 0),
-            s.get("uncovered", 0), s.get("floor_cells", 0), s.get("floor_walls", 0), s.get("set_pieces", 0), s.get("placed", s["entities"]), s.get("capped", 0), s["entities"],
-            s.get("models", 0), s["bytes"] / 1024))
+        lines.append("| %s | %s | %d | %d | %d | %d | %d | %d | %d | %d (%d) | %d (%d) | %d (%d) | %d | %d | %d | %d | %.0f KB |" % (
+            m, s.get("biome", ""), s["cells"], s.get("exact", 0), s.get("partial", 0), s.get("lookalike", 0), s.get("generic", 0),
+            s.get("empty", 0), s.get("uncovered", 0), s.get("tree_cells", 0), s.get("trees", 0), s.get("floor_cells", 0),
+            s.get("floor_walls", 0), s.get("set_pieces", 0), s.get("pieces", 0), s.get("placed", s["entities"]), s.get("capped", 0),
+            s["entities"], s.get("models", 0), s["bytes"] / 1024))
         tot.update({k: v for k, v in s.items() if isinstance(v, int) and k != "models"})
-    lines.append("| all | | %d | %d | %d | %d | %d | %d | %d (%d) | %d | %d | %d | %d | | %.0f KB |" % (
-        tot["cells"], tot["exact"], tot["partial"], tot["generic"], tot["empty"], tot["uncovered"], tot["floor_cells"],
-        tot["floor_walls"], tot["set_pieces"],
+    lines.append("| all | | %d | %d | %d | %d | %d | %d | %d | %d (%d) | %d (%d) | %d (%d) | %d | %d | %d | | %.0f KB |" % (
+        tot["cells"], tot["exact"], tot["partial"], tot["lookalike"], tot["generic"], tot["empty"], tot["uncovered"],
+        tot["tree_cells"], tot["trees"], tot["floor_cells"], tot["floor_walls"], tot["set_pieces"], tot["pieces"],
         tot["placed"], tot["capped"], tot["entities"], tot["bytes"] / 1024))
     lines += ["", "Learnt from %d D2R maps (%d wall and floor cells, %d distinct cell keys, %d variants). *exact*: the cell's wall tiles "
               "were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall "
               "tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act "
-              "(Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or "
-              "nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *floor "
+              "(Library.generic_pick); *look-alike*: a wall tile D2R never has borrows the variant of the learnt tile of its set and "
+              "orientation that has the same silhouette (Library.lookalike); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or "
+              "nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *tree "
+              "cells*: cells with only tree pieces (orientation 14), in brackets the trees placed on trunk tiles (Library.tree_pick); *floor "
               "cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave "
               "walls, ledges, stairs, trims; floor_cells); *set "
-              "pieces*: models D2R places on fewer than %d wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay "
+              "pieces*: models D2R places on fewer than %d wall cells (Library.set_piece), in brackets those placed where the map "
+              "repeats the wall tiles under them (Library.fit); *capped*: pieces cap() dropped to stay "
               "within D2R's largest scene (docktown3: %d placed models, %.2f MB)." % (
                   len(lib.sources), sum(lib.sources.values()), len(lib.seen), len(lib.variants), SET_PIECE_CELLS, MAX_PLACED,
                   MAX_BYTES / 1048576)]

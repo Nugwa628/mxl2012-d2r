@@ -25,6 +25,8 @@ The token is the monstats `Code` (= the art folder `data/global/monsters/<token>
   py -3 -I tools/hd_monsters.py recolour TOKEN..  only the colour of these entries again with the current rule (donor kept)
   py -3 -I tools/hd_monsters.py clips DIR         tools/data/d2r_unit_clips.json from extracted combined.animations
   py -3 -I tools/hd_monsters.py build             HD json -> work/hd_monsters/data/hd/character + report
+                  [--try-proposals all|TOK,..]  a trial build that also uses these stand-in proposals (owner review only;
+                                                tools/data/hd_monster_proposals.json, used otherwise only when switched on)
   py -3 -I tools/hd_monsters.py doc               docs/hd-monsters.md
 
 Read-only inputs (all outside git): the extracted 2012 MPQ, the D2R baseline extract and the reference checkout's work/
@@ -53,6 +55,8 @@ RUNS = fxpaths.RUNS   # R\mxl2012-runs (beside the main checkout, or above R\mxl
 REFERENCE = fxpaths.REFERENCE  # the reference checkout (read-only); None when this machine has none
 TOKENS_JSON = ROOT / "tools" / "data" / "hd_monster_tokens.json"
 PINS_JSON = ROOT / "tools" / "data" / "hd_monster_pins.json"
+# better stand-ins waiting for the owner's look (lane standin): used only when switched on, or in a trial build
+PROPOSALS_JSON = ROOT / "tools" / "data" / "hd_monster_proposals.json"
 # D2R enemy animation folder -> the clip names its combined.animations holds (`clips`, read from a game slot's CASC once; names
 # only). The build binds a mode whose clip a donor lacks to a clip it has (hd_units.clip_fill)
 CLIPS_JSON = ROOT / "tools" / "data" / "d2r_unit_clips.json"
@@ -124,6 +128,8 @@ class Paths:
         self.out = Path(a.work) / "hd_monsters"
         self.tokens = Path(a.tokens)
         self.pins = Path(a.pins)
+        self.proposals = Path(getattr(a, "proposals", None) or PROPOSALS_JSON)
+        self.try_proposals = getattr(a, "try_proposals", None) or os.environ.get("MXL_HD_TRY_PROPOSALS") or ""
         self.clips = Path(getattr(a, "clips", None) or CLIPS_JSON)
 
     def configure(self):
@@ -448,6 +454,44 @@ def suggest(ctx: Ctx, classes: dict, tokens: list[str]) -> str:
 # ------------------------------------------------------------------ mapping
 def load_pins(path: Path) -> dict:
     return json.loads(path.read_text("utf-8")) if path.exists() else {"tokens": {}, "noart": {}}
+
+
+def load_proposals(path: Path) -> dict:
+    return json.loads(path.read_text("utf-8")) if path.exists() else {"enabled": False, "tokens": {}}
+
+
+def used_proposals(data: dict, trial: str = "") -> dict:
+    """The stand-in proposals a build uses: those switched on one by one while the file's switch is on (the owner approved
+    them), plus, for a trial build only, the tokens named in `trial` ("all": every proposal) whatever their switches."""
+    props = data.get("tokens", {})
+    on = {t: p for t, p in props.items() if p.get("enabled")} if data.get("enabled") else {}
+    names = set(props) if trial.strip().lower() == "all" else {t.strip() for t in trial.split(",") if t.strip()}
+    unknown = sorted(names - set(props))
+    if unknown:
+        raise SystemExit(f"trial proposals {unknown} are not in the proposals file")
+    return {t: p for t, p in props.items() if t in on or t in names}
+
+
+def with_proposals(mapping: dict, data: dict, trial: str = "") -> dict:
+    """The mapping with the used proposals (`used_proposals`) in place of their tokens' donor, scale and colour."""
+    out = dict(mapping)
+    for tok, p in used_proposals(data, trial).items():
+        if tok not in out or not has_standin(out[tok]):
+            raise SystemExit(f"proposal {tok}: the token has no stand-in in the mapping")
+        adj = [float(x) for x in p.get("adjust", [0.0, 0.0, 0.0])][:3] + [1.0]
+        tint = [float(x) for x in p.get("tint", [0.0, 0.0, 0.0, 0.0])]
+        out[tok] = {**out[tok], "donor": p["donor"], "scale": float(p.get("scale", 1.0)), "adjust": adj, "tint": tint,
+                    "colour": colour_label(adj, tint) + " (proposal)", "confidence": p.get("confidence", out[tok]["confidence"]),
+                    "source": "proposal", "reason": p["why"]}
+    return out
+
+
+def proposal_report(data: dict, trial: str = "") -> list[str]:
+    """One line per proposal for the build report: what it would draw and whether this build uses it."""
+    used = used_proposals(data, trial)
+    return [f"`{t}` {p['donor']} x{float(p.get('scale', 1.0)):g} ("
+            + ("ON" if t in used and p.get("enabled") and data.get("enabled") else "TRIAL" if t in used else "off: owner review")
+            + ")" for t, p in sorted(data.get("tokens", {}).items())]
 
 
 def vanilla_unit(ctx: Ctx, mid: str, pins: dict | None = None) -> tuple[str | None, str]:
@@ -842,7 +886,8 @@ def level_entries(ctx: "Ctx", table: dict, tok: str, levels: dict[int, list]) ->
 def build(paths: Paths, out: Path | None = None) -> dict:
     """HD json for every monstats Id of the mod (units mxl_*.json, colour tables, adapted state machines, monsters.json)
     and a per-Id report. Needs only the committed mapping, the 2012 tables and the D2R baseline."""
-    mapping = json.loads(paths.tokens.read_text("utf-8"))["tokens"]
+    proposals = load_proposals(paths.proposals)
+    mapping = with_proposals(json.loads(paths.tokens.read_text("utf-8"))["tokens"], proposals, paths.try_proposals)
     pins = load_pins(paths.pins)
     ctx = Ctx(paths)
     out = out or paths.out / "data"
@@ -965,6 +1010,8 @@ def build(paths: Paths, out: Path | None = None) -> dict:
            f"{len(rows)} monstats Ids; {len(units)} unit definitions, {len(variants)} colour tables "
            f"({len(set(shared))} stand-in colours, close ones share a table: COLOUR_SHARE_TOL {COLOUR_SHARE_TOL}), {len(sms)} adapted "
            f"state machines. Part notes: {dict(notes)}", "",
+           "Stand-in proposals (tools/data/hd_monster_proposals.json, owner review): "
+           + ("; ".join(proposal_report(proposals, paths.try_proposals)) or "none"), "",
            "Stand-in tables with the classic TransLvl colours (bug #435): " + ("; ".join(level_notes) or "none"), "",
            "Skill summons drawn without a world-space vfx (bug #500): "
            + ("; ".join(f"{n} {', '.join(i)}" for n, i in sorted(moved.items())) or "none"), "",
@@ -977,7 +1024,8 @@ def build(paths: Paths, out: Path | None = None) -> dict:
     ctx.save()
     return {"ids": len(rows), "units": len(units), "variants": len(variants), "state_machines": len(sms), "clip_fills": len(fills),
             "state_fills": len(state_fills), "moved": {n: len(i) for n, i in moved.items()},
-            "notes": dict(notes), "classes": dict(Counter(r[2] for r in rows))}
+            "notes": dict(notes), "classes": dict(Counter(r[2] for r in rows)),
+            "proposals": [t for t, p in used_proposals(proposals, paths.try_proposals).items()]}
 
 
 # ------------------------------------------------------------------ doc table
@@ -1046,6 +1094,9 @@ def main() -> int:
     ap.add_argument("--tokens", default=str(TOKENS_JSON))
     ap.add_argument("--pins", default=str(PINS_JSON))
     ap.add_argument("--clips", default=str(CLIPS_JSON))
+    ap.add_argument("--proposals", default=str(PROPOSALS_JSON))
+    ap.add_argument("--try-proposals", default="", help="build: a TRIAL build for the owner's review that also uses these "
+                    "proposals (tokens, comma-separated, or `all`) whatever their switches (also MXL_HD_TRY_PROPOSALS)")
     ap.add_argument("--doc", default=str(ROOT / "docs" / "hd-monsters.md"))
     a = ap.parse_args()
     paths = Paths(a)

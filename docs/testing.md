@@ -2275,6 +2275,7 @@ Engine: 0 asserts and 0 crash files during the checks. Every stop of the game by
 same second as the stop (14:45:03, 15:20:58): the forced exit, not a check. Watchdog: 0 foreground changes, the real cursor never
 moved. Harness limits met on main (realpath's verbs not merged yet): no `cursor` verb (`held_item()` is always None), no `interact`
 / `menu` verbs (NPC menus by click and screenshot only).
+
 ## Lane savefmt: Save and Exit round-trip of characters and items (2026-10-28, slots 2 and 1, background mode, main e3b4896 + lane)
 
 Tools: `tools/d2save.py` (inspector / round-trip codec of D2RLoader's extended saves), `tools/save_audit.py` (static widths),
@@ -2321,6 +2322,7 @@ Lessons: a cast is read from D2R's cooldown stat 359 at the skill's layer (`stat
 skills (Mythal 471, Blink 346). Black Sleep and Retaliate need a melee weapon (itypea1 `mele`). The harness's gold (stat 14) does not
 reach the client's hire panel. The `s_StatsPool.IsEmpty()` assert after Save and Exit is the known exit-only one: `rc2death` takes its
 engine mark after re-entering.
+
 ## Lane ilvl: item levels 100-127 through Save and Exit and a reload (bug #251, 2026-10-28, background mode)
 
 Plugin part `ilvl` (`plugin/src/item_level.cpp`, off word `ilvl`; docs/plugin-plan.md section 18). Items made by the harness
@@ -2860,6 +2862,7 @@ hell_dragonknight (doomknight2) and the zombie1 Ids read clearly at their new sc
 (clawviper1) are small next to the player and partly hidden by the Rocky Waste ruin they spawn behind. cloakdagger,
 hell_dragonknight and dead3 look strongly blue, corpseworm and cultist1 green: that is the per-Id colour variant (lane
 `tints`), not the unit choice.
+
 ## Lane skilltips: skill tooltip lines (bug #396, 2026-10-29, slot 1, background mode, build of lane/skilltips)
 
 Check `stip_tooltips` (`MXL_RUN=<run> MXL_SLOT=N MXL_STIP_CLASSES=<class> py -3 tools/game_checks.py all stip_tooltips`; one class
@@ -2979,6 +2982,7 @@ fix deals the same damage as Median's values with half the missiles. Ten Heretic
 character either way, so the 30,000-life character of the first try would also have died within 5 s on Median's values. The slot-2
 "before" run logged D2R's pool asserts at game exit (`m_freed == 0`, `s_StatsPool.IsEmpty()`, ~800 missiles live at
 the close); the other three runs none.
+
 ## Lane tints2: stand-in colours (2026-10-29, slot 4, background mode)
 
 Check `hm2_monsters` (lane hdmon2) with `MXL_HM2_ONLY`; a **graphics check, seen with the harness** (spawn, `god 1`, Tank), not
@@ -3009,6 +3013,7 @@ The same shots showed the second fault: "targets a minion, unleashing a barrage 
 `ÿc1requires a crossbowÿc0` + line break (D2R drops a code that ends a line). The fix (codes moved behind the line break,
 commit "Colour codes that end a line ...") is unit-tested and in the build (audit 0 findings) but **not seen in game yet**: all
 four slots were taken for 35 minutes. Only the four shots named here were read one by one.
+
 ## Lane hdlook2: fire bolt tint fix and the rest of hdlook's items (2026-10-29, slot 4, background mode, build of lane/hdlook2)
 
 Fix of bug #403 (docs/hd-effects.md 5a, `TINT_OVERRIDES`), then the committed check `hdl_look` with the same set-up as lane
@@ -3035,6 +3040,7 @@ repo (`mxl2012-runs/hdlook2`).
 | Vendor windows (Charsi, Akara: talk, Trade, tabs) | PASS: same goods in HD and classic, HD pictures crisp (weapons, potions, scrolls, keys); Akara's HD tab 2 shot is of the closed window (check timing) | player (NPC dialog) | `hdl_shop_charsi_hd_0.png`, `_hd_1.png`, `hdl_shop_charsi_legacy_0.png`, `hdl_shop_akara_hd_0.png`, `_hd_2.png`, `hdl_shop_akara_legacy_0.png` (the other tab shots not looked at) |
 | Stash | partial: HD opened by a click (empty stash, so no item picture to judge); classic not opened by the walk | player | `hdl_stash_hd.png`, `hdl_stash_legacy.png` |
 | Walls of downtown (Crypt 1 A) and glados (Disused Fane) | PASS on the arrival shots: walls drawn in HD, the same layout as classic (brick walls and stone piers; arched stone walls). The Paladin died at once in both maps (Citizen, AC-2 Rivet Bot), so the walk shots are under the death screen | waypoint panel + entrance warp (set-up) | `hdl_wall_downtown_hd_0.png` / `_legacy_0.png`, `hdl_wall_glados_hd_0..1.png` / `_legacy_0..1.png` |
+
 ## Lane hdmon3: Act 3-5 Normal HD stand-ins (2026-10-29, build of lane/hdmon3)
 
 Check `hm3_monsters` (`MXL_RUN=<run> MXL_SLOT=N MXL_CHAR=<throwaway> py -3 tools/game_checks.py all hm3_monsters`; optional
@@ -3143,6 +3149,7 @@ active), none in A, C1, C2. Screenshots are kept outside the repo (`mxl2012-runs
 Only the shots named in this table were looked at (as contact sheets of 8 HD + 8 classic shots per skill, and full-size crops of
 `hdl_fx_pal_518_hd_5.png`, `hdl_fx_ama_314_hd_0.png`, `_hd_4.png`, `_legacy_0.png`). Harness spawns (Quill Bears, Skeletons) are
 "seen with the harness".
+
 ## Lane hdmonlook: in-game look of the Act 1-5 HD stand-ins (2026-10-29, slots 3 and 1, background mode, build of lane/hdmonlook)
 
 Checks `hm2_monsters` and `hm3_monsters` (`MXL_RUN=hdmonlook MXL_SLOT=N MXL_CHAR=hdmonlook [MXL_HM_GRAPHICS=legacy]
@@ -3314,6 +3321,7 @@ The cause and fix are in docs/bugs.md #487 (D2R's srvdo 51 reads the conversion 
 Param5-6 / Param3; `txt_migrate.py` `conversion_calcs`). Not run: the nine other srvdo 51 skills fixed with it (item charms,
 Dominate, the Sirens' Charm, the Eastern Sorceror's Merc Possess, Black Sleep); how many songs the spirit sings (Median: 10).
 By hand: cast Elvensong next to a pack: monsters around the spirit get the blue conversion swirl and fight for you for about 3 s.
+
 ## Lane uiplus: the level-up + buttons (bugs #488 / #489, 2026-10-29, slot 4, background mode, build of lane/uiplus; round 1 with main's plugin)
 
 `py -3 tools/game_checks.py all lvlup_ui` (MXL_RUN / MXL_SLOT as usual; unit tests `tools/test_lvlup_ui.py`). In the Rogue
@@ -3479,6 +3487,7 @@ The checks: `MXL_RUN=<lock> MXL_SLOT=N MXL_SOUND_TRACE=<file> py -3 tools/game_c
 (each makes its own character: SndBarb, SndAma). Without the trace `snd_spirits` judges by the plugin's skip count only
 (PARTIAL). Not judged: what the speakers play (no audio capture on this PC); a stackable javelin cannot be put in the hand by the
 harness, so the charges sit on a ring (the same stat 204).
+
 ## Lane totems: totems after Bend the Shadows (bug #493, 2026-10-29, slot 3, background mode, build of lane/totems)
 
 The player said: "Totems slow / lose effects after Shadow Blink". The owner ruled that the totems keep warping with the player but
@@ -3560,6 +3569,7 @@ harness verb clears shared tabs (`packclear` / `remove` take the player's own it
 the item list of each page was emptied in the file (header kept, page size 68: `JM` and a count of 0; 1756 -> 204 bytes;
 backup `mxl2012-runs/uicheck/stash-backup/`). In game the shared tab then showed pages 1-3 empty (`uic_stash_shared*.png`,
 `uic_stash_pages.png`) and the game saved it back unchanged (204 bytes).
+
 ## Lane apple: the Apple's item spell and totems-only `petspread` (bugs #499, #493, 2026-10-30, slot 3, background mode, build of lane/apple)
 
 Build: lane/apple (lane/totems merged), plugin `mxl2012-core` 0.1.2 with the new part `appleuse` and `petspread` narrowed to
@@ -3590,6 +3600,7 @@ By hand, for the pets:
 1. With a mercenary and shadows, Bend the Shadows onto a shadow.
 2. They arrive on you and walk off.
 3. Totems cast first are spread round you instead.
+
 ## Lane playerbugs: "Goodbye" in the chat and cave snappers (bugs #504 / #505 / #508, 2026-10-30, slot 4, background mode, release build 0.1.2)
 
 Lab scripts and evidence in `mxl2012-runs/playerbugs/` (`lab.py`, `lab2.py` .. `lab5.py`, run logs `run*.out`, shots in
@@ -3642,6 +3653,7 @@ Evidence in `mxl2012-runs/maptint/`; `sheets.py <before run> <after run> <out>` 
 
 Still to look at by a player's eye: whether the tints read as Median's maps at normal play (the harness shots are at level 1,
 god mode, mostly at the arrival).
+
 ## Lane endgame: Diablo, Act 5 travel, the Throne waves, Baal and Mephisto's moat on the player path (2026-10-29/30, slots 2-4, background mode, main's plugin)
 
 Sorceress `EndSorc` (slot 2) / `EndSorcD` (slot 3) set up by stage `build` as lane acts5 (level by `xp`, stat points by packet
@@ -3747,6 +3759,7 @@ build afterwards, all equal) were on the slot only for runs `r2`-`r4`. `vo3` run
 Summary sheet: `mxl2012-runs/fxleft/sheet_507.png`. Lessons: a cast overlay can last under 0.3 s (use bursts); the harness `cast`
 draws no skill cast overlay and plays no skill start sound on the client (click the skill to see / hear the player's view); no lab path
 made `slowed` land from its two monster skills. bugs.md #507 (closed) and #508 (options for the owner) have the details.
+
 ## Lane regress013: regression pass of main e8d4422 before 0.1.3 (2026-10-30, slot 3, background mode, build of lane/regress013 = main)
 
 Build: `tools/build.py` (validate 0 errors), `tools/build_plugin.ps1 -Release` (dev DLL installed by `install_mod.py --slot 3`:
@@ -3771,6 +3784,7 @@ unlocked. The real-input watchdog stayed clean on every check run (cursor did no
 Engine: across all runs, 0 new crash files and no unknown assert on a player path. The only asserts were the harness `cm1` one
 above and the shutdown pool asserts (`s_StatsPool.IsEmpty()`, `m_allocated == 0`) of the same session at game exit, after it.
 Tests: `unittest` tools/tests 810 OK, tools `test_*.py` 427 OK (1 skipped), `check_docs_links` 0, `check_public` 0.
+
 ## Lane unporteda: the class (a) rows of docs/unported.md and the owner's 2026-10-29 answers (2026-10-30, slot 3, background mode, build of lane/unporteda)
 
 The 12 class (a) rows of docs/unported.md are closed (moved to its "Closed rows" with evidence), together with the three owner answers
@@ -3837,6 +3851,7 @@ HD: the Rainbow Stones change visibly, the crystals and runes a little; legacy p
 `.sprite` files differ). Ring, amulet and jewel pictures differ between runs: D2R picks one of its pictures at random. Not
 tested: the stash (the harness `item` verb places in inv / cube / ground only). Evidence: `mxl2012-runs/itemart/review/`
 (`sheet_01.png` .. `sheet_05.png` and `_2x`, `ingame/before_*`, `after_*`, `compare_*`), `mxl2012-runs/itemart/monsters/`.
+
 ## Lane itemart2: the Rainbow Stones in D2R's HD gem pictures (2026-10-30, slot 4, background mode, build of lane/itemart2, data only)
 
 Owner decision (2026-10-30): of lane itemart's 28 picture proposals only the five Rainbow Stones `og1`..`og5` are switched
@@ -3857,6 +3872,7 @@ entry switched on is used, with the sheets' own render at HD and lowend size; an
 without the game files). Evidence: `mxl2012-runs/itemart2/ingame/checks-20261030-131851-s4/` (`itemart_rainbow_hd.png`,
 `itemart_rainbow_legacy.png`), `ingame/rainbow_hd_vs_legacy_crop.png`, `og_built_strip.png` (og1..og5 HD and lowend as
 built), `og<N>_hd.png` / `og<N>_lowend.png`.
+
 ## Lane walls3: the three maps with partial HD walls (2026-10-30, slot 2, background mode, build of lane/walls3, data only)
 
 Build: `py -3 tools/build.py` (validate 0 errors), install `MXL_SLOT=2 MXL_RUN=walls3 py -3 tools/install_mod.py --slot 2` (data
@@ -3876,6 +3892,29 @@ Evidence: `mxl2012-runs/walls3/sheets/sheet_<map>.png` (before HD | after HD | l
 `checks-20261030-005953-s1` for caveroom4 and belial, maptint `run2-checks-20261030-033400-s4` for the retextured maps),
 `sheets_final/` for the last run, the run folders `run1-…`, `run2-…`, `run3-…` next to them. Open: belial's void (what paints
 the HD floor of a level larger than its preset), charismatic's arches and roofs (no D2R model, custom art).
+
+## Lane walls4: charismatic's arches and roofs, downtown's trees (2026-10-30, slot 3, background mode, build of lane/walls4, data only)
+
+Build: `py -3 tools/build.py` (validate 0 errors), `tools/build_plugin.ps1 -Release` (plugin = main's), install
+`MXL_SLOT=3 MXL_RUN=walls4 py -3 tools/install_mod.py --slot 3`. Check (harness travel and god mode, new level-1 character
+WallsFour): `MXL_RUN=walls4 MXL_SLOT=3 MXL_CHAR=WallsFour MXL_CACHE_POLL=3 MXL_WALL_LEVELS=127,18,125 py -3 tools/game_checks.py
+all wall_maps`. The method (trees on trunk tiles, look-alike tiles by silhouette, set pieces by the wall tiles under them;
+D2R models only, owner rule) is in docs/maps-hd.md items 13-15; tests in `tools/tests/test_walls_hd.py` (LookalikeTest,
+TreeTest, PieceTest). Slot 3 held about 16:30-17:58, then unlocked.
+
+| run | maps | result |
+|---|---|---|
+| `checks-20261030-163728-s3` | charismatic, downtown (first build) | both reached in HD and classic; charismatic shows arches on gargoyle columns along the arcades. Exit-only pool asserts (`s_StatsPool.IsEmpty()` and followers, after the check), no crash file |
+| `checks-20261030-164621-s3` | same spots in HD and classic (scratch driver, `place` in steps) | the Fortress hut with its slate roof where classic has the roofed building; downtown's trees where classic has them, but a wall block beside the 14/15/3 trees that classic does not have: fixed (a tree cell draws its tree only), rebuilt |
+| `checks-20261030-173339-s3` | the same spots with main's scenes for both maps (HD before) | the before column of the sheets |
+| `checks-20261030-174616-s3` | the same spots, final build, HD and classic | 0 ERROR/ASSERT lines, no crash file |
+| `checks-20261030-175423-s3` | charismatic, downtown, macumba (final build) | all 3 reached in HD and classic; asserts per map: none; only the exit pool asserts after the check; no crash file; VariantTransformTable peak 94/128, ModelAsset 1350/2750 |
+
+Evidence: `mxl2012-runs/walls4/sheets/sheet_charismatic.png` and `sheet_downtown.png` (legacy G | HD before, main 0.1.4 |
+HD after, same spot per row), shots in `shots_before/`, `shots_after/`, `shots_after1/` (charismatic hut_10_4 after: the
+same scene, the tree fix does not touch charismatic), the final run in `run-checks-20261030-175423-s3/`. Left: charismatic's
+tall pointed arch and long roofed walls (no fitting D2R model), belial's void (not this lane).
+
 ## Lane runetab: runes into the stash's runes tab (bug #510, 2026-10-30, slot 3, background mode, build of lane/runetab)
 
 Build: `tools/build.py` (validate 0 errors; `d2r_adds` line "AdvancedStashStackable of D2R on 71 rows by code and type, 71
@@ -3965,6 +4004,7 @@ draws it next to the player.
 Evidence: `mxl2012-runs/uppass/evidence/run2-control/` (crash report, d2rloader.log), `evidence/run3/`, `evidence/run6-control/`.
 The run logs are `run2.log` to `run7.log`. Lesson: `graphics_mode` reads "legacy" in the dark caves in HD as well (the round-1
 row of the HD run); the town reading counts.
+
 ## Lane itemart3: D2R HD pictures of the same kind for the upscaled items, for the owner's review (2026-10-30, no game run)
 
 No game run: every new proposal is **off** (owner rule: the owner sees the art first), so a build or an install shows
@@ -4092,3 +4132,27 @@ The first run of the test failed at D: the update in C deleted `d2rloader.toml.r
 and D then made a new backup of the retail file. Fixed in `PlanInstall` (the `<preserve file>.retail-backup` is the player's
 too); this also keeps the backup the plugin part `savemode` writes. Not done: a run against a real D2R folder, a GUI run, signing,
 publishing.
+
+## Lane standin: better HD stand-ins for the most-seen Median-only monsters (2026-10-30, slot 2, background mode, build of lane/standin, data only)
+
+Proposals for owner review, OFF in the build (`tools/data/hd_monster_proposals.json`, docs/hd-monsters.md section 16.1). Trial
+builds: `hd_monsters.py build --out work/mod/data --try-proposals all`, `hd_translvl.py build`, `install_mod.py --slot 2`; the
+normal build was installed again at the end. Check `standin_mons` (new: `hm_monsters` over `STANDIN_MONSTERS` with `clear`, the
+pack of each monster killed before the next; `MXL_STANDIN_ONLY` picks some). Character `StandinNow` (Barbarian), `mxl2012-s2`.
+
+| Run | Build | Result |
+|---|---|---|
+| lab `mxl2012-runs/standin/cand1` | normal | 30 D2R candidate units spawned as they are, to compare shapes with the legacy art |
+| `checks-20261030-154226-s2` | normal | 13 spawned, 0 asserts (old order: the Siege Beast's corpse hid the later ones) |
+| `checks-20261030-154634-s2` | trial 1 | 13 spawned, 0 asserts, 0 crash files; the Smith pack's corpses hid the later ones |
+| `checks-20261030-155501-s2` | trial 2 (colours retuned, Porkchop last, `clear`) | 13 spawned, 0 asserts; Clay Golem and Smith keep their own colour whatever the table |
+| lab `cand2` | trial 2 | Hephasto = the Smith's grey-blue model; the Overseer brown-red |
+| `checks-20261030-161634-s2` | trial 3 (`5$` overseer1, `(l` no colour; ONLY 5 Ids) | 5 spawned, 0 asserts; Pest and Rathma out of the shots |
+| lab `cand3` | trial 3 | Pest (fallen1) drawn; Rathma on succubus1 **not drawn** in HD (only its spells), drawn in legacy |
+| `checks-20261030-162400-s2` + lab `cand4` | trial 4 (`$f` ancientbarb2) | FAIL: `BC_ASSERT: result` (animation_event_handler.cpp:608, "target mesh was not found") at Rathma's death; its unit holds only `hair.model`. `$f` withdrawn |
+| `checks-20261030-163132-s2` | normal | current look for the sheets: 13 spawned, 0 asserts, 0 crash files |
+| `checks-20261030-163506-s2` | trial 5 (the final 12 proposals) | **PASS load**: 13 spawned (Rathma on its current vampire1), 0 engine asserts, 0 crash files, no assert line in d2rloader.log; look PARTIAL (owner) |
+
+Review sheets (outside git): `mxl2012-runs/standin/sheet_1.png`, `sheet_2.png`, `sheet_3.png` (legacy art, HD now far / near
+from `163132`, HD proposal far / near from `163506`), `sheet_4_pest_close.png`. Owner: approve or reject each token; an approved
+one is switched on by its `enabled` and the file's `enabled`.

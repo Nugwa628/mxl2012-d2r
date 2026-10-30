@@ -387,6 +387,56 @@ class Committed(unittest.TestCase):
             self.assertIn(f"| `{tok}` ", table)  # a hand row may say what the token was ("| `hn` (was ...) |")
 
 
+class Proposals(unittest.TestCase):
+    """Stand-in proposals (lane standin, tools/data/hd_monster_proposals.json): off until the owner switches one on; a trial
+    build for the owner's review can use them anyway."""
+
+    MAP = {"9!": {"class": "reused", "ids": 3, "donor": "clawviper1", "scale": 1.3, "adjust": [0.0, -0.9, 0.3, 1.0],
+                  "tint": [1.0, 1.0, 1.0, 0.45], "colour": "x (hand)", "confidence": "low", "source": "pin", "reason": "r"},
+           "zz": {"class": "vanilla", "ids": 1, "d2r_units": {"zombie1": 1}}}
+
+    def data(self, file_on=False, entry_on=False):
+        return {"enabled": file_on, "tokens": {"9!": {"donor": "goatman1", "scale": 1.2, "adjust": [0.0, -0.5, 0.2],
+                                                       "tint": [1, 1, 1, 0.3], "enabled": entry_on, "why": "a horned spear beast"}}}
+
+    def test_off_unless_file_and_entry_are_on(self):
+        for f, e in ((False, False), (True, False), (False, True)):
+            self.assertEqual(hm.with_proposals(self.MAP, self.data(f, e)), self.MAP, (f, e))
+        on = hm.with_proposals(self.MAP, self.data(True, True))["9!"]
+        self.assertEqual((on["donor"], on["scale"], on["adjust"], on["source"]), ("goatman1", 1.2, [0.0, -0.5, 0.2, 1.0], "proposal"))
+        self.assertEqual(on["tint"], [1.0, 1.0, 1.0, 0.3])
+        self.assertEqual(on["ids"], 3)
+        self.assertTrue(on["colour"].endswith("(proposal)"))
+
+    def test_trial_uses_named_or_all_proposals_whatever_the_switches(self):
+        self.assertEqual(hm.with_proposals(self.MAP, self.data(), "all")["9!"]["donor"], "goatman1")
+        self.assertEqual(hm.with_proposals(self.MAP, self.data(), "9!")["9!"]["donor"], "goatman1")
+        self.assertEqual(hm.proposal_report(self.data(), "all"), ["`9!` goatman1 x1.2 (TRIAL)"])
+        self.assertEqual(hm.proposal_report(self.data()), ["`9!` goatman1 x1.2 (off: owner review)"])
+        self.assertEqual(hm.proposal_report(self.data(True, True)), ["`9!` goatman1 x1.2 (ON)"])
+        with self.assertRaises(SystemExit):
+            hm.with_proposals(self.MAP, self.data(), "ab")
+
+    def test_a_token_without_a_stand_in_is_refused(self):
+        d = {"enabled": True, "tokens": {"zz": {"donor": "goatman1", "enabled": True, "why": "w"}}}
+        with self.assertRaises(SystemExit):
+            hm.with_proposals(self.MAP, d)
+
+    def test_committed_proposals_are_the_approved_ones_and_complete(self):
+        d = hm.load_proposals(hm.PROPOSALS_JSON)
+        # owner, 2026-10-30: these eight on; Dark Fey, Fungus, Magma Demon and Crystal wait for a closer look
+        self.assertEqual(sorted(hm.used_proposals(d)), sorted(["9!", "&b", "0n", "08", "5$", "g7", "#m", "#q"]))
+        tokens = json.loads(hm.TOKENS_JSON.read_text("utf-8"))["tokens"]
+        trial = hm.with_proposals(tokens, d, "all")
+        for t, p in d["tokens"].items():
+            self.assertTrue(p["why"] and p["donor"], t)
+            self.assertTrue(0.5 <= float(p.get("scale", 1.0)) <= 2.5, t)
+            self.assertEqual(len(p.get("adjust", [0, 0, 0])), 3, t)
+            self.assertEqual(trial[t]["donor"], p["donor"], t)
+        donors = {e["donor"] for e in trial.values() if hm.has_standin(e)}
+        self.assertLessEqual(len(set(hm.colour_tables(trial, donors, levelled={"s7"}).values())), hm.COLOUR_TABLE_LIMIT)
+
+
 class NoModelUnits(unittest.TestCase):
     """A vanilla token whose D2R unit ships no model (bug #431): a pinned token gives those Ids a stand-in; without a pin
     they keep D2R's unit (D2R's own invisible helpers and traps)."""

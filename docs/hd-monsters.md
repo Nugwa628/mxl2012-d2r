@@ -491,6 +491,7 @@ py -3 -I tools/hd_monsters.py repin TOKEN ..      only these entries again from 
 py -3 -I tools/hd_monsters.py recolour TOKEN ..   only the colour of these entries again with the current rule (section 10)
 py -3 -I tools/hd_monsters.py clips DIR           clip names per D2R enemy animation folder -> tools/data/d2r_unit_clips.json
 py -3 -I tools/hd_monsters.py build               HD json for every monstats Id -> work/hd_monsters/data/hd/character/ + hd_monsters.md
+py -3 -I tools/hd_monsters.py build --try-proposals all|TOKEN,..  trial build with the owner-review stand-ins of section 16.1
 py -3 -I tools/hd_monsters.py doc                 regenerate the token tables of this file
 ```
 
@@ -530,6 +531,7 @@ is decoded from the MPQ extraction.
 | `tools/hd_donors.py` | `tools/hd_monsters.py` (tags, art stats, donors, scoring, tint, `vanilla_unit`) | no CASC / game access (D2R art stats from the reference cache), art read from the 2012 MPQ extraction, `bare()` local, pinned-donor and provenance code dropped, `choose` works with a single candidate |
 | `tools/hd_monsters.py` | `tools/hd_monsters.py` | **new** main program: classes, reference reuse, rescoring on 2012 names, pins, `build`, doc table. No per-Id scoring of every monster, provenance matching or wereowl pin |
 | `tools/data/hd_monster_tokens.json`, `tools/data/hd_monster_pins.json` | - | new (our mapping and hand picks) |
+| `tools/data/hd_monster_proposals.json` | - | new (lane standin): stand-in proposals for owner review, off in the build (section 16.1) |
 | `tools/data/d2r_unit_clips.json` | - | new (lane hdmon2): clip names per D2R enemy animation folder, section 9.1 |
 | `tools/tests/test_hd_clip_fill.py` | - | new (lane hdmon2): clip fallback, model check, committed donors have a model; lane hdmon3: state fill, the hm2 / hm3 check lists |
 | `tools/tests/test_hd_monsters.py` | - | new |
@@ -997,3 +999,50 @@ later round (owner picks):
 Bosses `#m` Belial, `#q` Enforcer, `$f` Rathma are the known FAILs of section 12. Not judged: `runepriest1`, `treeppl1`
 (hidden in the shots). Shots and sheets: `mxl2012-runs/itemart/monsters/` (`mon_sheet_1-4.png` legacy+HD, `mon_hd_1-4.png`,
 `mon_hd_near.png`; game art, outside git).
+
+### 16.1 Stand-in proposals (lane standin, 2026-10-30, owner review, OFF in the build)
+
+Owner rule: no new models; each pick is a D2R HD monster unit whose shape fits Median's classic art best, then scaled and
+coloured with the existing `hd_monsters` stand-in fields. The picks are in `tools/data/hd_monster_proposals.json` (like
+`item_art_proposals.json` for items): the build uses an entry only when the file's `enabled` and the entry's `enabled` are both
+true (both false now), so the shipped look does not change until the owner approves. `hd_monsters.py build --try-proposals all`
+(or `--try-proposals 9!,!2`, or `MXL_HD_TRY_PROPOSALS`) makes a trial build with them whatever the switches say; the report
+`hd_monsters.md` lists every proposal as ON, TRIAL or off. A proposal replaces donor, scale and colour of its token; the rest
+of the entry (class, Ids, part map) stays.
+
+| Token | Now | Proposal | Why (shape against the classic art) |
+|---|---|---|---|
+| `9!` Centaur | clawviper1 x1.3 | **goatman1 x1.4**, pale grey | D2R has no centaur; the Goatman has hoofed beast legs, fur and a pole weapon where the Claw Viper is a snake |
+| `!2` Dark Fey | councilmember1 x0.75 | **cr_lancer1 x0.85**, teal | the Dark Spearwoman is a slender wingless woman fighter; the Council Member is a robed man. Small and dark in the shots: the teal shows little |
+| `&b` Deathwing | vulture1 x1.2 | **batdemon1 x1.0**, bone white | bat wings and claws of a skeletal flyer; the Vulture is a feathered bird |
+| `0n` Onyx Knight | sandraider1 x1.15 | **doomknight1 x1.2**, darkened | a horned heavy plate knight with a sword; the Sand Raider is thin and unarmoured |
+| `2(` Fungus | thornhulk1 x0.75 teal | **thornhulk1 x0.65**, blue | D2R has no mushroom man; the Thorned Hulk's bushy head stays the nearest cap, smaller and blue like the art |
+| `(l` Magma Demon | deathmauler1 x1.15 | **claygolem x1.3**, own colour | a hulking rock golem; the Clay Golem ignores colour tables (an ember table drew it tan, like the Iron Golem of section 12), so no lava colour |
+| `08` Fell Fiend | warputriddefiler x0.85 | **megademon1 x0.75**, orange | Median's Fell Fiend uses the Megademon AI: the Venom Lord is the winged demon; red shifted to orange |
+| `5$` Porkchop | siegebeast1 x1.5 | **overseer1 x1.3**, warm orange | a fat hunched brute in brown leather (a whip, not a hammer); no tower on its back |
+| `g7` Pest | brute2 x0.55 | **fallen1 x1.0**, dark brown | a small hunched armoured imp with an axe: the Fallen, not a furred yeti |
+| `b#` Crystal | cantor1 x1 | **cr_lancer1 x1.1**, a little brighter | a woman fighter in red with a skirt; the Cantor is a robed priest |
+| `#m` Belial | baalminion1 x0.75 | **baalminion1 x0.85**, darker brown-black | kept (hunched horned demon); since the #496 fix its table shows, so the colour of the art |
+| `#q` Enforcer | arach1 x0.85 | **arach1 x0.9**, strong gold | kept (long-legged walker), a gold table of its own; in the shots only the body turns more orange, the legs stay dark |
+
+Tried and dropped: The Smith for `5$` (best fat-man-with-hammer shape; taken out of `hd_donors.NOT_DONORS` for the trial, back in now)
+drew grey-blue whatever its table said, Hephasto is the same grey-blue model; `$f` Rathma Primus stays
+`vampire1` (no proposal): `succubus1` (bare skin on bat wings) drew nothing for this Id in HD, only its spells (the legacy sprite
+was there), and `ancientbarb2` got a unit with only `hair.model` in its torso slot and asserted at its death (`BC_ASSERT: result`,
+animation_event_handler.cpp:608, "AnimateMaterialProperty event, but the target mesh was not found": the part mapping of a
+reused stand-in can pick the wrong donor model; no shipped token uses a reused `ancientbarb*` stand-in).
+
+Colour tables: with all proposals on the build still keeps `COLOUR_TABLE_LIMIT` (30, test `Proposals`); some share a table
+(`&b` with `9!`, `5$` with `08`, `b#` with a near one), and a few more donors lose their own level0 table under the limit.
+
+In game (slot 2, Blood Moor, check `standin_mons`: 13 monsters 8 subtiles from a tanked god-mode player, far / near / fight /
+death shots, the pack of each killed before the next; `MXL_STANDIN_ONLY` picks some): current look
+`checks-20261030-163132-s2`, all proposals `checks-20261030-163506-s2`: 13 spawned, 0 engine asserts, 0 crash files each.
+Review sheets (legacy art, HD now far / near, HD proposal far / near; outside git): `mxl2012-runs/standin/sheet_1.png`
+(`9!`, `!2`, `&b`, `0n`), `sheet_2.png` (`2(`, `(l`, `08`, `g7`), `sheet_3.png` (`b#`, `#m`, `#q`, `5$`),
+`sheet_4_pest_close.png` (the Pest close up, lab). To switch an approved pick on: set its `enabled` and the file's `enabled`
+to true, then build.
+
+**Owner, 2026-10-30:** on (0.1.5): `9!` Centaur, `&b` Deathwing, `0n` Onyx Knight, `08` Fell Fiend, `5$` Porkchop, `g7` Pest,
+`#m` Belial, `#q` Enforcer. Still off for a closer look: `!2` Dark Fey, `2(` Fungus, `(l` Magma Demon, `b#` Crystal. Rathma
+(`$f`) stays `vampire1` for now.

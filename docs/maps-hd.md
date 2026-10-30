@@ -95,7 +95,8 @@ entities made of D2R's own wall models**:
    own maps resolve those keys to other files) takes D2R's most common single-tile wall of the same orientation in the same
    tile set, else in the same act's sets (`generic`: `Library.generic_pick`; set pieces and variants with props are never
    used: Docktown's commonest orientation-1 piece was a book stack, Harrogath's orientation-7 one a flagpole). Only wall
-   orientations 1-9 get one; downtown's 126 Harrogath cells of orientation 14 (a tree/object slot, not a wall) stay without.
+   orientations 1-9 get one. Downtown's 126 Harrogath cells of orientation 14 (trees, not walls) get D2R's trees since lane
+   walls4 (item 13).
 6. **Cap** (bug #360 open, asset cache overflow). No generated scene goes above D2R's largest map scene, `act3/docktown/
    docktown3` (4,989 entities, 4,423 of them with a model, 679 distinct models, 4,651,080 bytes): `cap()` keeps at most 4,423
    placed models and 4,651,080 bytes. It drops props first, then details on walls (buttresses, pillars, arches, beams,
@@ -159,6 +160,37 @@ the three changes that fix what data could fix (for all 17 maps), and one that d
    floor over the whole void, the same as before. So the HD floor there does not come from the preset's terrain entity
    (perhaps the level's own ground, Ancient Tunnels being a larger level than the 48x48 preset); open, not shipped.
 
+**Arches, roofs and trees** (lane walls4, 2026-10-30). Owner rule: no new 3D models; only D2R's own wall, arch and roof
+models (any act's tile sets), placed with this pipeline; a cell with no fitting D2R model stays as it is and is listed.
+
+13. **Trees** (`Library.tree_pick`, `TREE`, `TRUNK_BASE`). Orientation 14 holds trees drawn over several cells: one trunk
+   tile and crown pieces on the cells next to it. downtown's 126 "uncovered" cells were the crown pieces (14/14/16-17) of
+   Harrogath's trees. A trunk tile is one whose lowest opaque pixel is within 50 pixels of its cell's ground (decoded from
+   the .dt1 by `tile_pixels`); it gets the tree D2R puts on that tile's cells (Harrogath townwest: `expansion_tree_dead05` /
+   `06`), or, for a trunk D2R never puts in a scene (`trees.dt1` 14/15/3), the tree learnt most for another trunk of the
+   same tile set. Crown cells get nothing (the trunk's model is the whole tree) and count as *tree cells*, not uncovered.
+   A cell with tree tiles only draws its tree and nothing else (D2R's 14/15/3 cells also carried a neighbour's
+   `wall_segment_short`, a wall block beside the tree that classic does not have). A tree on fewer than a third of
+   the tile's D2R cells is not the tile's (the jungle's tree tiles: 3 of 322), so the jungle maps keep their look.
+   downtown: 412 tree cells, 286 trees, 0 uncovered (126 before); macumba gets one Act 1 oak.
+14. **Look-alike tiles** (`Library.lookalike`, `compose`, `LOOKALIKE_IOU`). A wall tile D2R never has borrows the variant
+   of the learnt tile of the same set and orientation whose silhouette (opaque pixels in 4x4 blocks) overlaps it by at
+   least 0.75 (intersection over union). charismatic's Fortress arcade tiles (exterior 1/4/2-4, 1/3/0 and 1/3/11) look
+   like D2R's foregate arch tile 1/3/1 (0.80-0.99) and now get its `arch01` with the gargoyle columns, where the generic
+   pick gave a plain wall; a cell with a wall and an arcade in two layers draws both. charismatic 177 cells, glados 78,
+   cypherpunk 83, borgir 34, moskvich 27, epicwhiners 19, macumba 18, downtown 4, desertpeak 2.
+15. **Set pieces by layout** (`Library.learn_pieces`, `fit`, `footprint`, `model_box`). A model D2R uses on fewer than 3
+   wall cells is a set piece and is left out (item 4), but some match a Median map by the wall tiles under them. Each set
+   piece's footprint is the wall keys under its bounding box (bbMin / bbMax of its LOD-0 model, turned by its yaw); a Median
+   map that repeats at least 4 of those cells with 4 distinct keys, and 60% of the footprint, gets the piece at the same
+   offset. D2R's Fortress huts are walls and slate roof in one model: `hut_blacksmith01` matches charismatic 5 times and
+   `hut_merchant01` twice, the roofed buildings of the classic map. No other map gets one.
+
+**Left as is** (no fitting D2R model, by the owner rule): charismatic's tall pointed arch (foregate 8/3/0-1, 16 cells each;
+D2R draws it with `gate01`, whose footprint matches 1 cell only), the long roofed building walls (1/2/6-13, 2/2/7-9) and
+D2R's one-piece Fortress roof `ext_roof01` (no layout match), and the 81 cells D2R itself draws without a model. belial's
+void (item 12) is not part of this lane.
+
 **Floors** (lane wallsfix, `tools/maps_hd.py`). HD paints a floor tile from the biome's terrain layers through the biome's
 tile mask (`data/hd/env/tilemasks/*.json`), keyed by .dt1 path; a tile no mask names gets the base layer. Median's new .dt1
 are in no mask, so before this lane every Median floor got its biome's base layer: Kurast's, chosen for cypherpunk by its
@@ -194,28 +226,28 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 
 <!-- walls_hd:begin (generated: py -3 -I tools/walls_hd.py docs) -->
 
-| map | biome | wall cells | exact | partial | generic | no D2R model | uncovered | floor cells (with models) | set pieces left out | placed | capped | models in scene | distinct models | scene size |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 292 | 16 | 994 | 0 | 13435 (46) | 17 | 2924 | 0 | 2924 | 42 | 2246 KB |
-| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 756 | 9 | 867 | 0 | 9039 (836) | 11 | 11475 | 7052 | 4423 | 73 | 3672 KB |
-| expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 281 | 114 | 320 | 1 | 6911 (1322) | 109 | 4157 | 0 | 4157 | 49 | 3511 KB |
-| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2203 | 523 | 426 | 627 | 126 | 32292 (0) | 1 | 2603 | 0 | 2603 | 24 | 1952 KB |
-| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 212 | 74 | 124 | 13 | 43 | 1 | 308 (59) | 2 | 494 | 0 | 494 | 103 | 463 KB |
-| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 312 | 3 | 18 | 1 | 774 (57) | 1 | 1241 | 0 | 1241 | 57 | 1066 KB |
-| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 356 | 20 | 28 | 18 | 1 | 1128 (0) | 31 | 570 | 0 | 570 | 21 | 439 KB |
-| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 270 | 154 | 81 | 1 | 1173 (21) | 99 | 887 | 0 | 887 | 23 | 657 KB |
-| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 209 | 5 | 572 (87) | 0 | 533 | 0 | 533 | 66 | 1049 KB |
-| act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
-| act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 181 (0) | 0 | 352 | 0 | 352 | 30 | 321 KB |
-| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 1 | 84 (17) | 0 | 20 | 0 | 20 | 15 | 17 KB |
-| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 330 | 68 | 1709 (112) | 5 | 1823 | 0 | 1823 | 90 | 1410 KB |
-| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 3 | 96 (96) | 0 | 679 | 0 | 679 | 17 | 560 KB |
-| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 423 | 33 | 423 | 1 | 4412 (189) | 546 | 4000 | 0 | 4000 | 86 | 3038 KB |
-| act1/cathedrl/inarius.ds1 | act1_cathedral | 110 | 110 | 0 | 0 | 16 | 0 | 145 (0) | 1 | 245 | 0 | 245 | 35 | 202 KB |
-| expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 3 | 0 | 3556 (481) | 0 | 532 | 0 | 532 | 45 | 748 KB |
-| all | | 15842 | 11821 | 3016 | 796 | 3949 | 209 | 75996 (3323) | 823 | 32887 | 7052 | 25835 | | 21672 KB |
+| map | biome | wall cells | exact | partial | look-alike | generic | no D2R model | uncovered | tree cells (trees) | floor cells (with models) | set pieces left out (placed by layout) | placed | capped | models in scene | distinct models | scene size |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 292 | 2 | 14 | 994 | 0 | 0 (0) | 13435 (46) | 17 (0) | 2926 | 0 | 2926 | 42 | 2248 KB |
+| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 677 | 83 | 5 | 867 | 0 | 0 (0) | 9039 (836) | 11 (0) | 11083 | 6660 | 4423 | 62 | 3675 KB |
+| expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 275 | 78 | 42 | 320 | 1 | 0 (0) | 6911 (1322) | 109 (0) | 4175 | 0 | 4175 | 50 | 3527 KB |
+| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2085 | 355 | 4 | 422 | 396 | 0 | 412 (286) | 32292 (0) | 3 (0) | 2838 | 0 | 2838 | 28 | 2109 KB |
+| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 212 | 74 | 108 | 27 | 2 | 43 | 1 | 0 (0) | 308 (59) | 2 (0) | 528 | 0 | 528 | 99 | 478 KB |
+| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 278 | 34 | 3 | 18 | 1 | 0 (0) | 774 (57) | 1 (0) | 1193 | 0 | 1193 | 54 | 959 KB |
+| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 355 | 20 | 18 | 10 | 18 | 1 | 1 (1) | 1128 (0) | 30 (0) | 569 | 0 | 569 | 20 | 438 KB |
+| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 193 | 177 | 54 | 81 | 1 | 0 (0) | 1173 (21) | 47 (7) | 1097 | 0 | 1097 | 24 | 823 KB |
+| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 0 | 209 | 5 | 0 (0) | 572 (87) | 0 (0) | 533 | 0 | 533 | 66 | 1049 KB |
+| act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 352 | 0 | 352 | 30 | 321 KB |
+| act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 352 | 0 | 352 | 30 | 321 KB |
+| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 0 | 1 | 0 (0) | 84 (17) | 0 (0) | 20 | 0 | 20 | 15 | 17 KB |
+| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 0 | 330 | 68 | 0 (0) | 1709 (112) | 5 (0) | 1823 | 0 | 1823 | 90 | 1410 KB |
+| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 0 | 3 | 0 (0) | 96 (96) | 0 (0) | 679 | 0 | 679 | 17 | 560 KB |
+| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 423 | 19 | 14 | 423 | 1 | 0 (0) | 4412 (189) | 546 (0) | 4000 | 0 | 4000 | 86 | 3039 KB |
+| act1/cathedrl/inarius.ds1 | act1_cathedral | 110 | 110 | 0 | 0 | 0 | 16 | 0 | 0 (0) | 145 (0) | 1 (0) | 245 | 0 | 245 | 35 | 202 KB |
+| expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 0 | 3 | 0 | 0 (0) | 3556 (481) | 0 (0) | 532 | 0 | 532 | 45 | 748 KB |
+| all | | 15842 | 11702 | 2636 | 442 | 566 | 3718 | 83 | 413 (287) | 75996 (3323) | 772 (7) | 32945 | 6660 | 26285 | | 21923 KB |
 
-Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 44269 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
+Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 44298 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *look-alike*: a wall tile D2R never has borrows the variant of the learnt tile of its set and orientation that has the same silhouette (Library.lookalike); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *tree cells*: cells with only tree pieces (orientation 14), in brackets the trees placed on trunk tiles (Library.tree_pick); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece), in brackets those placed where the map repeats the wall tiles under them (Library.fit); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
 
 Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 of the learnt D2R maps have 3477 of their 6363 wall entities (55%; same model within 1.5 units).
 
@@ -239,12 +271,14 @@ crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #
 | expansion/morework/epicwhiners | 13 Cave Level 2 | yes | cave walls, stalagmites and rock mounds roughly where classic has them |
 | act1/cathedrl/inarius | 14 Underground Passage Level 2 | yes | cathedral walls, arches and windows as in classic |
 | expansion/icecave/rockisdead | 116 Drifter Cavern | yes | ice cave walls and ledges where classic has walls (classic is Median's brown cave colour) |
-| the 8 retextured maps | 60, 59, 95, 18, 98, 126, 125, 127 | yes (charismatic partial) | as in lanes walls / wallsfix; glados and cypherpunk now also show Kurast stairs and Travincal trench pieces on floor tiles; charismatic (lane walls3, items 9-10): the Fortress walls, gargoyle pillars and columns now stand along classic's walls (before they floated 3-4 tiles off) and 81 wall cells are left without a model (was 366); classic's cathedral arches and roofs have no D2R model (custom art) |
+| the 8 retextured maps | 60, 59, 95, 18, 98, 126, 125, 127 | yes | as in lanes walls / wallsfix; glados and cypherpunk now also show Kurast stairs and Travincal trench pieces on floor tiles; charismatic (lane walls3, items 9-10): the Fortress walls, gargoyle pillars and columns now stand along classic's walls (before they floated 3-4 tiles off) and 81 wall cells are left without a model (was 366); lane walls4 (items 13-15): charismatic's arcades have D2R's arches and gargoyle columns and its 7 roofed buildings D2R's Fortress huts; the tall pointed arch and the long roofed walls stay without; downtown has Harrogath's dead trees where classic has trees |
 
 Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 2 show only part of them (belial:
-the void drawn as floor; charismatic: no arches and roofs) and all 17 show D2R's stock walls, not Median's colours. Lane
+the void drawn as floor; charismatic: arches and hut roofs since lane walls4, but not the tall pointed arch and the long
+roofed walls) and all 17 show D2R's stock walls, not Median's colours. Lane
 walls3 (2026-10-30, slot 2, runs `checks-20261030-120504-s2` and `checks-20261030-121747-s2`, docs/testing.md "Lane walls3")
-re-checked caveroom4, belial, charismatic, glados and downtown in HD and classic.
+re-checked caveroom4, belial, charismatic, glados and downtown in HD and classic. Lane walls4 (slot 3, run
+`checks-20261030-175423-s3`, docs/testing.md "Lane walls4") re-checked charismatic, downtown and macumba.
 
 ## Median's look on the 8 retextured maps (lane maptint, 2026-10-30)
 
@@ -291,11 +325,11 @@ with their tint, no assert, load screens as before (0.1 - 2.9 s). Sheets: `mxl20
 | desertpeak | grey stone | warm gold, saturation 0.22 -> 0.54 | gold, 0.66 | - |
 | cypherpunk | warm grey | indigo / violet, hue 0.83 | 0.85 | - |
 | glados | warm grey | cyan-teal | teal | - |
-| downtown | warm grey | warm red-orange, saturation 0.37 -> 0.48 | 0.44 | 126 Harrogath cells without an HD wall |
+| downtown | warm grey | warm red-orange, saturation 0.37 -> 0.48 | 0.44 - (trees since lane walls4) |
 | moskvich | warm | warmer gold, 0.47 -> 0.61 | 0.63 | - |
 | borgir | grey, bright | dark teal-green | dark, teal floor, yellow torches | darker overall than before; torches keep their own light |
 | macumba | grey, bright | dark warm | very dark warm | - |
-| charismatic | white-grey | cool lavender-grey, hue 0.84 | lavender, hue 0.70, a bit more saturated | the cathedral's arches and roofs (no D2R model) |
+| charismatic | white-grey | cool lavender-grey, hue 0.84 | lavender, hue 0.70, a bit more saturated | the tall pointed arch and long roofed walls (no fitting D2R model; arches and huts since lane walls4) |
 
 The tint lights the scene and ground only. Median's coloured light spots (the light monsters) are not ported: D2R draws them
 with the monsters' own HD light, as before.

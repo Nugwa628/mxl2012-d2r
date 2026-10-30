@@ -5,17 +5,42 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+## D2R-XL 2012
+
+### 0.1.5 (2026-10-30)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.5:**
+
+- Saves: the mod now checks at start that D2RLoader writes the extended save format. If your `mods\mxl2012\d2rloader\config\d2rloader.toml`
+  lacks `[d2rcore.save_format] mode = "extended"`, it adds that key (the old file is kept as `d2rloader.toml.retail-backup`)
+  and asks you to restart once; a failed save now shows a red line. The downloader (0.1.1) sets the same key when it keeps your own
+  file. Without the key, every save failed while you carried many Median uniques, set items or runewords (#512).
 - No more game close when walking through an area entrance with a mercenary ("Could not get act!", for example into the
   Underground Passage): the game now waits for the mercenary's new spot to load instead of closing (#511).
 - Totems no longer stay on the player after Bend the Shadows next to rocks: when the free-spot test refuses the ring
   round the player, the totem is placed where the game's own move finds room (#509).
-- HD: 66 more Median item pictures now use D2R's HD art of the same kind in Median's colours instead of a scaled-up classic
+- Chat: the Act 5 soldiers' "Over here!" and "Help us!", which Median plays on some summons and spells, show at most once
+  every 5 s each (Baal's laugh: once every 30 s) (#508).
+
+**New in HD:**
+
+- 43 more Median item pictures now use D2R's HD art of the same kind in Median's colours instead of a scaled-up classic
   picture: the Horadric Malus, scepters, Jolly Roger, scrolls, Token of Absolution, Sunless Crystal Bird, the Sunstones (the
   Sunstone of Thunder in yellow) and Class Rewards, Shadowfang, the Ingredient Rings, the oils (the Oil of Jewelcraft in pink),
-  the clue gems, Fool's Gold and more. All 23 Median runes are D2R's rune stone with Median's sign redrawn and chiselled in
-  sharp (Qor is a skull), and the seven signets a gold seal with their sign engraved. 21 item pictures are still upscaled.
+  the clue gems, Fool's Gold and more, and the seven signets are a gold seal with their sign engraved. Median's runes keep
+  their classic pictures for now (new ones are being worked on).
+- Khalimgrad's cathedral (Hell 3) shows D2R's arches, gargoyle columns and Fortress huts with their roofs, and the
+  downtown map its Harrogath trees, all from D2R's own models (the tall pointed arch and the long roofed walls stay without).
+- Better D2R stand-ins for eight Median monsters: Centaur (Goatman), Deathwing (Desert Wing), Onyx Knight (Doom Knight),
+  Fell Fiend (Venom Lord), Porkchop (Overseer), Pest (Fallen), and Belial and the Enforcer in their own colours.
 
-## D2R-XL 2012
+**Known:** in HD, Median's runes still show their classic pictures scaled up (new ones are being worked on), the
+Ancient Tunnels void around the platform is drawn as floor, and Khalimgrad's cathedral has no tall pointed arch and
+long roofed walls yet.
 
 ### 0.1.4 (2026-10-30)
 
