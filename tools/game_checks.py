@@ -11976,6 +11976,229 @@ def itemart_mons():
 
 CHECKS += [("itemart_mons", itemart_mons)]
 
+# --- lane uppass: bug #511 / #292, the client's "Could not get act!" exit on entering the Underground Passage ---------------
+# The player (0.1.3, legacy graphics, a mercenary with them) entered Underground Passage Level 1 (10) and the game closed: the
+# client's handler of server command 0x15 (unit reassign; D2R table entry 0x22bbe38, code 0x12ab40) moved a unit and found no
+# room for it (`0x34b440`), asserted "Could not get act!" (SCmd.cpp:1254) and called the exit (`0x12e5278(-1)` -> the fatal
+# stub `0x12557f0`, image +0x1255802). This check walks into 10 (and 10 -> 14) the way the player did: a live, equipped
+# Rogue, legacy graphics, the walk up to the warp tile and real left clicks on it, several rounds.
+UP_ROUTES = "4-10,5-10,10-14"
+UP_CLICK_RING = [(0, 0)] + [(r * ux, r * uy) for r in (2, 4) for ux, uy in ((1, 1), (-1, -1), (1, -1), (-1, 1), (1, 0), (0, 1), (-1, 0), (0, -1))]
+
+
+def up_alive():
+    """The game process still runs and the harness answers."""
+    if not g.game_pids():
+        return False
+    try:
+        return bool(hstate()["ok"])
+    except Exception:
+        return False
+
+
+def up_merc_setup(log, rows, bad, shots):
+    """SET-UP: a Rogue hired from Kashya (quest fixture of hire_in) and equipped by clicks on the hireling panel (HD coordinates:
+    done before the switch to legacy). An existing live mercenary is kept."""
+    m, worn = merc_info()
+    if m is None:
+        m = hire_in(1, 1, 150, "Kashya", 271, log, rows, bad)
+        if m is None:
+            return None
+        worn = []
+    if not [i for i in worn if i.get("page") == 255]:
+        Hl("packclear", log)
+        merc_panel_open(log, shots, "uppass")
+        for code, body, allowed, what in MERC_GEAR[271]:
+            if allowed:
+                on, note = equip_by_click(code, body, log, shots, "uppass")
+                rows.append("SET-UP mercenary %s on body %d: %s" % (what, body, note))
+        panels_closed()
+    m, worn = merc_info()
+    rows.append("SET-UP mercenary id %s class %s level %s, worn %s" % (
+        m and m.get("id"), m and m.get("class"), m and m.get("level"),
+        ",".join(str(i.get("code")) for i in worn if i.get("page") == 255) or "none"))
+    return m
+
+
+def up_fill(n, log, rows):
+    """SET-UP (MXL_UP_FILL=n): n more items in the backpack / cube (the player's character was item-heavy)."""
+    codes = ("615", "600", "164", "101", "rin", "amu", "jew")
+    made = 0
+    for k in range(n):
+        if H("item %s inv" % codes[k % len(codes)])[0] or H("item %s cube" % codes[k % len(codes)])[0]:
+            made += 1
+    rows.append("SET-UP: %d of %d items made in the backpack / cube" % (made, n))
+
+
+def up_click_tile(tile, dest, log):
+    """Real left clicks on and round the warp tile (the legacy view is not the HD projection rp_screen_xy computes, so a ring of
+    spots round it, as glacial_click_spot). Returns the clicks made."""
+    clicks = 0
+    for up in (0, 40, 80):
+        for ox, oy in UP_CLICK_RING:
+            if not up_alive() or hstate()["player"].get("area") == dest:
+                return clicks
+            fx, fy = rp_screen_xy(tile["x"] + ox, tile["y"] + oy)
+            fy -= up / 900
+            g.click(min(max(fx, RP_SAFE[0] / 1600), RP_SAFE[2] / 1600), min(max(fy, RP_SAFE[1] / 900), RP_SAFE[3] / 900))
+            clicks += 1
+            time.sleep(2)
+    return clicks
+
+
+def up_tile_classes(level, dest):
+    """Every warp tile class (lvlwarp Id) that leads from `level` to `dest` (levels.txt Vis<i> == dest -> Warp<i>): Stony Field
+    and Dark Wood list four cave entrance variants (0-3) for area 10."""
+    row = next((r for r in table("levels") if r.get("Id") == str(level)), None) or {}
+    out = set()
+    for i in range(8):
+        w = row.get("Warp%d" % i)
+        if row.get("Vis%d" % i) == str(dest) and w and w.lstrip("-").isdigit() and int(w) >= 0:
+            out.add(int(w))
+    return out
+
+
+def up_click_through(src, dest, log):
+    """In `src`: the nearest loaded warp tile to `dest`, a walk up to it (harness `move`), then real left clicks on it (the
+    projection first, then a ring round it for the legacy view). Returns (entered, note)."""
+    want = up_tile_classes(src, dest)
+    p = hstate()["player"]
+    tiles = [t for t in cache_tiles(Hl("tiles", log)[1]) if t["area"] == src and t["class"] in want]
+    if not tiles:
+        return False, "no loaded tile of class %s in %d" % (sorted(want), src)
+    t = min(tiles, key=lambda t: (t["x"] - p["x"]) ** 2 + (t["y"] - p["y"]) ** 2)
+    acts_walk(t["x"], t["y"], reach=6, timeout=60)
+    in_dest = lambda: up_alive() and hstate()["player"].get("area") == dest  # noqa: E731
+    if rp_click_toward(t["x"], t["y"], in_dest, tries=4):
+        return True, "tile class %d at %d,%d by clicks" % (t["class"], t["x"], t["y"])
+    if not up_alive():
+        return False, "game gone during the clicks"
+    n = up_click_tile(t, dest, log)
+    for _ in range(4):
+        if in_dest():
+            return True, "tile class %d at %d,%d by ring clicks (%d)" % (t["class"], t["x"], t["y"], n)
+        if not up_alive():
+            break
+        time.sleep(1)
+    return False, "tile class %d at %d,%d: %d clicks, still in %s" % (t["class"], t["x"], t["y"], n,
+                                                                     hstate()["player"].get("area") if up_alive() else "GONE")
+
+
+def up_enter(src, dest, log):
+    """SET-UP: `src` (harness travel), the server warp into `dest` (`level <dest> warp`: lands at src's entrance of dest), real
+    clicks on dest's tile back out into `src` (the exit lands next to the entrance). Then the judged entry: real clicks on src's
+    tile into `dest`, with the mercenary along. Returns (entered, how)."""
+    if not up_alive():
+        return False, "game gone before the try"
+    goto(src)
+    if hstate()["player"].get("area") != src:
+        return False, "SET-UP: not in %d" % src
+    Hl("level %d warp" % dest, log)
+    time.sleep(6)
+    for _ in range(10):
+        if not up_alive() or hstate()["player"].get("area") == dest:
+            break
+        time.sleep(2)
+    if not up_alive():
+        return False, "game gone after the server warp into %d" % dest
+    if hstate()["player"].get("area") != dest:
+        return False, "SET-UP: `level %d warp` did not arrive" % dest
+    time.sleep(4)  # the mercenary follows
+    ok, how_out = up_click_through(dest, src, log)
+    if not ok:
+        return False, "SET-UP way out %d->%d: %s" % (dest, src, how_out)
+    time.sleep(5)
+    ok, how = up_click_through(src, dest, log)
+    return ok, "out: %s; in: %s" % (how_out, how)
+
+
+def check_uppass():
+    """Lane uppass (bugs #511 / #292): into Underground Passage Level 1 (10) from Stony Field (4) and from Dark Wood (5), and on
+    into Level 2 (14), with a live, equipped mercenary, in MXL_UP_GRAPHICS (default legacy), MXL_UP_ROUNDS rounds (default 3) of
+    MXL_UP_ROUTES (default 4-10,5-10,10-14). After each entry: game alive, the mercenary with the player, engine asserts and crash
+    files since the try. PASS: every route entered every round, the game alive. SET-UP: hire fixture quest, gear by clicks, travel
+    to the source area by harness, MXL_UP_FILL items."""
+    name = "uppass"
+    mark0 = engine_mark()
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    rows, bad, log, shots = [], [], [], []
+    revive_if_dead()
+    goto(1)
+    m = up_merc_setup(log, rows, bad, shots)
+    if m is None:
+        return finish(name, False, "no mercenary: " + "; ".join(bad), mark0, shots, rows + log[-300:])
+    fill = int(os.environ.get("MXL_UP_FILL", "0"))
+    if fill:
+        up_fill(fill, log, rows)
+    enable_debug()
+    cheat("god 1")  # SET-UP: the walks through Stony Field / Dark Wood / the caves are not cut short by deaths
+    for s in (7, 6):  # SET-UP: the mercenary lives through them too (maximum, then current life 20,000)
+        Hl("stat merc %d set %d" % (s, 20000 << 8), log)
+    rows.append("SET-UP: god mode on the player, mercenary life 20,000")
+    gfx = os.environ.get("MXL_UP_GRAPHICS", "legacy")
+    goto(1)
+    ok_gfx = set_graphics(gfx)
+    rows.append("graphics %s: %s" % (gfx, "on" if ok_gfx else "NOT SET (%s)" % graphics_mode()))
+    shots.append(sh("uppass_gfx_%s" % gfx))
+    routes = [tuple(int(v) for v in r.split("-")) for r in os.environ.get("MXL_UP_ROUTES", UP_ROUTES).split(",") if r.strip()]
+    rounds = int(os.environ.get("MXL_UP_ROUNDS", "3"))
+    tries = entered = 0
+    gone = False
+    for rnd in range(1, rounds + 1):
+        for src, dest in routes:
+            guard()
+            mark = engine_mark()
+            if src != 10:
+                revive_if_dead()
+                mb, _w = merc_info()
+                if mb is None:  # dead or lost: revive it at Kashya (fixture gold), it must be with the player for the try
+                    merc_revive(150, "Kashya", 1, log, rows, [])  # its price checks belong to `mercs`
+            tries += 1
+            t0 = time.time()
+            ok, how = up_enter(src, dest, log)
+            time.sleep(8)  # the client's room / unit packets of the new level
+            alive = up_alive()
+            mi = merc_info()[0] if alive else None
+            area = hstate()["player"].get("area") if alive else None
+            near = alive and mi is not None and any(x.get("id") == mi.get("id") for x in hstate()["mons"])
+            asserts = engine_asserts(mark)
+            crashes = sorted((set(os.listdir(g.CRASH_DIR)) if os.path.isdir(g.CRASH_DIR) else set()) - mark["crashes"])
+            entered += 1 if ok and alive else 0
+            rows.append("round %d %d->%d: %s (%s) in %.0f s; game %s, area %s, mercenary %s%s%s%s" % (
+                rnd, src, dest, "entered" if ok else "NOT entered", how, time.time() - t0, "alive" if alive else "GONE", area,
+                "none" if mi is None else "id %s level %s %s" % (mi.get("id"), mi.get("level"), "near" if near else "not in view"),
+                "; asserts: " + "; ".join("%s (%s)" % (a[0][:70], a[1].split("\\")[-1]) for a in asserts) if asserts else "",
+                "; CRASH FILES " + ", ".join(crashes) if crashes else "",
+                "; graphics " + graphics_mode() if alive and dest != 14 and rnd == 1 else ""))
+            g.log("uppass " + rows[-1])
+            if alive and rnd == 1:
+                shots.append(sh("uppass_r%d_%d_%d" % (rnd, src, dest)))
+            if not alive:
+                gone = True
+                bad.append("game gone after %d->%d round %d" % (src, dest, rnd))
+                break
+        if gone:
+            break
+    if not gone:
+        # after the travels: back in town, is the mercenary with the player again (server mode, in `state`, on screen)?
+        goto(1)
+        time.sleep(10)
+        mi = merc_info()[0]
+        near = mi is not None and any(x.get("id") == mi.get("id") for x in hstate()["mons"])
+        rows.append("after the rounds, Rogue Encampment: mercenary %s" % (
+            "none" if mi is None else "id %s mode %s life %s %s" % (mi.get("id"), mi.get("mode"), mi.get("life"), "near" if near else "not in view")))
+        g.log("uppass " + rows[-1])
+        shots.append(sh("uppass_town_after"))
+        cheat("god 0")
+        rows.extend("plugin: " + ln for ln in mxl_text().splitlines() if ln.startswith("reassign"))  # the guard's counters
+    note = "%d of %d entries, graphics %s; %s" % (entered, tries, gfx, "GAME CLOSED" if gone else "game alive throughout")
+    finish(name, not gone and entered == tries and not bad, note + ("; " + "; ".join(bad) if bad else ""), mark0, shots,
+           rows + log[-400:], partial=None if ok_gfx else "graphics mode not reached")
+
+
+CHECKS += [("uppass", check_uppass)]
+
 if __name__ == "__main__":
     main()
 

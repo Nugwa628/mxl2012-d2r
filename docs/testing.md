@@ -3935,3 +3935,33 @@ By hand:
 1. Cast four totems next to rocks or a wall, then Bend the Shadows onto one of them, several times.
 2. After every blink the totems stand round you and none is on you.
 
+## Lane uppass: into the Underground Passage with a mercenary (bugs #511 / #292, 2026-10-30, slot 4, background mode, build of lane/uppass on main 0.1.4, plugin `build_plugin.ps1 -Release -Tests`)
+
+Check `uppass` (game_checks.py). Paladin "UpPass" (Normal). The Rogue Scout (class 271) is hired from Kashya (fixture quest bit and
+gold) and given Cap, Quilted Armor and Short Battle Bow by clicks on the hireling panel. The player gets god mode and the
+mercenary 20,000 life (SET-UP: the walks are not cut short by deaths). The graphics come from `MXL_UP_GRAPHICS` (default
+legacy, the player's). Each try: travel to the source area (harness `level`); `level <dest> warp` (SET-UP: next to the link);
+walk OUT through the link tile by background clicks; then walk back IN by clicks (the entry that is judged). After 8 s, the check
+looks at: the game alive, the area, the mercenary near (the `state` list, server units within 40, mode 0/12 left out), engine
+asserts and crash files of the try. At the end: back to the Rogue Encampment (mercenary mode, a shot) and the `reassign` line of
+`mxl2012`. Routes come from `MXL_UP_ROUTES` (4-10 Stony Field to Level 1, 10-14 Level 1 to Level 2; 5-10 Dark Wood: its SET-UP
+warp lands at the Stony Field side, so not used), with `MXL_UP_ROUNDS` rounds and `MXL_UP_FILL` items. Guard off with
+`MXL_CONTROL=reassign`.
+
+| run | guard | graphics | result |
+|---|---|---|---|
+| `checks-20261030-152733-s4` | off (control) | legacy | 4->10 entered. 10->14: the game closed 23 s after the server warp: `BC_ASSERT: 0` "Could not get act!" (SCmd.cpp:1254), then the object_pool / CommandSystem exit asserts. Crash file RIP 0x141255802, a write to 0: the player's crash, #292's |
+| `checks-20261030-153516-s4` | first version (checks the room at x, y before D2R's move; never fired) | legacy | Round 1 both entered. Round 2: the game closed after 10->14, at the harness `level 4`, with the same assert and RIP. The room at the target was there before the move, and the unit had none after it. So the guard was moved to D2R's own no-room branch |
+| `checks-20261030-154943-s4` | on | legacy | **8 of 8 entries (4 rounds 4->10, 10->14), game alive, 0 asserts, 0 crash files.** 11 reassigns left the Rogue (type 1, class 271) without a client room. Each time, D2R would have ended the game: to 7877,8020 (Level 1's entrance from Stony Field), 5193,5027 (Stony Field's cave), 8051,8294 / 7528,13142 (Level 1 <-> Level 2). They fell on the walk-through clicks (4->10, 10->4, 10->14, 14->10) and on one harness warp. 53 commands, 0 for the player |
+| `checks-20261030-155820-s4` | on | HD | 4 of 4 entries (2 rounds), game alive, 0 crash files, 5 units left without a room. In town after the rounds, the Rogue stands by the player on screen (`uppass_town_after.png`) |
+| `checks-20261030-160348-s4` | off (control) | legacy | Round 1 both entered, round 2 4->10 entered. 10->14: the game closed 15 s after the server warp, the same assert chain, RIP 0x141255802 |
+| `checks-20261030-161142-s4` | on, first start (`d2rloader\data\compiler` moved aside, put back after) | legacy | 2 of 2 entries (1 round), game alive, 0 crash files. Sounds table 11913 rows (crash-audit C17, as in the player's log), so `soundguard` skipped Median's sounds. 1 reassign caught: the Rogue sent to the town spot 5653,5523 on the harness travel back to the Rogue Encampment |
+
+With the guard off, 3 of 3 runs closed the game within 5 tries (today's main = 0.1.4 plugin plus nothing that touches this
+path). With it on, 0 of 3 runs (14 entries, 17 reassigns caught) closed. The mercenary's server mode is 12 after the first round in every run,
+guard or not (in `-153516-s4` before any guard fired). `state` then leaves it out ("not in view"), but the client
+draws it next to the player.
+
+Evidence: `mxl2012-runs/uppass/evidence/run2-control/` (crash report, d2rloader.log), `evidence/run3/`, `evidence/run6-control/`.
+The run logs are `run2.log` to `run7.log`. Lesson: `graphics_mode` reads "legacy" in the dark caves in HD as well (the round-1
+row of the HD run); the town reading counts.
