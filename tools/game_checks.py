@@ -11877,17 +11877,22 @@ ITEMART_SETS = [
                   "gsb", "gpb", "gpw", "jew", "rin", "amu"]),
     ("runes", ["r34", "r35", "r36", "r37", "r38", "r39", "r40", "r41", "r42", "r43", "r44", "r45", "r46", "r47",
                "r48", "r49", "r50", "r01", "r10", "r26"]),
+    # lane itemart2: the five Rainbow Stones (D2R's HD sapphires in Median's colours) beside D2R's five sapphires and gems
+    ("rainbow", ["yo1", "yo2", "yo3", "yo4", "yo5", "gcb", "gfb", "gsb", "glb", "gpb", "gpr", "gpg", "gpy", "gpv", "gpw"]),
 ]
 
 
 def itemart_pics():
     """Lane itemart: the candidate pictures (arcane crystals, signet, apple, rainbow stones, Median runes) in the backpack
     with D2R's own gems / charm / jewel / ring / amulet / runes, one backpack per set, shot in HD and in legacy graphics (G).
-    PASS: every item made, the game alive; the pictures are judged by hand (itemart_<set>_hd.png against _legacy.png)."""
+    PASS: every item made, the game alive; the pictures are judged by hand (itemart_<set>_hd.png against _legacy.png).
+    MXL_ITEMART_SETS=<name>[,<name>]: only those sets (rainbow: lane itemart2's Rainbow Stones)."""
     mark = engine_mark()
     log, shots, bad = [], [], []
     goto(1)
-    for name, codes in ITEMART_SETS:
+    only = [x for x in os.environ.get("MXL_ITEMART_SETS", "").split(",") if x]  # e.g. MXL_ITEMART_SETS=rainbow
+    sets = [(n, c) for n, c in ITEMART_SETS if not only or n in only]
+    for name, codes in sets:
         Hl("packclear", log)
         for code in codes:
             _ok, ln = Hl("item %s inv" % code, log)
@@ -11914,7 +11919,7 @@ def itemart_pics():
     if not game_alive():
         bad.append("the game died")
     Hl("packclear", log)
-    finish("itemart_pics", not bad, "sets: " + ", ".join("%s (%d items)" % (n, len(c)) for n, c in ITEMART_SETS)
+    finish("itemart_pics", not bad, "sets: " + ", ".join("%s (%d items)" % (n, len(c)) for n, c in sets)
            + ("; PROBLEMS: " + "; ".join(bad) if bad else ""),
            mark, shots, log, partial="the pictures in itemart_*_hd.png / itemart_*_legacy.png are judged by hand")
 

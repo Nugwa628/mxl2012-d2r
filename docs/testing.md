@@ -3837,6 +3837,26 @@ HD: the Rainbow Stones change visibly, the crystals and runes a little; legacy p
 `.sprite` files differ). Ring, amulet and jewel pictures differ between runs: D2R picks one of its pictures at random. Not
 tested: the stash (the harness `item` verb places in inv / cube / ground only). Evidence: `mxl2012-runs/itemart/review/`
 (`sheet_01.png` .. `sheet_05.png` and `_2x`, `ingame/before_*`, `after_*`, `compare_*`), `mxl2012-runs/itemart/monsters/`.
+## Lane itemart2: the Rainbow Stones in D2R's HD gem pictures (2026-10-30, slot 4, background mode, build of lane/itemart2, data only)
+
+Owner decision (2026-10-30): of lane itemart's 28 picture proposals only the five Rainbow Stones `og1`..`og5` are switched
+on (D2R's HD sapphires in Median's colours by position); `item_hd` now makes the pictures of the proposals switched on
+(docs/hd-icons.md "Picture review"). Build: `py -3 tools/build.py` (validate 0 errors; `picture proposals used: 5`;
+item icon check 0 sprite problems), install `MXL_SLOT=4 MXL_RUN=itemart2 py -3 tools/install_mod.py --slot 4` (data only;
+the installed `og4.sprite` is byte for byte the build's). Check: `MXL_RUN=itemart2 MXL_SLOT=4 MXL_CHAR=ItemArtTwo
+MXL_ITEMART_SETS=rainbow py -3 tools/game_checks.py all itemart_pics` (new set `rainbow` in `ITEMART_SETS`: `yo1`..`yo5`
+next to D2R's five sapphires and the perfect ruby, emerald, topaz, amethyst and diamond; `MXL_ITEMART_SETS` picks sets).
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-131851-s4` | itemart_pics, set rainbow (15 items) | PARTIAL (shots judged by hand): all 15 made. HD: the five Rainbow Stones are D2R's crisp faceted gems of their cut in Median's rainbow colours, the same look as D2R's gems beside them; legacy (G): Median's classic pixel pictures, unchanged. No assert while playing; only the engine's exit-only pool asserts (`s_StatsPool.IsEmpty()` and its followers, table above: ignored); no crash file |
+
+Not tested: the stash and the cube (same sprite). Unit tests: `tools/tests/test_itemart.py` `BuildProposalTests` (an
+entry switched on is used, with the sheets' own render at HD and lowend size; an entry or a file switched off is not) and
+`Og4AgainstTheReviewSheetTests` (the build's og4 found on lane itemart's `sheet_01.png`, max pixel difference 0; skipped
+without the game files). Evidence: `mxl2012-runs/itemart2/ingame/checks-20261030-131851-s4/` (`itemart_rainbow_hd.png`,
+`itemart_rainbow_legacy.png`), `ingame/rainbow_hd_vs_legacy_crop.png`, `og_built_strip.png` (og1..og5 HD and lowend as
+built), `og<N>_hd.png` / `og<N>_lowend.png`.
 ## Lane walls3: the three maps with partial HD walls (2026-10-30, slot 2, background mode, build of lane/walls3, data only)
 
 Build: `py -3 tools/build.py` (validate 0 errors), install `MXL_SLOT=2 MXL_RUN=walls3 py -3 tools/install_mod.py --slot 2` (data

@@ -1,10 +1,13 @@
 """Unit tests of the item picture review tools (item_art_review: visibility ranking, the proposal switch; item_art_sheets:
-loose silhouette match, colour match, colour by position, upscale variants, sheet drawing) on synthetic data (no game
-files). Run: py -3 -I -m unittest discover -s tools/tests -p "test_itemart.py" """
+loose silhouette match, colour match, colour by position, upscale variants, sheet drawing; item_hd / item_art: the build
+makes the pictures of the proposals switched on) on synthetic data, plus one check of og4 against lane itemart's review
+sheet (skipped without the game files and the sheet). Run: py -3 -I -m unittest discover -s tools/tests -p "test_itemart.py" """
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -95,13 +98,13 @@ class ProposalTests(unittest.TestCase):
         data["pictures"]["mxl/a"]["enabled"] = False
         self.assertEqual(R.enabled_proposals(data), {})
 
-    def test_the_committed_proposals_are_all_off_and_well_formed(self):
+    def test_the_committed_proposals_are_well_formed_and_only_the_rainbow_stones_are_on(self):
         data = json.loads(R.PROPOSALS.read_text("utf-8"))
-        self.assertFalse(data["enabled"])
-        self.assertEqual(R.enabled_proposals(data), {})
+        self.assertTrue(data["enabled"])  # owner, 2026-10-30 (lane itemart2): og1..og5 only
+        self.assertEqual(sorted(R.enabled_proposals(data)), [f"mxl/og{i}" for i in range(1, 6)])
         for k, v in data["pictures"].items():
             self.assertRegex(k, r"^(mxl|classic)/[\w\-]+$")
-            self.assertFalse(v["enabled"], k)
+            self.assertEqual(v["enabled"], k.startswith("mxl/og"), k)
             self.assertTrue(v.get("why"), k)
             self.assertEqual(sum(1 for f in ("method", "reuse") if v.get(f)), 1, k)
             if v.get("method"):
@@ -183,6 +186,114 @@ class SheetTests(unittest.TestCase):
         one, two = S.draw_sheet([row], "t"), S.draw_sheet([row, row], "t")
         self.assertEqual(one.width, S.PAD + 3 * (S.MIN_COL + S.PAD))
         self.assertGreater(two.height, one.height + 98)
+
+
+# -- the build uses the proposals switched on (item_hd.generate -> item_art.make_asset -> item_art_sheets.candidate) --------
+PAL = [(i, (i * 3) % 256, 255 - i) for i in range(256)]
+
+
+def dc6_frame(left: int, right: int, n: int = 24) -> bytes:
+    """A one-frame DC6 of an n x n square: palette index `left` on the left half, `right` on the right half."""
+    from dc6 import build_dc6
+    row = bytes([n]) + bytes([left] * (n // 2) + [right] * (n - n // 2)) + b"\x80"
+    return build_dc6([(n, n, 0, 0, row * n)])
+
+
+class BuildProposalTests(unittest.TestCase):
+    """item_hd.generate makes a picture from its proposal entry when the entry is switched on, else the usual upscale."""
+
+    def setUp(self):
+        import item_hd
+        from dc6 import write_item_sprite
+        self.t = tempfile.TemporaryDirectory()
+        t = Path(self.t.name)
+        self.src, self.hd_items, self.out = t / "mxl", t / "d2r" / "items", t / "out"
+        self.src.mkdir()
+        for inv in ("a", "b"):
+            (self.src / f"{inv}.dc6").write_bytes(dc6_frame(40, 150))
+        for name, n in (("x", 98), ("x.lowend", 49)):
+            img = disc(n * 3 // 4, n * 3 // 4, (60, 60, 200))
+            write_item_sprite(self.hd_items / "misc" / "gem" / f"{name}.sprite", n, n,
+                              upscale.place(img, n, n).tobytes())
+        entry = {"reuse": {"folder": "misc", "asset": "gem/x", "colour": "by position"}, "why": "t"}
+        self.data = {"enabled": True, "pictures": {"mxl/a": dict(entry, enabled=True), "mxl/b": dict(entry, enabled=False)}}
+        self.plan = item_hd.Plan({}, {}, {"items": {}, "uniques": {}, "sets": {}}, set(), {"a", "b"}, set(), [],
+                                 hd_items=self.hd_items)
+        self.plan.needs = {("misc", "mxl", "a"): (1, 1), ("misc", "mxl", "b"): (1, 1)}
+
+    def tearDown(self):
+        self.t.cleanup()
+
+    def generate(self):
+        import item_art
+        import item_hd
+        self.plan.proposals, self.plan.proposal_keys = R.enabled_proposals(self.data), set(self.data["pictures"])
+        with mock.patch.dict(item_art.GROUPS, {"mxl": self.src}):
+            return item_hd.generate(self.plan, PAL, self.out)
+
+    def sprite(self, inv: str, low: bool = False) -> np.ndarray:
+        from dc6 import read_sprite
+        p = self.out / "global" / "ui" / "items" / "misc" / "mxl" / f"{inv}{'.lowend' if low else ''}.sprite"
+        return upscale.rows_to_array(read_sprite(p)[0])
+
+    def source(self) -> np.ndarray:
+        from dc6 import decode_frame, parse_dc6
+        w, h, _ox, _oy, block = parse_dc6(dc6_frame(40, 150))[0]
+        return upscale.rows_to_array(decode_frame(w, h, block, PAL, fill=True))
+
+    def test_an_enabled_entry_is_used_with_the_sheets_own_render(self):
+        n = self.generate()
+        self.assertEqual(self.plan.report["proposal_on"], ["mxl/a"])
+        self.assertEqual((n["mxl from proposal"], n["mxl upscaled"]), (1, 1))
+        prop = self.data["pictures"]["mxl/a"]
+        want, _label = S.candidate(prop, self.source(), 98, 98, self.hd_items)
+        self.assertTrue((self.sprite("a") == want).all())
+        want_low, _label = S.candidate(prop, self.source(), 49, 49, self.hd_items, 49)
+        self.assertTrue((self.sprite("a", low=True) == want_low).all())
+        # D2R's blue disc, Median's colours by position: the two halves take the source's two palette colours' hues
+        left, right = self.sprite("a")[49, 30, :3].astype(int), self.sprite("a")[49, 68, :3].astype(int)
+        self.assertGreater(left[2], left[0])
+        self.assertGreater(right[0], right[2])
+
+    def test_a_disabled_entry_or_file_is_not_used(self):
+        self.generate()
+        keep = upscale.place(upscale.upscale(self.source(), 98 / 28), 98, 98)
+        self.assertTrue((self.sprite("b") == keep).all())
+        self.data["enabled"] = False  # the file's switch off: entry a is not used either (fresh output folder)
+        self.out = self.out.with_name("out2")
+        self.plan.report.clear()
+        n = self.generate()
+        self.assertEqual((self.plan.report["proposal_on"], n["mxl upscaled"]), ([], 2))
+        self.assertTrue((self.sprite("a") == keep).all())
+
+
+class Og4AgainstTheReviewSheetTests(unittest.TestCase):
+    """The build's og4 (Flawless Rainbow Stone) is the candidate the owner approved on lane itemart's sheet 1."""
+
+    def test_og4_matches_the_review_candidate(self):
+        import fxpaths
+        import item_art
+        from dc6 import palette, read_sprite
+        from PIL import Image
+        sheet = fxpaths.RUNS / "itemart" / "review" / "sheet_01.png"
+        hd_items = fxpaths.D2R_DATA / "hd" / "global" / "ui" / "items"
+        pal = item_art.BASE / "palette" / "pal.dat"
+        src = item_art.MOD_ITEMS / "og4.dc6"
+        if not all(p.exists() for p in (sheet, hd_items / "misc" / "gem" / "flawless_saphire.sprite", pal, src)):
+            self.skipTest("needs the game files and mxl2012-runs/itemart/review/sheet_01.png")
+        prop = R.load_proposals()["pictures"]["mxl/og4"]
+        with tempfile.TemporaryDirectory() as t:
+            dst = Path(t) / "og4.sprite"
+            item_art.convert(src, dst, 1, 1, palette(pal), item_art.CELL_HD, None, hd_items, prop)
+            a = upscale.rows_to_array(read_sprite(dst)[0])
+        g = np.asarray(S.on_grid(a, 1, 1)).astype(int)
+        sh = np.asarray(Image.open(sheet).convert("RGBA")).astype(int)
+        h, w = g.shape[:2]
+        best = 255
+        for y, x in zip(*np.nonzero((sh[:-h + 1, :-w + 1] == g[0, 0]).all(-1))):
+            if (sh[y, x:x + w] == g[0]).all():
+                best = min(best, int(np.abs(sh[y:y + h, x:x + w] - g).max()))
+        self.assertLessEqual(best, 2)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,8 @@ References: invfile / uniqueinvfile / setinvfile of weapons, armor, misc, and in
   - an invfile the mod ships a DC6 for must have its HD sprite (mxl/<invfile>.sprite + .lowend.sprite, right size,
     matching the DC6's opaque fraction and colour) and every item that uses it must point at it; a picture made from
     D2R's HD sprite (item_hd_report.json "hd_reuse", tools/item_reuse.py) is D2R's art, so it is held to the looser
-    REUSE_* limits, and an exact one may point at D2R's asset itself ("hd_reuse_direct")
+    REUSE_* limits, and an exact one may point at D2R's asset itself ("hd_reuse_direct"); so is a picture made from a
+    picture proposal switched on ("proposal_on", tools/data/item_art_proposals.json)
   - an invfile with only a D2R classic DC6 resolves through D2R's HD asset or a converted classic/<invfile> sprite
   - an invfile with no DC6 in the mod or in D2R is unresolved (reported with its rows)
   - every base item code / unique / set name is in items.json / uniques.json / sets.json and its asset is a D2R sprite
@@ -121,7 +122,7 @@ def main() -> int:
     mod_dc6 = {p.stem.lower() for p in MOD_ITEMS.glob("*.dc6")}
     d2r_dc6 = {p.stem.lower() for p in D2R_ITEMS.glob("*.dc6")}
     hd_report = json.loads((OUT / "item_hd_report.json").read_text("utf-8")) if (OUT / "item_hd_report.json").exists() else {}
-    reused = set(hd_report.get("hd_reuse", {}))
+    reused = set(hd_report.get("hd_reuse", {})) | set(hd_report.get("proposal_on", []))  # both are D2R's HD art
     report = check_items(tables, maps["items"], maps["uniques"], maps["sets"], sprite_set(BASE / "filelist.txt"), mod_dc6, d2r_dc6,
                          direct=hd_report.get("hd_reuse_direct", {}))
     pal = palette(BASE / "palette" / "pal.dat")

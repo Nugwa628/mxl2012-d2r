@@ -20,6 +20,9 @@ The mod's art always wins over D2R's: an invfile the mod ships a DC6 for (even o
 A converted picture (mod or classic) that is vanilla art (tools/item_reuse.py: exact, recolour or rescale of a D2R
 picture that has an HD sprite) is made from D2R's HD sprite instead of an upscale; an exact one whose D2R sprite has the
 right folder and size is not written at all, the map points at D2R's asset ("mod: D2R HD").
+A converted picture with a picture proposal switched on (tools/data/item_art_proposals.json: the file's `enabled` and the
+entry's; item_art_review.enabled_proposals) is made from that entry instead (item_art_sheets.candidate, the review
+sheets' own code), on the same cells and path; the report lists those as `proposal_on`.
 
 Output: work/hd/data/hd/items/{items,uniques,sets}.json, work/hd/data/hd/global/ui/items/** sprites,
 work/hd/item_hd_report.json (every item with its method, the fallbacks, unresolved invfiles).
@@ -80,6 +83,8 @@ class Plan:
         dc6_size(group, inv) -> (w, h) of the picture (for the size test of a direct reuse)."""
         self.mod, self.d2r, self.maps, self.have = mod, d2r, d2r_maps, set(d2r_sprites)
         self.reuse, self.hd_items, self.dc6_size = reuse or {}, hd_items, dc6_size
+        self.proposals: dict[str, dict] = {}  # "mxl/<inv>" -> proposal entry switched on (item_art_review.enabled_proposals)
+        self.proposal_keys: set[str] = set()  # every key of the proposals file (on or off): its change remakes the sprite
         self.direct: dict[str, str] = {}  # invfile -> D2R asset (folder/asset) an exact mod picture points at
         self.mod_dc6, self.d2r_dc6 = mod_dc6, d2r_dc6
         self.needs: dict[tuple[str, str, str], tuple[int, int]] = {}  # (folder, group, invfile) -> cells
@@ -145,7 +150,7 @@ class Plan:
         if not inv:
             return None
         if inv in self.mod_dc6:
-            if (m := self.reuse.get(f"mxl/{inv}")) and self.dc6_size:
+            if (m := self.reuse.get(f"mxl/{inv}")) and self.dc6_size and f"mxl/{inv}" not in self.proposals:
                 import item_reuse
                 cw, ch = asset_size(*self.dc6_size("mxl", inv), *size)
                 if item_reuse.direct(m, folder, (cw * CELL_HD, ch * CELL_HD), self.hd_items):
@@ -260,12 +265,19 @@ def generate(plan: Plan, pal: list, hd_root: Path = HD_OUT) -> Counter:
                 if (f, g, sp.name.split(".")[0]) not in keep:
                     sp.unlink()
                     n["stale removed"] += 1
+    import item_art_review
     for (folder, group, inv), (cw, ch) in sorted(plan.needs.items()):
-        m = plan.reuse.get(f"{group}/{inv}")
-        if make_asset(group, inv, folder, cw, ch, pal, hd_root, reuse=m, hd_items=plan.hd_items):
-            n[f"{group} from D2R HD" if m else f"{group} upscaled"] += 1
+        k = f"{group}/{inv}"
+        m, prop = plan.reuse.get(k), plan.proposals.get(k)
+        deps = (item_art_review.PROPOSALS,) if k in plan.proposal_keys else ()
+        if make_asset(group, inv, folder, cw, ch, pal, hd_root, reuse=m, hd_items=plan.hd_items, proposal=prop, deps=deps):
+            n[f"{group} from proposal" if prop else f"{group} from D2R HD" if m else f"{group} upscaled"] += 1
+            if prop:
+                plan.report["proposal_on"].append(k)
         else:
-            plan.report["missing_dc6"].append(f"{group}/{inv}")
+            plan.report["missing_dc6"].append(k)
+    for k in sorted(set(plan.proposals) - set(plan.report["proposal_on"])):
+        plan.report["proposal_unused"].append(f"{k}: switched on, but the build makes no such picture")
     return n
 
 
@@ -294,7 +306,7 @@ def find_reuse(plan: Plan) -> dict:
 
 
 def proposals_report() -> dict:
-    """tools/data/item_art_proposals.json as listed in the report (lane itemart; not used by the build yet)."""
+    """tools/data/item_art_proposals.json as listed in the report: each entry, ON (used) or off."""
     import item_art_review
     return item_art_review.report_entry(item_art_review.load_proposals())
 
@@ -312,9 +324,12 @@ def build() -> Plan:
                 {p.stem.lower() for p in MOD_ITEMS.glob("*.dc6")}, {p.stem.lower() for p in D2R_ITEMS.glob("*.dc6")},
                 rows(EXCEL / "itemtypes.txt"), hd_items=hd_items, dc6_size=dc6_size)
     if hd_items.is_dir():
+        import item_art_review
         plan.reuse = find_reuse(plan)
+        data = item_art_review.load_proposals()
+        plan.proposals, plan.proposal_keys = item_art_review.enabled_proposals(data), set(data.get("pictures", {}))
     else:
-        plan.report["notes"].append(f"no D2R HD item sprites at {hd_items}: every picture is upscaled")
+        plan.report["notes"].append(f"no D2R HD item sprites at {hd_items}: every picture is upscaled (no proposals)")
     return plan
 
 
@@ -333,6 +348,7 @@ def main() -> int:
          **plan.report}, indent=1), "utf-8")
     print(f"items.json {len(items)}, uniques.json {len(uniques)}, sets.json {len(sets)}; sprites: "
           + ", ".join(f"{k} {v}" for k, v in sorted(n.items())) + "; " + ", ".join(f"{k} {v}" for k, v in sorted(plan.how.items())))
+    print(f"picture proposals used: {len(plan.report['proposal_on'])} ({', '.join(plan.report['proposal_on']) or 'none'})")
     print(f"pictures that are vanilla art, made from D2R's HD sprite: {len(plan.reuse)} "
           f"({len(plan.direct)} used directly); fallbacks {len(plan.report['fallback'])}, invfiles without a DC6 {len(plan.report['no_dc6'])}, missing assets {len(bad)}")
     return 1 if bad else 0

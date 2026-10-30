@@ -1,6 +1,6 @@
 {
- "enabled": false,
- "note": "Lane itemart proposals (2026-10-30). OFF: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd does not read this file yet. Switch on one entry and the file's switch to use it.",
+ "enabled": true,
+ "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5.",
  "pictures": {
   "mxl/og1": {
    "reuse": {
@@ -8,7 +8,7 @@
     "asset": "gem/chipped_saphire",
     "colour": "by position"
    },
-   "enabled": false,
+   "enabled": true,
    "why": "Median's Chipped Rainbow Stone is a D2R gem cut in many colours: D2R's HD chipped saphire (same cut and grade), Median's colours by position"
   },
   "mxl/og2": {
@@ -17,7 +17,7 @@
     "asset": "gem/flawed_saphire",
     "colour": "by position"
    },
-   "enabled": false,
+   "enabled": true,
    "why": "Median's Flawed Rainbow Stone is a D2R gem cut in many colours: D2R's HD flawed saphire (same cut and grade), Median's colours by position"
   },
   "mxl/og3": {
@@ -26,7 +26,7 @@
     "asset": "gem/saphire",
     "colour": "by position"
    },
-   "enabled": false,
+   "enabled": true,
    "why": "Median's Rainbow Stone is a D2R gem cut in many colours: D2R's HD saphire (same cut and grade), Median's colours by position"
   },
   "mxl/og4": {
@@ -35,7 +35,7 @@
     "asset": "gem/flawless_saphire",
     "colour": "by position"
    },
-   "enabled": false,
+   "enabled": true,
    "why": "Median's Flawless Rainbow Stone is a D2R gem cut in many colours: D2R's HD flawless saphire (same cut and grade), Median's colours by position"
   },
   "mxl/og5": {
@@ -44,7 +44,7 @@
     "asset": "gem/perfect_saphire",
     "colour": "by position"
    },
-   "enabled": false,
+   "enabled": true,
    "why": "Median's Perfect Rainbow Stone is a D2R gem cut in many colours: D2R's HD perfect saphire (same cut and grade), Median's colours by position"
   },
   "mxl/pearl1": {

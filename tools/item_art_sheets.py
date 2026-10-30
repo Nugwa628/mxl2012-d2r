@@ -48,9 +48,9 @@ def nearest(a: np.ndarray, factor: float) -> np.ndarray:
         (max(1, round(w * factor)), max(1, round(h * factor))), Image.Resampling.NEAREST))
 
 
-def upscaled(a: np.ndarray, method: str = upscale.METHOD) -> np.ndarray:
-    """`a` at HD size with an upscale method or a VARIANTS name (module settings restored afterwards)."""
-    f = CELL_HD / CELL_CLASSIC
+def upscaled(a: np.ndarray, method: str = upscale.METHOD, cell: int = CELL_HD) -> np.ndarray:
+    """`a` at `cell` pixels per cell (HD) with an upscale method or a VARIANTS name (module settings restored afterwards)."""
+    f = cell / CELL_CLASSIC
     if method not in VARIANTS:
         return upscale.upscale(a, f, method)
     base, settings = VARIANTS[method]
@@ -171,10 +171,11 @@ def colour_by_position(hd: np.ndarray, src: np.ndarray) -> np.ndarray:
 
 
 def render_reuse(hd: np.ndarray, src: np.ndarray, out_w: int, out_h: int, shift: dict | None,
-                 by_position: bool = False) -> np.ndarray:
-    """D2R HD sprite `hd` cropped, scaled so its area matches Median's picture `src` at HD size, recoloured, centred."""
+                 by_position: bool = False, cell: int = CELL_HD) -> np.ndarray:
+    """D2R HD sprite `hd` cropped, scaled so its area matches Median's picture `src` at `cell` pixels per cell (HD; the
+    lowend sprite at 49), recoloured, centred."""
     c, s = crop(hd), crop(src)
-    f = CELL_HD / CELL_CLASSIC
+    f = cell / CELL_CLASSIC
     k = math.sqrt((s.shape[0] * f * s.shape[1] * f) / max(c.shape[0] * c.shape[1], 1))
     k = min(k, out_w / c.shape[1], out_h / c.shape[0])
     a = upscale.resize(c, max(1, round(c.shape[1] * k)), max(1, round(c.shape[0] * k)))
@@ -190,17 +191,19 @@ def hd_sprite(hd_items: Path, folder_asset: str) -> np.ndarray:
 
 
 # -- candidates of one picture -------------------------------------------------------------------------------------
-def candidate(prop: dict | None, src: np.ndarray, out_w: int, out_h: int, hd_items: Path) -> tuple[np.ndarray, str]:
-    """(image, label) of a proposal entry; the current upscale for none / keep."""
+def candidate(prop: dict | None, src: np.ndarray, out_w: int, out_h: int, hd_items: Path,
+              cell: int = CELL_HD) -> tuple[np.ndarray, str]:
+    """(image, label) of a proposal entry; the current upscale for none / keep. The sheets show it at HD size; the build
+    (item_art.convert) makes the HD sprite with the same call and the lowend one at cell 49 from D2R's lowend sprite."""
     if prop and prop.get("reuse"):
         r = prop["reuse"]
         shift = {k: r[k] for k in ("hue", "sat", "val")} if "hue" in r else None
-        img = render_reuse(hd_sprite(hd_items, f"{r['folder']}/{r['asset']}"), src, out_w, out_h, shift,
-                           r.get("colour") == "by position")
+        asset = f"{r['folder']}/{r['asset']}" + (".lowend" if cell != CELL_HD else "")
+        img = render_reuse(hd_sprite(hd_items, asset), src, out_w, out_h, shift, r.get("colour") == "by position", cell)
         return img, f"D2R {r['asset'].split('/')[-1]}" + (", Median's colours" if r.get("colour") == "by position" else "")
     if prop and prop.get("method"):
-        return upscale.place(upscaled(src, prop["method"]), out_w, out_h), prop["method"]
-    return upscale.place(upscaled(src), out_w, out_h), "keep (no better)"
+        return upscale.place(upscaled(src, prop["method"], cell), out_w, out_h), prop["method"]
+    return upscale.place(upscaled(src, cell=cell), out_w, out_h), "keep (no better)"
 
 
 # -- sheet drawing --------------------------------------------------------------------------------------------------

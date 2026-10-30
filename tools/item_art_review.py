@@ -17,7 +17,8 @@ counts as low: Median's misc items are level 0).
 
 The candidates are in tools/data/item_art_proposals.json ("enabled": false for all until the owner approves one): per
 picture either a D2R HD sprite recoloured like item_reuse (`reuse`: folder, asset, hue / sat / val) or another upscale
-method (`method`). item_hd does not read the file yet (owner rule, 2026-10-30: the owner sees the pictures first).
+method (`method`). Owner rule (2026-10-30): the owner sees the pictures first; item_hd uses only the entries switched
+on (the file's `enabled` and the entry's: enabled_proposals), the five Rainbow Stones og1-og5 since lane itemart2.
 Needs numpy and Pillow; game art is read from the extraction and written only to <out_dir> (keep it out of git).
 """
 import json

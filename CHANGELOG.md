@@ -5,6 +5,7 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- HD: the Rainbow Stones use D2R's crisp HD gem pictures in Median's colours.
 - Reign of the Warlock stash: runes (Ith and all others), gems, skulls, rejuvenation potions and the Token of Absolution
   can now be put into the runes / gems tabs.
 - "Baal says: *Laughing*" from Median's skills now reads "Baal says: LOL", at most once every 30 seconds.

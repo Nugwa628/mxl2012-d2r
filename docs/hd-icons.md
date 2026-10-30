@@ -274,11 +274,26 @@ the reused ones are at most D2R's (D2R's chipped gems are 100 x 100, ours 98 x 9
 
 Of the 2429 item codes, about 1,700 already use D2R's own HD art by invfile and 23 pictures are D2R HD sprites recoloured
 (`hd_reuse` above); the 92 upscales are what looks soft. **Owner rule (2026-10-30): the owner sees new item pictures
-before any goes into the build.** So nothing here changes the build: the candidates are written down in
-`tools/data/item_art_proposals.json` with `"enabled": false` for the file and for every entry. `item_hd` does not use them
-yet; it only lists them in `item_hd_report.json` `picture_proposals` ("off: owner review"). A later round switches on the
-approved ones and wires them in (`item_art_review.enabled_proposals` gives only the entries switched on under an enabled
-file).
+before any goes into the build.** The candidates are written down in `tools/data/item_art_proposals.json`, each with its
+own `enabled` switch under the file's `enabled`; `item_hd` uses only the entries switched on
+(`item_art_review.enabled_proposals`) and lists every entry in `item_hd_report.json` `picture_proposals` ("ON" or "off:
+owner review").
+
+**Switched on (owner, 2026-10-30, lane itemart2): the five Rainbow Stones `og1`..`og5`** ("they look really nice"): D2R's
+HD sapphire of the same cut and grade in Median's colours by position, as on sheets 1, 2 and 4. The other 23 entries (the
+arcane crystals, the runes, the signet, the apple) stay off: they are only a smoother or crisper upscale.
+
+How the build uses an entry switched on (`item_hd.generate` -> `item_art.make_asset(proposal=...)` -> `item_art.convert`):
+the picture is made by the review sheets' own code, `item_art_sheets.candidate`, instead of the upscale or the `hd_reuse`
+render: a `reuse` entry crops D2R's HD sprite, scales it to the area of Median's picture at 98 px per cell, recolours it
+(`colour_by_position`, or the entry's hue / sat / val) and centres it on the item's cells; the `.lowend` sprite does the same
+from D2R's lowend sprite at 49 px per cell; a `method` entry is that upscale setting. The cells, the centring and the size
+rule (`asset_size`) are the upscale's, and the sprite is written at the same path (`mxl/<inv>.sprite`), so the item maps do
+not change. The report lists the pictures made so as `proposal_on` (a switched-on entry the build has no picture for: under
+`proposal_unused`); `generate` counts them as "mxl from proposal". A change of the proposals file remakes the sprites of its
+entries (it is a dependency of their cache). The check (`item_icon_check.py`) holds them to the looser `REUSE_*` limits,
+as D2R's art. The built og1..og5 sprites are pixel for pixel the candidates on lane itemart's sheets (max difference 0;
+`test_itemart.Og4AgainstTheReviewSheetTests` for og4); in game: docs/testing.md "Lane itemart2".
 
 **Ranking** (`py -3 -I tools/item_art_review.py rank --top 0`): how often players see a picture, summed over the items that
 show it: expected drops per kill over every enabled monster row and the three difficulties through the treasureclassex tree
@@ -318,7 +333,8 @@ with a proposal first (sheets 1-4), then the top-25 pictures kept as they are (s
 
 468 invfiles are referenced (invfile, uniqueinvfile, setinvfile of weapons/armor/misc, invfile of uniques/sets): 100 have a mod DC6,
 366 only a D2R classic DC6, **2 have no DC6 anywhere**. Checked: all 228 generated sprites against their DC6 (size = whole cells
-holding the picture, opaque fraction, colour; the 22 made from D2R's HD art within the looser `REUSE_*` limits, opaque
+holding the picture, opaque fraction, colour; the 22 made from D2R's HD art and the 5 from a picture proposal within the
+looser `REUSE_*` limits, opaque
 fraction 0.15 and colour 25, as D2R's redraw is not the classic picture; 0 problems), every one of the 2429 codes in `items.json` and every unique / set name
 in its map with an existing asset (D2R sprite or generated; 0 missing), every item using a mod picture points at it or, for an exact copy, at D2R's asset (0 not used).
 Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not failed.
@@ -339,8 +355,8 @@ Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not fail
 - **Repeated unique/set names.** The maps are keyed by name; Median reuses one name on many bases (231 unique names on several
   rows, 350 rows `Cornerstone of the Roflworld`, 195 `SkillsdLastSkillEver` placeholders). The first row's picture is used for all
   rows of a name; only 5 names (2 unique, 3 set) have rows with another picture.
-- **Art quality.** 92 pictures (78 Median, 14 D2R classic without an HD picture) are still upscales (the hybrid above;
-  28 better candidates wait for the owner: "Picture review"):
+- **Art quality.** 87 pictures (73 Median, 14 D2R classic without an HD picture) are still upscales (the hybrid above;
+  the five Rainbow Stones are D2R's HD gems since lane itemart2; the other 23 candidates stay off: "Picture review"):
   crisp, but pixel-art detail next to D2R's painted HD items. No new HD redraw. Skill icon sheets use the hybrid too (item 4). Seen in game with the harness (check `hdit_icons`, slot 4,
   2026-10-29, docs/testing.md): 16 items in HD and legacy, drawn as intended.
 - **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees").
@@ -370,6 +386,7 @@ The tools, what they were built from and what changed:
 | `tools/data/item_skill_icons.tsv`; `shared_icons.py`, `skill_icon_check.py`, `test_shared_icons.py` | new / changed (lane procicons) | closest icon of the item skills on the "?" (donor table, its resolution, the strip limit), renamed `_mxl` skills by their Median name, per-bank table check; 6 more unit tests |
 | `tools/hd_polish_sheet.py`, `tools/tests/test_hdpolish.py` | new (lane hdpolish) | comparison sheets (skill icons, panels, classic 225-254), 9 unit tests |
 | `tools/item_art_review.py`, `tools/item_art_sheets.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | new (lane itemart) | visibility ranking of the upscaled pictures, loose silhouette / colour-by-position candidates, upscale variants, review sheets, the proposal list (off), 20 unit tests; `item_hd.py` lists the proposals in its report |
+| `tools/item_hd.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_icon_check.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart2) | the build makes the pictures of the proposals switched on (`candidate` at HD and lowend cell size), report `proposal_on`, the check's reuse limits for them; og1..og5 on; 3 more unit tests |
 
 Not copied: `state_icons.py` (no state icon art in 1.13c, see Gaps), `dcc.py`, `hd-effects.md` / `item-tooltips.md` (no state icons in the mod; DCC art and tooltips are
 other lanes).
