@@ -5,7 +5,17 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-**Fixed / new (merged, for the next alpha):**
+Nothing yet.
+
+## D2R-XL 2012
+
+### 0.1.3 (2026-10-30)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.3:**
 
 - Barbarian spirit summons (Guardian, Defender, Protector Spirit) no longer play the Ancients' HD death roar over and over.
 - Totems: Bend the Shadows still brings them to you, but they no longer stack on you or slow down; in HD a moved totem no
@@ -17,7 +27,9 @@ version being released (docs/release.md).
 - HD: Median's 8 retextured maps are lit in their own colours; all 17 Median maps show walls.
 - Legacy graphics (G): Fire Wall's skill icon and the skill tab titles are right.
 
-## D2R-XL 2012
+**Known:** now and then one totem stays on your own spot after Bend the Shadows (often next to rocks); cast again or step
+aside. The Glacial Trail exit stands on a ledge; from the low pocket below it, clicking does nothing: walk round through the
+other rooms.
 
 ### 0.1.2 (2026-10-29)
 
