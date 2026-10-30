@@ -346,11 +346,11 @@ class SkillTreeHdTests(unittest.TestCase):
     def page(self) -> Image.Image:
         return MedianTreeArtTests.page(self)
 
-    def test_switch_ships_off(self):
+    def test_switch_ships_d2r(self):
         import skill_tree_hd
         data = skill_tree_hd.load_switch()
-        self.assertFalse(data.get("enabled"))
-        self.assertEqual(skill_tree_hd.used_method(data), "lanczos")
+        self.assertTrue(data.get("enabled"))  # owner picked C (2026-10-31)
+        self.assertEqual(skill_tree_hd.used_method(data), "d2r")
         self.assertIn(data.get("method"), skill_tree_hd.METHODS)
         self.assertEqual(skill_tree_hd.used_method({"enabled": True, "method": "d2r"}), "d2r")
         self.assertEqual(skill_tree_hd.used_method(data, "rebuild"), "rebuild")   # a trial build

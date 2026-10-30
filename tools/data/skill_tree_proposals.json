@@ -1,5 +1,5 @@
 {
- "enabled": false,
- "method": "rebuild-stone",
- "note": "Lane skillhd (2026-10-30): sharper HD skill tree pages (tools/skill_tree_hd.py, docs/hd-ui.md \"Skill trees: HD page candidates\"). Owner rule: the owner sees the review sheets (mxl2012-runs/skillhd/) first. The build draws the pages with `method` only while `enabled` is true, else with lanczos (the shipped look); `skill_tree_art.py --try METHOD` or MXL2012_SKILLTREE_TRY=METHOD makes a trial build. Methods: lanczos (shipped), rebuild, rebuild-stone, d2r."
+ "enabled": true,
+ "method": "d2r",
+ "note": "Lane skillhd (2026-10-30): sharper HD skill tree pages (tools/skill_tree_hd.py, docs/hd-ui.md \"Skill trees: HD page candidates\"). Owner (2026-10-31): ship C (d2r) for all classes; the old tab column does not carry over. The build draws the pages with `method` only while `enabled` is true, else with lanczos (the shipped look); `skill_tree_art.py --try METHOD` or MXL2012_SKILLTREE_TRY=METHOD makes a trial build. Methods: lanczos (shipped), rebuild, rebuild-stone, d2r."
 }

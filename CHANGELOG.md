@@ -7,6 +7,7 @@ version being released (docs/release.md).
 
 - HD: the Boss Killer Ring and the Upgraded Boss Killer Ring show their picture again (they showed an empty cell) (#513).
 - HD: the names under the pet icons by the portrait no longer run into each other, and the Necromancer's summons (and a few other pets) have their own pet icons (#514).
+- HD: new skill tree pages for all seven classes in D2R's own HD style (D2R's stone and carved sockets on Median's layout, each tree's colour as a rim).
 
 ## D2R-XL 2012
 
