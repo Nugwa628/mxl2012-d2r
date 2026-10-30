@@ -3856,3 +3856,40 @@ Evidence: `mxl2012-runs/walls3/sheets/sheet_<map>.png` (before HD | after HD | l
 `checks-20261030-005953-s1` for caveroom4 and belial, maptint `run2-checks-20261030-033400-s4` for the retextured maps),
 `sheets_final/` for the last run, the run folders `run1-…`, `run2-…`, `run3-…` next to them. Open: belial's void (what paints
 the HD floor of a level larger than its preset), charismatic's arches and roofs (no D2R model, custom art).
+## Lane runetab: runes into the stash's runes tab (bug #510, 2026-10-30, slot 3, background mode, build of lane/runetab)
+
+Build: `tools/build.py` (validate 0 errors; `d2r_adds` line "AdvancedStashStackable of D2R on 71 rows by code and type, 71
+cells set"), `tools/build_plugin.ps1 -Release -Tests` (plugin = main's), `install_mod.py --slot 3`. Slot 3 held about 12:01-12:38,
+then unlocked. Scratch drivers (not committed): `mxl2012-runs/runetab/` (`drv.py`, `qm.py`, `r_lib.py`, `r_tab.py`, `r_tab2.py`,
+`r_leg1.py`, `r_leg2.py`, `col.py`, `codes.py`), logs `session*.log`; evidence `mxl2012-runs/runetab/evidence/checks-*`.
+
+**Cause (static).** D2R 3.3's runes / gems / materials tab is not a grid: D2R's `bankexpansionlayouthd.json` holds one
+`AdvancedStashSlotWidget` per item code (91: 33 runes, 35 gems and skulls, `rvs` / `rvl`, `toa`, keys, organs, essences,
+shards, Colossal materials), and D2R's misc.txt marks exactly those rows `AdvancedStashStackable` 1. The mod ships no stash
+layout (D2R's is used) and its misc rows on those codes are the same items (same code, type, size), but the built column was
+empty on every row: `txt_migrate.py` gives D2R-only columns the neutral default. So the tab took no rune at all, not only Ith.
+The `advanced_stash` step of `tools/d2r_adds.py` now copies D2R's flag onto mod rows with the same code and type (71 rows, RotW
+bank; D2R's base bank has none); unit test `test_advanced_stash_flag_from_d2r`.
+
+**In game.** The slots' Battle.net account does not own Reign of the Warlock: the stash shows only Personal and Shared and the
+character screen's Game Version offers only Expansion (`evidence/checks-20261030-120133-s3/t0_stash_hd.png`, pre-fix install),
+so **the runes tab itself could not be opened here**. Checked instead that the flag changes nothing for the normal tabs
+(new Sorceress `RuneTabbccb`, items made by harness `item`, moves by the player's clicks):
+
+| What | Result | Evidence |
+|---|---|---|
+| HD personal tab, Ctrl-click: all 33 runes r01-r33, `gcv` `gpw` `skz` `gsb`, `rvs` `rvl`, `toa` | **PASS** 40 of 40 into the stash as 1x1 items (no stacking) | `checks-20261030-122132-s3/runetab_moves.json`, `t1_hd_personal.png` |
+| HD personal tab, drag into free cells: Ith, Tal, Eth, `gcv`, `rvs`, `toa` | **PASS** 6 of 6 | `checks-20261030-122936-s3/runetab_moves2.json`, `u1_hd_personal_drag.png` |
+| HD shared tab, Ctrl-click Ith, Eth, Zod, `gcv`, `rvs`, `toa`; drag Ith, Thul | **PASS** 8 of 8 | `u2_hd_shared.png`, `u5_hd_reloaded_shared.png` |
+| Legacy (G with the stash open), personal: Ctrl-click Ith, El, Lem, `gpv`, `rvl`, `toa`; drag Ith, Zod, `skc` | **PASS** 9 of 9 | `checks-20261030-123600-s3/runetab_moves3.json`, `v1_legacy_stash_open.png`, `v2_legacy_personal.png` |
+| Legacy, shared: Ctrl-click Ith, Sol; drag Ith | **PASS** 3 of 3 | `v3_legacy_shared.png` |
+| Save and Exit, reload (three times) | **PASS** items identical (76, 86, 96) | `session2.log`, `session3.log`, `session6.log` |
+| Engine | 0 asserts on the play path (only the known Save and Exit pool check), 0 crash files | the same logs |
+
+Test faults on the way (not the game): D2R names take letters only (`RuneTab1211` was typed as `RuneTab`, taken); a drag onto an
+occupied cell swapped items and left one on the cursor, which blocked the later moves of `r_tab.py` (redone in `r_tab2.py`);
+`hdl_stash_open` clicks HD spots, so in legacy it picked a rune instead of opening the stash (redone: open in HD, then G).
+Left behind: slot 3's shared stash page 1 holds 11 test items, `RuneTabbccb` in `mxl2012-s3`.
+
+**For a RotW account (owner / user):** put Ith and a few other runes, gems and a rejuvenation potion into the runes / gems
+tabs by drag and Ctrl-click; take them back out; Save and Exit.

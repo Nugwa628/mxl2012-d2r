@@ -20,7 +20,9 @@ Steps (each one is idempotent, so the step can run twice):
   warlock         Warlock on Median's rules: experience column (curve + MaxLvl 120) and the charstats per-level /
                   movement / regen constants copied from the template class (Amazon, whose D2R values match the
                   Warlock's), Median's common starting kit plus a Median dagger instead of D2R's `dgr` (no such item)
-  advanced_stash  only with --advanced-stash off: misc AdvancedStashStackable emptied (owner question, default keep)
+  advanced_stash  keep (default): misc AdvancedStashStackable copied from D2R's misc.txt onto the mod rows with the same
+                  code and type (runes, gems, rejuvenation potions, Token; the migration leaves it empty, bug #510);
+                  --advanced-stash off empties it (owner question)
 
 Input:  <mod>/data/global/excel/{,base/}<table>.txt   the migrated tables (tables lane: work/mod)
         <d2r>/data/hd/global/excel/desecratedzones.json D2R 93847 baseline (read-only)
@@ -53,6 +55,7 @@ TERROR_TC = {"monstats": ("TreasureClassDesecrated", "TreasureClassDesecratedCha
              "superuniques": ()}  # superuniques: every "... Desecrated" column, found by name
 DUP_CODE_COLUMNS = {"gems": ("code",), "books": ("ScrollSpellCode", "BookSpellCode")}
 POSITIONAL = ("books",)
+STASH_FLAG = "AdvancedStashStackable"
 
 WARLOCK = "Warlock"
 TEMPLATE = "Amazon"  # D2R's Warlock per-level values equal D2R's Amazon's (ManaPerMagic 8 vs 6 aside)
@@ -226,6 +229,34 @@ def step_dup_codes(mod: Mod, d2r: Path, log: list[str]) -> None:
     log.append(f"dup_codes: {len(dropped)} D2R rows dropped" + (": " + "; ".join(dropped) if dropped else ""))
 
 
+def step_advanced_stash(mod: Mod, d2r: Path, log: list[str]) -> None:
+    """D2R's materials / gems / runes tab (bankexpansionlayouthd.json, one AdvancedStashSlotWidget per item code) takes an
+    item only when its misc row has AdvancedStashStackable 1. The migration leaves D2R-only columns empty, so every Median
+    row lost it (bug #510: no rune could go into the runes tab). A mod row with D2R's code and item type takes D2R's flag."""
+    n, rows = 0, 0
+    for bank in BANKS:
+        ts = [t for t in mod.tables("misc") if t.path.parent.name == ("base" if bank else "excel")]
+        src = d2r / EXCEL / bank / "misc.txt"
+        if not ts or not src.exists():
+            continue
+        t, base = ts[0], Table(src)
+        flag, code, typ = t.col(STASH_FLAG), t.col("code"), t.col("type")
+        bflag, bcode, btyp = base.col(STASH_FLAG), base.col("code"), base.col("type")
+        if None in (flag, code, bflag, bcode):
+            continue
+        d2r_rows = {base.get(r, bcode): r for r in base.rows if base.get(r, bflag) not in ("", "0")}
+        for r in t.rows:
+            src_row = d2r_rows.get(t.get(r, code))
+            if src_row is None:
+                continue
+            if typ is not None and btyp is not None and t.get(r, typ) != base.get(src_row, btyp):
+                continue  # another item on D2R's code: it has no slot of its own in the tab
+            rows += 1
+            n += t.set(r, flag, base.get(src_row, bflag))
+    log.append(f"advanced_stash: kept (D2R's stack tab; owner question, docs/d2r-additions.md); {STASH_FLAG} of D2R on "
+               f"{rows} rows by code and type, {n} cells set")
+
+
 def step_warlock(mod: Mod, log: list[str]) -> None:
     n = 0
     for t in mod.tables("experience"):
@@ -287,9 +318,9 @@ def run(mod_dir: Path, out_dir: Path, d2r: Path, advanced_stash: str = "keep", o
         step_warlock(mod, log)
     if "advanced_stash" in want:
         if advanced_stash == "off":
-            step_clear_columns(mod, log, "advanced_stash", ("misc",), ("AdvancedStashStackable",))
+            step_clear_columns(mod, log, "advanced_stash", ("misc",), (STASH_FLAG,))
         else:
-            log.append("advanced_stash: kept (D2R's stack tab; owner question, docs/d2r-additions.md)")
+            step_advanced_stash(mod, d2r, log)
     written = mod.save()
     report = ["# D2R additions step (tools/d2r_adds.py)", "", *[f"- {line}" for line in log], "",
               "Written: " + (", ".join(written) if written else "nothing changed")]

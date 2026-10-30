@@ -5,6 +5,8 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Reign of the Warlock stash: runes (Ith and all others), gems, skulls, rejuvenation potions and the Token of Absolution
+  can now be put into the runes / gems tabs.
 - "Baal says: *Laughing*" from Median's skills now reads "Baal says: LOL", at most once every 30 seconds.
 - Release notes: the line on HD item pictures now says about 90 Median-only ones are upscaled classic pictures.
 - HD walls: Hole Level 2 has its stairs at the arrival, and Khalimgrad's cathedral has its Fortress walls in place (they

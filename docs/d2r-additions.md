@@ -31,7 +31,7 @@ this step writes the same json plus `max_herald_tiers` 0). Run on the tables lan
 | `merc_classitems` | hireling `equivalentcharclass` emptied (96 cells: Rogues as Amazon, Barbarians as Barbarian for class items) |
 | `dup_codes` | D2R rows appended to keyed tables that repeat a Median item code: gems `Chipped..Perfect Sapphire` (Median spells "Saphire"; both carried gcb..gpb, D2R's vanilla gem mods next to Median's) and books' three Tome rows (Median names its books "unused") - both banks, 16 rows |
 | `warlock` | experience: Warlock column = Amazon's (Median curve, MaxLvl 120 instead of 99). charstats Warlock: hpadd, ManaRegen, ToHitFactor, Walk/RunVelocity, RunDrain, Life/Stamina/ManaPerLevel, LifePerVitality, StaminaPerVitality, ManaPerMagic, StatPerLevel, SkillsPerLevel, BlockFactor = Amazon's Median values (D2R's Warlock numbers are D2R's Amazon numbers, so Amazon is the template). Base stats, skills, strings stay D2R's. Starting kit = Median's common kit (cube, 8 hp1, 10 tsc, zen, 600 body armour, 01-) with Median's "Dagger (Grade 1)" `142` in the right hand: D2R's `dgr` is not an item in Median's tables |
-| `advanced_stash` | `--advanced-stash off` empties misc `AdvancedStashStackable` (71 Median rows got it by code); default keep (owner question 2) |
+| `advanced_stash` | default keep: misc `AdvancedStashStackable` copied from D2R onto the 71 Median rows with D2R's code and type (the migration left it empty, bug #510); `--advanced-stash off` empties it (owner question 2) |
 
 ## Feature table
 
@@ -62,7 +62,7 @@ D2R has it), **plugin** (needs plugin work, another lane), **owner** (decision n
 | Colossal Summit area + Colossal Ancients (RotW, level 137, monstats colossal1-3, colbarb*, objects ColossalAltar / colossal_statue_*, monai Colossal*) | levels row 137, monstats/monstats2/monai/objects rows | yes as content, but unreachable: no level links to 137, entry needs "Uber Ancient Summon Material" (misc rows replaced by Median's, so no material exists) | keep rows (indexed tables, D2R ids hardcoded), unreachable | - | auto (verify no portal opens) |
 | Terror token / uber materials stack item types (`terrt`, `uberm`) | itemtypes/misc | yes | remove | not in the migrated tables | auto |
 | Colossal Jewel (`cjwl`, Restricted) | itemtypes | yes | remove | no item of the type; type row kept for stable type ids | auto |
-| Advanced stash "Materials" stack tab (3.0) | misc `AdvancedStashStackable` (71 Median rows by code: runes, gems, ...) | storage QoL; Median 2012 has 1 stash page | owner | `--advanced-stash off` | owner (question 2) |
+| Advanced stash "Materials" stack tab (3.0) | misc `AdvancedStashStackable` (71 Median rows by code and type: runes, gems, rejuvs, Token; bug #510) | storage QoL; Median 2012 has 1 stash page | owner | `--advanced-stash off` | owner (question 2) |
 | Shared stash tabs (D2R 1.0) | D2R / D2RLoader `add_shared_tabs` | no (plugin-plan J) | keep | - | kept |
 | Loot filter (3.x) | D2R UI | no (display only) | keep | - | kept |
 | Chronicle (3.x collection log, cosmetic rewards: portal / footsteps / backlight) | uniques/sets `disableChronicle`, itemtypes `UICategory` / `RunewordCategory1-2`, states chronicle* | no gameplay effect | keep, tracks Median's items (owner 2026-10-28) | `tools/chronicle.py`, see "Chronicle" below | done (data); game check below |
