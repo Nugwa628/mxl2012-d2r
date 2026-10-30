@@ -443,4 +443,8 @@ files, 9,875,908 bytes, none larger than its D2R source. The final gold step cha
 
 **In game** (docs/testing.md "Lane picktint"): Magic Missiles red-orange, Lorenado's tornado and orbs green. Judgement's glow is
 gold, its bolt core stays white: the core's colour is a constant in the particle program, not a gradient, so no texture tint
-reaches it. The bolt drawn below the target is the missile's own path (classic draws the missile's light on the same spot).
+reaches it. The bolt drawn below the target is the missile's own path (classic draws the missile's light on the same spot). Lane tunnels
+(docs/bugs.md #481, check `jdg_path`) traced the mallets. They are Lightning Strike chain bolts (srvhit 20): when one finds no
+other target it flies its full range straight down-screen, in both modes, and the HD effect follows it correctly. Two ways
+to turn the core gold failed, and neither ships. The grey float4 constants in the program are random ranges, not colours. A gold
+texture in place of `default/White.texture` left the core white in game.

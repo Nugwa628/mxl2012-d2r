@@ -23,6 +23,10 @@ right folder and size is not written at all, the map points at D2R's asset ("mod
 A converted picture with a picture proposal switched on (tools/data/item_art_proposals.json: the file's `enabled` and the
 entry's; item_art_review.enabled_proposals) is made from that entry instead (item_art_sheets.candidate, the review
 sheets' own code), on the same cells and path; the report lists those as `proposal_on`.
+Item types with random pictures (itemtypes `VarInvGfx` N: rings, amulets, charms, jewels, Median's Mega Rings `kill`) make
+D2R ask for the item's asset with the variant number appended (D2R's own: ring/ring1..5, gem/perfect_diamond1..6); a
+generated picture used by such an item is also written as <inv>1..<inv>N (copies; bugs.md #513: the Boss Killer Rings
+`r@r` / `s@s`, type `kill`, were blank in HD).
 
 Output: work/hd/data/hd/items/{items,uniques,sets}.json, work/hd/data/hd/global/ui/items/** sprites,
 work/hd/item_hd_report.json (every item with its method, the fallbacks, unresolved invfiles).
@@ -30,6 +34,7 @@ Usage: py -3 -I tools/item_hd.py
 """
 import json
 import re
+import shutil
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -97,6 +102,9 @@ class Plan:
         self.cells_of: dict[str, tuple[int, int]] = {}
         self.parents = {r.get("Code", "").lower(): [r.get("Equiv1", "").lower(), r.get("Equiv2", "").lower()]
                         for r in mod_types if r.get("Code")}
+        self.var_gfx = {r.get("Code", "").lower(): int(r.get("VarInvGfx") or 0) for r in mod_types
+                        if r.get("Code") and (r.get("VarInvGfx") or "0").isdigit()}
+        self.variants: dict[tuple[str, str, str], int] = {}  # (folder, group, invfile) -> VarInvGfx of its users
         self._index_d2r()
 
     # -- D2R baseline ---------------------------------------------------------------------------------
@@ -205,6 +213,11 @@ class Plan:
                         f"{table} {code} {r.get('name', '')!r}: invfile {inv!r} has no picture -> {asset} ({how})")
                 self.items[code] = {"asset": asset}
                 self.how[f"items: {how}"] += 1
+                group, _, gen = asset.partition("/")
+                n = self.var_gfx.get(r.get("type", "").lower(), 0)
+                if n and group in ("mxl", "classic") and (folder, group, gen) in self.needs:
+                    k = (folder, group, gen)
+                    self.variants[k] = max(self.variants.get(k, 0), n)
                 if inv and not inv in self.mod_dc6 | self.d2r_dc6:
                     self.report["no_dc6"].append(f"{table} {code} {r.get('name', '')!r}: invfile {inv!r}")
 
@@ -258,7 +271,8 @@ class Plan:
 def generate(plan: Plan, pal: list, hd_root: Path = HD_OUT) -> Counter:
     """Writes the sprites the plan asked for and removes earlier generated ones (mxl/, classic/) it no longer asks for."""
     n = Counter()
-    keep = {(f, g, i) for f, g, i in plan.needs}
+    keep = {(f, g, i) for f, g, i in plan.needs} | {(f, g, f"{i}{v}") for (f, g, i), n in plan.variants.items()
+                                                     for v in range(1, n + 1)}
     for f in TABLES.values():
         for g in ("mxl", "classic"):
             for sp in sorted((hd_root / "global" / "ui" / "items" / f / g).glob("*.sprite")):
@@ -272,6 +286,14 @@ def generate(plan: Plan, pal: list, hd_root: Path = HD_OUT) -> Counter:
         deps = (item_art_review.PROPOSALS,) if k in plan.proposal_keys else ()
         if make_asset(group, inv, folder, cw, ch, pal, hd_root, reuse=m, hd_items=plan.hd_items, proposal=prop, deps=deps):
             n[f"{group} from proposal" if prop else f"{group} from D2R HD" if m else f"{group} upscaled"] += 1
+            base = hd_root / "global" / "ui" / "items" / folder / group
+            for v in range(1, plan.variants.get((folder, group, inv), 0) + 1):  # VarInvGfx: <inv>1..N (#513)
+                for ext in (".sprite", ".lowend.sprite"):
+                    src, dst = base / f"{inv}{ext}", base / f"{inv}{v}{ext}"
+                    if not dst.exists() or dst.read_bytes() != src.read_bytes():
+                        shutil.copyfile(src, dst)
+                n[f"{group} variant copies"] += 1
+                plan.report["variant_copies"].append([f"{group}/{inv}{v}", k])
             if prop:
                 plan.report["proposal_on"].append(k)
         else:

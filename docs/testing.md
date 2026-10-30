@@ -4202,3 +4202,57 @@ icons rebuilt ("picture proposals used: 48").
 Evidence: `mxl2012-runs/runehd/ingame/checks-20261030-214917-s3/` (`itemart_itemart4a_hd.png`, `_legacy.png`) and
 `mxl2012-runs/runehd/ingame/runes_hd_crop_3x.png`. Slot 3 keeps this lane's install (runes off in it would need a reinstall
 of a normal build).
+
+## Lane itemart5: the 21 unmatched item pictures rebuilt crisp, for the owner's review (2026-10-30)
+
+The 21 pictures with no D2R HD item of their kind (shrine cross, the four arcane crystals, the three catalysts, Apple, goblet,
+Goodberry, Moon Icon, the junket eye, the skull star, the skull ring, the bag, the open book, the two Bling Bling piles, the
+bones, the candles) are lane `itemart5` method entries (`item-hd` / `item-soft`, tools/item_rebuild.py, docs/hd-icons.md
+"Rebuilt pictures"), all **off** (owner rule: the owner sees the art first), so a normal build shows nothing new.
+
+| check | result |
+|---|---|
+| `py -3 -I tools/item_art_review.py sheets ../mxl2012-runs/itemart5/review --rebuild` | `sheet_01..03.png` (+ `_2x`): classic, HD now, proposal, alternatives (the arcane crystals also as D2R's flawless diamond in Median's colours) at HD size, then classic / now / proposal at 1920 x 1080; `overview_2x.png` (classic and new, all 21) |
+| `tools/tests/test_itemart.py` | 49 tests OK (new: `ItemRebuildTests` x5 on a synthetic fruit: size and shape, a 1 px stem kept and still green, the highlight, anti-aliased edge, tones in the original's range, item-soft evens out the speckle only, lowend size, `candidate`, lane itemart5's 21 entries off; `BuildProposalTests` VarInvGfx copies, bug #513) |
+| `MXL2012_HD_OUT=work/mod py -3 -I tools/hd_icons.py build` | normal build: "picture proposals used: 48", item icon check 238 sprites, 0 problems (the 10 new ones: the `ring08` variant copies, #513) |
+
+**In game (slot 3, background mode, build of lane/itemart5, data only, the trial switched on only for this build).** The 21
+entries set `enabled` in the working tree (not committed), `MXL2012_HD_OUT=work/mod py -3 -I tools/hd_icons.py build`
+("picture proposals used: 69"), install `MXL_SLOT=3 MXL_RUN=itemart5 py -3 tools/install_mod.py --slot 3` (data only), check
+`MXL_RUN=itemart5 MXL_SLOT=3 MXL_CHAR=ItemArtFive MXL_ITEMART_SETS=itemart5 py -3 tools/game_checks.py all itemart_pics`
+(new set `itemart5`: one item per picture; an entry may name a quality, `r@r unique`); then the file restored (`git checkout`)
+and the icons rebuilt ("picture proposals used: 48").
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-222156-s3` | itemart_pics, set itemart5 (Boss Killer Ring `r@r` normal) | 20 of 21 show the new picture; the ring's cell is empty in HD (legacy: a random classic ring): bug #513 found. FAIL only by the engine note `wPrefix != 0 \|\| wSuffix != 0` (bugs.md #35: making the Retard Mode Charm `yq9`, harness path) and the exit-only `m_freed == 0` |
+| `checks-20261030-222616-s3` | the same, `r@r unique` | the unique ring is blank too (so players see it): #513 is not only the harness's normal ring |
+| `checks-20261030-223159-s3` | the same after the #513 fix (`ring081..5` written) | PARTIAL (shots judged by hand): **all 21 show the new pictures in HD**, the Boss Killer Ring included; d2rloader.log 0 new ERROR / ASSERT lines (the check's FAIL is #35's engine note again), 0 crash files |
+
+Evidence: `mxl2012-runs/itemart5/ingame/checks-20261030-2*-s3/` (`itemart_itemart5_hd.png`, `_legacy.png`) and
+`mxl2012-runs/itemart5/ingame/itemart5_crop_3x.png` (the backpack of the last run at 3x). Slot 3 keeps this lane's trial
+install (the 21 on); a normal build reinstalled turns them off again.
+
+## Lane tunnels: Judgement's bolt below the target (bug #481) and the Ancient Tunnels void (2026-10-30, slot 1, background mode)
+
+New check `jdg_path` (tools/game_checks.py). It runs the Paladin `HdlPal` with Judgement (skill 518) on the right button,
+in HD and then legacy (`MXL_JDG_MODES`, default `hd,legacy`). For each target in JDG_TARGETS it spawns a zombie, right-clicks
+it and polls `missiles` for 3 s, with up to 6 shots `jdg_<mode>_<dx>_<dy>_<n>.png`. The rows give the missiles seen per
+Judgement row and each mallet's path from the player. The look is judged by hand.
+
+```
+MXL_RUN=tunnels MXL_SLOT=1 MXL_CHAR=HdlPal MXL_CHAR_CLASS=paladin MXL_CACHE_POLL=3 MXL_WALL_LEVELS=65 py -3 tools/game_checks.py all jdg_path wall_maps
+```
+
+| run | checks | result |
+|---|---|---|
+| `checks-20261030-223110-s1` | jdg_path, wall_maps (level 65 only), build with belial's terrain mesh indexed in `model_lod_desc.bin` | jdg_path PARTIAL: mallets (`zomgpewpewmallet`, class 1256) start 1-3 sub-tiles from the player; the ones that find no target fly straight down-screen (legacy +3,+0 → +12,+9; HD +3,+0 → +12,+10) whichever side the zombie stands on, the same in both modes (`jdg_legacy_5_0_2.png`: classic's gold bolt below the target; `jdg_hd_5_0_3.png`, `jdg_hd_0_6_1.png`: HD's bolt on the same spot, white core). wall_maps PARTIAL: belial reached in HD and classic, no engine error, HD still stone floor over the void (`wall_belial_hd_0.png` against `wall_belial_classic_0.png`) |
+| `checks-20261030-225247-s1` | jdg_path, build with a gold texture in place of `default/White.texture` in Judgement's `lightningstrike` copy (tried, not shipped) | PARTIAL: same paths (HD +12,+10 and +16,+14 for the misses); the bolt core still white (`jdg_hd_0_6_1.png`), so the swap was reverted |
+
+Results: #481 is explained, not an HD bug. The mallet is Lightning Strike's chain bolt (srvhit 20). When it finds no other
+target it flies down-screen, in classic too, and the HD effect is drawn where the missile is. Only the white core differs
+from classic, and it is still open (docs/bugs.md). The void cannot be fixed through the scene (docs/maps-hd.md item 12,
+closed): `TERRAIN_MAPS` stays empty. No game data changes in this lane.
+
+Evidence: `mxl2012-runs/tunnels/ingame/<run>/` (both runs), `mxl2012-runs/tunnels/jdg_before_grid.png` (HD top, legacy bottom),
+`jdg_after_hd_grid.png`, `jdg_core_zoom.png` (core before / after the texture swap), logs `run1.log`, `run2.log`, `build1.log`.

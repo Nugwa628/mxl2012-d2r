@@ -1,6 +1,6 @@
 {
  "enabled": true,
- "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off. Round 3 (2026-10-30): the 23 runes are off again (owner: too blobby, not sharp) and, with the signets (still off), use Median's sign redrawn as strokes (tools/item_glyphs.py), cut in crisp: reuse \"glyph\" / \"seal\": \"chisel\" with \"sign\" = the picture key. \"tint\" retints a picture (item_art_sheets.tint): Sunstone of Thunder yellow, Oil of Jewelcraft pink. ON (owner, 2026-10-30, round 4: \"the new ones look great, ship em\"): the 23 runes and the 7 signets with the redrawn signs. Lane runehd (owner, 2026-10-30: \"just upscale the runes again\"): the 23 runes are Median's own pictures upscaled again (`method`: rune-flat / rune-hd / rune-crisp, tools/rune_hd.py, lane runehd), off until the owner approves; the round-4 chisel (item_art_sheets.round4_rune) is kept for the comparison sheets only.",
+ "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off. Round 3 (2026-10-30): the 23 runes are off again (owner: too blobby, not sharp) and, with the signets (still off), use Median's sign redrawn as strokes (tools/item_glyphs.py), cut in crisp: reuse \"glyph\" / \"seal\": \"chisel\" with \"sign\" = the picture key. \"tint\" retints a picture (item_art_sheets.tint): Sunstone of Thunder yellow, Oil of Jewelcraft pink. ON (owner, 2026-10-30, round 4: \"the new ones look great, ship em\"): the 23 runes and the 7 signets with the redrawn signs. Lane runehd (owner, 2026-10-30: \"just upscale the runes again\"): the 23 runes are Median's own pictures upscaled again (`method`: rune-flat / rune-hd / rune-crisp, tools/rune_hd.py, lane runehd), off until the owner approves; the round-4 chisel (item_art_sheets.round4_rune) is kept for the comparison sheets only. Lane itemart5 (2026-10-30): the 21 pictures with no D2R HD art of their kind are Median's own pictures rebuilt crisp (`method`: item-hd / item-soft, tools/item_rebuild.py, lane itemart5; `alt`: what else the sheets show, never built), off until the owner approves; they replace lane itemart's off hybrid-smooth / hybrid-crisp entries of the arcane crystals and the apple.",
  "pictures": {
   "mxl/og1": {
    "reuse": {
@@ -48,24 +48,80 @@
    "why": "Median's Perfect Rainbow Stone is a D2R gem cut in many colours: D2R's HD perfect saphire (same cut and grade), Median's colours by position"
   },
   "mxl/pearl1": {
-   "method": "hybrid-smooth",
+   "method": "item-soft",
    "enabled": false,
-   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+   "lane": "itemart5",
+   "why": "glossy orb: Median's picture rebuilt crisp, its dither evened out (item-soft: a clean round outline, smooth shading, the two highlights kept); D2R has no plain sphere (its orb heads sit in claws or wire), the alternative is D2R's round-cut flawless diamond in Median's colours (reads as a gem)",
+   "pick": 2,
+   "alt": [
+    {
+     "reuse": {
+      "folder": "misc",
+      "asset": "gem/flawless_diamond",
+      "colour": "by position"
+     }
+    },
+    {
+     "method": "item-hd"
+    }
+   ]
   },
   "mxl/pearl2": {
-   "method": "hybrid-smooth",
+   "method": "item-soft",
    "enabled": false,
-   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+   "lane": "itemart5",
+   "why": "glossy orb: Median's picture rebuilt crisp, its dither evened out (item-soft: a clean round outline, smooth shading, the two highlights kept); D2R has no plain sphere (its orb heads sit in claws or wire), the alternative is D2R's round-cut flawless diamond in Median's colours (reads as a gem)",
+   "pick": 3,
+   "alt": [
+    {
+     "reuse": {
+      "folder": "misc",
+      "asset": "gem/flawless_diamond",
+      "colour": "by position"
+     }
+    },
+    {
+     "method": "item-hd"
+    }
+   ]
   },
   "mxl/pearl3": {
-   "method": "hybrid-smooth",
+   "method": "item-soft",
    "enabled": false,
-   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+   "lane": "itemart5",
+   "why": "glossy orb: Median's picture rebuilt crisp, its dither evened out (item-soft: a clean round outline, smooth shading, the two highlights kept); D2R has no plain sphere (its orb heads sit in claws or wire), the alternative is D2R's round-cut flawless diamond in Median's colours (reads as a gem)",
+   "pick": 4,
+   "alt": [
+    {
+     "reuse": {
+      "folder": "misc",
+      "asset": "gem/flawless_diamond",
+      "colour": "by position"
+     }
+    },
+    {
+     "method": "item-hd"
+    }
+   ]
   },
   "mxl/pearl4": {
-   "method": "hybrid-smooth",
+   "method": "item-soft",
    "enabled": false,
-   "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
+   "lane": "itemart5",
+   "why": "glossy orb: Median's picture rebuilt crisp, its dither evened out (item-soft: a clean round outline, smooth shading, the two highlights kept); D2R has no plain sphere (its orb heads sit in claws or wire), the alternative is D2R's round-cut flawless diamond in Median's colours (reads as a gem)",
+   "pick": 5,
+   "alt": [
+    {
+     "reuse": {
+      "folder": "misc",
+      "asset": "gem/flawless_diamond",
+      "colour": "by position"
+     }
+    },
+    {
+     "method": "item-hd"
+    }
+   ]
   },
   "mxl/r-a-01": {
    "method": "rune-hd",
@@ -187,9 +243,16 @@
    "pick": 15
   },
   "mxl/realapple": {
-   "method": "hybrid-crisp",
+   "method": "item-soft",
    "enabled": false,
-   "why": "crisper highlight and leaf; no D2R apple"
+   "lane": "itemart5",
+   "why": "no D2R apple; Median's picture rebuilt crisp (smooth skin, the highlight and the leaf kept)",
+   "pick": 7,
+   "alt": [
+    {
+     "method": "item-hd"
+    }
+   ]
   },
   "mxl/sigil1b": {
    "reuse": {
@@ -745,6 +808,198 @@
    "lane": "itemart3",
    "why": "Fool's Gold: D2R's HD gold coins; Median's picture is lumps of gold, not coins (shape differs)",
    "pick": 66
+  },
+  "mxl/jbscross": {
+   "method": "item-soft",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "the shrine cross: no D2R cross; Median's picture rebuilt crisp (smooth bars, the speckle evened out)",
+   "pick": 1,
+   "alt": [
+    {
+     "method": "item-hd"
+    }
+   ]
+  },
+  "mxl/catal3": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a cross with a stone at each end: no D2R object of the kind; Median's picture rebuilt crisp (item-hd keeps the stones' shading)",
+   "pick": 6,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/apple": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a golden goblet: no D2R goblet; Median's picture rebuilt crisp",
+   "pick": 8,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/cherries": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "no D2R fruit; Median's picture rebuilt crisp (thin stems kept)",
+   "pick": 9,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/moon1": {
+   "method": "item-soft",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a crescent: no D2R moon; Median's picture rebuilt crisp, smooth",
+   "pick": 10,
+   "alt": [
+    {
+     "method": "item-hd"
+    }
+   ]
+  },
+  "mxl/evileye": {
+   "method": "item-soft",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a slit-pupil eye (D2R's eye is an eyeball with its nerve); Median's picture rebuilt crisp",
+   "pick": 11,
+   "alt": [
+    {
+     "method": "item-hd"
+    }
+   ]
+  },
+  "mxl/skullstar": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a skull under a star: Median's picture rebuilt crisp (D2R's perfect skull would lose the star)",
+   "pick": 12,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/ring08": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a skull ring: D2R has none; Median's picture rebuilt crisp",
+   "pick": 13,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/s1": {
+   "method": "item-soft",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a bag: D2R has none; Median's picture rebuilt crisp, smooth cloth",
+   "pick": 14,
+   "alt": [
+    {
+     "method": "item-hd"
+    }
+   ]
+  },
+  "mxl/summbook": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "an open book (D2R's books and grimoires are closed); Median's picture rebuilt crisp",
+   "pick": 15,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/catal1": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a cross with a stone at each end: no D2R object of the kind; Median's picture rebuilt crisp (item-hd keeps the stones' shading)",
+   "pick": 16,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "mxl/catal2": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a cross with a stone at each end: no D2R object of the kind; Median's picture rebuilt crisp (item-hd keeps the stones' shading)",
+   "pick": 17,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "classic/invfary4": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a pile of gems (Bling Bling): Median's picture rebuilt crisp",
+   "pick": 18,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "classic/invfary3": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a pile of gems (Bling Bling): Median's picture rebuilt crisp",
+   "pick": 19,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "classic/invbonr3": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "a bone pile: D2R has no loose bones; Median's picture rebuilt crisp",
+   "pick": 20,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
+  },
+  "classic/invcndl": {
+   "method": "item-hd",
+   "enabled": false,
+   "lane": "itemart5",
+   "why": "candles: D2R has none; Median's picture rebuilt crisp",
+   "pick": 21,
+   "alt": [
+    {
+     "method": "item-soft"
+    }
+   ]
   }
  }
 }

@@ -11920,6 +11920,11 @@ ITEMART_SETS = [
     # the Sunstone of Thunder (yellow) and the Oil of Jewelcraft (pink)
     ("itemart4a", [f"r{n}" for n in range(34, 57)]),
     ("itemart4b", ["zkq", "zkx", "zkw", "!@B", "zku", "zkr", "zky", "x3x", "7o^"]),
+    # lane itemart5: the 21 pictures rebuilt crisp from Median's own (shrine cross, arcane crystals, catalysts, apples,
+    # goblet, berry, moon, eye, skull star, skull ring, bag, book, Bling Bling, bones, candle); the Boss Killer Ring as the
+    # unique players get (a normal one takes the ring type's random picture, VarInvGfx: blank in HD, bugs.md #513)
+    ("itemart5", ["A0+", "qut", "quy", "qux", "qus", "9o^", "dog", "^01", "b@b", "c@c", "!@1", "yq9", "r@r unique", "yq2",
+                  "s0m", "0o^", "3o^", "qul", "quz", "x0x", "mec"]),
 ]
 
 
@@ -11937,7 +11942,7 @@ def itemart_pics():
         Hl("packclear", log)
         for code in codes:
             _ok, ln = Hl("item %s inv" % code, log)
-            if not any(("code=%s " % code) in x for x in ln):
+            if not any(("code=%s " % code.split()[0]) in x for x in ln):  # an entry may name a quality: "r@r unique"
                 bad.append("%s not made" % code)
         if not set_graphics("hd"):
             bad.append("graphics mode hd not reached")
@@ -12229,6 +12234,95 @@ def standin_mons():
 
 
 CHECKS += [("standin_mons", standin_mons)]
+
+
+# ---- lane tunnels: Judgement's bolts (bug #481), traced and shot ---------------------------------------------------------------
+# SET-UP (named in the notes): the Paladin HdlPal of lane hdlook (level 120, Judgement by `setskill`, mana refilled), a target
+# zombie spawned at each offset of JDG_TARGETS (sub-tiles from the player; its life raised). JUDGED: Judgement picked on the right
+# button (packet 0x3c) and cast by a background right click on the zombie; `missiles` polled for the chain's rows, so the log shows
+# where each bolt (`zomgpewpewmallet`) starts and goes relative to player and target; shots `jdg_<mode>_<target>_<n>`.
+JDG_SKILL = 518
+JDG_ROWS = ("zomgpewpewidol", "zomgpewpewcreator", "zomgpewpewspawnmissile", "zomgpewpewmallet", "zomgpewpewidolcast")
+JDG_TARGETS = ((5, 0), (-4, -4), (0, 6))  # screen right-down, straight up, left-down
+
+
+def jdg_track(ids, secs, shots, tag):
+    """`missiles` polled for `secs`: [(t, id, class, x, y)] of the live missiles of `ids`; a shot every ~0.4 s."""
+    out, t0, nxt, n = [], time.time(), 0.0, 0
+    while time.time() - t0 < secs:
+        _ok, ln = H("missiles")
+        t = round(time.time() - t0, 2)
+        for x in ln:
+            m = re.search(r"mis id=(\d+) class=(\d+) mode=\d+ at (-?\d+),(-?\d+)", x)
+            if m and int(m.group(2)) in ids:
+                out.append((t, int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))))
+        if t >= nxt and n < 6:
+            shots.append(sh("%s_%d" % (tag, n)))
+            n, nxt = n + 1, t + 0.4
+    return out
+
+
+def jdg_paths(track, origin):
+    """{missile id: (class, [(dx, dy) from origin per sample])}."""
+    paths = {}
+    for _t, mid, cls, x, y in track:
+        p = paths.setdefault(mid, (cls, []))[1]
+        if not p or p[-1] != (x - origin[0], y - origin[1]):
+            p.append((x - origin[0], y - origin[1]))
+    return paths
+
+
+def check_jdg_path():
+    """Bug #481: where Judgement's bolts fly, in HD and in legacy graphics. PASS: the skill was cast in both modes, bolts were
+    seen and no engine assert; the look is judged by hand from the shots (`jdg_*`)."""
+    mark = engine_mark()
+    log, shots, rows, bad = [], [], [], []
+    if hdl_be("paladin", log) is None:
+        return finish("jdg_path", False, "paladin not played", mark, shots, log)
+    log.append("setskill %d -> %s" % (JDG_SKILL, learn(JDG_SKILL, 20)))
+    ids = {missile_id(r): r for r in JDG_ROWS if missile_id(r) is not None}
+    bolt = missile_id("zomgpewpewmallet")
+    for mode in [m for m in (os.environ.get("MXL_JDG_MODES") or "hd,legacy").split(",") if m]:
+        goto(1)
+        if not set_graphics(mode):
+            bad.append("graphics %s not reached" % mode)
+        goto(2)
+        time.sleep(3)
+        if not Hl("skill right %d" % JDG_SKILL, log)[0]:
+            bad.append("%s: skill not picked" % mode)
+            continue
+        for dx, dy in JDG_TARGETS:
+            hdl_clear(log)
+            mid = hdl_target(log, dx, dy)
+            time.sleep(1.0)
+            st = hstate()
+            p = (st["player"].get("x", 0), st["player"].get("y", 0))
+            z = next(((m["mx"], m["my"]) for m in st["mons"] if m.get("id") == mid), None)
+            Hl("missiles reset", log)
+            hdl_mana()
+            if mid is None or not click_unit(mid, button="right"):
+                g.click(0.62, 0.52, button="right")
+            track = jdg_track(set(ids), 3.0, shots, "jdg_%s_%d_%d" % (mode, dx, dy))
+            paths = jdg_paths(track, p)
+            bolts = {k: v[1] for k, v in paths.items() if v[0] == bolt}
+            seen = missiles_seen(Hl("missiles", log)[1])
+            rows.append("%s target %+d,%+d (zombie at %s from the player): seen %s; bolts traced %d: %s" % (
+                mode, dx, dy, (z[0] - p[0], z[1] - p[1]) if z else "?", {ids[c]: n for c, n in seen.items() if c in ids},
+                len(bolts), "; ".join("->".join("%+d,%+d" % s for s in v) for v in list(bolts.values())[:8])))
+            log.extend("track %s %+d,%+d: t=%s id=%d %s at %+d,%+d" % (mode, dx, dy, t, i, ids.get(c, c), x - p[0], y - p[1])
+                       for t, i, c, x, y in track)
+            if mid is not None:
+                H("kill %d" % mid)
+            if not game_alive():
+                bad.append("the game died (%s)" % mode)
+                return finish("jdg_path", False, "; ".join(rows + bad), mark, shots, rows + log[-600:])
+    goto(1)
+    set_graphics("hd")
+    finish("jdg_path", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots,
+           rows + log[-600:], partial="the bolts' look is judged by hand from the jdg_* shots")
+
+
+CHECKS += [("jdg_path", check_jdg_path)]
 
 if __name__ == "__main__":
     main()

@@ -5,6 +5,8 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- HD: the Boss Killer Ring and the Upgraded Boss Killer Ring show their picture again (they showed an empty cell) (#513).
+
 ## D2R-XL 2012
 
 ### 0.1.6 (2026-10-30)

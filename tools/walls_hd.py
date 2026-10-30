@@ -95,8 +95,16 @@ MAPS = RETEXTURED + STOCK   # every map tools/maps_hd.py gives a minimal scene (
 # Arcane Sanctuary that put floor where classic has the starry void, and hid the arches that hang under the platform edges.
 # D2R's own Arcane maps have a mesh over their platforms only (sancte: 482 flat triangles at y = 0). Tried on belial
 # ({"act2/arcane/belial.ds1": "act2/arcane/sancte"}, also with sancte's physics body): the scene loads, no assert, but HD still
-# draws floor over the void (docs/maps-hd.md item 12), so no map uses it yet.
-TERRAIN_MAPS = {}
+# draws floor over the void (docs/maps-hd.md item 12). Why (lane tunnels): the engine finds a model only through its index
+# data/hd/model_lod_desc.bin (docs/d2r-addresses.md section 23), and the new path was not in it, so the mesh was never drawn.
+# The build now adds the path to the mod's copy of the index (lod_entries, write_lod_desc), with the template's own entry as
+# the donor. The donor's per-mesh records (stream sizes, a bounding box) are shared, so the mesh is padded to the template's
+# vertex and index counts (terrain_model `pad`) and the template is a D2R terrain whose box holds the map's platform:
+# the Kurast jungle's pygn2 (0-330 on both axes; sancte's box is 30-130 x 40-80). In game (slot 1, run
+# checks-20261030-223110-s1) the indexed mesh loaded with no assert and HD still drew floor over the whole void, so the
+# floor does not come from the scene's terrain at all; left empty (docs/maps-hd.md item 12, closed).
+TERRAIN_MAPS: dict[str, str] = {}
+LOD_DESC = "data/hd/model_lod_desc.bin"
 KEEP_COMPONENTS = {"TransformDefinitionComponent", "ModelDefinitionComponent", "ModelVariationDefinitionComponent",
                    "ModelPlatformTierComponent", "WallTransparencyComponent"}
 # Decoration that D2R's artists put on and around walls (plants, rubble, bones, stains): not part of the wall, and copied per
@@ -350,11 +358,14 @@ def terrain_cells(cells) -> set:
     return {(x, y) for x, y in have if {(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)} & have}
 
 
-def terrain_model(template: bytes, cells, width: int, height: int) -> bytes:
+def terrain_model(template: bytes, cells, width: int, height: int, pad: bool = False, biome: str | None = None) -> bytes:
     """A terrain_lod0.model: the template (a D2R terrain model: one rigid mesh 'terrainShape', vertices Position int16[4],
     Normal, Tangent, half-float UV) with its mesh replaced by flat quads at y = 0 over `cells` (tile coordinates). As in D2R's
     own: world positions, UV = position / map size, the bone and the model placed at the map's centre, the bone binding's box
-    in bone space, the reflective plane the mesh's bounds, triangles wound as D2R's (clockwise seen from above)."""
+    in bone space, the reflective plane the mesh's bounds, triangles wound as D2R's (clockwise seen from above).
+    pad: as many vertices and indices as the template (copies of the first vertex, degenerate triangles), so the template's
+    entry in model_lod_desc.bin fits the file; ValueError when the cells need more. biome: the biome json the terrain material
+    names (the template's own otherwise)."""
     import math
     import d2r_model as dm
     gr2 = dm.Gr2File.read(template)
@@ -369,10 +380,16 @@ def terrain_model(template: bytes, cells, width: int, height: int) -> bytes:
     if not tris or len(corners) > 65535:
         raise ValueError("terrain_model: %d cells, %d corners" % (len(cells), len(corners)))
     pos = sorted(corners, key=corners.get)
+    mesh = tree["Meshes"][0]
+    if pad:
+        nv, ni = len(mesh["PrimaryVertexData"]["Vertices"].obj), len(mesh["PrimaryTopology"]["Indices16"])
+        if len(pos) > nv or len(tris) * 3 > ni or ni % 3:
+            raise ValueError("terrain_model: %d corners / %d indices do not fit the template's %d / %d" % (len(pos), len(tris) * 3, nv, ni))
+        pos += [pos[0]] * (nv - len(pos))
+        tris += [(0, 0, 0)] * (ni // 3 - len(tris))
     xs, zs = [p[0] * TILE for p in pos], [p[1] * TILE for p in pos]
     scale = max(max(xs), max(zs), 1.0)
     w = int(round(math.log2(scale) / 13 * 32767))
-    mesh = tree["Meshes"][0]
     vertices = mesh["PrimaryVertexData"]["Vertices"]
     vtd = vertices.obj[0].td
     sx, sz = width * TILE, height * TILE
@@ -400,6 +417,9 @@ def terrain_model(template: bytes, cells, width: int, height: int) -> bytes:
     for model in tree["Models"]:
         p = model["InitialPlacement"]
         model["InitialPlacement"] = dm.Transform(p.flags, centre, p.orientation, p.scale_shear)
+    if biome:
+        for tex in tree["Textures"]:
+            tex["FromFileName"] = "data/hd/env/biome/%s.json" % biome
     out = dm.Writer(gr2).build(tree).write()
     dm.parse_tree(dm.Gr2File.read(out))      # well formed
     return out
@@ -421,6 +441,28 @@ def terrain_entity(path: str) -> dict:
         {"type": "ModelDefinitionComponent", "name": name + "_ModelDefinitionComponent", "filename": path, "visibleLayers": 1,
          "lightMask": 19, "shadowMask": 3, "ghostShadows": False, "floorModel": False, "terrainBlendEnableYUpBlend": False,
          "terrainBlendMode": 1}]}
+
+
+def lod_entry(map_name: str, template: str, model: bytes):
+    """(new game path, donor game path, (bbMin, bbMax)) of a generated terrain model for the mod's model_lod_desc.bin."""
+    import d2r_model
+    ed = d2r_model.parse_tree(d2r_model.Gr2File.read(model))["Meshes"][0]["ExtendedData"].obj
+    return ("data/hd/env/preset/%s/terrain.model" % map_name[:-4], "data/hd/env/preset/%s/terrain.model" % template,
+            (tuple(ed["bbMin"]), tuple(ed["bbMax"])))
+
+
+def write_lod_desc(data_dir: Path, entries, d2r_read=None) -> int:
+    """The mod's data/hd/model_lod_desc.bin: D2R's index (it replaces the game's) with `entries` (lod_entry) added. Nothing is
+    written without entries. -> number of entries added."""
+    import model_lod_desc
+    if not entries:
+        return 0
+    table = (d2r_read or d2r_bytes)(LOD_DESC)
+    out = model_lod_desc.add(table, {new: donor for new, donor, _b in entries}, {new: b for new, _d, b in entries})
+    dest = Path(data_dir) / LOD_DESC[len("data/"):]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(out)
+    return len(entries)
 
 
 def add_terrain(text: str, path: str) -> str:
@@ -1049,7 +1091,7 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
     The maps of TERRAIN_MAPS also get their terrain mesh (terrain_model; d2r_read(rel) -> the template's bytes, default
     d2r_bytes), next to the scene as <map>/terrain_lod0.model, over floors[map] (floor_tiles; default: the map's cells);
     the map's size is its cells' extent (the corner tiles)."""
-    out = {}
+    out, lods = {}, []
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
         biome = map_tint.apply(data_dir, e["map"], map_tint.base_biome(data_dir, biome, e["biome"]), read)   # the 8 retextured maps: a biome with the map's own light
@@ -1060,13 +1102,15 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
             mc = cells[e["map"]]
             template = (d2r_read or d2r_bytes)("data/hd/env/preset/%s/terrain_lod0.model" % TERRAIN_MAPS[e["map"]])
             ground = terrain_cells((floors or {}).get(e["map"]) or mc)
-            model = terrain_model(template, ground, max(x for x, _ in mc) + 1, max(y for _, y in mc) + 1)
+            model = terrain_model(template, ground, max(x for x, _ in mc) + 1, max(y for _, y in mc) + 1, pad=True, biome=biome)
             (dest.parent / dest.stem).mkdir(exist_ok=True)
             (dest.parent / dest.stem / "terrain_lod0.model").write_bytes(model)
             text = add_terrain(text, "data/hd/env/preset/%s/terrain.model" % e["map"][:-4])
+            lods.append(lod_entry(e["map"], TERRAIN_MAPS[e["map"]], model))
             st = dict(st, terrain_cells=len(ground), terrain_bytes=len(model))
         dest.write_text(text, encoding="utf-8")
         out[e["map"]] = dict(st, bytes=len(text.encode("utf-8")), biome=biome)
+    write_lod_desc(data_dir, lods, d2r_read)
     return out
 
 

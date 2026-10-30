@@ -524,6 +524,65 @@ class TerrainTest(unittest.TestCase):
             p, q, r = pos[a], pos[b], pos[c]
             self.assertLess((q[0] - p[0]) * (r[2] - p[2]) - (q[2] - p[2]) * (r[0] - p[0]), 0)
 
+    @unittest.skipUnless(TEMPLATE, "D2R's sancte terrain model is in neither the D2R extraction nor the cache")
+    def test_padded_to_the_template_with_the_biome(self):
+        """Lane tunnels: the template's vertex and index counts, so its model_lod_desc.bin entry fits; the material names the
+        scene's biome."""
+        import d2r_model
+        tpl = d2r_model.parse_tree(d2r_model.Gr2File.read(TEMPLATE))["Meshes"][0]
+        out = walls_hd.terrain_model(TEMPLATE, {(3, 4), (4, 4), (4, 5)}, 13, 13, pad=True, biome="act2_arcane")
+        tree = d2r_model.parse_tree(d2r_model.Gr2File.read(out))
+        mesh = tree["Meshes"][0]
+        self.assertEqual(len(mesh["PrimaryVertexData"]["Vertices"].obj), len(tpl["PrimaryVertexData"]["Vertices"].obj))
+        self.assertEqual(len(mesh["PrimaryTopology"]["Indices16"]), len(tpl["PrimaryTopology"]["Indices16"]))
+        pos, tris = walls_hd.terrain_mesh(tree)
+        self.assertEqual(len([t for t in tris if len(set(t)) == 3]), 6)       # the padding is degenerate
+        self.assertEqual([round(v, 2) for v in mesh["ExtendedData"].obj["bbMin"]], [30.0, 0.0, 40.0])
+        self.assertEqual(tree["Textures"][0]["FromFileName"], "data/hd/env/biome/act2_arcane.json")
+        with self.assertRaises(ValueError):
+            walls_hd.terrain_model(TEMPLATE, {(x, y) for x in range(20) for y in range(20)}, 21, 21, pad=True)
+
+
+def lod_table(path, bb=(0.0, 0.0, 0.0, 9.0, 0.0, 9.0)):
+    """A model_lod_desc.bin with one entry (`path`), one 12-byte and one 32-byte stream record (tools/model_lod_desc.py)."""
+    import model_lod_desc
+    a1, a2, a3 = 24, 24 + 44, 24 + 44 + 12
+    e = struct.pack("<I6f", model_lod_desc.fnv(path), *bb) + bytes([2, 0, 0, 0]) + struct.pack("<3I", 1, a2 - (a1 + 36), 1)
+    rec2 = struct.pack("<3I", 7, 1, a3 - (a2 + 8))
+    rec3 = struct.pack("<6f2I", *bb, 1, 0x200001)
+    return struct.pack("<6i", 1, a1 - 4, 1, a2 - 12, 1, a3 - 20) + e + rec2 + rec3
+
+
+class LodDescTest(unittest.TestCase):
+    """Lane tunnels: a generated terrain gets an entry in the mod's model_lod_desc.bin, else the engine never draws it."""
+    DONOR = "data/hd/env/preset/act3/jungle/pygn2/terrain.model"
+
+    def test_entry_added_with_own_bounds_and_the_donor_records(self):
+        import model_lod_desc
+        new = "data/hd/env/preset/act2/arcane/belial/terrain.model"
+        with tempfile.TemporaryDirectory() as d:
+            n = walls_hd.write_lod_desc(Path(d), [(new, self.DONOR, ((110.0, 0.0, 60.0), (220.0, 0.0, 320.0)))],
+                                        d2r_read=lambda rel: lod_table(self.DONOR) if rel == walls_hd.LOD_DESC else None)
+            data = (Path(d) / "hd" / "model_lod_desc.bin").read_bytes()
+        self.assertEqual(n, 1)
+        entries, a2, a3, _counts = model_lod_desc.parse(data)
+        self.assertEqual(len(entries), 2)
+        e, donor = model_lod_desc.find(entries, new), model_lod_desc.find(entries, self.DONOR)
+        self.assertEqual(struct.unpack_from("<6f", e, 4), (110.0, 0.0, 60.0, 220.0, 0.0, 320.0))
+        self.assertEqual(e[28:36], donor[28:36])                              # LOD mask and count
+        target = [24 + i * 44 + 36 + struct.unpack_from("<I", x, 36)[0] for i, x in enumerate(entries) if x in (e, donor)]
+        self.assertEqual(len(set(target)), 1)                                 # the same stream record
+
+    def test_nothing_written_without_entries(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(walls_hd.write_lod_desc(Path(d), [], d2r_read=lambda rel: self.fail("read")), 0)
+            self.assertFalse((Path(d) / "hd").exists())
+
+    def test_no_terrain_ships(self):
+        # the indexed belial mesh changed nothing in game (docs/maps-hd.md item 12), so no map gets one and the game's own
+        # model_lod_desc.bin is not replaced
+        self.assertEqual(walls_hd.TERRAIN_MAPS, {})
+
 
 def square(x0, x1, y0, y1):
     """Opaque pixels of a rectangle, as dt1_pixels.tiles gives them."""

@@ -159,6 +159,20 @@ the three changes that fix what data could fix (for all 17 maps), and one that d
    `checks-20261030-120504-s2`, and again with sancte's physics body added) belial loaded with no assert, but HD still drew
    floor over the whole void, the same as before. So the HD floor there does not come from the preset's terrain entity
    (perhaps the level's own ground, Ancient Tunnels being a larger level than the 48x48 preset); open, not shipped.
+   **Lane tunnels (2026-10-30): closed, cannot be done with the scene.** walls3's mesh was never drawn: the engine finds
+   a model only through `data/hd/model_lod_desc.bin` (docs/d2r-addresses.md section 23) and the new path was not in it.
+   The tool now can add it (`lod_entry`, `write_lod_desc`: the mod's copy of the index with the path added, the template's
+   entry as donor, the mesh padded to the template's vertex and index counts, `terrain_model(pad=True)`; template
+   `act3/jungle/pygn2`, whose box 0-330 holds belial's platform at 110-220 x 60-320; texture on the `act2_arcane` biome).
+   In game (slot 1, run `checks-20261030-223110-s1`, `wall_belial_hd_*.png` against `wall_belial_classic_*.png`) the
+   indexed mesh loaded with no assert and no engine error, and HD still drew the same stone floor over the whole void.
+   So the HD floor is not the scene's terrain at all; with a terrain indexed or not, the engine draws it. D2R's own void
+   cannot be borrowed from the scene either: belial already names the `act2_arcane` biome, and D2R's Arcane Sanctuary
+   (level 74) shares its LevelType 19. What is left that differs is the level itself: level 65 is a maze level
+   (DrlgType 2, 47x47, one lvlprest room 1092 with FillBlanks) where level 74 is a preset level (DrlgType 1). Making
+   level 65 a preset level changes how the game builds the level, a gameplay-data change for the owner to rule on; it is
+   not tried. `TERRAIN_MAPS` stays empty, so the build writes neither a terrain nor an index of its own (the index tool and
+   its tests stay for a later map that needs a new model path).
 
 **Arches, roofs and trees** (lane walls4, 2026-10-30). Owner rule: no new 3D models; only D2R's own wall, arch and roof
 models (any act's tile sets), placed with this pipeline; a cell with no fitting D2R model stays as it is and is listed.
@@ -267,7 +281,7 @@ crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #
 | act3/temple/temple5, temple6 | 96 Forgotten Reliquary (one of the two, identical in Median) | yes | temple walls and pillars as in classic; the HD floor is the Kurast biome's grass where classic has temple stone (biome, not walls) |
 | act1/caves/caveroom4 | 15 Hole Level 2 | yes (walls3) | cave rock walls where classic has walls, and the stairs at the arrival as in classic (lane walls3: D2R's `back_stairs01`, item 11). The room is small: 3 wall cells, 84 floor cells, 20 pieces |
 | act3/kurast/excelsior3 | 84 Spider Cave | yes | Kurast walls, stairs and the courtyard as in classic; 68 wall cells stay without (43 tiles no file of the level type has, 25 Kurast corner halves) |
-| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is still drawn as floor in HD, and classic's arches under the platform edge stay hidden under it (lane walls3: 22 edge pieces are placed there now, but a terrain mesh over the platform only did not change the floor, item 12; open) |
+| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is still drawn as floor in HD, and classic's arches under the platform edge stay hidden under it (lane walls3: 22 edge pieces are placed there now; lane tunnels: a terrain mesh over the platform, indexed in model_lod_desc.bin, did not change the floor either, so it is not the scene's; closed as a known issue, item 12) |
 | expansion/morework/epicwhiners | 13 Cave Level 2 | yes | cave walls, stalagmites and rock mounds roughly where classic has them |
 | act1/cathedrl/inarius | 14 Underground Passage Level 2 | yes | cathedral walls, arches and windows as in classic |
 | expansion/icecave/rockisdead | 116 Drifter Cavern | yes | ice cave walls and ledges where classic has walls (classic is Median's brown cave colour) |

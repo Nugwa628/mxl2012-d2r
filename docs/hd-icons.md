@@ -443,13 +443,53 @@ the runes.
 `rune-hd` | `rune-crisp`); `overview_2x.png` (all 23 new runes at 2x). In `mxl2012-runs/runehd/review/`. In game:
 docs/testing.md "Lane runehd".
 
+### Rebuilt pictures: the 21 without D2R art of their kind (lane itemart5, 2026-10-30; all 21 off)
+
+The 21 pictures lane itemart3 found no D2R HD item for (its "Not matched" list: the shrine cross, the four arcane crystals,
+the three catalysts, both apples, the goblet, the berry, the moon, the eye, the skull star, the skull ring, the bag, the open
+book, the two Bling Bling piles, the bones, the candles) are lane `itemart5` `"method"` entries (picks 1-21, all **off**),
+Median's own picture rebuilt crisp by `tools/item_rebuild.py` (also `upscale.METHODS`, so `candidate` and the build use them
+like any other method). It is lane runehd's idea (`rune_hd`, owner: "HD versions of the original without losing the ...
+feel") for any picture, not only a convex stone with a sign; no new art, every colour from the original:
+
+- **silhouette**: the opaque pixels EPX-scaled twice (staircases become 45 degree edges), blurred 0.45 classic px, cut with an
+  anti-aliased edge at the HD size: a clean outline, thin parts (a cherry stem, the cross's bars) kept.
+- **tones**: threshold decomposition of the brightness at every distinct tone of the original (midpoints between its tones;
+  each step a mask scaled and cut as the silhouette, the steps stacked), then a bilateral smoothing (range 12): the small
+  steps of soft shading even out, outlines and highlights stay sharp, and every tone stays where the original has it.
+- **colour**: joint bilateral upsampling: an HD pixel takes the colour of the classic pixels near it whose brightness is close
+  to its own (a red cherry does not bleed into its green stem), set to the rebuilt brightness.
+
+| method | what | picked for |
+|---|---|---|
+| `item-hd` | as above | the catalysts, the goblet, the berry, the skull star, the skull ring, the book, Bling Bling, the bones, the candles (their detail is in the tones) |
+| `item-soft` | the original's low-contrast dither evened out first (a pixel within 14 of the median of its opaque neighbours takes it) | the arcane crystals, the shrine cross, the Apple, the moon, the eye, the bag (smooth surfaces) |
+
+D2R art was looked at again for each (all 444 HD inventory sprites, and D2R 3.3's new ones: the Warlock's grimoires, the
+essences, the fragment busts): the orb heads of D2R's sorceress orbs are the only spheres and each sits in a claw or wire
+band (Dragon Stone's claw crosses the ball's front), the grimoires are closed books, D2R's eye is an eyeball. For the arcane
+crystals the sheets also show **D2R's round-cut flawless diamond in Median's colours** (`alt`, as lane itemart's rejected
+gem idea: it reads as a gem; the owner picks) and the other method; an entry's `alt` list is shown on the sheets and never
+built.
+
+Still weak (the source has too few pixels): the catalysts' 1 px bars come out a little thicker (the dark outline pixels
+around them are part of the shape), the candles merge into one waxy block, the bone pile and Bling Bling stay as busy as the
+original, the skull ring's band is faint (as in the original).
+
+**Review sheets:** `py -3 -I tools/item_art_review.py sheets <out_dir> --rebuild` (`item_art_sheets.write_rebuild`):
+`sheet_01..03.png` (+ `_2x`), per picture: Median classic (nearest) | HD now (the plain upscale) | proposal | the alternatives,
+at HD size, then classic, now and proposal at 1920 x 1080 (49 px per cell); `overview_2x.png` (classic | new for all 21 at
+2x). In `mxl2012-runs/itemart5/review/`. In game (trial build with the 21 on, slot 3): all 21 drawn in HD, docs/testing.md
+"Lane itemart5". That run found bug #513: an item type with random pictures (`VarInvGfx`) makes D2R ask for
+`<asset><n>`; `item_hd` now also writes those copies (only Median's Boss Killer Rings `ring08` need it).
+
 ### Check (`tools/item_icon_check.py`)
 
 468 invfiles are referenced (invfile, uniqueinvfile, setinvfile of weapons/armor/misc, invfile of uniques/sets): 100 have a mod DC6,
 366 only a D2R classic DC6, **2 have no DC6 anywhere**. Checked: all 228 generated sprites against their DC6 (size = whole cells
 holding the picture, opaque fraction, colour; the 22 made from D2R's HD art within the looser `REUSE_*` limits, opaque
 fraction 0.15 and colour 25, as D2R's redraw is not the classic picture; the 142 made from a picture proposal switched on
-(71 pictures, HD and lowend) must be the approved candidate pixel for pixel, `check_proposal_sprite`, since several approved
+(71 pictures, HD and lowend) must be the approved candidate pixel for pixel, a VarInvGfx variant copy (#513) its picture byte for byte, `check_proposal_sprite`, since several approved
 D2R pictures have another outline than Median's, e.g. coins for Fool's Gold; 0 problems), every one of the 2429 codes in `items.json` and every unique / set name
 in its map with an existing asset (D2R sprite or generated; 0 missing), every item using a mod picture points at it or, for an exact copy, at D2R's asset (0 not used).
 Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not failed.
@@ -474,7 +514,8 @@ Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not fail
   the five Rainbow Stones are D2R's HD gems since lane itemart2; lane itemart3 found D2R HD art of the same kind for 66 of
   them, on since 2026-10-30 but the 23 runes (off for 0.1.5; lane runehd proposes Median's own rune pictures upscaled
   again, "Runes: Median's own pictures upscaled again"), the signets with redrawn, chiselled signs: "D2R HD art of
-  the same kind"; so 21 remain upscales, plus the 23 runes while off):
+  the same kind"; so 21 remain upscales, plus the 23 runes while off; lane itemart5 proposes all 21 rebuilt crisp from
+  Median's own pictures, off, "Rebuilt pictures"):
   crisp, but pixel-art detail next to D2R's painted HD items. No new HD redraw. Skill icon sheets use the hybrid too (item 4). Seen in game with the harness (check `hdit_icons`, slot 4,
   2026-10-29, docs/testing.md): 16 items in HD and legacy, drawn as intended.
 - **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees").
@@ -507,6 +548,7 @@ The tools, what they were built from and what changed:
 | `tools/item_hd.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_icon_check.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart2) | the build makes the pictures of the proposals switched on (`candidate` at HD and lowend cell size), report `proposal_on`, the check's reuse limits for them; og1..og5 on; 3 more unit tests |
 | `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart3) | rune stone recomposition (`blank_stone`, `glyph_mask`, `carve`, reuse key `glyph`), lane sheets with an in-game size column (`write_lane`, `sheets --lane`), 66 proposals; round 2: 59 on, the signet seal (`seal`, reuse key `seal`, off), `item_icon_check.check_proposal_sprite`, `game_checks` sets `itemart3a` / `itemart3b`; round 3: the runes off, the signs redrawn (`tools/item_glyphs.py`, `chisel`, `engrave_rune`, reuse keys `"chisel"` + `sign`), `tint`, `sheets --round3`; round 4: the runes and signets on, `game_checks` sets `itemart4a` / `itemart4b`; 7 more unit tests |
 | `tools/rune_hd.py`, `tools/upscale.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | new / changed (lane runehd) | the rune upscale (`rune_hd`: hull silhouette, face, threshold-decomposed sign; methods `rune-flat` / `rune-hd` / `rune-crisp` in `upscale.METHODS`), the 23 rune proposals as lane `runehd` method entries (off), `write_runehd` / `sheets --runehd`, `round4_rune`; 6 more unit tests (`RuneHdTests` x5, the lane's entries) |
+| `tools/item_rebuild.py`, `tools/upscale.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/item_hd.py`, `tools/item_icon_check.py`, `tools/data/item_art_proposals.json`, `tools/game_checks.py`, `tools/tests/test_itemart.py` | new / changed (lane itemart5) | the picture rebuild (`item_rebuild`: EPX-cut silhouette, threshold-decomposed tones, bilateral smoothing, joint bilateral colour; methods `item-hd` / `item-soft` in `upscale.METHODS`), the 21 proposals as lane `itemart5` method entries with `alt` (off), `write_rebuild` / `sheets --rebuild`, `game_checks` set `itemart5`; `item_hd` / `item_icon_check`: VarInvGfx variant copies (#513); 6 more unit tests (`ItemRebuildTests` x5, the copies) |
 
 Not copied: `state_icons.py` (no state icon art in 1.13c, see Gaps), `dcc.py`, `hd-effects.md` / `item-tooltips.md` (no state icons in the mod; DCC art and tooltips are
 other lanes).

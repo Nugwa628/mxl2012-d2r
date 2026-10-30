@@ -9,6 +9,8 @@ array (h, w, 4) uint8 with alpha 0 or 255 as decoded from a DC6:
   scale2x    Scale2x (EPX) twice -> 4x, Lanczos down to the target size, mild unsharp mask
   scale3x    Scale3x (AdvMAME3x) -> 3x, Lanczos up to the target size, mild unsharp mask
   rune-*     Median's rune stones only: taken apart into stone, rim and sign and rebuilt crisp (tools/rune_hd.py)
+  item-*     any picture rebuilt crisp: silhouette and brightness steps cut one by one, colours by edge-aware sampling
+             (tools/item_rebuild.py)
 
 ScaleNx are edge-directed: an output sub-pixel takes a neighbour's colour where two neighbours of the same colour meet
 on a diagonal, so staircase edges become smooth lines and nothing is blended. "Same colour" is a YUV distance below
@@ -20,7 +22,8 @@ Needs numpy and Pillow (both checked by tools/lane_setup.py).
 import numpy as np
 from PIL import Image
 
-METHODS = ("bilinear", "lanczos", "scale2x", "scale3x", "scale2x-loose", "hybrid", "rune-flat", "rune-hd", "rune-crisp")
+METHODS = ("bilinear", "lanczos", "scale2x", "scale3x", "scale2x-loose", "hybrid", "rune-flat", "rune-hd", "rune-crisp",
+           "item-hd", "item-soft")
 METHOD = "hybrid"
 EQ_THRESHOLD = 1.0   # YUV distance (0-255 scale) under which two opaque pixels count as the same colour (1: identical)
 LOOSE_THRESHOLD = 24.0  # scale2x-loose: neighbouring shades count as one colour (posterizes pre-rendered texture)
@@ -143,6 +146,9 @@ def upscale(a: np.ndarray, factor: float, method: str = METHOD) -> np.ndarray:
     if method.startswith("rune-"):
         import rune_hd
         return rune_hd.rune_upscale(a, sw, sh, method)
+    if method.startswith("item-"):
+        import item_rebuild
+        return item_rebuild.rebuild(a, sw, sh, method)
     if method == "lanczos":
         big = a
     elif method == "scale2x":

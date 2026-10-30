@@ -11,6 +11,9 @@ most, side-by-side sheets for the owner, and the proposal list of better picture
   py -3 -I tools/item_art_review.py sheets <out_dir> --runehd    lane runehd: the 23 runes upscaled again (rune_hd):
                                                                  classic | shipped | round 4 | new, HD and in game;
                                                                  methods_NN.png, overview_2x.png
+  py -3 -I tools/item_art_review.py sheets <out_dir> --rebuild   lane itemart5: the pictures rebuilt crisp (item_rebuild):
+                                                                 classic | now | proposal | alternatives, HD and in game;
+                                                                 overview_2x.png
 
 Visibility of a picture (the sum over the items that show it) is built from the tables:
   drop     expected drops per kill, summed over every enabled monster row (TreasureClass1 of normal / nightmare / hell),
@@ -231,8 +234,8 @@ def build_ranking():
 
 def main(argv: list[str]) -> int:
     top, lane = 25, None
-    round3, runehd = "--round3" in argv, "--runehd" in argv
-    argv = [a for a in argv if a not in ("--round3", "--runehd")]
+    round3, runehd, rebuild = "--round3" in argv, "--runehd" in argv, "--rebuild" in argv
+    argv = [a for a in argv if a not in ("--round3", "--runehd", "--rebuild")]
     if "--lane" in argv:
         i = argv.index("--lane")
         lane = argv[i + 1]
@@ -254,6 +257,8 @@ def main(argv: list[str]) -> int:
         props = load_proposals()
         if runehd:
             return item_art_sheets.write_runehd(Path(argv[1]), plan, ranked, props)
+        if rebuild:
+            return item_art_sheets.write_rebuild(Path(argv[1]), plan, ranked, props)
         if round3:
             return item_art_sheets.write_round3(Path(argv[1]), plan, ranked, props)
         if lane:

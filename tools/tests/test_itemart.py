@@ -1,7 +1,7 @@
 """Unit tests of the item picture review tools (item_art_review: visibility ranking, the proposal switch; item_art_sheets:
 loose silhouette match, colour match, colour by position, upscale variants, sheet drawing, the rune stone
 recomposition of lane itemart3, the redrawn signs and the chisel of round 3 (item_glyphs), the retint; lane runehd's rune
-upscale (rune_hd); item_hd / item_art: the build
+upscale (rune_hd); lane itemart5's picture rebuild (item_rebuild); item_hd / item_art: the build
 makes the pictures of the proposals switched on) on synthetic data, plus one check of og4 against lane itemart's review
 sheet (skipped without the game files and the sheet). Run: py -3 -I -m unittest discover -s tools/tests -p "test_itemart.py" """
 import json
@@ -18,6 +18,7 @@ import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/p
 import item_art_review as R  # noqa: E402
 import item_art_sheets as S  # noqa: E402
 import item_glyphs as G  # noqa: E402
+import item_rebuild  # noqa: E402
 import rune_hd  # noqa: E402
 import upscale  # noqa: E402
 
@@ -466,6 +467,85 @@ class RuneHdTests(unittest.TestCase):
         self.assertTrue((img == upscale.place(S.upscaled(self.src, "rune-hd"), 98, 98)).all())
 
 
+def classic_fruit(seed: int = 2) -> np.ndarray:
+    """A synthetic Median picture (28 x 28): a red ball (radius 8, centre 14, 17) with a dark outline, a white
+    highlight, low-contrast speckle on its face, and a 1 px green stem (x 14, y 3..8) over it."""
+    rng = np.random.default_rng(seed)
+    a = np.zeros((28, 28, 4), np.uint8)
+    y, x = np.mgrid[:28, :28]
+    ball = (y - 17) ** 2 + (x - 14) ** 2 <= 64
+    a[ball] = (170, 30, 30, 255)
+    a[ball, :3] = np.clip(a[ball, :3].astype(int) + rng.integers(-6, 7, (ball.sum(), 1)), 0, 255)
+    a[ball & ~rune_hd.erode(ball, 1), :3] = (60, 10, 10)
+    a[13:15, 10:12, :3] = 245
+    a[3:9, 14] = (40, 150, 40, 255)
+    return a
+
+
+class ItemRebuildTests(unittest.TestCase):
+    """item_rebuild (lane itemart5): Median's own picture rebuilt crisp at the HD size."""
+    src = classic_fruit()
+
+    def test_size_shape_thin_stem_and_highlight_kept_in_both_methods(self):
+        for method in item_rebuild.METHODS:
+            out = upscale.upscale(self.src, 3.5, method)
+            self.assertEqual(out.shape, (98, 98, 4), method)
+            area = (out[..., 3] > 127).sum() / (self.src[..., 3] > 0).sum() / 3.5 ** 2
+            self.assertAlmostEqual(area, 1.0, delta=0.1, msg=method)
+            stem = out[14:26, 48:52]  # the 1 px stem at x 14 (HD 49..52), y 4..7
+            self.assertTrue((stem[..., 3] > 200).any(), method)
+            g = stem[stem[..., 3] > 200][:, :3].astype(int)
+            self.assertTrue((g[:, 1] > g[:, 0] + 40).all(), method)  # still green: no red bled into it
+            self.assertGreater(out[47:51, 36:41, :3].mean(), 200, method)  # the highlight
+            face = out[64:80, 44:60, :3].astype(float)
+            self.assertGreater(face[..., 0].mean(), 2 * face[..., 1].mean(), method)  # the red face stays red
+
+    def test_edges_are_anti_aliased_and_colours_stay_in_the_originals_range(self):
+        op = self.src[..., 3] > 0
+        lo, hi = self.src[op][:, :3].min(0).astype(int), self.src[op][:, :3].max(0).astype(int)
+        for method in item_rebuild.METHODS:
+            out = item_rebuild.rebuild(self.src, 98, 98, method)
+            al = out[..., 3]
+            self.assertTrue(((al > 0) & (al < 255)).sum() > 60, method)
+            rgb = out[al > 0][:, :3].astype(int)
+            self.assertTrue((rgb >= lo - 20).all() and (rgb <= hi + 12).all(), method)
+            y, src_y = item_rebuild.luma(rgb.astype(float)), item_rebuild.luma(self.src[op][:, :3].astype(float))
+            self.assertTrue((y >= src_y.min() - 2).all() and (y <= src_y.max() + 2).all(), method)  # the tones kept
+
+    def test_soft_evens_out_the_speckle_and_keeps_the_outline(self):
+        hd, soft = (item_rebuild.rebuild(self.src, 98, 98, m)[60:84, 40:64, 0].astype(float) for m in item_rebuild.METHODS)
+        self.assertLess(soft.std(), hd.std())
+        y = item_rebuild.luma(self.src[..., :3].astype(float))
+        d = item_rebuild.despeckle(y, self.src[..., 3] > 0)
+        self.assertEqual(d[13, 10], y[13, 10])  # the highlight is no speckle
+        self.assertEqual(d[9, 14], y[9, 14])    # nor the outline
+
+    def test_deterministic_lowend_size_empty_picture_and_candidate(self):
+        a = item_rebuild.rebuild(self.src, 98, 98)
+        self.assertTrue((a == item_rebuild.rebuild(self.src, 98, 98)).all())
+        self.assertEqual(upscale.upscale(self.src, 1.75, "item-soft").shape, (49, 49, 4))
+        self.assertFalse(item_rebuild.rebuild(np.zeros((28, 28, 4), np.uint8), 98, 98).any())
+        with self.assertRaises(ValueError):
+            item_rebuild.rebuild(self.src, 98, 98, "item-x")
+        img, label = S.candidate({"method": "item-hd"}, self.src, 98, 196, Path("."))
+        self.assertEqual((img.shape, label), ((196, 98, 4), "item-hd"))
+
+    def test_lane_itemart5_the_21_unmatched_pictures_rebuilt_and_off(self):
+        pics = R.load_proposals()["pictures"]
+        lane = {k: v for k, v in pics.items() if v.get("lane") == "itemart5"}
+        self.assertEqual(sorted(lane), sorted(["mxl/" + k for k in (
+            "jbscross", "pearl1", "pearl2", "pearl3", "pearl4", "catal1", "catal2", "catal3", "realapple", "apple",
+            "cherries", "moon1", "evileye", "skullstar", "ring08", "s1", "summbook")]
+            + ["classic/" + k for k in ("invfary3", "invfary4", "invbonr3", "invcndl")]))
+        self.assertEqual(sorted(v["pick"] for v in lane.values()), list(range(1, 22)))
+        for k, v in lane.items():
+            self.assertFalse(v["enabled"], k)
+            self.assertIn(v["method"], item_rebuild.METHODS, k)
+            for alt in v.get("alt", []):
+                self.assertEqual(sum(1 for f in ("method", "reuse") if alt.get(f)), 1, k)
+                self.assertIn(alt.get("method", "item-hd"), item_rebuild.METHODS, k)
+
+
 class BuildProposalTests(unittest.TestCase):
     """item_hd.generate makes a picture from its proposal entry when the entry is switched on, else the usual upscale."""
 
@@ -532,6 +612,25 @@ class BuildProposalTests(unittest.TestCase):
         n = self.generate()
         self.assertEqual((self.plan.report["proposal_on"], n["mxl upscaled"]), ([], 2))
         self.assertTrue((self.sprite("a") == keep).all())
+
+    def test_a_varinvgfx_item_gets_its_picture_as_numbered_copies(self):
+        # bugs.md #513: D2R asks a VarInvGfx type (rings, Median's Mega Rings `kill`) for <asset><n>
+        import item_hd
+        plan = item_hd.Plan({"misc": [{"code": "r@r", "invfile": "a", "type": "kill", "invwidth": "1", "invheight": "1"},
+                                      {"code": "cx1", "invfile": "b", "type": "char", "invwidth": "1", "invheight": "1"}]},
+                            {}, {"items": {}, "uniques": {}, "sets": {}}, set(), {"a", "b"}, set(),
+                            [{"Code": "kill", "VarInvGfx": "3"}, {"Code": "char", "VarInvGfx": ""}], hd_items=self.hd_items)
+        plan.run()
+        self.assertEqual(plan.variants, {("misc", "mxl", "a"): 3})
+        self.plan.variants = plan.variants
+        n = self.generate()
+        self.assertEqual(n["mxl variant copies"], 3)
+        self.assertEqual(self.plan.report["variant_copies"], [[f"mxl/a{v}", "mxl/a"] for v in (1, 2, 3)])
+        for v in (1, 2, 3):
+            for low in (False, True):
+                self.assertTrue((self.sprite(f"a{v}", low) == self.sprite("a", low)).all())
+        self.generate()  # a second build keeps the copies (not stale)
+        self.assertTrue((self.out / "global" / "ui" / "items" / "misc" / "mxl" / "a3.sprite").exists())
 
     def test_the_icon_check_holds_a_proposal_sprite_to_its_candidate(self):
         import item_icon_check as C

@@ -144,6 +144,7 @@ def main() -> int:
     d2r_dc6 = {p.stem.lower() for p in D2R_ITEMS.glob("*.dc6")}
     hd_report = json.loads((OUT / "item_hd_report.json").read_text("utf-8")) if (OUT / "item_hd_report.json").exists() else {}
     reused = set(hd_report.get("hd_reuse", {}))  # D2R's HD art
+    copies = dict(hd_report.get("variant_copies", []))  # "<group>/<inv><n>" -> "<group>/<inv>"
     import fxpaths
     from item_art_review import enabled_proposals, load_proposals
     proposals = {k: v for k, v in enabled_proposals(load_proposals()).items() if k in set(hd_report.get("proposal_on", []))}
@@ -161,7 +162,11 @@ def main() -> int:
             inv = sp.name[:-len(".lowend.sprite" if low else ".sprite")]
             checked += 1
             k = f"{folder_dir.name}/{inv}"
-            if k in proposals:
+            if k in copies:  # a VarInvGfx variant (item_hd, bugs.md #513): the same bytes as its picture
+                base = folder_dir / sp.name.replace(inv, copies[k].split("/", 1)[1], 1)
+                if not base.exists() or base.read_bytes() != sp.read_bytes():
+                    sprite_problems.append(f"{sp}: variant copy differs from {base.name}")
+            elif k in proposals:
                 sprite_problems += check_proposal_sprite(sp, group / f"{inv}.dc6", pal, CELL_LOW if low else CELL_HD,
                                                          proposals[k], hd_items)
             else:

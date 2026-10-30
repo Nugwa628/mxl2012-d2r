@@ -26,7 +26,7 @@ D2R_ITEMS = BASE / "items"
 CELL_CLASSIC, CELL_HD, CELL_LOW = 28, 98, 49
 GROUPS = {"mxl": MOD_ITEMS, "classic": D2R_ITEMS}
 TOOLS = [Path(__file__).resolve().parent / f for f in ("item_art.py", "upscale.py", "item_reuse.py", "colour_shift.py", "dc6.py",
-                                                       "item_art_sheets.py", "rune_hd.py")]
+                                                       "item_art_sheets.py", "rune_hd.py", "item_rebuild.py")]
 
 
 def asset_size(w: int, h: int, cells_w: int, cells_h: int) -> tuple[int, int]:

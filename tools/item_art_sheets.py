@@ -736,3 +736,59 @@ def write_runehd(out: Path, plan, ranked: list, proposals: dict, lane: str = "ru
     for w in written:
         print(w)
     return 0
+
+
+# -- lane itemart5: Median's own pictures rebuilt crisp (tools/item_rebuild.py) -------------------------------------
+def write_rebuild(out: Path, plan, ranked: list, proposals: dict, lane: str = "itemart5") -> int:
+    """Lane itemart5's sheets (entries with "lane": lane, by "pick"), PER_SHEET rows each: Median classic (nearest) |
+    today's HD (the plain upscale) | the proposal | its `alt` entries (shown, never built), at HD size, then classic, today
+    and the proposal at in-game size (49 px per cell); and overview_2x.png, every picture as classic | proposal at 2x."""
+    pal = palette(Path(__file__).resolve().parent.parent / "work" / "d2r-baseline" / "palette" / "pal.dat")
+    rank_of = {p.key: (n, p) for n, p in enumerate(ranked, 1)}
+    picks = sorted((v.get("pick", 999), k, v) for k, v in proposals.get("pictures", {}).items()
+                   if v.get("lane") == lane and k in rank_of)
+    rows, tiles = [], []
+    for pick, key, prop in picks:
+        n, p = rank_of[key]
+        src = classic_rgba(key, pal)
+        cw, ch = asset_size(src.shape[1], src.shape[0], *plan.needs[(p.folder, *key.split("/", 1))])
+        W, H = cw * CELL_HD, ch * CELL_HD
+        classic, now = upscale.place(nearest(src, CELL_HD / CELL_CLASSIC), W, H), upscale.place(upscaled(src), W, H)
+        cand, label = candidate(prop, src, W, H, plan.hd_items)
+        alts = [candidate(a, src, W, H, plan.hd_items) for a in prop.get("alt", [])]
+        rows.append({"cells": (cw, ch),
+                     "caption": f"{pick}. (rank #{n}) {caption(p)}: {label}. {'ON' if prop.get('enabled') else 'off'}. "
+                                f"{prop.get('why', '')}",
+                     "images": [classic, now, cand] + [a[0] for a in alts] + [in_game(x, cw, ch) for x in (classic, now, cand)],
+                     "labels": ["Median classic (nearest)", "HD now (plain upscale)", f"proposal: {label}"]
+                     + [f"alternative: {a[1]}" for a in alts]
+                     + ["classic, in game", "HD now, in game", "proposal, in game (1920x1080)"]})
+        name = sorted({u["name"] for u in p.users})[0] if p.users else key
+        tiles.append((name, classic, cand))
+    written = []
+    for k, i in enumerate(range(0, len(rows), PER_SHEET), 1):
+        title = (f"D2R-XL 2012 item pictures, lane {lane}, sheet {k}: Median's own pictures rebuilt crisp (off until "
+                 f"approved); HD size (98 px per cell), the last three at 1920 x 1080 (49 px per cell)")
+        written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
+    if tiles:
+        per_row, z = 4, 2
+        tw, th = max(t[1].shape[1] for t in tiles) * z, max(t[1].shape[0] for t in tiles) * z
+        f = _font(15)
+        im = Image.new("RGBA", (PAD + per_row * (2 * tw + 3 * PAD), PAD + -(-len(tiles) // per_row) * (th + 24 + PAD)),
+                       (*BG, 255))
+        d = ImageDraw.Draw(im)
+        for n, (name, classic, new) in enumerate(tiles):
+            x, y = PAD + (n % per_row) * (2 * tw + 3 * PAD), PAD + (n // per_row) * (th + 24 + PAD)
+            d.text((x, y), f"{name}: classic | new", (*TEXT, 255), font=f)
+            for j, img in enumerate((classic, new)):
+                im.alpha_composite(Image.fromarray(np.ascontiguousarray(img), "RGBA").resize(
+                    (img.shape[1] * z, img.shape[0] * z), Image.Resampling.NEAREST), (x + j * (tw + PAD), y + 22))
+        ov = Path(out) / "overview_2x.png"
+        Path(out).mkdir(parents=True, exist_ok=True)
+        im.save(ov)
+        written.append(ov)
+    Path(out).mkdir(parents=True, exist_ok=True)
+    (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
+    for w in written:
+        print(w)
+    return 0
