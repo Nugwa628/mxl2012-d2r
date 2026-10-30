@@ -36,7 +36,7 @@
     0.55
    ],
    "confidence": "medium",
-   "enabled": false,
+   "enabled": true,
    "before": "councilmember1 x0.75",
    "why": "Dark Fey: a slender teal-skinned woman with green hair, melee (21x54 px). The Dark Spearwoman is D2R's slender wingless woman fighter; teal like the art. The Council Member is a robed man"
   },
@@ -93,7 +93,7 @@
     0.4
    ],
    "confidence": "low",
-   "enabled": false,
+   "enabled": true,
    "before": "thornhulk1 x0.75 (teal)",
    "why": "Fungus: a dark blue biped under a wide blue mushroom cap (53x86 px). D2R has no mushroom man; the Thorned Hulk's broad bushy head and shoulders are the nearest cap. Kept, smaller and blue like the art instead of teal"
   },
@@ -101,7 +101,7 @@
    "donor": "claygolem",
    "scale": 1.3,
    "confidence": "medium",
-   "enabled": false,
+   "enabled": true,
    "before": "deathmauler1 x1.15",
    "why": "Magma Demon: a hulking golem of dark rock with glowing lava cracks (94x104 px). The Clay Golem is D2R's hulking rock-and-earth golem, the nearest shape. Its colour cannot be changed: a darkened ember table drew it tan as ever in game (trials 1 and 2, like the Iron Golem of section 12), so it stays its own earth-tan. The Fire Golem (all flame) and the Death Mauler (a spined beast) fit the shape worse"
   },
@@ -177,7 +177,7 @@
     0.0
    ],
    "confidence": "medium",
-   "enabled": false,
+   "enabled": true,
    "before": "cantor1 x1.0",
    "why": "Crystal: a woman with orange-red hair, green top and red skirt, melee (50x80 px). The Dark Spearwoman is D2R's woman fighter in red; a little brighter. The Cantor is a robed priest"
   },
@@ -218,6 +218,25 @@
    "enabled": true,
    "before": "arach1 x0.85 (shared table, drew dull red-brown)",
    "why": "Enforcer with Laser: a golden box on long jointed legs (87x72 px). The Arach stays (D2R's long-legged walker); a strong gold tint of its own so it no longer falls on a shared table that kept it red-brown"
+  },
+  "$f": {
+   "donor": "doomknight3",
+   "scale": 1.2,
+   "adjust": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "vampire1 x1.4",
+   "why": "Rathma Primus: in Median a necromancer; the classic art is a pale winged humanoid caster (68x109 px). Owner pick (2026-10-30, for now): the Oblivion Knight (doomknight3 x1.2), a bronze skeletal caster with glowing hands; drawn, casts, dies, 0 asserts in lane rathma's trial (checks-20261030-204213-s3). Also tried: Nihlathak (nihlathakboss x1.35, value +0.3: a bald robed man). The Vampire is a bare-skinned winged man; succubus1 drew nothing for this Id and ancientbarb2 asserted at death (lane standin)"
   }
  }
 }

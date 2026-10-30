@@ -424,8 +424,10 @@ class Proposals(unittest.TestCase):
 
     def test_committed_proposals_are_the_approved_ones_and_complete(self):
         d = hm.load_proposals(hm.PROPOSALS_JSON)
-        # owner, 2026-10-30: these eight on; Dark Fey, Fungus, Magma Demon and Crystal wait for a closer look
-        self.assertEqual(sorted(hm.used_proposals(d)), sorted(["9!", "&b", "0n", "08", "5$", "g7", "#m", "#q"]))
+        # owner, 2026-10-30: all twelve on (eight first, then Dark Fey, Fungus, Magma Demon and Crystal after a closer look);
+        # lane rathma's `$f`: the owner picked the Oblivion Knight "for now" (Nihlathak tried as well)
+        self.assertEqual(sorted(hm.used_proposals(d)), sorted(d["tokens"]))
+        self.assertEqual((d["tokens"]["$f"]["donor"], d["tokens"]["$f"]["scale"]), ("doomknight3", 1.2))
         tokens = json.loads(hm.TOKENS_JSON.read_text("utf-8"))["tokens"]
         trial = hm.with_proposals(tokens, d, "all")
         for t, p in d["tokens"].items():

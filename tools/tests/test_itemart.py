@@ -1,6 +1,7 @@
 """Unit tests of the item picture review tools (item_art_review: visibility ranking, the proposal switch; item_art_sheets:
 loose silhouette match, colour match, colour by position, upscale variants, sheet drawing, the rune stone
-recomposition of lane itemart3, the redrawn signs and the chisel of round 3 (item_glyphs), the retint; item_hd / item_art: the build
+recomposition of lane itemart3, the redrawn signs and the chisel of round 3 (item_glyphs), the retint; lane runehd's rune
+upscale (rune_hd); item_hd / item_art: the build
 makes the pictures of the proposals switched on) on synthetic data, plus one check of og4 against lane itemart's review
 sheet (skipped without the game files and the sheet). Run: py -3 -I -m unittest discover -s tools/tests -p "test_itemart.py" """
 import json
@@ -17,6 +18,7 @@ import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/p
 import item_art_review as R  # noqa: E402
 import item_art_sheets as S  # noqa: E402
 import item_glyphs as G  # noqa: E402
+import rune_hd  # noqa: E402
 import upscale  # noqa: E402
 
 
@@ -104,7 +106,8 @@ class ProposalTests(unittest.TestCase):
         data = json.loads(R.PROPOSALS.read_text("utf-8"))
         self.assertTrue(data["enabled"])
         # owner, 2026-10-30: og1..og5 (lane itemart2), lane itemart3's 59 entries and its 7 signets (round 4: the runes
-        # and signets with the redrawn signs); the 23 runes off again for 0.1.5 ("we need to work on those more")
+        # and signets with the redrawn signs); the 23 runes off again for 0.1.5 ("we need to work on those more"), now
+        # lane runehd's upscales of Median's own pictures, off until the owner has seen them
         rune = lambda k: k.startswith(("mxl/r-a-", "mxl/r-d-"))
         approved = lambda k, v: k.startswith("mxl/og") or (v.get("lane") in ("itemart3", "itemart3-signets") and not rune(k))
         self.assertEqual(len(R.enabled_proposals(data)), 5 + 36 + 7)
@@ -119,28 +122,39 @@ class ProposalTests(unittest.TestCase):
                 self.assertTrue({"folder", "asset"} <= set(v["reuse"]), k)
 
 
-    def test_lane_itemart3_proposals_in_pick_order_the_runes_and_signets_on_with_redrawn_signs(self):
+    def test_lane_itemart3_proposals_in_pick_order_the_signets_on_with_redrawn_signs(self):
         pics = R.load_proposals()["pictures"]
         lane = {k: v for k, v in pics.items() if v.get("lane") == "itemart3"}
-        self.assertEqual(len(lane), 59)
-        self.assertEqual(len({v["pick"] for v in lane.values()}), 59)
-        runes = [k for k in lane if k.startswith(("mxl/r-a-", "mxl/r-d-"))]
-        self.assertEqual(len(runes), 23)
-        self.assertTrue(all(v["enabled"] != (k in runes) for k, v in lane.items()))  # the runes off (owner, 0.1.5)
-        for k in runes:
-            self.assertEqual((lane[k]["reuse"].get("glyph"), lane[k]["reuse"].get("sign")), ("chisel", k))
+        self.assertEqual(len(lane), 36)  # 59 less the 23 runes (lane runehd since 2026-10-30)
+        self.assertEqual(len({v["pick"] for v in lane.values()}), 36)
+        self.assertTrue(all(v["enabled"] for v in lane.values()))
+        self.assertFalse([k for k in lane if k.startswith(("mxl/r-a-", "mxl/r-d-"))])
         signets = {k: v for k, v in pics.items() if v.get("lane") == "itemart3-signets"}
         self.assertEqual(sorted(signets), sorted(f"mxl/{k}" for k in (
             "sigil1b", "sigil2b", "sigil3b", "sigil4b", "sigil5b", "sigil6b", "sigilxl")))
         for k, v in signets.items():
             self.assertTrue(v["enabled"], k)
             self.assertEqual((v["reuse"].get("seal"), v["reuse"].get("sign")), ("chisel", k))
-        self.assertEqual(sorted(G.RUNES), sorted(runes))
         self.assertEqual(sorted(G.SIGNETS), sorted(signets))
         # owner's colour notes (round 3): Sunstone of Thunder yellow, Oil of Jewelcraft pink; both stay on
         self.assertEqual(pics["classic/invgmw"]["reuse"]["tint"]["hue"], 52)
         self.assertEqual(pics["mxl/zelixir7"]["reuse"]["tint"]["hue"], 330)
         self.assertTrue(pics["classic/invgmw"]["enabled"] and pics["mxl/zelixir7"]["enabled"])
+
+    def test_lane_runehd_the_23_runes_are_median_pictures_upscaled_again_and_off(self):
+        # owner, 2026-10-30: "just upscale the runes again" (the round-4 chisel held back from 0.1.5)
+        pics = R.load_proposals()["pictures"]
+        lane = {k: v for k, v in pics.items() if v.get("lane") == "runehd"}
+        runes = sorted(k for k in pics if k.startswith(("mxl/r-a-", "mxl/r-d-")))
+        self.assertEqual(sorted(lane), runes)
+        self.assertEqual(len(runes), 23)
+        self.assertEqual(sorted(v["pick"] for v in lane.values()), list(range(1, 24)))
+        for k, v in lane.items():
+            self.assertFalse(v["enabled"], k)
+            self.assertIn(v["method"], rune_hd.METHODS, k)
+            self.assertNotIn("reuse", v, k)
+        self.assertEqual(sorted(G.RUNES), runes)  # the redrawn signs stay for the comparison sheets
+        self.assertEqual(S.round4_rune("mxl/r-a-01")["reuse"]["glyph"], "chisel")
 
     def test_report_entry_says_off_or_on(self):
         data = {"enabled": False, "pictures": {"mxl/a": {"method": "hybrid-crisp", "enabled": True},
@@ -378,6 +392,78 @@ def dc6_frame(left: int, right: int, n: int = 24) -> bytes:
     from dc6 import build_dc6
     row = bytes([n]) + bytes([left] * (n // 2) + [right] * (n - n // 2)) + b"\x80"
     return build_dc6([(n, n, 0, 0, row * n)])
+
+
+def classic_rune(seed: int = 1) -> np.ndarray:
+    """A synthetic Median rune (28 x 28): a grey trapezoid stone with a dark rim, speckle, a darker lower-right edge,
+    and a sign of two 1 px vertical strokes (x 11 and 13, a 1 px gap at x 12) joined by a bar at y 9."""
+    rng = np.random.default_rng(seed)
+    a = np.zeros((28, 28, 4), np.uint8)
+    for y in range(3, 25):
+        half = 7 + (y - 3) * 4 // 21
+        x0, x1 = 14 - half, 14 + half
+        a[y, x0:x1] = (110, 108, 104, 255)
+    op = a[..., 3] > 0
+    a[..., :3] = np.clip(a[..., :3].astype(int) + rng.integers(-8, 9, (28, 28, 1)), 0, 255)
+    a[op & ~rune_hd.erode(op, 1), :3] = 30                      # the dark rim
+    a[22:24, 14:20][op[22:24, 14:20], :3] = 74                  # the stone's own darker lower edge (no sign)
+    a[9:19, 11, :3] = a[9:19, 13, :3] = 50                      # two strokes ...
+    a[9, 11:14, :3] = 50                                        # ... joined at the top
+    a[16, 6, :3] = 80                                           # one dark speckle (no sign)
+    a[~op] = 0
+    return a
+
+
+class RuneHdTests(unittest.TestCase):
+    """rune_hd (lane runehd): Median's rune picture rebuilt crisp at the HD size."""
+    src = classic_rune()
+
+    def test_sign_mask_takes_the_strokes_not_the_speckle_or_the_rims_shading(self):
+        dark, m = rune_hd.sign_layers(self.src, self.src[..., 3] > 0)
+        self.assertTrue(m[9:19, 11].all() and m[9:19, 13].all() and m[9, 12])
+        self.assertFalse(m[10:19, 12].any())  # the gap
+        self.assertFalse(m[16, 6] or m[22:24].any())
+        self.assertTrue((dark[~rune_hd.dilate(m, 1)] == 0).all())
+
+    def test_every_method_keeps_size_shape_strokes_and_the_one_pixel_gap(self):
+        for method in rune_hd.METHODS:
+            out = upscale.upscale(self.src, 3.5, method)
+            self.assertEqual(out.shape, (98, 98, 4), method)
+            v = out[..., :3].astype(float).mean(-1)
+            stroke = v[40:60, round(11.5 * 3.5)]  # the middle of the stroke at x 11
+            gap = v[40:60, round(12.5 * 3.5)]
+            stone = v[40:60, round(8.5 * 3.5)]
+            self.assertLess(stroke.mean(), 0.75 * stone.mean(), method)
+            self.assertGreater(gap.mean(), 0.85 * stone.mean(), method)  # the gap stays open
+            area = (out[..., 3] > 127).sum() / (self.src[..., 3] > 0).sum() / 3.5 ** 2
+            self.assertAlmostEqual(area, 1.0, delta=0.08)
+
+    def test_edges_are_anti_aliased_and_colours_stay_in_the_originals_range(self):
+        op = self.src[..., 3] > 0
+        lo, hi = self.src[op][:, :3].min(0).astype(int), self.src[op][:, :3].max(0).astype(int)
+        for method in rune_hd.METHODS:
+            out = rune_hd.rune_upscale(self.src, 98, 98, method)
+            al = out[..., 3]
+            self.assertTrue(((al > 0) & (al < 255)).sum() > 50)  # a smooth edge, not a staircase of full pixels
+            rgb = out[al == 255][:, :3].astype(int)
+            if method == "rune-flat":  # no new colours
+                self.assertTrue((rgb >= lo - 2).all() and (rgb <= hi + 2).all())
+            else:  # the shading pass: the lit bevel and lip lift the brightest stone a little, the cut darkens the sign
+                top = hi * (1 + rune_hd.BEVEL + rune_hd.LIP) + 4 * rune_hd.FINE
+                self.assertTrue((rgb >= lo * 0.75).all() and (rgb <= top).all(), method)
+
+    def test_deterministic_lowend_size_and_empty_picture(self):
+        a = rune_hd.rune_upscale(self.src, 98, 98, "rune-hd")
+        self.assertTrue((a == rune_hd.rune_upscale(self.src, 98, 98, "rune-hd")).all())
+        self.assertEqual(upscale.upscale(self.src, 1.75, "rune-crisp").shape, (49, 49, 4))
+        self.assertFalse(rune_hd.rune_upscale(np.zeros((28, 28, 4), np.uint8), 98, 98).any())
+        with self.assertRaises(ValueError):
+            rune_hd.rune_upscale(self.src, 98, 98, "rune-x")
+
+    def test_a_method_proposal_is_drawn_by_candidate_as_the_build_does(self):
+        img, label = S.candidate({"method": "rune-hd"}, self.src, 98, 98, Path("."))
+        self.assertEqual(label, "rune-hd")
+        self.assertTrue((img == upscale.place(S.upscaled(self.src, "rune-hd"), 98, 98)).all())
 
 
 class BuildProposalTests(unittest.TestCase):

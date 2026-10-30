@@ -1,6 +1,6 @@
 {
  "enabled": true,
- "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off. Round 3 (2026-10-30): the 23 runes are off again (owner: too blobby, not sharp) and, with the signets (still off), use Median's sign redrawn as strokes (tools/item_glyphs.py), cut in crisp: reuse \"glyph\" / \"seal\": \"chisel\" with \"sign\" = the picture key. \"tint\" retints a picture (item_art_sheets.tint): Sunstone of Thunder yellow, Oil of Jewelcraft pink. ON (owner, 2026-10-30, round 4: \"the new ones look great, ship em\"): the 23 runes and the 7 signets with the redrawn signs.",
+ "note": "Lane itemart proposals (2026-10-30). Owner rule: the owner reviews the sheets first (mxl2012-runs/itemart/review); item_hd uses only an entry switched on under the file's switch. ON (owner, 2026-10-30, lane itemart2): the five Rainbow Stones og1-og5. Lane itemart3 (2026-10-30): 66 more proposals (`lane`: itemart3, `pick`: best first), D2R HD art of the same kind recoloured (the runes: D2R's stone with Median's glyph); all off until the owner approves. ON (owner, 2026-10-30, lane itemart3 round 2): the 59 itemart3 proposals except the seven signets (they read as jewels, not signets / emblems). Lane itemart3 round 2: the seven signets have a second try (lane itemart3-signets: a gold seal with Median's sign), off. Round 3 (2026-10-30): the 23 runes are off again (owner: too blobby, not sharp) and, with the signets (still off), use Median's sign redrawn as strokes (tools/item_glyphs.py), cut in crisp: reuse \"glyph\" / \"seal\": \"chisel\" with \"sign\" = the picture key. \"tint\" retints a picture (item_art_sheets.tint): Sunstone of Thunder yellow, Oil of Jewelcraft pink. ON (owner, 2026-10-30, round 4: \"the new ones look great, ship em\"): the 23 runes and the 7 signets with the redrawn signs. Lane runehd (owner, 2026-10-30: \"just upscale the runes again\"): the 23 runes are Median's own pictures upscaled again (`method`: rune-flat / rune-hd / rune-crisp, tools/rune_hd.py, lane runehd), off until the owner approves; the round-4 chisel (item_art_sheets.round4_rune) is kept for the comparison sheets only.",
  "pictures": {
   "mxl/og1": {
    "reuse": {
@@ -68,208 +68,123 @@
    "why": "glossy orb: the hybrid's Scale2x steps the round shading; Scale2x only on the outline, Lanczos inside (no D2R sphere: the sorceress orbs are on a claw, gems are faceted and would read as gems)"
   },
   "mxl/r-a-01": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-01"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 41
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 14
   },
   "mxl/r-a-02": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-02"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 43
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 16
   },
   "mxl/r-a-03": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-03"
-   },
+   "method": "rune-crisp",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 44
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5); On's lower bars and Qor's skull are faint in the original: rune-crisp (darker, bolder sign)",
+   "pick": 17
   },
   "mxl/r-a-05": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-05"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 28
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 1
   },
   "mxl/r-a-06": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-06"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 29
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 2
   },
   "mxl/r-a-07": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-07"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 30
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 3
   },
   "mxl/r-a-08": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-08"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 31
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 4
   },
   "mxl/r-a-09": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-09"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 32
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 5
   },
   "mxl/r-a-10": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-10"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 33
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 6
   },
   "mxl/r-a-11": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-11"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 34
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 7
   },
   "mxl/r-a-12": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-12"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 35
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 8
   },
   "mxl/r-a-13": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-13"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 36
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 9
   },
   "mxl/r-a-14": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-14"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 37
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 10
   },
   "mxl/r-a-15": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-15"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 38
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 11
   },
   "mxl/r-a-16": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-16"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 39
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 12
   },
   "mxl/r-a-17": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-17"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 40
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 13
   },
   "mxl/r-a-18": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-a-18"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 42
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 15
   },
   "mxl/realapple": {
    "method": "hybrid-crisp",
@@ -613,76 +528,46 @@
    "pick": 27
   },
   "mxl/r-d-02": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-d-02"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 45
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 18
   },
   "mxl/r-d-05": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-d-05"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 46
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 19
   },
   "mxl/r-d-11": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-d-11"
-   },
+   "method": "rune-crisp",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 47
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5); On's lower bars and Qor's skull are faint in the original: rune-crisp (darker, bolder sign)",
+   "pick": 20
   },
   "mxl/r-d-07": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-d-07"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 48
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 21
   },
   "mxl/r-d-04": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-d-04"
-   },
+   "method": "rune-flat",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 49
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5); Auhe's thin-rayed star: rune-flat (the cut-in shading of rune-hd makes it a splash)",
+   "pick": 22
   },
   "mxl/r-d-12": {
-   "reuse": {
-    "folder": "misc",
-    "asset": "rune/ist_rune",
-    "glyph": "chisel",
-    "sign": "mxl/r-d-12"
-   },
+   "method": "rune-hd",
    "enabled": false,
-   "lane": "itemart3",
-   "why": "Median's rune stone is D2R's stone shape: D2R's HD rune stone, its glyph taken out, Median's sign redrawn as clean strokes (tools/item_glyphs.py) and chiselled in, crisp (round 3; round 2's carved classic pixels were too blobby: owner, 2026-10-30)",
-   "pick": 50
+   "lane": "runehd",
+   "why": "Median's own classic rune picture upscaled again (owner, 2026-10-30: \"just upscale the runes again ... HD versions of the original without losing the symbol feel\"): taken apart into stone, rim and sign at the classic size and rebuilt crisp at the HD size in the original's colours (tools/rune_hd.py); replaces round 4's D2R stone with the chiselled sign (held back from 0.1.5)",
+   "pick": 23
   },
   "mxl/sigil4b": {
    "reuse": {

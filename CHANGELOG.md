@@ -7,6 +7,22 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.6 (2026-10-30)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**New in HD:**
+
+- Better D2R stand-ins for four more Median monsters: Dark Fey and Crystal (the Dark Spearwoman, teal / bright),
+  Magma Demon (the Clay Golem) and Fungus (a smaller, blue Thorned Hulk).
+- Rathma Primus is drawn as D2R's Oblivion Knight, a skeletal caster, instead of the Vampire.
+
+**Known:** in HD, Median's runes still show their classic pictures scaled up (sharper versions are made and wait for
+a review), the Ancient Tunnels void around the platform is drawn as floor, and Khalimgrad's cathedral has no tall pointed
+arch and long roofed walls yet.
+
 ### 0.1.5 (2026-10-30)
 
 D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its

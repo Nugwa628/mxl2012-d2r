@@ -670,3 +670,69 @@ def write_round3(out: Path, plan, ranked: list, proposals: dict) -> int:
     for w in written:
         print(w)
     return 0
+
+
+# -- lane runehd: Median's runes upscaled again (owner, 2026-10-30) -------------------------------------------------
+def round4_rune(key: str) -> dict:
+    """The round-4 proposal of a rune (lane itemart3: D2R's blank Ist stone, Median's sign redrawn and chiselled in),
+    kept for the comparison sheets."""
+    return {"reuse": {"folder": "misc", "asset": "rune/ist_rune", "glyph": "chisel", "sign": key}}
+
+
+def write_runehd(out: Path, plan, ranked: list, proposals: dict, lane: str = "runehd") -> int:
+    """Lane runehd's sheets of the 23 runes (entries with "lane": lane, by "pick"), PER_SHEET rows each: Median classic
+    (nearest) | today's shipped HD (the plain upscale) | round 4 (chiselled) | the proposal, at HD size, then the same four
+    at in-game size (49 px per cell); methods_NN.png: rune-flat | rune-hd | rune-crisp (the approaches tried); and
+    overview_2x.png: every proposal side by side at 2x."""
+    import rune_hd
+    pal = palette(Path(__file__).resolve().parent.parent / "work" / "d2r-baseline" / "palette" / "pal.dat")
+    rank_of = {p.key: p for p in ranked}
+    picks = sorted((v.get("pick", 999), k, v) for k, v in proposals.get("pictures", {}).items()
+                   if v.get("lane") == lane and k in rank_of)
+    rows, alts, tiles = [], [], []
+    for pick, key, prop in picks:
+        p = rank_of[key]
+        src = classic_rgba(key, pal)
+        cw, ch = asset_size(src.shape[1], src.shape[0], *plan.needs[(p.folder, *key.split("/", 1))])
+        W, H = cw * CELL_HD, ch * CELL_HD
+        four = [upscale.place(nearest(src, CELL_HD / CELL_CLASSIC), W, H), upscale.place(upscaled(src), W, H),
+                candidate(round4_rune(key), src, W, H, plan.hd_items)[0], candidate(prop, src, W, H, plan.hd_items)[0]]
+        name = sorted({u["name"] for u in p.users})[0] if p.users else key
+        rows.append({"cells": (cw, ch), "images": four + [in_game(x, cw, ch) for x in four],
+                     "caption": f"{pick}. {caption(p)}: {prop.get('method')}. {'ON' if prop.get('enabled') else 'off'}",
+                     "labels": ["Median classic (nearest)", "shipped HD (plain upscale)", "round 4 (chiselled)",
+                                f"new: {prop.get('method')}", "classic, in game", "shipped, in game", "round 4, in game",
+                                "new, in game (1920x1080)"]})
+        alts.append({"cells": (cw, ch), "caption": f"{pick}. {caption(p)}",
+                     "images": [upscale.place(nearest(src, CELL_HD / CELL_CLASSIC), W, H)]
+                     + [upscale.place(upscaled(src, m), W, H) for m in rune_hd.METHODS],
+                     "labels": ["Median classic (nearest)"] + [m + (" (picked)" if m == prop.get("method") else "")
+                                                               for m in rune_hd.METHODS]})
+        tiles.append((name, four[3]))
+    written = []
+    for k, i in enumerate(range(0, len(rows), PER_SHEET), 1):
+        title = (f"D2R-XL 2012 runes, lane {lane}, sheet {k}: Median's own rune pictures upscaled again (off until "
+                 f"approved); left four at HD size (98 px per cell), right four at 1920 x 1080 (49 px per cell)")
+        written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
+    for k, i in enumerate(range(0, len(alts), PER_SHEET), 1):
+        title = f"D2R-XL 2012 runes, lane {lane}, the approaches tried {k}: rune_hd.METHODS at HD size (98 px per cell)"
+        written += save_pair(draw_sheet(alts[i:i + PER_SHEET], title), Path(out) / f"methods_{k:02}.png")
+    if tiles:
+        per_row, z = 6, 2
+        tw, th = max(t[1].shape[1] for t in tiles) * z, max(t[1].shape[0] for t in tiles) * z
+        f = _font(15)
+        im = Image.new("RGBA", (PAD + per_row * (tw + PAD), PAD + -(-len(tiles) // per_row) * (th + 24 + PAD)), (*BG, 255))
+        d = ImageDraw.Draw(im)
+        for n, (name, img) in enumerate(tiles):
+            x, y = PAD + (n % per_row) * (tw + PAD), PAD + (n // per_row) * (th + 24 + PAD)
+            d.text((x, y), name, (*TEXT, 255), font=f)
+            im.alpha_composite(Image.fromarray(np.ascontiguousarray(img), "RGBA").resize(
+                (img.shape[1] * z, img.shape[0] * z), Image.Resampling.NEAREST), (x, y + 22))
+        ov = Path(out) / "overview_2x.png"
+        im.save(ov)
+        written.append(ov)
+    Path(out).mkdir(parents=True, exist_ok=True)
+    (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
+    for w in written:
+        print(w)
+    return 0

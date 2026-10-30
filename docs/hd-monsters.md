@@ -1044,5 +1044,27 @@ Review sheets (legacy art, HD now far / near, HD proposal far / near; outside gi
 to true, then build.
 
 **Owner, 2026-10-30:** on (0.1.5): `9!` Centaur, `&b` Deathwing, `0n` Onyx Knight, `08` Fell Fiend, `5$` Porkchop, `g7` Pest,
-`#m` Belial, `#q` Enforcer. Still off for a closer look: `!2` Dark Fey, `2(` Fungus, `(l` Magma Demon, `b#` Crystal. Rathma
-(`$f`) stays `vampire1` for now.
+`#m` Belial, `#q` Enforcer. Then (after the close-up sheet `mxl2012-runs/standin/eye_review.png`) also `!2` Dark Fey, `2(` Fungus, `(l` Magma
+Demon, `b#` Crystal: all twelve on. Rathma
+(`$f`): the Oblivion Knight (section 16.2).
+
+### 16.2 Rathma Primus as a necromancer (lane rathma, 2026-10-30; owner: the Oblivion Knight, for now)
+
+Median draws `$f` Rathma Primus (Act 3 superunique) as a pale winged caster; in Median he is a necromancer, and the owner wants
+him to read as one. Same rule and mechanism as 16.1 (D2R's own HD units only; a proposal entry with `enabled: false` in
+`tools/data/hd_monster_proposals.json`; trial builds `hd_monsters.py build --try-proposals $f`).
+
+| Candidate | Unit in game (HD) | Result |
+|---|---|---|
+| **`nihlathakboss` x1.35, value +0.3** (the proposal) | Nihlathak, the Act 5 boss unit (the town NPC `nihlathak` stays in `NOT_DONORS`; the boss unit was never excluded, so no exception was needed): a bald, gaunt man in long grey robes, one torso model as in D2R's own unit | drawn, walks, casts, dies; his frost spells show; 0 engine asserts, 0 crash files. At x1.15 with no colour he was small and dark in the grass |
+| `doomknight3` x1.2 (Oblivion Knight) | a bronze skeletal knight with glowing hands (torso, head and two special models) | drawn, casts, dies; 0 engine asserts, 0 crash files. Reads as an undead knight more than as a necromancer |
+
+Kept: `vampire1` x1.4 until the owner picks. The check's fixed shots (`standin_mons`, spawned 8 subtiles to the right) mostly
+miss Rathma: he walks off to the left at once and casts from range, so the "far" shot shows him small beside the rocks and the
+lane standin "now" shots did not show the vampire at all. The review uses lab crops that follow the monster's position.
+Review sheet (outside git): `mxl2012-runs/rathma/sheet_rathma.png`, one row per candidate (classic sprite, legacy in game, HD
+in game at three moments): the vampire now, Nihlathak, the Oblivion Knight. To switch Nihlathak on: set the `$f` entry's
+`enabled` to true (the file's switch is on), then build.
+
+**Owner, 2026-10-30:** "use oblivion knight for now": the `$f` entry is `doomknight3` x1.2, no colour change (the values of
+run `checks-20261030-204213-s3`), on.

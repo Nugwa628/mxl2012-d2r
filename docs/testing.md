@@ -4156,3 +4156,49 @@ pack of each monster killed before the next; `MXL_STANDIN_ONLY` picks some). Cha
 Review sheets (outside git): `mxl2012-runs/standin/sheet_1.png`, `sheet_2.png`, `sheet_3.png` (legacy art, HD now far / near
 from `163132`, HD proposal far / near from `163506`), `sheet_4_pest_close.png`. Owner: approve or reject each token; an approved
 one is switched on by its `enabled` and the file's `enabled`.
+
+## Lane rathma: an HD stand-in for Rathma Primus that reads as a necromancer (2026-10-30, slot 3, background mode, build of lane/rathma, data only)
+
+Proposal for owner review, OFF in the build (`$f` in `tools/data/hd_monster_proposals.json`, docs/hd-monsters.md section 16.2).
+Trial builds: `hd_monsters.py build --out work/mod/data --try-proposals $f`, `hd_translvl.py build`, `install_mod.py --slot 3`;
+the normal build was installed again at the end. Check `MXL_STANDIN_ONLY=rathma_primus game_checks.py all standin_mons`,
+character `RathmaLane` (Barbarian, `mxl2012-s3`); the look from the lab copy `mxl2012-runs/rathma/lab.py` (stage `cand`, crops
+around the monster's own position: Rathma walks away from the spawn point and casts from range, out of the check's shots).
+
+| Run | Build | Result |
+|---|---|---|
+| `checks-20261030-203247-s3` + lab `mxl2012-runs/rathma/cand1` | trial 1 (`nihlathakboss` x1.15, no colour) | spawned, 0 engine asserts, 0 crash files; drawn (lab crops; in the check shots small by the rocks on the left), spells show; small and dark |
+| `checks-20261030-203859-s3` + lab `cand2` | trial 2 (`nihlathakboss` x1.35, value +0.3: the proposal) | **PASS load**: 0 engine asserts, 0 crash files; drawn, walks, casts frost nova and orbs, dies |
+| `checks-20261030-204213-s3` + lab `cand3` | trial 3 (`doomknight3` x1.2) | **PASS load**: 0 engine asserts, 0 crash files; drawn, casts, dies |
+| lab `now` | normal (`vampire1` x1.4) | the current look for the sheet |
+
+The only assert lines in each run are the engine's pool checks when the game is closed (`s_StatsPool.IsEmpty()`,
+`m_allocated == 0`, ...: exit-only, ignored, see the table above). Review sheet (outside git):
+`mxl2012-runs/rathma/sheet_rathma.png`. Owner: Nihlathak, the Oblivion Knight or keep the vampire.
+
+## Lane runehd: Median's runes upscaled again, for the owner's review (2026-10-30)
+
+Owner ruling (2026-10-30): "just upscale the runes again, try to make them look more like HD versions of the original without
+losing the symbol feel too much". The 23 rune proposals are now lane `runehd` method entries (`rune-hd`, `rune-crisp` for On
+and Qor, `rune-flat` for Auhe; tools/rune_hd.py, docs/hd-icons.md "Runes: Median's own pictures upscaled again"), all
+**off** (owner rule: the owner sees the art first), so a normal build or install shows nothing new.
+
+| check | result |
+|---|---|
+| `py -3 -I tools/item_art_review.py sheets ../mxl2012-runs/runehd/review --runehd` | `sheet_01..03.png` (+ `_2x`): classic, shipped HD, round 4, new at HD size and at 1920 x 1080; `methods_01..03.png` (the three methods); `overview_2x.png` |
+| `tools/tests/test_itemart.py` | 43 tests OK (new: `RuneHdTests` x5 on a synthetic rune: sign mask without speckle / rim shading, size, strokes and a 1 px gap kept in every method, anti-aliased edge and the original's colour range, lowend size, `candidate`; lane runehd's 23 entries off) |
+
+**In game (slot 3, background mode, build of lane/runehd, data only, the trial switched on only for this build).** The 23
+runehd entries set `enabled` in the working tree (not committed), `MXL2012_HD_OUT=work/mod py -3 -I tools/hd_icons.py build`
+("picture proposals used: 71", item icon check 0 sprite problems), install `MXL_SLOT=3 MXL_RUN=runehd py -3
+tools/install_mod.py --slot 3` (data only, 3389 files), check `MXL_RUN=runehd MXL_SLOT=3 MXL_CHAR=RuneHdTrial
+MXL_ITEMART_SETS=itemart4a py -3 tools/game_checks.py all itemart_pics`; then the file restored (`git checkout`) and the
+icons rebuilt ("picture proposals used: 48").
+
+| run | what | result |
+|---|---|---|
+| `checks-20261030-214917-s3` | itemart_pics, set itemart4a (the 23 runes `r34`..`r56`) | PARTIAL (shots judged by hand): all 23 made; HD: every rune shows the new picture, clean stone outline and the original's sign (Thur a 3, Sha'ad a bolt, Qor a skull over crossbones, Nih's hole open); at 1920 x 1080 the signs are lighter than round 4's chiselled ones (as in Median's own pictures); 0 crash files, d2rloader.log 0 ERROR / ASSERT lines |
+
+Evidence: `mxl2012-runs/runehd/ingame/checks-20261030-214917-s3/` (`itemart_itemart4a_hd.png`, `_legacy.png`) and
+`mxl2012-runs/runehd/ingame/runes_hd_crop_3x.png`. Slot 3 keeps this lane's install (runes off in it would need a reinstall
+of a normal build).

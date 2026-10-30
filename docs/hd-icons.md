@@ -378,7 +378,7 @@ against their surroundings, stretched, cut in as a dark groove with a light lip)
 |---|---|---|---|
 | 1-15 (best) | Horadric Malus `invhmr`, scepter `invscp`, Jolly Roger `hardmode`, scroll pair `invhscr2`, Token of Absolution `pot04`, Sunless Crystal Bird `bird4`, the four Sunstones `invgm[rbwv]` and the Class Rewards `invgmy`, Shadowfang `invbla`, New2LilithsBelt `invblt`, I Am Rich `redgem`, Multi Shards `gemcontainer` | D2R's Horadric Malus, scepter, skull, Horadric scroll pair, green flask (self-resurrect scroll), golden bird, flawless ruby / sapphire / diamond / amethyst / emerald (round cut), Shadowfang, light belt, flawed ruby, soul stone | by position or mean |
 | 16-27 | Ingredient Rings 1-5 `ring01/03/06/07/09`; the seven oils `zelixir1,2,4-8` | D2R's rings `ring2` / `ring`; D2R's round potion flask (`full_rejuv_potion`; the oils' skull stopper is lost) | by position |
-| 28-50 | the 23 Median runes `r-a-01..03, 05..18`, `r-d-02, 04, 05, 07, 11, 12` | **recomposed**: D2R's Ist rune stone with its glyph taken out (`blank_stone`) and Median's glyph cut in (round 2: `glyph_mask`, `carve`, reuse key `"glyph": "median"`, too blobby; round 3: the redrawn sign chiselled, `"glyph": "chisel"`, on since round 4) | D2R's stone |
+| 28-50 | the 23 Median runes `r-a-01..03, 05..18`, `r-d-02, 04, 05, 07, 11, 12` | **recomposed**: D2R's Ist rune stone with its glyph taken out (`blank_stone`) and Median's glyph cut in (round 2: `glyph_mask`, `carve`, reuse key `"glyph": "median"`, too blobby; round 3: the redrawn sign chiselled, `"glyph": "chisel"`, on in round 4, off for 0.1.5; since lane runehd: Median's own pictures upscaled again, "Runes" below) | D2R's stone |
 | 51-57 | the seven signets `sigil1b-6b`, `sigilxl` | round 1: D2R's gem in a gold setting (`perfect_diamond6`), rejected by the owner (reads as a jewel); then the seal above (round 3: the redrawn sign engraved), on since round 4 | by position |
 | 58-63 | the six clue gem colours `shinie*` | D2R's flawed gem of the colour (rough stone); they may read as D2R flawed gems | by position |
 | 64-66 (weakest) | Boss Junket `scroll11`, Scroll of Kings `invscb2`, Fool's Gold `invgldm` | D2R's parchments; D2R's gold coins (Median draws lumps, not coins) | mean |
@@ -398,6 +398,50 @@ the open book `summbook` (D2R's books are closed), the Bling Bling piles `invfar
 **Review sheets:** `py -3 -I tools/item_art_review.py sheets <out_dir> --lane itemart3` (`item_art_sheets.write_lane`):
 the lane's entries by `pick`, four columns: Median classic (legacy look) | current HD upscale | proposal | the proposal at
 1920 x 1080 (49 px per cell, the HD sprite at half size). Written to `mxl2012-runs/itemart3/review/sheet_01..09.png` (+ `_2x`).
+
+### Runes: Median's own pictures upscaled again (lane runehd, 2026-10-30; all 23 off)
+
+Round 4's chiselled runes were held back from 0.1.5 ("we need to work on those more"); the owner's ruling (2026-10-30):
+*"just upscale the runes again, try to make them look more like HD versions of the original without losing the symbol feel
+too much"*. So the D2R stone is dropped: the 23 rune proposals (`r-a-01..03, 05..18`, `r-d-02, 04, 05, 07, 11, 12`) are now
+`"method"` entries of lane `runehd` (picks 1-23, all **off**), made from Median's classic picture by `tools/rune_hd.py`
+(also `upscale.METHODS`, so `item_art_sheets.candidate` and the build use them like any other method). No new art, no 3D:
+every colour comes from the original.
+
+Why not the plain upscalers: a Median rune is a 23 px stone with 1-3 px strokes and a speckled face. Scale2x / the hybrid
+keep the staircase and the speckle, Lanczos smears the sign into the face (the shipped picture: blurry, blobby). `rune_hd`
+takes the picture apart at the classic size, scales each layer the way that suits it and puts it back together at 98 px
+(49 for lowend):
+
+- **silhouette**: the convex hull of the opaque pixels (the stones are convex), supersampled 4 x 4, corners rounded: straight
+  anti-aliased sides; a dark rim band 0.7 classic px wide in the colour of the original's outer ring.
+- **face**: the stone's colour without the sign and the speckle (a normalised Gaussian over the face pixels), scaled bicubic
+  (the original's light-left / dark-lower-right shading kept as smooth gradients); the speckle comes back weaker, Lanczos-scaled.
+- **sign**: each pixel's darkness against the stone around it, kept on the groups of connected dark pixels that hold a clearly
+  dark pixel (or form a faint line of 6+ px well inside); single dark speckles and the stone's own darker edge are no sign.
+  It is scaled by **threshold decomposition**: every darkness level (0.08 .. 0.50) is a mask, EPX-scaled twice (staircases
+  become 45 degree edges), lightly blurred and cut with an anti-aliased edge, and the levels are stacked. So every contour is
+  crisp, the original's tones stay (a faint stroke stays faint, a dark core dark), and a 1 px gap (Nih's hole, Thai's bars)
+  stays open; binary masks (tried first) melted the signs into blobs, a plain bicubic cut lost faint strokes.
+
+Three methods (sheet `methods_NN.png` shows all three per rune):
+
+| method | what | picked for |
+|---|---|---|
+| `rune-flat` | the layers only: the closest to the original | Auhe `r-d-04` (its thin-rayed star: the cut-in shading makes it a splash) |
+| `rune-hd` | + a light shading pass: the stone's edge bevelled (lit top left), a fine grain on the face, the sign cut in (shadowed upper-left wall, thin lit lower-right lip) | the other 20 |
+| `rune-crisp` | `rune-hd` with the sign 1.25 x darker | On `r-a-03`, Qor `r-d-11` (their signs are faint in the original) |
+
+Still weak (the source has too few pixels): Auhe's star loses its fine rays, Qor's skull keeps its shape but not its eye
+sockets, On's lower bars and Sha's faint side marks are thin, Kur and Rha are as tangled as the original. The round-4 chisel
+code (`item_glyphs`, `engrave_rune`, `item_art_sheets.round4_rune`) stays for the comparison sheets; nothing uses it for
+the runes.
+
+**Review sheets:** `py -3 -I tools/item_art_review.py sheets <out_dir> --runehd` (`item_art_sheets.write_runehd`):
+`sheet_01..03.png` (+ `_2x`), per rune: Median classic (nearest) | the shipped HD picture (the plain upscale) | round 4
+(chiselled) | the new one, at HD size and again at 1920 x 1080 (49 px per cell); `methods_01..03.png` (classic | `rune-flat` |
+`rune-hd` | `rune-crisp`); `overview_2x.png` (all 23 new runes at 2x). In `mxl2012-runs/runehd/review/`. In game:
+docs/testing.md "Lane runehd".
 
 ### Check (`tools/item_icon_check.py`)
 
@@ -428,8 +472,9 @@ Exit 1 on any of those; unresolved invfiles and fallbacks are reported, not fail
   rows of a name; only 5 names (2 unique, 3 set) have rows with another picture.
 - **Art quality.** 21 pictures (17 Median, 4 D2R classic without an HD picture) are still upscales (the hybrid above;
   the five Rainbow Stones are D2R's HD gems since lane itemart2; lane itemart3 found D2R HD art of the same kind for 66 of
-  them and all 66 are on since 2026-10-30, the runes and signets with redrawn, chiselled signs: "D2R HD art of
-  the same kind"; so 21 remain upscales):
+  them, on since 2026-10-30 but the 23 runes (off for 0.1.5; lane runehd proposes Median's own rune pictures upscaled
+  again, "Runes: Median's own pictures upscaled again"), the signets with redrawn, chiselled signs: "D2R HD art of
+  the same kind"; so 21 remain upscales, plus the 23 runes while off):
   crisp, but pixel-art detail next to D2R's painted HD items. No new HD redraw. Skill icon sheets use the hybrid too (item 4). Seen in game with the harness (check `hdit_icons`, slot 4,
   2026-10-29, docs/testing.md): 16 items in HD and legacy, drawn as intended.
 - **Skill tree backgrounds** (`skltree_*_back.dc6`): done by `skill_tree_art.py`, docs/hd-ui.md ("Skill trees").
@@ -461,6 +506,7 @@ The tools, what they were built from and what changed:
 | `tools/item_art_review.py`, `tools/item_art_sheets.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | new (lane itemart) | visibility ranking of the upscaled pictures, loose silhouette / colour-by-position candidates, upscale variants, review sheets, the proposal list (off), 20 unit tests; `item_hd.py` lists the proposals in its report |
 | `tools/item_hd.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_icon_check.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart2) | the build makes the pictures of the proposals switched on (`candidate` at HD and lowend cell size), report `proposal_on`, the check's reuse limits for them; og1..og5 on; 3 more unit tests |
 | `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | changed (lane itemart3) | rune stone recomposition (`blank_stone`, `glyph_mask`, `carve`, reuse key `glyph`), lane sheets with an in-game size column (`write_lane`, `sheets --lane`), 66 proposals; round 2: 59 on, the signet seal (`seal`, reuse key `seal`, off), `item_icon_check.check_proposal_sprite`, `game_checks` sets `itemart3a` / `itemart3b`; round 3: the runes off, the signs redrawn (`tools/item_glyphs.py`, `chisel`, `engrave_rune`, reuse keys `"chisel"` + `sign`), `tint`, `sheets --round3`; round 4: the runes and signets on, `game_checks` sets `itemart4a` / `itemart4b`; 7 more unit tests |
+| `tools/rune_hd.py`, `tools/upscale.py`, `tools/item_art.py`, `tools/item_art_sheets.py`, `tools/item_art_review.py`, `tools/data/item_art_proposals.json`, `tools/tests/test_itemart.py` | new / changed (lane runehd) | the rune upscale (`rune_hd`: hull silhouette, face, threshold-decomposed sign; methods `rune-flat` / `rune-hd` / `rune-crisp` in `upscale.METHODS`), the 23 rune proposals as lane `runehd` method entries (off), `write_runehd` / `sheets --runehd`, `round4_rune`; 6 more unit tests (`RuneHdTests` x5, the lane's entries) |
 
 Not copied: `state_icons.py` (no state icon art in 1.13c, see Gaps), `dcc.py`, `hd-effects.md` / `item-tooltips.md` (no state icons in the mod; DCC art and tooltips are
 other lanes).
