@@ -4349,3 +4349,81 @@ Plains (the mercenary comes along), god mode, then `cast` of the Necromancer / i
 Evidence: `mxl2012-runs/peticons/{before,trial1,trial2,after}/` (`nec_hd.png`, `nec_legacy.png`, `other_*.png`, `crop_*`),
 the review sheet `mxl2012-runs/peticons/sheet_peticons.png` (legacy, HD now, HD proposed, per pet type). Slot 2 got the
 normal build of this branch again at the end (icons off, the names staggered).
+
+## Lane acts25: Acts 2-5 on Normal with a live mercenary (2026-10-30, slot 4, background mode, build of lane/acts25 = main 0.1.4 + #509 + #511/#292 `reassign`)
+
+Check `acts25` (game_checks.py): `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<new> MXL_CHAR_CLASS=paladin py -3 tools/game_checks.py all acts25`.
+Per act (`MXL_A25_ACTS`, default `2,3,4,5`) the parts of `MXL_A25_PARTS` (`travel,town,hire,items,wp,entries,bosses`) run in turn:
+
+- **travel**: into the act the player's way, then (SET-UP) the act boss before it killed by the harness, so the quest hooks run.
+  - Act 2: Warriv's line.
+  - Act 3: Meshif's line, after quest 14 bit 0.
+  - Act 4: Mephisto's portal, by `acts_portal_a4`.
+  - Act 5: the Tyrael talk, then a click on his red portal 566.
+- **town**: every NPC of `TOWN_NPCS` talked to.
+  - To reach an NPC: `moveto`, then the town sweep's spot or the map's `presets 1` spot.
+  - Last resort: SET-UP `place` or a spawned copy (named in the row).
+  - Trade: buy one item at the act's trader and sell it back.
+- **hire**: the act's hireling by `hire_in`, gear worn by clicks on the hireling panel, then SET-UP life 20,000.
+- **items**: each quest item dropped next to the character and picked up by a click.
+  - Usable items get a right click.
+  - The cube recipes go through the Transmute button: the cube is emptied first, then the inputs are put in by `item X cube`.
+- **wp**: every waypoint of the act by the HD panel.
+- **entries**: every warp-tile link of levels.txt (`a25_routes`) by `up_enter` (lane uppass), in `MXL_A25_GRAPHICS` (legacy or HD).
+  - `MXL_A25_ROUTES_MAX` caps the count.
+  - A failed SET-UP warp or way out is listed but not judged.
+- **bosses** (`A25_BOSSES`): the map's own unit or a SET-UP spawn, fought `MXL_A25_FIGHT_S` s. Life is read before and after.
+- Last, the `reassign` counter delta of the act.
+
+Common SET-UP for every act:
+
+- Level 114 by an xp award.
+- God mode.
+- All waypoint bits.
+- A Rogue from Kashya, mercenary life 20,000.
+
+Town, items and waypoints always run in HD (their click spots are the HD panel's); `MXL_A25_GRAPHICS` switches only the entries and the fights. So every row is PARTIAL-grade evidence of the click paths, not a no-help playthrough.
+
+| Act | Run | Travel | Town NPCs / trade / hire | Quest items / waypoints | Click entries | Bosses | `reassign` (commands, units without a room, player) | Result |
+|---|---|---|---|---|---|---|---|---|
+| 2 (legacy) | `checks-20261030-200614-s4` (`run4-a2.log`), 54 min | Warriv line d36 -> Lut Gholein: OK | 8 of 10 menus (Atma, Fara, Greiz, Elzix, Lysander by spawned copy; Jerhyn by place). Drognan not found; Cain no menu. Fara: buy / sell OK. Greiz (338, level 113) hired, Cap / Quilted / Spear worn by clicks | 0 of 4 picked up: the run was still walking when the item was dropped (harness, fixed with `ven_wait_still`). Waypoints 7 of 9 by the panel (42, 44 by warp) | **17 of 17 judged entered** (9 SET-UP failures: no loaded tile, or the way out failed) | Radament killed in 4 s; Creature of Flame 22.86M -> 20.30M; Summoner killed; Duriel (map's own) 5.47M -> 77k, then the harness kill | 4,0,0 -> 211, 46, 0 | FAIL (harness rows only); game alive, no crash |
+| 3 (legacy) | `checks-20261030-210750-s4` (`run6-a3.log`), 71 min | Meshif not found (the travel had no NPC spot then: fixed); harness travel instead | Hratli, Ormus (copy), Meshif: menus. Cain, Asheara, Alkor, Natalya not found (moveto sees loaded rooms only: `presets 1` fallback added). Hratli: buy / sell OK. Asheara (359) hired, Cap / Quilted / Scimitar / Buckler worn | 7 of 9 picked up (g34, xyz missed: click pickup); cube qf1 + eye + brain + heart: no qf2, because the cube still held Act 2's msf / vip (harness; the cube is now emptied first). Waypoints 7 of 9 (76, 80 by warp) | 12 of 15 judged entered (5 SET-UP failures). Not entered: 83->100 (Durance stairs: the Compelling Orb was not smashed, as D2), 81->97 and 82->99 (Kurast temples: 51 clicks on the tile, still outside; 80->94 and 82->98 entered) | Azmodan: the spawn made none (one spot; now 6 spots). Mephisto (map's own): no damage in 166 s (known: across the moat, see the acts rows above) | 4,0,0 -> 181, 33, 0 | FAIL (harness rows, 2 temple entries open); game alive, no crash |
+| 4 (legacy) | `checks-20261030-222412-s4` (`run7-a4.log`), 11 min | Mephisto's portal -> Pandemonium Fortress by click: **PASS** | Cain (copy), Tyrael, Jamella, Halbu: all menus. Halbu buy / sell OK. No hirer (Act 3's stays) | mss, hfh picked up. Waypoints 3 of 3 | 106->107: SET-UP failure (no loaded tile), not judged | Izual (spawned) 17.05M -> 0; Hephasto (spawned) killed in 17 s; Diablo (spawned) 22.30M -> 21.51M in 30 s | 4,0,0 -> 38, 0, 0 | **PASS** |
+| 5 (legacy) | `checks-20261030-223842-s4` (`run8-a5.log`), 54 min, 18 routes max | No object 566: the run skipped Tyrael's talk (fixed: `acts_end_talk` first); harness travel | Larzuk (copy), Malah, Cain (copy): menus. Drehya, Nihlathak, Tyrael not found (before the `presets 1` fallback). Larzuk buy / sell OK. Qual-Kehk (561) hired after quest 36 bit 0 (fixture), Cap / Quilted / Scimitar worn | ice picked up, tr2 missed (click pickup). Waypoints 8 of 9 (129 by warp) | 4 of 5 judged entered (12 SET-UP failures). Not entered: 120->128 (the Worldstone Keep stays shut until the Ancients die, as D2; they were fought after the entries) | Nihlathak (spawned): no damage (the server refused the path to the copy, 2 attacks); Ancients (spawned) killed in 11 s; Baal (map's own) 31.90M, gone after 93 s (his flight), then the harness kill | 5,0,0 -> 93, 12, 0 | FAIL (harness rows only); game alive, no crash |
+
+Across the four legacy runs: 33 of 37 judged click entries entered, the game alive all the way, the mercenary alive and following (server mode 12 after the first entry in every act, as lane uppass saw; the client draws it). The `reassign` guard caught 91 units left without a client room (0 for the player): each would have closed the game before #511's fix. Engine asserts: only the known `nDirectionIndex < nDirections` (#54 / #73).
+
+One start (`checks-20261030-210445-s4`) did not reach the menu: a failed read of a `.dt1` and a crash report (bug #517). The next start was clean.
+
+Not bugs (checked against the docs):
+
+- **The colossal row:** the first Act 5 run spawned `colossal1` (745) in level 137. That raised D2R's `MONFLAG_ENABLED` assert. These are D2R RotW rows that no table of the port places (#71), and level 137 is #261. The row was taken out of `A25_BOSSES`.
+- **Act numbers in `level`:** the plugin's `level` answer prints D2R's 0-based act index ("act 4" in Act 5).
+
+Open:
+
+- **Kurast temples:** two entries (81->97, 82->99) took 51 clicks on the warp tile and the character stayed outside. Next: a shot of the tile under the cursor, and a hand check of the projection there.
+- **Lut Gholein NPCs:** Drognan was not found and Cain gave no menu (before the `presets 1` fallback).
+- **Waypoints:** 5 waypoints (42, 44, 76, 80, 129) came by warp when the panel click missed.
+- **Click pickups:** 3 of 15 quest items in Acts 3-5 were not taken by the click (g34, xyz, tr2). The item was 4 from the character; 4 clicks on its projection did nothing.
+- **Nightmare / Hell:** not run (time).
+
+Fixes in the harness after these runs (unit tests `tools/test_game_checks_acts25.py`):
+
+- `hostiles_near` leaves out the player's own hireling classes (`HIRELING_CLASSES`). Run 1 fought its own mercenary for two hours.
+- `up_click_through` walks to the warp's preset when the tile's room is not loaded.
+- The town NPC is found from `presets 1`.
+- The cube is emptied before a recipe.
+- The spawn is retried on 6 spots.
+- Tyrael's talk comes before his portal.
+- Lam Esen's Tome is not "used".
+
+HD sample (`MXL_A25_GRAPHICS=hd`, Acts 3 and 5, 4 routes each): 
+
+| Act | Run | Result |
+|---|---|---|
+| 3 (HD, stopped) | `checks-20261030-233629-s4` | Started as Acts 3 + 5 (`run9-hd-a35.log`). **Meshif's travel line 1 -> Kurast Docks (75): PASS** (the NPC spot fix). The Kurast NPCs came from `presets 1` (Asheara talked to at 1.4, Alkor, Natalya, Ormus by walk or copy). Then `hire_in`'s own talk walk to Asheara (97-104 away) ran 22 min without an end, so the run was stopped. The game closed with it. `unlock 4` restored the shared files (10, verified). Open: give `talk` in `hire_in` a time cap |
+| 5 (HD; parts travel, wp, entries, bosses; 4 routes) | `checks-20261031-001845-s4` (`run10-hd-a5.log`), 17 min | **Act 5 travel PASS**: after the Diablo harness kill, Tyrael's talk (`acts_end_talk`), then a mouse click on portal 566 -> Harrogath (109). Waypoints 7 of 9 by the panel (115, 118 by warp). Entries: 113<->114 entered by clicks in HD, 3 SET-UP failures. Ancients (spawned) killed in 18 s. Nihlathak (spawned) no damage: 18 attacks, every one at 10-14 from him, "mode now 1" (the walk does not close in: harness). Baal (map's own) no damage, 0 attacks: he sits on his throne until the waves are done (as D2). `reassign` 5 -> 57 commands, 5 units without a room, 0 player; no engine assert; game alive |
+
+
+Evidence: run logs `mxl2012-runs/acts25/run1.log` .. `run10-hd-a5.log`, the per-run `report.md` / shots under `work/runs/<run>/`, `mxl2012-runs/acts25/evidence/run5-startup/`.

@@ -3735,7 +3735,10 @@ def hostiles_near(st, radius, skip=(), unkillable=None):
     """Monsters of a `state` within `radius` that can die (no NPCs in the dungeons the walks go through), nearest first."""
     bad = unkillable_classes() if unkillable is None else unkillable
     return sorted((m for m in st["mons"] if m.get("dist", 99) <= radius and m.get("class") not in skip and m.get("life", 1) > 0
-                   and m.get("class") not in bad), key=lambda m: m.get("dist", 99))
+                   and m.get("class") not in bad and m.get("class") not in HIRELING_CLASSES), key=lambda m: m.get("dist", 99))
+
+
+HIRELING_CLASSES = (271, 338, 359, 561)  # the player's own mercenary (lane acts25: the walks fought a hired one for two hours)
 
 
 def parse_moveto(lines):
@@ -12082,6 +12085,12 @@ def up_click_through(src, dest, log):
     want = up_tile_classes(src, dest)
     p = hstate()["player"]
     tiles = [t for t in cache_tiles(Hl("tiles", log)[1]) if t["area"] == src and t["class"] in want]
+    if not tiles:  # (lane acts25) the warp's room is not loaded yet: walk to the map's warp preset, then look again
+        for pr in [q for q in parse_presets(Hl("presets 5", log)[1]) if q["class"] in want][:2]:
+            acts_walk(pr["x"], pr["y"], reach=10, timeout=90)
+            tiles = [t for t in cache_tiles(Hl("tiles", log)[1]) if t["area"] == src and t["class"] in want]
+            if tiles:
+                break
     if not tiles:
         return False, "no loaded tile of class %s in %d" % (sorted(want), src)
     t = min(tiles, key=lambda t: (t["x"] - p["x"]) ** 2 + (t["y"] - p["y"]) ** 2)
@@ -12323,6 +12332,515 @@ def check_jdg_path():
 
 
 CHECKS += [("jdg_path", check_jdg_path)]
+
+
+# ---------------------------------------------------------------- lane acts25: Acts 2-5 swept with a live, equipped mercenary
+# `MXL_CHAR=<new> MXL_CHAR_CLASS=paladin py -3 tools/game_checks.py all acts25`. Per act (MXL_A25_ACTS, default 2,3,4,5) the parts
+# of MXL_A25_PARTS (default all of A25_PARTS) in this order: the act travel into the act (the previous town's NPC line / portal;
+# SET-UP: the quest bit or the harness boss kill that opens it), the town NPCs (talk, Trade with a buy and a sell back, hire and
+# gear the act's mercenary by clicks), the quest items (dropped by the harness, picked up by a click, cubed / used), every
+# waypoint of the act by the panel (HD clicks), then in MXL_A25_GRAPHICS (default legacy) the click entries (`up_enter`: every
+# warp-tile link of levels.txt both ways by clicks) and the act's bosses (the map's own unit, else a spawned one, fought for
+# MXL_A25_FIGHT_S seconds). Town, items and waypoints run in HD: their click spots are the HD panel's. SET-UP on every row:
+# character level A25_LEVEL by the xp award, god mode, mercenary life 20,000 after each hire, the waypoint bits and the acts'
+# tabs (save edit, rp_open_acts). The `reassign` guard's counters are read after each act.
+A25_PARTS = ("travel", "town", "hire", "items", "wp", "entries", "bosses")
+A25_LEVEL = 75
+A25_HIRERS = {act: (area, npc, name, cls) for act, area, npc, name, cls in MERC_HIRERS}
+A25_REVIVERS = {1: (150, "Kashya", 1), 2: (198, "Greiz", 40), 3: (252, "Asheara", 75), 4: (367, "Tyrael", 103),
+                5: (515, "Qual-Kehk", 109)}
+# act: [(stage name, boss level, monstats class, harness kill afterwards: the death that opens the next act)]. Median's own: the
+# Creature of Flame (quest_fleshdoom) in the Ancient Tunnels, Azmodan (superunique 35 on azmo_special) in the Forgotten Reliquary
+# (Kurast Temple 1, 94), Hephasto (Median's "The Feature Creep") at the Hellforge, the Ancients on the Summit, the Colossal
+# Ancients of Median's Colossal Summit (137).
+A25_BOSSES = {2: [("radament", 49, 229, False), ("creatureofflame", 65, 1101, False), ("summoner", 74, 250, False),
+                  ("duriel", 73, 211, True)],
+              3: [("azmodan", 94, 1060, False), ("mephisto", 102, 242, True)],
+              4: [("izual", 105, 256, False), ("hephasto", 107, 409, False), ("diablo", 108, 243, True)],
+              5: [("nihlathak", 124, 526, False), ("ancients", 120, 540, False),
+                  ("baal", 132, 544, True)]}
+# act: [(item code, what is done after the pickup: None, "use", or the cube recipe's other inputs and its output)]
+A25_ITEMS = {2: [("box", None), ("ass", "use"), ("msf", None), ("vip", ("cube", ("msf",), "hst"))],
+             3: [("j34", None), ("g34", None), ("xyz", "use"), ("g33", None), ("bbb", None), ("qey", None), ("qbr", None),
+                 ("qhr", None), ("qf1", ("cube", ("qey", "qbr", "qhr"), "qf2"))],
+             4: [("mss", None), ("hfh", None)],
+             5: [("ice", None), ("tr2", "use")]}
+# how the act is entered from the previous one: (stage, from town, the boss quest bit SET-UP that opens the NPC line)
+A25_START = {121: 109}  # links whose source is entered from a town by a portal (Anya's), set up by harness travel
+
+
+def a25_routes(act):
+    """The warp-tile links of the act from levels.txt (Vis<i> / Warp<i> >= 0), once per pair (lower id as the source)."""
+    out = []
+    for r in table("levels"):
+        if not (r.get("Id") or "").isdigit() or str(int(r.get("Act") or -1) + 1) != str(act):
+            continue
+        src = int(r["Id"])
+        for i in range(8):
+            v, w = r.get("Vis%d" % i) or "", r.get("Warp%d" % i) or ""
+            if v.isdigit() and int(v) > 0 and w.lstrip("-").isdigit() and int(w) >= 0:
+                pair = (min(src, int(v)), max(src, int(v)))
+                if pair not in out:
+                    out.append(pair)
+    return sorted(out)
+
+
+def a25_reassign():
+    """(commands, units left without a room, the player without a room) of the guard's `mxl` line, or None."""
+    for ln in mxl_text().splitlines():
+        if ln.startswith("reassign"):
+            m = re.search(r"commands (\d+), units left without a room (\d+), the player without a room (\d+)", ln)
+            if m:
+                return tuple(int(x) for x in m.groups())
+    return None
+
+
+def a25_merc_ok(act, log, rows):
+    """The mercenary alive (revived at the act's reviver when dead: the gear stays on it). Returns the merc dict or None."""
+    m, _w = merc_info()
+    if m is None:
+        npc, nm, area = A25_REVIVERS[act]
+        merc_revive(npc, nm, area, log, rows, [])
+        m, _w = merc_info()
+        if m is not None:
+            Hl("stat merc 7 set %d" % (20000 << 8), log)
+            Hl("stat merc 6 set %d" % (20000 << 8), log)
+    return m
+
+
+def a25_hire(act, log, rows, bad, shots):
+    """The act's hirer: a new mercenary of its class (replaces the old one), its gear by clicks on the hireling panel."""
+    if act not in A25_HIRERS:
+        rows.append("act %d: no hirer (the mercenary of act %d stays)" % (act, act - 1))
+        return merc_info()[0]
+    area, npc, nm, cls = A25_HIRERS[act]
+    m = hire_in(act, area, npc, nm, cls, log, rows, bad)
+    if m is None:
+        return None
+    Hl("packclear", log)
+    merc_panel_open(log, shots, "a25_%d" % act)
+    for code, body, allowed, what in MERC_GEAR[cls]:
+        if allowed:
+            on, note = equip_by_click(code, body, log, shots, "a25_%d" % act)
+            rows.append("act %d %s: %s on body %d by clicks: %s" % (act, nm, what, body, note))
+            if not on:
+                bad.append("act %d: %s's %s not worn (%s)" % (act, nm, what, note))
+    panels_closed()
+    for s in (7, 6):
+        Hl("stat merc %d set %d" % (s, 20000 << 8), log)
+    m, worn = merc_info()
+    rows.append("act %d mercenary class %s level %s worn %s (SET-UP: life 20,000)" % (
+        act, m and m.get("class"), m and m.get("level"), ",".join(str(i.get("code")) for i in worn if i.get("page") == 255) or "none"))
+    return m
+
+
+def a25_reach_npc(cls, log, wait_s=25, spot=None):
+    """The town NPC: the server's walk to it (`moveto`), up to wait_s; still farther than 6 -> SET-UP `place` next to it. An NPC
+    whose room is not loaded (moveto finds only loaded units) is walked to at the town sweep's spot first (`place` there when the
+    walk does not get there). Returns (unit, how) or (None, why)."""
+    u = parse_moveto(Hl("moveto nearest %d" % cls, log)[1])
+    if u is None and not spot:  # the map's own placement of the NPC (also in rooms not loaded yet): Kurast's NPCs in run
+        pr = [q for q in parse_presets(Hl("presets 1", log)[1]) if q["class"] == cls]  # checks-20261030-210750-s4
+        spot = pr and (pr[0]["x"], pr[0]["y"]) or None
+    if u is None and spot:
+        if not acts_walk(spot[0], spot[1], reach=8, timeout=40):
+            Hl("place %d %d" % spot, log)
+            time.sleep(2)
+        u = parse_moveto(Hl("moveto nearest %d" % cls, log)[1])
+    if u is None:
+        return None, "not found (spot %s)" % (spot,)
+    t0 = time.time()
+    while time.time() - t0 < wait_s:
+        time.sleep(2)
+        p = hstate()["player"]
+        u = parse_moveto(H("moveto nearest %d" % cls)[1]) or u
+        if abs(p.get("x", 0) - u["x"]) <= 6 and abs(p.get("y", 0) - u["y"]) <= 6:
+            return u, "walk"
+    for dx, dy in ((0, 0), (4, 0), (0, 4), (-4, 0), (0, -4)):
+        ok, _l = Hl("place %d %d" % (u["x"] + dx, u["y"] + dy), log)
+        if ok:
+            time.sleep(2)
+            return u, "SET-UP place"
+    Hl("spawn %d" % cls, log)  # the fixture of `talk`: a copy of the NPC next to the character
+    time.sleep(2)
+    return parse_moveto(Hl("moveto nearest %d" % cls, log)[1]) or u, "SET-UP spawned copy"
+
+
+def a25_npc_menu(cls, log, spot=None):
+    """Reach and talk (the talk packet; the client opens the menu after the greeting). Returns (menu or None, how)."""
+    close_menu()
+    u, how = a25_reach_npc(cls, log, spot=spot)
+    if u is None:
+        return None, how
+    for _ in range(2):
+        H("interact %d" % cls)
+        menu = parse_menu(wait_menu(35) or [])
+        if menu:
+            return menu, how
+    return None, how + ", no menu"
+
+
+A25_TALK = 0xd35  # the menu's Talk line (its handler, called while the greeting dialog runs, asserts `!sgpActiveDialog`)
+
+
+def a25_npcs(act, log, rows, bad):
+    """Every town NPC of TOWN_NPCS[act] talked to (time-capped: acts_town walked 40 min for one NPC in run 1)."""
+    goto(ACT_TOWNS[act])
+    p0 = hstate()["player"]
+    spots = acts_town_sweep(act, log)
+    spots.update({c: xy for (a, c), xy in TOWN_NPC_SPOTS.items() if a == ACT_TOWNS[act]})
+    talked, silent = [], []
+    for cls, nm in TOWN_NPCS[act].items():
+        Hl("place %d %d" % (p0["x"], p0["y"]), log)  # back to the arrival (the sweep left the character wedged in a corner of
+        time.sleep(2)                               # Lut Gholein, every later walk refused: run checks-20261030-191412-s4)
+        menu, how = a25_npc_menu(cls, log, spot=spots.get(cls))
+        if menu:
+            talked.append("%s[%s](%s)" % (nm, how, ",".join("%x" % s for _i, s, _h in menu["lines"])))
+        else:
+            silent.append("%s (%s)" % (nm, how))
+        close_menu()
+        time.sleep(1)
+        if not game_alive():
+            bad.append("act %d: the game died talking to %s" % (act, nm))
+            return
+    rows.append("act %d NPCs talked (menu string ids): %s; no menu: %s" % (act, "; ".join(talked), ", ".join(silent) or "none"))
+    bad += ["act %d: %s gave no menu" % (act, s) for s in silent if "not found" not in s]
+
+
+def a25_harness_kill(area, cls, log, rows):
+    """SET-UP: the act boss killed by the harness (the quest kill hooks run, as a player's kill): what opens the act travel."""
+    goto(area, timeout=60)
+    u = parse_moveto(Hl("moveto nearest %d" % cls, log)[1])
+    if u is None:
+        Hl("spawn %d" % cls, log)
+        time.sleep(2)
+        u = parse_moveto(Hl("moveto nearest %d" % cls, log)[1])
+    if u:
+        Hl("kill %d" % u["id"], log)
+        time.sleep(4)
+    rows.append("SET-UP: class %d in area %d killed by the harness: %s" % (cls, area, "done" if u else "NOT FOUND"))
+    return u is not None
+
+
+def a25_npc_travel(frm, npc, dest, log):
+    """The travel line of the NPC's menu (every line but Talk, in turn) until the character is in `dest`. Returns the note."""
+    goto(frm)
+    tried = []
+    for _round in range(3):
+        menu, how = a25_npc_menu(npc, log, spot=TOWN_NPC_SPOTS.get((frm, npc)))
+        if menu is None:
+            return "no menu (%s)" % how
+        lines = [(i, s) for i, s, _h in menu["lines"] if s != A25_TALK and i not in tried]
+        if not lines:
+            close_menu()
+            return "menu %s: no line but Talk" % [("%x" % s) for _i, s, _h in menu["lines"]]
+        i, s = lines[0]
+        tried.append(i)
+        g.hcmd("menu %d" % i, 5)
+        for _ in range(10):
+            time.sleep(2)
+            if hstate()["player"].get("area") == dest:
+                time.sleep(5)
+                return "menu line %d (%x) -> %d" % (i, s, dest)
+        panels_closed()  # (it undoes an Esc that brought up the pause menu)
+        time.sleep(1)
+    return "lines %s tried, still in %s" % (tried, hstate()["player"].get("area"))
+
+
+def a25_travel(act, log, rows, bad):
+    """Into `act` the way a player goes: Warriv / Meshif's travel line (SET-UP: the act boss killed by the harness, Meshif's
+    quest 14 bit 0 that the Jerhyn talk sets), Mephisto's portal (acts_portal_a4), Tyrael's red portal after Diablo."""
+    town = ACT_TOWNS[act]
+    if act == 2:
+        a25_harness_kill(37, 156, log, rows)
+        note = a25_npc_travel(1, 155, 40, log)
+    elif act == 3:
+        if "duriel" not in STATE.get("acts_killed", set()):
+            a25_harness_kill(73, 211, log, rows)
+        Hl("quest 14 0 set", log)
+        rows.append("SET-UP: quest 14 bit 0 (the Jerhyn talk after Duriel)")
+        note = a25_npc_travel(40, 210, 75, log)
+    elif act == 4:
+        if "mephisto" not in STATE.get("acts_killed", set()):
+            a25_harness_kill(102, 242, log, rows)
+            STATE.setdefault("acts_killed", set()).add("mephisto")
+        acts_portal_a4()
+        note = "acts_portal_a4 (its own row)"
+    else:
+        if "diablo" not in STATE.get("acts_killed", set()):
+            a25_harness_kill(108, 243, log, rows)
+        goto(103)
+        time.sleep(3)
+        for area, who, kind, quest in ACT_END_TALKS["travel45"]:  # Tyrael's talk opens the red portal (no object 566 without it:
+            acts_end_talk(area, who, kind, quest, log)             # run checks-20261030-223842-s4)
+        note = acts_click_portal(TYRAEL_PORTAL, 103, 109, log)
+    area = hstate()["player"].get("area")
+    rows.append("act %d travel: %s; now in %s (want %d)" % (act, note, area, town))
+    if area != town:
+        bad.append("act %d: the act travel did not arrive (%s; area %s); harness travel instead" % (act, note, area))
+        goto(town)
+    return area == town
+
+
+def a25_town(act, log, rows, bad, shots):
+    """Every town NPC talked to, Trade at the act's trader: buy one, sell it back."""
+    a25_npcs(act, log, rows, bad)
+    _area, npc, nm, _gam, _gnm = TOWN_VENDORS[act]
+    b, notes = rp_vendor_round(npc, nm, log, shots)
+    rows.append("act %d trade %s: %s%s" % (act, nm, "; ".join(notes), (" | " + "; ".join(b)) if b else ""))
+    bad += ["act %d: %s" % (act, x) for x in b]
+
+
+def a25_at_waypoint(log):
+    """Stand by the town's waypoint (the arrival of Lut Gholein is next to the sewer grate: a pickup click walked into it)."""
+    wp = find_waypoint_object()
+    xy = wp and rp_object_xy(wp[0])
+    if xy:
+        town = hstate()["player"].get("area")
+        for dx, dy in ((12, 8), (-12, -8), (8, -12), (-8, 12)):  # off the waypoint: a pickup click on it opens its panel
+            acts_walk(xy[0] + dx, xy[1] + dy, reach=3, timeout=30)
+            if hstate()["player"].get("area") == town:
+                break
+            goto(town)  # Lut Gholein's waypoint is next to the sewer grate: the walk went down (run checks-20261030-191412-s4)
+    close_right_panel()  # (no Esc: with nothing open it brings up the pause menu, and the paused game answers no harness verb)
+
+
+def a25_use_click(it, log, shots):
+    """Right click on the item in the backpack (the player's use). Returns a note: used (gone from the backpack) or kept."""
+    rc_open_inventory()
+    px, py = inv_px(it["x"], it["y"])
+    g.click(px / 1600, py / 900, button="right")
+    time.sleep(2.5)
+    shots.append(sh("a25_use_%s" % it.get("code")))
+    close_right_panel()
+    left = any(i.get("id") == it["id"] for i in rc_items(log))
+    return "right click: %s" % ("KEPT (not used)" if left else "used")
+
+
+def a25_items(act, log, rows, bad, shots):
+    """Quest items: dropped next to the character (SHORTCUT, named), picked up by a click; used, or put in the Horadric Cube
+    (the backpack's cube; act 2 picks one up) and transmuted by a click on Transmute (rc_transmute)."""
+    goto(ACT_TOWNS[act])
+    a25_at_waypoint(log)
+    H("packclear")
+    if act > 2:
+        Hl("item box inv", log)  # SET-UP: the act 2 cube (packclear took it)
+    for code, then in A25_ITEMS[act]:
+        if held_item():
+            drop_held(log)  # a left click with an item on the cursor drops it instead of picking up
+        ven_wait_still()  # rc_obtain projects the drop from the player's spot: a still running walk made it miss (run 4)
+        it = rc_obtain(code, log, [])
+        note = "picked up" if it else "NOT picked up"
+        if it and then == "use":
+            note += ", " + a25_use_click(it, log, shots)
+        elif it and then:
+            _cube, others, out = then
+            cube = next((i for i in rc_items(log) if i.get("code") == "box" and i.get("page") == RC_PAGE_INV), None)
+            if cube is None:
+                note += ", no cube in the backpack"
+            else:
+                for i in [i for i in rc_items(log) if i.get("page") == RC_PAGE_CUBE]:  # an earlier act's leftovers (Act 2's staff
+                    Hl("remove id %d" % i["id"], log)                                  # and amulet blocked Khalim's Will: -210750-s4)
+                for c in (code,) + others:
+                    Hl("remove %s" % c, log)
+                    Hl("item %s cube" % c, log)
+                inside = rc_transmute(cube, log, shots, "a25_cube_%s" % out)
+                made = out in inside
+                note += ", cube %s -> %s: %s (cube holds %s)" % ("+".join((code,) + others), out, "made" if made else "NOT made", inside)
+                if not made:
+                    bad.append("act %d: the cube did not make %s" % (act, out))
+        rows.append("act %d quest item %s: %s" % (act, code, note))
+        if not it:
+            bad.append("act %d: %s not picked up" % (act, code))
+        if not game_alive():
+            bad.append("act %d: the game died at quest item %s" % (act, code))
+            return False
+        a25_at_waypoint(log)
+    return True
+
+
+def a25_waypoints(act, log, rows, bad):
+    wps = sorted((w, lvl) for lvl, (a, w, _k) in rp_waypoints().items() if a == act)
+    got, fell = [], []
+    for _n, lvl in wps:
+        n0 = sum(1 for ln in log if ln.startswith("WAYPOINT FALLBACK"))
+        a = rp_waypoint_to(lvl, log)
+        (got if a == lvl else fell).append(lvl)
+        if sum(1 for ln in log if ln.startswith("WAYPOINT FALLBACK")) > n0:
+            fell.append("%d(warp)" % lvl)
+        if not game_alive():
+            bad.append("act %d: the game died taking the waypoint to %d" % (act, lvl))
+            return False
+        a25_merc_ok(act, log, rows)
+    rows.append("act %d waypoints: %d of %d by the panel; not by the panel: %s" % (act, len(got) - len([f for f in fell if isinstance(f, str)]),
+                                                                              len(wps), ",".join(str(f) for f in fell) or "none"))
+    return True
+
+
+def a25_entries(act, log, rows, bad, gfx):
+    routes = a25_routes(act)
+    most = int(os.environ.get("MXL_A25_ROUTES_MAX") or 0)
+    if most:
+        routes = routes[:most]
+    entered = setup_fail = 0
+    for src, dest in routes:
+        if not game_alive():
+            break
+        a25_merc_ok(act, log, rows)
+        if src in A25_START:
+            goto(A25_START[src])
+        mark = engine_mark()
+        t0 = time.time()
+        ok, how = up_enter(src, dest, log)
+        time.sleep(6)
+        alive = up_alive()
+        mi = merc_info()[0] if alive else None
+        area = hstate()["player"].get("area") if alive else None
+        asserts = engine_asserts(mark)
+        crashes = sorted((set(os.listdir(g.CRASH_DIR)) if os.path.isdir(g.CRASH_DIR) else set()) - mark["crashes"])
+        entered += 1 if ok and alive else 0
+        setup_fail += 1 if not ok and "SET-UP" in how else 0
+        rows.append("act %d %s %d<->%d: %s (%s) %.0f s; game %s, area %s, mercenary %s%s%s" % (
+            act, gfx, src, dest, "entered" if ok else "NOT entered", how, time.time() - t0, "alive" if alive else "GONE", area,
+            "none" if mi is None else "id %s mode %s" % (mi.get("id"), mi.get("mode")),
+            "; asserts: " + "; ".join("%s (%s)" % (a[0][:70], a[1].split("\\")[-1]) for a in asserts) if asserts else "",
+            "; CRASH FILES " + ", ".join(crashes) if crashes else ""))
+        g.log("acts25 " + rows[-1])
+        if not alive:
+            bad.append("act %d: the game died on %d<->%d" % (act, src, dest))
+            rp_recover("entry %d-%d" % (src, dest), log)
+            return entered, len(routes), setup_fail
+        if not ok and "SET-UP" not in how:
+            bad.append("act %d: %d<->%d not entered by clicks (%s)" % (act, src, dest, how[:120]))
+    return entered, len(routes), setup_fail
+
+
+def a25_bosses(act, log, rows, bad, shots):
+    secs = int(os.environ.get("MXL_A25_FIGHT_S") or 40)
+    for stage, area, cls, kill in A25_BOSSES[act]:
+        if not game_alive():
+            break
+        a25_merc_ok(act, log, rows)
+        mark = engine_mark()
+        st = goto(area, timeout=60)
+        if st["player"].get("area") != area:
+            Hl("level %d warp" % area, log)
+            time.sleep(8)
+        if hstate()["player"].get("area") != area:
+            rows.append("act %d boss %s: level %d not reached" % (act, stage, area))
+            bad.append("act %d: boss level %d not reached" % (act, area))
+            continue
+        time.sleep(4)
+        mon = acts_find(cls, log, tries=3)
+        how = "the map's own"
+        if mon is None:
+            p = hstate()["player"]
+            for dx, dy in ((6, 6), (-6, 6), (6, -6), (-6, -6), (10, 0), (0, 10)):  # a 3x3 boss needs room (Azmodan by the
+                if Hl("spawn %d 1 %d %d" % (cls, p["x"] + dx, p["y"] + dy), log)[0]:  # Ruined Temple's door: run -210750-s4)
+                    break
+            time.sleep(2)
+            u = parse_moveto(Hl("moveto nearest %d" % cls, log)[1])
+            mon = u and {"id": u["id"], "life": acts_mon_life(u["id"])}
+            how = "SET-UP spawned"
+        if not mon:
+            rows.append("act %d boss %s (class %d): not found and the spawn made none" % (act, stage, cls))
+            bad.append("act %d: no %s" % (act, stage))
+            continue
+        life0 = acts_mon_life(mon["id"])
+        killed, deaths, t = acts_fight(mon["id"], timeout=secs)
+        life1 = acts_mon_life(mon["id"])
+        mi = merc_info()[0] if game_alive() else None
+        shots.append(sh("a25_boss_%s" % stage))
+        note = ""
+        if kill and game_alive() and not killed:
+            Hl("kill %d" % mon["id"], log)
+            time.sleep(3)
+            note = "; SET-UP harness kill (opens the next act)"
+        if kill:
+            STATE.setdefault("acts_killed", set()).add(stage)
+        asserts = engine_asserts(mark)
+        rows.append("act %d boss %s (class %d, %s, id %d): life %s -> %s in %d s (killed %s, deaths %d); mercenary %s; game %s%s%s" % (
+            act, stage, cls, how, mon["id"], life0, life1, t, killed, deaths, "none" if mi is None else "id %s" % mi.get("id"),
+            "alive" if game_alive() else "GONE", note,
+            "; asserts: " + "; ".join("%s (%s)" % (a[0][:70], a[1].split("\\")[-1]) for a in asserts) if asserts else ""))
+        g.log("acts25 " + rows[-1])
+        if not game_alive():
+            bad.append("act %d: the game died at %s" % (act, stage))
+            rp_recover("boss %s" % stage, log)
+        elif life0 is not None and life1 is not None and life1 >= life0 and not killed:
+            bad.append("act %d: %s took no damage in %d s" % (act, stage, t))
+
+
+def check_acts25():
+    """Lane acts25: Acts 2-5 (MXL_A25_ACTS) on Normal with a live, equipped mercenary; see the block comment above."""
+    name = "acts25"
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    acts = [int(a) for a in (os.environ.get("MXL_A25_ACTS") or "2,3,4,5").split(",") if a.strip()]
+    parts = [p for p in (os.environ.get("MXL_A25_PARTS") or ",".join(A25_PARTS)).split(",") if p in A25_PARTS]
+    gfx = os.environ.get("MXL_A25_GRAPHICS", "legacy")
+    revive_if_dead()
+    setup_log = []
+    opened = rp_open_acts([max(acts)], setup_log)
+    enable_debug()
+    cheat("god 1")
+    lvl = acts_level_up(A25_LEVEL)
+    acts_gear(lvl)  # SET-UP: the acts lanes' weapon and stats (named in their rows)
+    for _lvl, (_a, w, _k) in rp_waypoints().items():  # SET-UP: every waypoint activated
+        H("waypoint n %d set" % w)
+    goto(1)
+    up_merc_setup(setup_log, [], [], [])
+    for s in (7, 6):
+        Hl("stat merc %d set %d" % (s, 20000 << 8), setup_log)
+    re0 = a25_reassign()
+    add("acts25 set-up", "PASS", "SET-UP: level %s by the xp award, god mode, all waypoint bits, acts' tabs %s, Rogue from Kashya with "
+        "gear by clicks, mercenary life 20,000; graphics for entries / bosses %s; reassign %s" % (lvl, opened or "already open", gfx, re0),
+        log=setup_log[-200:])
+    for act in acts:
+        rows, bad, log, shots = [], [], [], []
+        mark = engine_mark()
+        r0 = a25_reassign()
+        t0 = time.time()
+        try:
+            guard()
+            goto(ACT_TOWNS[act - 1] if act > 1 else 1)
+            set_graphics("hd")
+            if "travel" in parts:
+                a25_travel(act, log, rows, bad)
+            else:
+                goto(ACT_TOWNS[act])
+            if "town" in parts:
+                a25_town(act, log, rows, bad, shots)
+            if "hire" in parts:
+                a25_hire(act, log, rows, bad, shots)
+            if "items" in parts:
+                a25_items(act, log, rows, bad, shots)
+            if "wp" in parts:
+                a25_waypoints(act, log, rows, bad)
+            goto(ACT_TOWNS[act])
+            ok_gfx = set_graphics(gfx)
+            rows.append("graphics %s: %s" % (gfx, "on" if ok_gfx else "NOT SET (%s)" % graphics_mode()))
+            shots.append(sh("a25_act%d_town_%s" % (act, gfx)))
+            if "entries" in parts:
+                e, n, sf = a25_entries(act, log, rows, bad, gfx)
+                rows.append("act %d entries: %d of %d entered by clicks (%d SET-UP failures, not judged)" % (act, e, n, sf))
+            if "bosses" in parts:
+                a25_bosses(act, log, rows, bad, shots)
+            goto(ACT_TOWNS[act])
+            set_graphics("hd")
+        except Exception as e:
+            bad.append("script error %r" % (e,))
+        if not game_alive():
+            rp_recover("act %d" % act, log)
+        r1 = a25_reassign()
+        caught = (r1[1] - r0[1]) if r0 and r1 and r1[1] >= r0[1] else (r1[1] if r1 else None)
+        rows.append("reassign guard: %s -> %s (units left without a room in this act: %s)" % (r0, r1, caught))
+        finish("acts25 act %d" % act, not bad, "%.0f min; " % ((time.time() - t0) / 60) + "; ".join(rows)
+               + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots[:30], rows + log[-500:])
+    cheat("god 0")
+
+
+CHECKS += [("acts25", check_acts25)]
 
 if __name__ == "__main__":
     main()
