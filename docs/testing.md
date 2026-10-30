@@ -3725,3 +3725,25 @@ exit-only pool asserts when `game_ctl.stop()` closes the game (`m_allocated == 0
 | `checks-20261030-062933-s3` | diablo, travel45 | **Diablo killed** (all seals by click, 80 s, 0 deaths in the fight), quest 26 -> `1000000000000100`; travel45 FAIL (menu only: no line on Tyrael, see above) |
 | `checks-20261030-075529-s3` | travel45 | new game: quest 26 still done, Tyrael Talk / Cancel only; red portal by him on the screenshot |
 | `checks-20261030-075910-s3` | travel45 | **PASS: portal 566 by a mouse click -> Harrogath** |
+
+## Lane fxleft: the last 3 overlay picks of #507, the boss / soldier subtitles of #508 (2026-10-30, slot 4, background mode, build of lane/fxleft, plugin `build_plugin.ps1 -Release`)
+
+Lab scripts in `mxl2012-runs/fxleft/` (kept outside the repo, made from lane fxpick's `fxlab2.py`):
+`MXL_RUN=fxleft MXL_SLOT=4 py -3 lab.py <worktree> <out> [modes] [groups]` on a new Necromancer "FxlNecroman" in the Blood Moor; per entry
+a burst of shots (`burst()`: PrintWindow frames kept in memory, about 30 a second, saved afterwards); `sheet.py` makes crop sheets.
+Groups: `bts` Bend the Shadows (486) at a Death's Fury totem (488) by a background right click (`click_unit`; legacy: 24 / 12 px per
+sub-tile round 800, 450) and by harness `cast`; `slow` `mcast` of SpiderLay 173 (Arach 122, mode 7) and Vine Attack 234 (plague poppy
+425, mode 10) on the player; `slowv` `cast 664 self` with `slowvariant.py` applied; `vo` / `vo2` / `vo3` the #508 sounds (harness casts,
+harness missiles, click casts). Slot-only table variants (`slowvariant.py`, `vovariant.py`: backup, edit, restore, md5 compared with the
+build afterwards, all equal) were on the slot only for runs `r2`-`r4`. `vo3` runs without `debug_mode` and god mode.
+
+| run | groups | result |
+|---|---|---|
+| `r1` | HD: bts, slow, vo | Bend the Shadows: click cast PASS, `willowispdeath` wisps rise from the head 0 to about 270 ms (`zoom_bts_hd_0.png`); harness cast: warp, no overlay. `slowed`: both monsters start their skill 7 times in 12 s, the state never lands (server and client). vo: no chat line (harness casts and missiles, see `r4`) |
+| `r2` | HD + legacy: bts, slowv, vo2 | Bend the Shadows HD click PASS again. `slowed` HD PASS: blue tint, `ice_cast_1` ring at 400-700 ms, then the `shrine_resist_cold` snowflake over the head, still there at 2 s and 4.5 s (`sheet_slowv_hd_0.png`, `slowv_late_hd_legacy.png`). Legacy part unusable (summons of the vo2 casts filled the screen) |
+| `r3` | legacy: bts, slowv | Bend the Shadows legacy click: Median's white floating skull 0 to about 320 ms (`zoom_bts_legacy_0.png`); `slowed` legacy: blue tint, cast flash, looping blue arcs (`sheet_slowv_legacy_0.png`) |
+| `r4` | HD: vo3 (with `vovariant.py`) | Controls: state onsound `pal_goodbye` -> "FxlNecroman says: Goodbye.", `baallaugh1` -> "Baal says: \*Laughing\*", `sol_helpus` -> "Soldier says: Help us!"; skill stsound `nec_goodbye`: harness cast no line, click cast the line. Build rows: click Spawn Edyrem "Baal says: \*Laughing\*" + "Soldier says: Over here!" (2 of 2), Belial Volcano the laugh (1 of 2), Mon Deathswarm none (2); harness casts and harness missiles (850, 2189) none. Chat log only, no overhead text (`sheet_chat_a.png`, `sheet_chat_b.png`, `full_click998.png`, scan `chat_scan.json`) |
+
+Summary sheet: `mxl2012-runs/fxleft/sheet_507.png`. Lessons: a cast overlay can last under 0.3 s (use bursts); the harness `cast`
+draws no skill cast overlay and plays no skill start sound on the client (click the skill to see / hear the player's view); no lab path
+made `slowed` land from its two monster skills. bugs.md #507 (closed) and #508 (options for the owner) have the details.
