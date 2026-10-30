@@ -11391,6 +11391,17 @@ def check_snd_spirits():
     if not switch_character("SndBarb", "barbarian", 4):
         return finish("snd_spirits", False, "no Barbarian", mark, shots, log)
     traced = bool(os.environ.get("MXL_SOUND_TRACE"))
+    with Tank(), Level(120):  # a new Barbarian: level 1 refuses the skill points, 5 mana casts nothing (regress013 runB / runB2)
+        snd_spirit_modes(traced, log, shots, rows, bad)
+    set_graphics("hd")
+    if not game_alive():
+        bad.append("the game is gone")
+    finish("snd_spirits", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial=None if traced else "no MXL_SOUND_TRACE: the HD death roar judged by the plugin's count only")
+
+
+def snd_spirit_modes(traced, log, shots, rows, bad):
+    """check_snd_spirits per graphics mode: cast, re-cast and kill the spirits; rows / bad filled."""
     for mode in ("hd", "legacy"):
         set_graphics(mode)
         goto(1)
@@ -11417,11 +11428,6 @@ def check_snd_spirits():
             bad.append("HD: no ancient_death_hd play skipped (%s)" % (line or "no spiritsound line"))
         if traced and d[0] > 0:
             bad.append("%s: ancient_death_hd played %d times" % (mode, d[0]))
-    set_graphics("hd")
-    if not game_alive():
-        bad.append("the game is gone")
-    finish("snd_spirits", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
-           partial=None if traced else "no MXL_SOUND_TRACE: the HD death roar judged by the plugin's count only")
 
 
 CHECKS += [("snd_spirits", check_snd_spirits)]

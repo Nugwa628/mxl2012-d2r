@@ -5,7 +5,17 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-Nothing yet.
+**Fixed / new (merged, for the next alpha):**
+
+- Barbarian spirit summons (Guardian, Defender, Protector Spirit) no longer play the Ancients' HD death roar over and over.
+- Totems: Bend the Shadows still brings them to you, but they no longer stack on you or slow down; in HD a moved totem no
+  longer leaves its glass orb behind. Other pets keep D2R's placement.
+- The Apple works again (heals as in Median XL 2012).
+- No more "<name> says: Goodbye." and similar class voice lines in the chat.
+- HD: the Veil King has pale swirling bands for his cloud; 16 Median effects that drew nothing in HD now show (Holy Armor,
+  Pagan Heart, Thundergod, Amazing Grace, War Spirit, Firedance, Poison Flash and more); 48 states draw their colour shift.
+- HD: Median's 8 retextured maps are lit in their own colours; all 17 Median maps show walls.
+- Legacy graphics (G): Fire Wall's skill icon and the skill tab titles are right.
 
 ## D2R-XL 2012
 
