@@ -314,7 +314,7 @@ def write_all(out: Path, plan, order: list, proposals: dict) -> int:
         rows = groups[has]
         for i in range(0, len(rows), PER_SHEET):
             k += 1
-            title = f"D2R-XL item pictures {k}: {what}, real pixel size (98 px per cell)"
+            title = f"D2R-XL 2012 item pictures {k}: {what}, real pixel size (98 px per cell)"
             written += save_pair(draw_sheet(rows[i:i + PER_SHEET], title), Path(out) / f"sheet_{k:02}.png")
     Path(out).mkdir(parents=True, exist_ok=True)
     (Path(out) / "sheets.json").write_text(json.dumps([str(w) for w in written], indent=1), "utf-8")
