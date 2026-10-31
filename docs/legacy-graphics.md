@@ -437,6 +437,7 @@ guard on `0x154ac0` skips an item picture without its `+0x78` record (not reache
 where Gems / Materials / Runes would be): no crash, only Personal / Shared show, Shared's pages work. The control (`never`) crashes at `+0x23E6A5` on the
 first G. With D2R's own classic layout: 5 more cycles, no crash, unchanged. 0 crash files.
 
-**Still not shipped** (`MXL2012_ROTW_LEGACY` stays off by default): a RotW account has not opened the pages in classic, and
+**Shipped by default since 2026-10-31 (owner)**: `tools/build.py` puts the layout into the mod; `MXL2012_ROTW_LEGACY=0` keeps
+it out. The text below is the state before that: a RotW account has not opened the pages in classic, and
 without RotW the step's tab bar is a small step back from D2R's own: "Personal" is cut to "PERSON" on the 63-pixel tab (D2R's
 own classic tabs are wider). Once the owner test passes, the layout can go into the mod by default; the part is already on.

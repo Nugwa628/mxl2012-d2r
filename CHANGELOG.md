@@ -5,6 +5,8 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Classic graphics (G): the Reign of the Warlock stash pages (Gems, Materials, Runes) now have a classic look, drawn down from
+  D2R's HD pages, and pressing G with the stash open no longer risks a crash (#516). Without RotW only Personal and Shared show.
 - Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the unfolding stair in their doorway stayed shut and blocked the way (#518).
 
 ## D2R-XL 2012

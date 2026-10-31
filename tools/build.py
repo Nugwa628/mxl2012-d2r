@@ -49,8 +49,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
                      "Walls"; D2R's scenes come from the shared cache, MXL_SLOT=2..5 fills it once)
   legacy_art.py      Median's classic (legacy-mode, Alt+G) art files -> work/mod/data/global (docs/legacy-graphics.md)
   rotw_stash_legacy.py build  classic layout + art of D2R's RotW Gems / Materials / Runes stash pages, down-rendered from
-                     D2R's HD art (docs/legacy-graphics.md section 9); staged in work/rotw_stash_legacy, into the mod
-                     only with MXL2012_ROTW_LEGACY=1 (owner test on a RotW account)
+                     D2R's HD art (docs/legacy-graphics.md section 9); into the mod by default (owner, 2026-10-31);
+                     MXL2012_ROTW_LEGACY=0 stages it in work/rotw_stash_legacy instead
   merge_string_overrides.py, strings_check.py   as above, after the writers
   validate.py        D2R schema checks        -> work/mod/validate_report.md
 
@@ -127,10 +127,10 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
-             # after legacy_art: its item pictures. Staged outside the mod unless MXL2012_ROTW_LEGACY=1: the plugin's rotwstash
-             # part keeps it from crashing without RotW (docs/legacy-graphics.md 9.6), but a RotW account has not tried it yet
+             # after legacy_art: its item pictures. In the mod by default (owner, 2026-10-31): the plugin's rotwstash part keeps
+             # it from crashing without RotW (docs/legacy-graphics.md 9.6). MXL2012_ROTW_LEGACY=0 stages it outside the mod
              ["rotw_stash_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data"), "--out",
-              str(MOD / "data" if os.environ.get("MXL2012_ROTW_LEGACY") == "1" else ROOT / "work" / "rotw_stash_legacy" / "data")]]
+              str(MOD / "data" if os.environ.get("MXL2012_ROTW_LEGACY", "1") != "0" else ROOT / "work" / "rotw_stash_legacy" / "data")]]
 STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["validate.py"]]
 LOGS = ROOT / "work" / "build-logs"
 
