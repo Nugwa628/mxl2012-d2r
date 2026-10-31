@@ -127,8 +127,8 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
-             # after legacy_art: its item pictures. Staged outside the mod unless MXL2012_ROTW_LEGACY=1 (the classic slot widget
-             # crashes D2R without RotW, docs/legacy-graphics.md 9.4)
+             # after legacy_art: its item pictures. Staged outside the mod unless MXL2012_ROTW_LEGACY=1: the plugin's rotwstash
+             # part keeps it from crashing without RotW (docs/legacy-graphics.md 9.6), but a RotW account has not tried it yet
              ["rotw_stash_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data"), "--out",
               str(MOD / "data" if os.environ.get("MXL2012_ROTW_LEGACY") == "1" else ROOT / "work" / "rotw_stash_legacy" / "data")]]
 STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["validate.py"]]

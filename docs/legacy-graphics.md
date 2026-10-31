@@ -309,16 +309,15 @@ for a Warlock. Expect the Necromancer look, a Flame Wave without its wave and sh
 6. Toggle G three times: once during a cast, once with the pets out. Leave the game and come back in classic.
 7. On a crash, keep the file in `d2rloader\crashes\`, the log, and the last skill / action. Findings go to bugs.md #498.
 
-## 9. The RotW stash pages in classic mode (lane rotwstash, 2026-10-30; built, but not in the mod: D2R crashes without RotW, 9.4)
+## 9. The RotW stash pages in classic mode (lane rotwstash, 2026-10-30; built, not in the mod by default; lane rotwgate, 2026-10-31: the plugin wires the pages in classic, no crash without RotW, 9.6)
 
 Owner request (2026-10-30): "make the new RotW stash pages work in legacy 'down renders'": the Gems, Materials and Runes tabs of
 Reign of the Warlock's stash (bug #510) get a classic version, its art down-rendered from D2R's own HD art. No new 3D models.
 
 ### 9.1 What D2R 93847 does in classic mode today
 
-Read from D2R's files (extraction 93847). D2R.exe's code was not read: no instruction in the file refers to the widget names
-(`advancedstash_gems` and the others are in `.rdata`, nothing in `.text` points at them), so the panel code is not
-readable statically here.
+Read from D2R's files (extraction 93847). Lane rotwgate (9.6) later read the panel code in the dumped D2R.exe: the stash
+init `0x23b1b0` does name the widgets (the packed file hides that), and it wires the pages only in HD.
 
 | | HD (`bankexpansionlayouthd.json`) | Classic (`bankexpansionlayout.json`) |
 |---|---|---|
@@ -398,6 +397,9 @@ Shared at top level (tested fine above), and accept that they then draw on the R
 
 Also seen: "MATERIALS" does not fit a 63-pixel tab in D2R's classic font (it is cut to "MATERIAL:").
 
+Lane rotwgate found the cause of both crashes in D2R's code and made the plugin wire the pages in classic too (9.6). With it the
+step's full layout (`basicstash_container`, slots, cube) no longer crashes without RotW.
+
 ### 9.5 Median's 10 x 8 cube in the stash cube window (bug #515, open)
 
 D2R's stash cube window is 3 x 4 (D2R's cube). Median's Horadric Cube is 10 x 8 (`inventory.txt` "Transmogrify Box", the mod's
@@ -405,3 +407,36 @@ own cube panel; docs/hd-ui.md). Both layouts (D2R's HD one, the step's classic o
 panel shows the cube's contents through this window, items outside the first 3 x 4 cells of Median's cube are not shown there
 (nothing is lost: the cube's own panel shows all 80 cells). A 10 x 8 window does not fit the pages (290 x 232 classic pixels
 under the slots, 980 x 784 HD pixels). Not changed; to look at on a RotW account (docs/testing.md "Lane rotwstash").
+
+### 9.6 Why it crashed, and the plugin part `rotwstash` (lane rotwgate, 2026-10-31; docs/plugin-plan.md section 29)
+
+Owner (2026-10-31): "we will need to code it so they only work in rotw some how". Read in the dumped D2R.exe (`d2r_find.py`):
+
+- D2R's stash panel init `0x23b1b0` (after the layout is read) calls `0x846210` (HD graphics: the panel manager's byte `+0xb9`)
+  at `0x23b204`. Only on yes, and only when the layout has `basicstash_container`, it fills the panel's page table (`+0x278`:
+  `basicstash_container` twice, `advancedstash_gems`, `_materials`, `_runes`; `+0x2a0`: `advancedstash_horadriccube`) and
+  sets `+0x2a8` (the five pages are in use). The tab update `0x23e630` reads that table: with the step's layout in classic
+  the table is empty and it calls through a null entry, `D2R.exe+0x23E6A5`. The pages nobody hid then draw their slots through
+  the classic item picture `0x154ac0`, which reads `[item+0x78]` without a check, `D2R.exe+0x154AF2`. So **D2R never wires the
+  RotW pages in classic, with or without RotW**: the crashes of 9.4 were not about the account.
+- The RotW test itself is the panel's own: in HD, in a game without RotW, the same wired panel shows only Personal / Shared.
+  The game type is the client game's (global `0x2a236e0`) byte `+0x5c`: 1 classic, 2 Lord of Destruction, 3 Reign of the
+  Warlock (D2R's own test `0x8d3e0`; our slots read 2).
+- A layout cannot test for RotW: it is picked by name, and the name is the panel's key. D2RLoader's
+  `always_enable_rotw_legacy_graphics_keybind` only lets G work in a RotW game; it does not change the panel.
+
+**The part** (`rotw_stash.cpp`, off word `rotwstash`): the call at `0x23b204` goes through the 14 int3 bytes at `0x2388a2` to the
+plugin, which answers yes in HD (D2R's answer) and in classic as well, in every game. The panel then runs as in HD and D2R's
+own RotW rule decides which tabs show: without RotW only Personal / Shared, with RotW all five (to be seen on a RotW account).
+With D2R's own classic layout nothing changes (it has no `basicstash_container`; the init leaves right after the check). A
+guard on `0x154ac0` skips an item picture without its `+0x78` record (not reached once the pages are wired; counted in
+`mxl2012`). Dev builds only: `MXL_ROTWSTASH_TEST=rotw` wires in classic only in a RotW game, `=never` keeps D2R's rule.
+
+**In game** (slot 1, no RotW, game type 2; docs/testing.md "Lane rotwgate"): with the step's full layout and the default part,
+17 cycles with the stash open, 34 G presses (HD -> classic -> HD; stash opened fresh in classic, tabs clicked, empty clicks
+where Gems / Materials / Runes would be): no crash, only Personal / Shared show, Shared's pages work. The control (`never`) crashes at `+0x23E6A5` on the
+first G. With D2R's own classic layout: 5 more cycles, no crash, unchanged. 0 crash files.
+
+**Still not shipped** (`MXL2012_ROTW_LEGACY` stays off by default): a RotW account has not opened the pages in classic, and
+without RotW the step's tab bar is a small step back from D2R's own: "Personal" is cut to "PERSON" on the 63-pixel tab (D2R's
+own classic tabs are wider). Once the owner test passes, the layout can go into the mod by default; the part is already on.

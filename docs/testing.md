@@ -4427,3 +4427,46 @@ HD sample (`MXL_A25_GRAPHICS=hd`, Acts 3 and 5, 4 routes each):
 
 
 Evidence: run logs `mxl2012-runs/acts25/run1.log` .. `run10-hd-a5.log`, the per-run `report.md` / shots under `work/runs/<run>/`, `mxl2012-runs/acts25/evidence/run5-startup/`.
+
+## Lane rotwgate: RotW stash pages in classic only as RotW allows (bug #516, 2026-10-31, slot 1, background mode)
+
+Plugin part `rotwstash` (docs/plugin-plan.md section 29, docs/legacy-graphics.md 9.6): D2R wires the stash's five pages only in
+HD; the part makes its init wire them in classic as well, and D2R's own RotW rule picks the tabs. Build of lane/rotwgate, dev
+plugin, mod built with `MXL2012_ROTW_LEGACY=1` (the step's full classic layout: `basicstash_container`, 91 slots, cube).
+Slot 1 (no RotW: `mxl2012` "game type 2"), character `RotwGate` (Sorceress, `mxl2012-s1`), stash opened through the harness,
+G through `set_graphics`. Scripts: `mxl2012-runs/rotwgate/g1.py` (HD first), `g2.py` (classic first).
+
+| run | part mode | classic layout | result |
+|---|---|---|---|
+| E0 control | `MXL_ROTWSTASH_TEST=never` (D2R's HD-only rule) | the step's | **crash** on the first G, `D2R.exe+0x23E6A5` (as lane rotwstash; `evidence/e0_crash_head.txt`) |
+| E1 | wired in every game | the step's | PASS: classic shows Personal / Shared only, back to HD fine (`e1always_2legacy.png`) |
+| final 1 (`checks-20261031-144351-s1`) | default (no variable) | the step's | PASS: 10 cycles HD stash -> G -> G, 0 crash; `mxl2012` "stash inits 21 (classic: pages wired 10, left as D2R 0), item pictures skipped 0; game type 2" |
+| final 2 (same run) | default | the step's | PASS: 6 cycles, stash opened fresh in classic, clicks on Shared, Personal and where Gems / Materials / Runes would be (nothing happens there), G to HD and back; Shared shows "Shared with offline characters" and Page 1 / 3 |
+| final 3 (`checks-20261031-145750-s1`) | default | D2R's own (the mod's file moved aside for the run, put back after, `cmp` equal to `work/mod`) | PASS: 5 cycles, D2R's two wide tabs, unchanged |
+
+0 new crash files over final 1-3 (logscan at each stop); `mxl2012-core.log` only the usual "assert skipped" status words.
+Plugin: `build_plugin.ps1 -Release -Tests`, `rotwstash_tests` all passed. Not tried: the release DLL in game (no harness in
+it; it has the same default and no test variable). Cosmetic, without RotW: "Personal" is cut to "PERSON" on the step's
+63-pixel tab. Evidence: `mxl2012-runs/rotwgate/evidence/` (shots, `final1-3.log`, the E0 crash head).
+
+### Owner test on a RotW account (the slots cannot)
+
+1. Build with `MXL2012_ROTW_LEGACY=1 py -3 tools/build.py` and install (dev or release plugin: the part is on in both). In the
+   install's `d2rloader\config\d2rloader.toml` set `always_enable_rotw_legacy_graphics_keybind = true` (G in a RotW game).
+2. Start a **RotW** character in a RotW game. Type `mxl2012` in the console: the `rotwstash` line must say "rotwstash on" and
+   **"game type 3"** (2 means a LoD game: the RotW tabs will not show, as in HD).
+3. In HD put a few gems, runes, materials (a key, an essence) into the Gems / Materials / Runes tabs, and an item into the stash
+   cube window. Close the stash.
+4. Open the stash on Personal and press **G**. Expected: no crash, five tabs. `mxl2012` again: "classic: pages wired" went up
+   by one.
+5. Click each tab in classic: Gems, Materials, Runes show their page art, each stored item in its recess with its count, and no
+   Personal / Shared grid or gold on them; Personal / Shared show no RotW slots. The cube window: its cover and its items, the
+   Transmute and Withdraw buttons (bug #515: only a 3 x 4 window).
+6. Move a gem from the inventory onto the Gems tab and take one out (the notify mark on the tab). Press G back to HD with a RotW
+   tab open, then G again with Runes open.
+7. `mxl2012` once more: "item pictures skipped" should stay 0 (more than 0 means a slot found an item without its picture
+   record: tell us, with a screenshot of that page).
+8. If anything crashes: keep the file from `d2rloader\crashes\` and the `mxl2012` line, and note the tab and graphics mode.
+   As a check, the dev plugin with `MXL_ROTWSTASH_TEST=never` must crash on step 4 (D2R's own rule), and with `=rotw` must
+   behave like the default here (it wires only in a RotW game).
+9. Report to bug #516 (and #515 for the cube window). If it all works, `MXL2012_ROTW_LEGACY` can become the default.

@@ -465,6 +465,7 @@ PluginVersion 0.1.0. Build: `cmake -S plugin -B build/plugin -A x64 -DMXL2012_PL
 | + Baal laugh chat line | `vo_chat.cpp`, `vo_chat_logic.h` (`PathKeyIs`, `LineAllowed`) | `vochat` | Bug #508, section 27. Inline hook at the entry of D2R's voice subtitle `0x1a0da0` (19 bytes): the "Baal says: ..." line of the voice file `baallaugh1` is left out when the last one was printed less than 30 s ago; the sound is not touched |
 | + unit reassign guard | `reassign_guard.cpp`, `reassign_guard_logic.h` (`Parse`, `Decide`, `BranchBytes`, `StubBytes`) | `reassign` | Bugs #511 / #292. D2R's client handler of server command 0x15 (unit reassign, `0x12ab40`) moves the unit (`0x9bf00`) and, when it then has no client room (`0x34b440`), asserts "Could not get act!" (SCmd.cpp:1254, block `0x12aec0`) and ends the process (fatal stub `0x12557f0`, image +0x1255802); 1.14d does the same (Game.exe `0x45d160`). An inline hook at the handler's entry (15 bytes) keeps the command's fields; the branch `je 0x12aec0` at `0x12addb` goes to the 12 int3 bytes at `0x12aee4` (`movabs rax` / `jmp rax`) and a stub that asks the plugin: a unit other than the local player is left without a room and the handler returns (`0x12ae7e`), the local player goes on to D2R's block. Both are logged (first 16, with unit type / class / id / x, y). `mxl2012` prints commands seen, units left, player ends. (Line 1237, the same text, is command 0x04's own check at `0x129ab1`: not changed) |
 | + save format and cancelled saves | `save_mode.cpp`, `save_mode_logic.h` (`ParseMode`, `Repair`, `CountFailures`, notices) | `savemode` | Bug #512, section 28. No game address: the mod's `d2rloader.toml` must ask for D2RLoader's extended save format (put back when it does not, restart notice); a thread reads `d2rloader.log` and puts a red line on screen for every cancelled save |
+| + RotW stash pages in classic | `rotw_stash.cpp`, `rotw_stash_logic.h` (`WirePages`, `ParseMode`, `SkipPicture`, `AbsJumpBytes`) | `rotwstash` | Bug #516, section 29. The stash init `0x23b1b0` wires its five pages only after the HD check `0x846210`; its call at `0x23b204` goes through the int3 pad `0x2388a2` (`movabs rax` / `jmp rax`) to the plugin, which answers yes in classic too, so D2R's own RotW rule picks the tabs as in HD. Inline hook at `0x154ac0` (16 bytes): a classic item picture without its `+0x78` record is skipped. `mxl2012` prints stash inits, classic wired / left, pictures skipped, the game type |
 | G harness (dev) | `harness_cmds.cpp`, `harness_cmds_logic.h` (`ParseSlotTable`, `WatchableTable`), `testharness.cpp` | - | verbs of 10.1 (lane triage: `watch`, a counting wrapper on one cltdo / srvhit entry, written and restored with `PatchWriteU64` and its expected old value); the harness itself hooks the server frame `0x406550` |
 | `d2r.h` | trimmed to the v0.1 calls and the five function tables | - | summon / pet / melee / seed helpers of the skeleton removed |
 
@@ -923,3 +924,33 @@ engine parts:
 Extended mode reads a retail character. A retail shared stash: see docs/testing.md "Lane savecap". The 65,535-byte save
 buffer is far from reached in extended mode: about 28 bytes per plain item and 57 per ring with six stats; 141 items take 9,046
 bytes.
+
+## 29. RotW stash pages in classic graphics (lane rotwgate, 2026-10-31; bug #516)
+
+The classic layout of the RotW stash pages (`tools/rotw_stash_legacy.py`, docs/legacy-graphics.md section 9) crashed D2R on G
+with the stash open on our slots (no RotW). Owner (2026-10-31): "we will need to code it so they only work in rotw some how".
+Read in the dump:
+
+| What | Address | Notes |
+|---|---|---|
+| stash panel init | `0x23b1b0(panel)` | at `0x23b204` `call 0x846210` / `test al, al` / `je 0x23b6d7`; on yes and when the layout has `basicstash_container`: page table `+0x278` (5 widgets: `basicstash_container` x2, `advancedstash_gems` / `_materials` / `_runes`), `+0x2a0` (`advancedstash_horadriccube`), byte `+0x2a8` = 1 |
+| HD graphics | `0x846210()` | the panel manager (global `0x3440170`) byte `+0xb9`; 20 bytes compared |
+| tab update | `0x23e630` | reads `[panel + tab*8 + 0x278]`; a null entry is `D2R.exe+0x23E6A5` |
+| RotW game | `0x8d3e0()` | client game (global `0x2a236e0`) byte `+0x5c` == 3 (1 classic, 2 LoD, 3 RotW: D2RLoader's `DataTables::Bank` values) |
+| classic item picture | `0x154ac0(item, ...)` | `[item+0x78]` read through without a check, then `+0x440` (`D2R.exe+0x154AF2`); the callers do not use the result |
+| int3 pad | `0x2388a2` | 14 bytes before `0x2388b0`; 12 used |
+
+Ideas looked at: a layout cannot test for RotW (it is picked by name, `0xc7aa0`, and the name is the panel's key); D2RLoader's
+`always_enable_rotw_legacy_graphics_keybind` only lets G work in a RotW game. Neither keeps the layout from crashing, because
+the crash is not about RotW: D2R never wires the pages in classic.
+
+**Part `rotwstash`** (`rotw_stash.cpp`, `rotw_stash_logic.h`, test `rotwstash_tests`, off word `rotwstash`): all compared bytes
+first (the call, `0x846210`, `0x8d3e0`, the pad, the picture entry), else nothing is written. The picture guard goes in
+first, then the pad (`AbsJumpBytes` to `WireDecision`), then `PatchCallRel32(0x23b204 -> 0x2388a2)`. `WireDecision` returns
+`WirePages(hd, rotwGame, mode)`: yes in HD; in classic yes in every game (default). The panel then runs as in HD, and D2R's own
+RotW rule shows the Gems / Materials / Runes tabs only in a RotW game. With D2R's own classic layout nothing changes (no
+`basicstash_container`). Dev builds only (`#ifndef MXL_RELEASE`): `MXL_ROTWSTASH_TEST=rotw` wires in classic only when
+`0x8d3e0` says RotW, `=never` keeps D2R's HD-only rule (the control). `mxl2012`: "stash inits N (classic: pages wired N, left
+as D2R N), item pictures skipped N; game type N, HD|legacy".
+
+Checked in game: docs/testing.md "Lane rotwgate" (slot 1, no RotW). On a RotW account: the steps there.
