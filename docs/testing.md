@@ -4402,7 +4402,7 @@ Not bugs (checked against the docs):
 
 Open:
 
-- **Kurast temples:** two entries (81->97, 82->99) took 51 clicks on the warp tile and the character stayed outside. Next: a shot of the tile under the cursor, and a hand check of the projection there.
+- **Kurast temples:** two entries (81->97, 82->99) took 51 clicks on the warp tile and the character stayed outside. A mod data bug (the doorway stair's art token), fixed as bug #518; see "Lane kurast".
 - **Lut Gholein NPCs:** Drognan was not found and Cain gave no menu (before the `presets 1` fallback).
 - **Waypoints:** 5 waypoints (42, 44, 76, 80, 129) came by warp when the panel click missed.
 - **Click pickups:** 3 of 15 quest items in Acts 3-5 were not taken by the click (g34, xyz, tr2). The item was 4 from the character; 4 clicks on its projection did nothing.
@@ -4470,3 +4470,24 @@ it; it has the same default and no test variable). Cosmetic, without RotW: "Pers
    As a check, the dev plugin with `MXL_ROTWSTASH_TEST=never` must crash on step 4 (D2R's own rule), and with `=rotw` must
    behave like the default here (it wires only in a RotW game).
 9. Report to bug #516 (and #515 for the cube window). If it all works, `MXL2012_ROTW_LEGACY` can become the default.
+
+## Lane kurast: the Kurast temple entrances 81->97 and 82->99 (bug #518, 2026-10-31, slot 3, background mode, build of lane/kurast)
+
+From lane acts25 (run `checks-20261030-210750-s4`): Upper Kurast (81) -> Forgotten Temple (97) and Kurast Causeway (82) -> Disused
+Reliquary (99) did not take the character in; 82 -> 98 (Ruined Fane) did. Probe: `mxl2012-runs/kurast/kurast_probe.py` (check `kprobe`,
+imports game_checks: per temple a server warp in, acts25's own way out by clicks, then the walk collision (`walkmap`, step 1) and the
+objects round the entrance tile, a shot, and the way in). Paladin, level 114, god mode.
+
+| Run | Build | What | Result |
+|---|---|---|---|
+| `checks-20261031-141642-s3` (`probe1.log`) | before | legacy; A: clicks on the tile from the exit spot, B: walk 9-13 away, then clicks | 97, 99 not entered (held at tile x+1); 98 entered (control). An object class 194 (UnfoldingStairLeft) in mode 0 stands in both blocked doorways, none at 98 |
+| `checks-20261031-143451-s3` (`probe2.log`) | before | legacy + HD; every free cell within 8 of the tile, a click then `move` | 97, 99 not entered in either mode (so not the click projection or the harness); 98 entered |
+| `checks-20261031-150631-s3` (`probe3.log`) | after (stair Token `9c`) | legacy + HD, cells | 99 entered (legacy cell 0,-1; HD 0,0), 97 entered (legacy +5,-1; HD +4,0), 98 entered in legacy; HD 98: the SET-UP way out from inside failed (class 62), not judged |
+| `checks-20261031-151721-s3` (`probe4.log`) | after | legacy + HD, acts25's own `up_enter` | PASS in both modes: 81<->97, 82<->99, 82<->98 entered (and left again by clicks) |
+
+Cause and fix: bugs.md #518 (objects.txt row 194 Token `sl` -> D2R's `9c` in `tools/txt_migrate.py`). Shots and reports per run:
+`mxl2012-runs/kurast/evidence/before/<run>/`, `.../after/<run>/` (`kp_<src>_<dest>_<gfx>_*.png`).
+
+Open: the way out from inside a temple by clicks failed now and then (acts25: 95->80 class 63, 96->81 class 62; here 96 in run 1 and
+98 in HD run 3) and worked in the next run. Not looked into in this lane. Also seen, left alone: objects rows 78 (Town1Ambient, Token
+`TA`) and 133 (ShrineMagicArcaneSanctuary1, `xx`) carry tokens D2R has no art for (maybe Median's intent; neither blocks a way).

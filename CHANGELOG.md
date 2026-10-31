@@ -5,6 +5,8 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the unfolding stair in their doorway stayed shut and blocked the way (#518).
+
 ## D2R-XL 2012
 
 ### 0.1.7 (2026-10-31)

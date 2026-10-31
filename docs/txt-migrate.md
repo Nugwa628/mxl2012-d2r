@@ -93,6 +93,7 @@ skill Median's description and tree slot.
   | misc (via `book_cursors`) | spellicon of the books.txt scroll / tome codes = that row's `SpellIcon` | 1.13c takes a scroll's / tome's cursor from books.txt, D2R from misc `spellicon` (Median: -1 everywhere): `isc` / `ibk` get 0, the identify cursor (bug #485) |
   | skills (via `conversion_calcs`) | calc1 `dm56` / calc2 `par3` of every srvdofunc 51 row whose cell is blank | 1.13c's conversion (Mind Blast, Median's charms, Elvensong's spirit) takes the chance from Param5 / Param6 and the length from Param3 + rand(Param4); D2R evaluates calc1 / calc2 instead (its own Mind Blast row was moved the same way). Blank cells meant a 1 % chance and a 0-frame charm (bug #487); a set cell (Black Sleep's calc1 100) is kept |
   | plrmode / monmode | Code (always D2R's) | 1.13c spells Sequence and Knockback `GH`, D2R `SQ` / `KB` (trap 1) |
+  | objects | Token `sl` -> `9c` (`D2R_RENAMED`: only a cell that still holds 1.13c's value, on a row where D2R holds the new one) | UnfoldingStairLeft (row 194): D2R ships this stair's art and animation data as `9c` and has no `sl`; with `sl` the stair never unfolds and blocks the Kurast temple doorway (bug #518). Median's own Token changes (rows 45, 277, 284, 361, ...) stay |
   | skills (via `skill_rules`) | srvstopfunc / cltstopfunc | a mod row on a do function D2R pairs with a stop function (Whirlwind) gets D2R's; GH -> SQ in anim / seqtrans |
   | itemtypes | MaxSocketsLevelThreshold1/2 = 25 / 40 | 1.13c's fixed socket thresholds |
 

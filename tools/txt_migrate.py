@@ -282,6 +282,16 @@ def d2r_when_empty(table: str, column: str, mrow: list[str], mi: dict[str, int])
 # Engine tokens D2R renamed: a matching row always takes D2R's value. plrmode/monmode Code: 1.13c spells Sequence and
 # Knockback "GH" like Get Hit; D2R's are SQ and KB, and skills.txt's SQ resolves through them (trap 1).
 D2R_ALWAYS = {"plrmode": {"Code"}, "monmode": {"code"}}
+# Single values D2R renamed (table -> column -> {1.13c value: D2R value}): the cell takes D2R's value only where it still holds
+# 1.13c's and the matching D2R row holds the new one, so Median's own changes in the same column stay. objects Token "sl"
+# (UnfoldingStairLeft, row 194): D2R ships that stair's art and animation data as "9c" and has no "sl" at all, so the stair
+# never unfolds and its collision shuts the Kurast temple doorway it stands in (bug #518).
+D2R_RENAMED = {"objects": {"Token": {"sl": "9c"}}}
+
+
+def d2r_renamed(table: str, column: str, value: str, d2r_value: str) -> bool:
+    """True when the mod's `value` is a 1.13c value D2R renamed to `d2r_value` (D2R_RENAMED)."""
+    return D2R_RENAMED.get(table, {}).get(column, {}).get(value) == d2r_value
 # 32-bit fields printed unsigned by some tools: -1 as 4294967295 (trap 4). The .txt files hold real values, so this only
 # catches stray ones. experience.txt holds real unsigned 32-bit values (D2R's own Warlock column).
 UNSIGNED_32_TABLES = {"experience"}
@@ -543,6 +553,8 @@ class Migrator:
                     if dc in cmap:
                         v = median_value(dc, mrow[mi[cmap[dc]]])
                         if match is not None and dc in D2R_ALWAYS.get(table, ()):
+                            v = match[di[dc]]
+                        elif match is not None and d2r_renamed(table, dc, v, match[di[dc]]):
                             v = match[di[dc]]
                         elif v == "" and match is not None and d2r_when_empty(table, dc, mrow, mi):
                             v = match[di[dc]]
