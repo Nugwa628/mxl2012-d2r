@@ -4257,6 +4257,41 @@ closed): `TERRAIN_MAPS` stays empty. No game data changes in this lane.
 Evidence: `mxl2012-runs/tunnels/ingame/<run>/` (both runs), `mxl2012-runs/tunnels/jdg_before_grid.png` (HD top, legacy bottom),
 `jdg_after_hd_grid.png`, `jdg_core_zoom.png` (core before / after the texture swap), logs `run1.log`, `run2.log`, `build1.log`.
 
+## Lane tunnels65: the Ancient Tunnels as a fixed map, the void in HD (2026-10-31, slot 2, background mode)
+
+Owner (2026-10-31): "try making it a fixed pre made map". Level 65 already is one: levels.txt `DrlgType` 2 is a preset level
+(1 maze, 3 outdoors), and Median's 65 has 2 (lvlprest 1091, `act2/arcane/belial.ds1` only); the Arcane Sanctuary is the maze
+(docs/maps-hd.md item 12). What was tried instead: the belial terrain mesh named in the scene's `dependencies.models`, as all
+of D2R's scenes with a terrain name it (lane tunnels had it in `other`), behind `MXL2012_BELIAL_TERRAIN=1` (default off,
+`tools/walls_hd.py` `terrain_maps`).
+
+New check `tunnels65` (tools/game_checks.py, tests `tools/test_game_checks_tunnels65.py`). Per mode (`MXL_T65_MODES`, default
+`hd,legacy`, G set in the Act 2 town): SET-UP `h level 65 warp`, out to the Lost City by clicks on 65's warp tile, back in by
+clicks on the Lost City's tile (that tile is not loaded from the Lost City's waypoint: `tiles` 0, `presets 5` 0), `move` walks
+to the .ds1 cells of `T65_CELLS` (`place` where the walk fails), out again by clicks. Shots `t65_<mode>_<n>`, god mode.
+
+```
+MXL_RUN=tunnels65 MXL_SLOT=2 MXL_CHAR=TunnelWalk MXL_CHAR_CLASS=paladin py -3 tools/game_checks.py all tunnels65
+```
+
+| run | build | result |
+|---|---|---|
+| `checks-20261031-141923-s2` | switch on | FAIL (check script): the Lost City's warp to 65 is not loaded from its waypoint; the check now goes in by `level 65 warp` first |
+| `checks-20261031-142109-s2` | switch on | PARTIAL: in and out by clicks; the "legacy" round was still HD (the Lost City is too dark for `graphics_mode`; G is now set in town); HD floor over the void |
+| `checks-20261031-144449-s2` | switch on | PARTIAL: HD and classic, in and out of 65 by clicks on both warps, no assert, no crash file; HD stone floor over the void, classic the black void |
+| `checks-20261031-151341-s2` | switch off (before) | PARTIAL: the same as the run with the switch; HD looks the same |
+
+Results: **no change in HD**, so the switch stays off (no CHANGELOG line). The level's entrance and exit work both ways in both
+modes and its monsters (Astral Guardians, 10-13 near the spots) are there. The spot walks mostly ended at the Astral Guardian
+pack round the neck (y about 5091-5126; one walk reached spot 3), and `place` found no free spot at spot 1 (cell 16,7, the
+north bar): not looked into further. Whether that part of the platform is reached on foot in Median 2012 on 1.13c or only by
+Teleport (levels.txt `Teleport` 1) is an open question; the switch only changes the HD scene, so it is the same with it off.
+
+Evidence: `mxl2012-runs/tunnels65/ingame/<run>/` (the last three runs), sheet `mxl2012-runs/tunnels65/t65_before_after.png`
+(rows: HD before, HD after, classic; arrival, spot 1, spot 3), logs `build1.log`, `run-on3.log`, `run-off.log`, the switch's
+scene, mesh and index in `on-artifacts/`. Plugin: the DLL of worktree nmhell4 (same commit `de8986d`, no plugin change in
+this lane; this lane's own plugin build was not allowed to run).
+
 ## Lane rotwstash: the RotW stash pages in classic mode (bug #516, 2026-10-30, slot 3, background mode)
 
 Classic layout + art for the Gems / Materials / Runes stash pages, down-rendered from D2R's HD art (`tools/rotw_stash_legacy.py`,

@@ -173,6 +173,21 @@ the three changes that fix what data could fix (for all 17 maps), and one that d
    level 65 a preset level changes how the game builds the level, a gameplay-data change for the owner to rule on; it is
    not tried. `TERRAIN_MAPS` stays empty, so the build writes neither a terrain nor an index of its own (the index tool and
    its tests stay for a later map that needs a new model path).
+   **Lane tunnels65 (2026-10-31, owner: "try making it a fixed pre made map"): already one; the terrain tried again, no effect.**
+   In levels.txt `DrlgType` 1 is a maze, 2 a preset, 3 outdoors (Rogue Encampment 2, Blood Moor 3, Den of Evil 1). So Median's
+   level 65 (`DrlgType` 2, 47x47, lvlprest 1091 -> `act2/arcane/belial.ds1` only) **is** a fixed pre-made map, and the Arcane
+   Sanctuary (74, `DrlgType` 1) is the maze, built from D2R's 12x12 Sanct rooms; the note above had the two the wrong way round.
+   There is nothing to switch on the level side. The .ds1 is not the difference either: belial and D2R's `sanctnsew.ds1` both
+   leave the void cells without a floor tile, and both lvlprest rows have `FillBlanks` 1. One untried difference was left in
+   the scene: every one of D2R's 2,026 scenes with a terrain names the terrain model in `dependencies.models`, the earlier try
+   named it in `dependencies.other`. `add_terrain` now uses `models`, and the build adds the belial terrain (pygn2 template,
+   indexed in model_lod_desc.bin) only with `MXL2012_BELIAL_TERRAIN=1` (`walls_hd.terrain_maps`, default off). In game (slot 2,
+   check `tunnels65`, in and out by clicks on the warp tiles, HD and classic; runs `checks-20261031-144449-s2` with the switch,
+   `checks-20261031-151341-s2` without, sheet `mxl2012-runs/tunnels65/t65_before_after.png`): HD draws the same stone floor over
+   the void at the arrival and at both spots with and without the terrain, classic the black void; no assert, no crash file
+   either way. **Left off**; the HD floor comes from neither the level type nor the .ds1 nor the scene's terrain. What remains
+   untried needs engine work (where HD fills a preset's empty cells) or a different map (one of D2R's Sanct layouts, which
+   changes Median's level), so it stays a known issue.
 
 **Arches, roofs and trees** (lane walls4, 2026-10-30). Owner rule: no new 3D models; only D2R's own wall, arch and roof
 models (any act's tile sets), placed with this pipeline; a cell with no fitting D2R model stays as it is and is listed.
@@ -281,7 +296,7 @@ crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #
 | act3/temple/temple5, temple6 | 96 Forgotten Reliquary (one of the two, identical in Median) | yes | temple walls and pillars as in classic; the HD floor is the Kurast biome's grass where classic has temple stone (biome, not walls) |
 | act1/caves/caveroom4 | 15 Hole Level 2 | yes (walls3) | cave rock walls where classic has walls, and the stairs at the arrival as in classic (lane walls3: D2R's `back_stairs01`, item 11). The room is small: 3 wall cells, 84 floor cells, 20 pieces |
 | act3/kurast/excelsior3 | 84 Spider Cave | yes | Kurast walls, stairs and the courtyard as in classic; 68 wall cells stay without (43 tiles no file of the level type has, 25 Kurast corner halves) |
-| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is still drawn as floor in HD, and classic's arches under the platform edge stay hidden under it (lane walls3: 22 edge pieces are placed there now; lane tunnels: a terrain mesh over the platform, indexed in model_lod_desc.bin, did not change the floor either, so it is not the scene's; closed as a known issue, item 12) |
+| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is still drawn as floor in HD, and classic's arches under the platform edge stay hidden under it (lane walls3: 22 edge pieces are placed there now; lane tunnels: a terrain mesh over the platform, indexed in model_lod_desc.bin, did not change the floor either, so it is not the scene's; closed as a known issue, item 12; lane tunnels65: the level already is a preset level, and the terrain named as D2R names its own did not change it either) |
 | expansion/morework/epicwhiners | 13 Cave Level 2 | yes | cave walls, stalagmites and rock mounds roughly where classic has them |
 | act1/cathedrl/inarius | 14 Underground Passage Level 2 | yes | cathedral walls, arches and windows as in classic |
 | expansion/icecave/rockisdead | 116 Drifter Cavern | yes | ice cave walls and ledges where classic has walls (classic is Median's brown cave colour) |

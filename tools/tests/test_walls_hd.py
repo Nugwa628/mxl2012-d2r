@@ -500,7 +500,8 @@ class TerrainTest(unittest.TestCase):
         self.assertEqual(scene["terrain"]["name"], "terrain")
         types = [c["type"] for c in scene["terrain"]["components"]]
         self.assertEqual(types, ["TransformDefinitionComponent", "TerrainDefinitionComponent", "ModelDefinitionComponent"])
-        self.assertIn({"path": path}, scene["dependencies"]["other"])
+        self.assertIn({"path": path}, scene["dependencies"]["models"])     # where D2R's own scenes name their terrain
+        self.assertNotIn({"path": path}, scene["dependencies"].get("other", []))
         self.assertEqual(walls_hd.terrain_path(scene), "data/hd/env/preset/act2/arcane/belial/terrain_lod0.model")
 
     def test_half_floats(self):
@@ -582,6 +583,12 @@ class LodDescTest(unittest.TestCase):
         # the indexed belial mesh changed nothing in game (docs/maps-hd.md item 12), so no map gets one and the game's own
         # model_lod_desc.bin is not replaced
         self.assertEqual(walls_hd.TERRAIN_MAPS, {})
+        self.assertEqual(walls_hd.terrain_maps({}), {})
+
+    def test_the_switch_adds_belial(self):
+        # lane tunnels65: the belial terrain is tried again behind MXL2012_BELIAL_TERRAIN=1 (default off)
+        self.assertEqual(walls_hd.terrain_maps({walls_hd.TERRAIN_SWITCH: "1"}), {"act2/arcane/belial.ds1": "act3/jungle/pygn2"})
+        self.assertEqual(walls_hd.terrain_maps({walls_hd.TERRAIN_SWITCH: "0"}), {})
 
 
 def square(x0, x1, y0, y1):

@@ -39,6 +39,7 @@ import copy
 import functools
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
@@ -103,7 +104,19 @@ MAPS = RETEXTURED + STOCK   # every map tools/maps_hd.py gives a minimal scene (
 # the Kurast jungle's pygn2 (0-330 on both axes; sancte's box is 30-130 x 40-80). In game (slot 1, run
 # checks-20261030-223110-s1) the indexed mesh loaded with no assert and HD still drew floor over the whole void, so the
 # floor does not come from the scene's terrain at all; left empty (docs/maps-hd.md item 12, closed).
+# Lane tunnels65: that run listed the mesh under the scene's dependencies "other"; every one of D2R's 2,026 scenes with a
+# terrain lists it under "models" (add_terrain does that now). Tried again behind the switch TERRAIN_SWITCH=1 (default off):
+# TERRAIN_TRY is what the build then uses. In game (slot 2, runs checks-20261031-144449-s2 on, checks-20261031-151341-s2 off)
+# HD draws the same stone floor over the void with and without it, no assert either way: it stays off (docs/maps-hd.md item 12).
+TERRAIN_SWITCH = "MXL2012_BELIAL_TERRAIN"
+TERRAIN_TRY = {"act2/arcane/belial.ds1": "act3/jungle/pygn2"}
 TERRAIN_MAPS: dict[str, str] = {}
+
+
+def terrain_maps(env=None) -> dict:
+    """The maps that get a terrain mesh: TERRAIN_MAPS, plus TERRAIN_TRY when the environment has TERRAIN_SWITCH=1."""
+    env = os.environ if env is None else env
+    return {**TERRAIN_MAPS, **(TERRAIN_TRY if env.get(TERRAIN_SWITCH) == "1" else {})}
 LOD_DESC = "data/hd/model_lod_desc.bin"
 KEEP_COMPONENTS = {"TransformDefinitionComponent", "ModelDefinitionComponent", "ModelVariationDefinitionComponent",
                    "ModelPlatformTierComponent", "WallTransparencyComponent"}
@@ -466,10 +479,11 @@ def write_lod_desc(data_dir: Path, entries, d2r_read=None) -> int:
 
 
 def add_terrain(text: str, path: str) -> str:
-    """A scene_json() text with terrain_entity(path) as its terrain (also named in the dependencies, as D2R's are)."""
+    """A scene_json() text with terrain_entity(path) as its terrain, also named in the dependencies' "models", where all of
+    D2R's 2,026 scenes with a terrain name it."""
     scene = json.loads(text)
     scene["terrain"] = terrain_entity(path)
-    scene["dependencies"]["other"] = scene["dependencies"].get("other", []) + [{"path": path}]
+    scene["dependencies"]["models"] = scene["dependencies"].get("models", []) + [{"path": path}]
     return json.dumps(scene, separators=(",", ":"))
 
 
@@ -1084,13 +1098,14 @@ def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground
     return wanted, cells, lib
 
 
-def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None):
+def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None, terrain=None):
     """Write the wall scenes. -> {map: stats + bytes}. biomes: {map: biome name}; None = the biome of the scene maps_hd's
     build wrote into data_dir (a generated floor biome, maps_hd.floor_biomes), else the plan's. The maps of map_tint.TINTS get a
     copy of that biome with their own key light (tools/map_tint.py); read(rel) -> D2R json for it (default fxpaths).
-    The maps of TERRAIN_MAPS also get their terrain mesh (terrain_model; d2r_read(rel) -> the template's bytes, default
+    The maps of `terrain` also get their terrain mesh (terrain_model; d2r_read(rel) -> the template's bytes, default
     d2r_bytes), next to the scene as <map>/terrain_lod0.model, over floors[map] (floor_tiles; default: the map's cells);
-    the map's size is its cells' extent (the corner tiles)."""
+    the map's size is its cells' extent (the corner tiles). terrain: {map: template}, default terrain_maps()."""
+    terrain = terrain_maps() if terrain is None else terrain
     out, lods = {}, []
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
@@ -1098,15 +1113,15 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
         text, st = build_scene(cells[e["map"]], lib, biome)
         dest = Path(data_dir) / "hd" / "env" / "preset" / (e["map"][:-4] + ".json")
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if e["map"] in TERRAIN_MAPS:
+        if e["map"] in terrain:
             mc = cells[e["map"]]
-            template = (d2r_read or d2r_bytes)("data/hd/env/preset/%s/terrain_lod0.model" % TERRAIN_MAPS[e["map"]])
+            template = (d2r_read or d2r_bytes)("data/hd/env/preset/%s/terrain_lod0.model" % terrain[e["map"]])
             ground = terrain_cells((floors or {}).get(e["map"]) or mc)
             model = terrain_model(template, ground, max(x for x, _ in mc) + 1, max(y for _, y in mc) + 1, pad=True, biome=biome)
             (dest.parent / dest.stem).mkdir(exist_ok=True)
             (dest.parent / dest.stem / "terrain_lod0.model").write_bytes(model)
             text = add_terrain(text, "data/hd/env/preset/%s/terrain.model" % e["map"][:-4])
-            lods.append(lod_entry(e["map"], TERRAIN_MAPS[e["map"]], model))
+            lods.append(lod_entry(e["map"], terrain[e["map"]], model))
             st = dict(st, terrain_cells=len(ground), terrain_bytes=len(model))
         dest.write_text(text, encoding="utf-8")
         out[e["map"]] = dict(st, bytes=len(text.encode("utf-8")), biome=biome)
@@ -1166,7 +1181,7 @@ def main(argv=None):
     if a.cmd != "build":     # no maps_hd build in this folder: write the floor biomes here too
         maps, dt1s, _levels = maps_hd.plan(inp)
         biomes = maps_hd.floor_biomes(data_dir, maps, dt1s)
-    stats = build(data_dir, wanted, cells, lib, biomes, floors={m: floor_tiles(inp, m) for m in TERRAIN_MAPS if m in cells})
+    stats = build(data_dir, wanted, cells, lib, biomes, floors={m: floor_tiles(inp, m) for m in terrain_maps() if m in cells})
     table = md_table(stats, lib)
     if a.cmd in ("report", "docs"):
         f, t, n = self_check(inp, lib)

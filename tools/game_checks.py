@@ -12842,6 +12842,99 @@ def check_acts25():
 
 CHECKS += [("acts25", check_acts25)]
 
+# ---- lane tunnels65: the Ancient Tunnels (level 65, Median's belial.ds1) walked in by its warp, HD and classic ---------------
+# SET-UP (named in the notes): harness travel to the Lost City (44), `god 1`; then the player path: a walk to the warp tile to 65
+# and real clicks on it (cache_click_into), `move` walks to the platform spots of T65_CELLS, a walk back to the warp tile to 44 and
+# real clicks on it. `place` only where a walk does not get there (named in the row). Shots `t65_<mode>_<n>` at the arrival and
+# each spot, the same spots in every run (before / after the belial terrain of MXL2012_BELIAL_TERRAIN, docs/maps-hd.md item 12).
+T65_LEVEL, T65_FROM = 65, 44
+T65_CELLS = ((16, 7), (20, 11), (16, 20), (15, 28))  # belial.ds1 floor cells: the top bar, the east column, the neck, the south block
+
+
+def t65_spots(origin, cells=T65_CELLS):
+    """Sub-tile spots (state units) of .ds1 cells: the level's origin + 5 sub-tiles a cell, the cell's middle."""
+    ox, oy = origin
+    return [(ox + cx * 5 + 2, oy + cy * 5 + 2) for cx, cy in cells]
+
+
+def t65_origin(lines):
+    """The level's origin: the lowest x and y of the `presets rooms` lines (`room x=.. y=..`), None without one."""
+    rooms = [(int(m.group(1)), int(m.group(2))) for m in (re.match(r"room x=(-?\d+) y=(-?\d+)", ln) for ln in lines) if m]
+    return (min(x for x, _ in rooms), min(y for _, y in rooms)) if rooms else None
+
+
+def t65_visit(mode, log, shots, rows):
+    """One round in the current graphics mode: in by the Lost City's warp, the spots, out by the level's warp. -> problems."""
+    bad = []
+    mark = engine_mark()
+    # SET-UP: the Lost City's warp to 65 is not loaded from its waypoint (run checks-20261031-141923-s2: `tiles` 0, `presets 5`
+    # 0), so the harness `level 65 warp` (the level's own entrance warp) first, out by clicks: then the warp tile is next to the
+    # character in 44 and the way in is clicked.
+    H("level %d warp" % T65_LEVEL)
+    time.sleep(8)
+    if hstate()["player"].get("area") != T65_LEVEL or not cache_click_into(T65_LEVEL, T65_FROM, log):
+        return ["%s: the travel help into %d and out by its warp failed (area %s)" % (mode, T65_LEVEL, hstate()["player"].get("area"))]
+    rows.append("%s: out of %d by clicks on its warp (after `level %d warp`)" % (mode, T65_LEVEL, T65_LEVEL))
+    if not cache_click_into(T65_FROM, T65_LEVEL, log):
+        return ["%s: not entered from %d by the warp" % (mode, T65_FROM)]
+    time.sleep(5)  # the scene and its models stream in
+    p = hstate()["player"]
+    rows.append("%s: entered %d by clicks on the warp, arrival %s,%s" % (mode, T65_LEVEL, p.get("x"), p.get("y")))
+    shots.append(sh("t65_%s_0" % mode))
+    origin = t65_origin(Hl("presets rooms", log)[1])
+    if origin is None:
+        bad.append("%s: no room origin" % mode)
+    for n, (x, y) in enumerate(t65_spots(origin) if origin else [], 1):
+        walked = acts_walk(x, y, reach=4, timeout=60)  # god mode: no fight (a level-1 character's fights stopped every walk)
+        if not walked:
+            H("place %d %d" % (x, y))
+            time.sleep(2)
+        st = hstate()
+        q = st["player"]
+        how = "walked" if walked else "NOT walked, placed (travel help)"
+        rows.append("%s spot %d %s %d,%d: %s, at %s,%s, monsters near %d" % (
+            mode, n, T65_CELLS[n - 1], x, y, how, q.get("x"), q.get("y"), sum(1 for m in st["mons"] if not m.get("npc"))))
+        time.sleep(2)
+        shots.append(sh("t65_%s_%d" % (mode, n)))
+    out = cache_click_into(T65_LEVEL, T65_FROM, log)
+    rows.append("%s: %s" % (mode, "left by clicks on the warp to %d" % T65_FROM if out else "NOT left by the warp (area %s)" % hstate()["player"].get("area")))
+    if not out:
+        bad.append("%s: exit warp" % mode)
+    issues, known = engine_issues(mark)
+    rows.append("%s asserts: %s" % (mode, "; ".join(issues + known) or "none"))
+    return bad
+
+
+def check_tunnels65():
+    """Lane tunnels65 (docs/testing.md "Lane tunnels65"): the Ancient Tunnels in HD and classic (MXL_T65_MODES, default hd,legacy)
+    on the player path from the Lost City's warp tile. JUDGED: entered and left by the warps, every spot reached by a walk, no
+    assert; the look (void or floor round the platform) by hand from t65_<mode>_<n>.png."""
+    if not need_game():
+        add("tunnels65", "BLOCKED", "not in the game")
+        return
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    modes = [m.strip() for m in (os.environ.get("MXL_T65_MODES") or "hd,legacy").split(",") if m.strip()]
+    enable_debug()
+    cheat("god 1")
+    for mode in modes:
+        goto(40, timeout=60)  # G is read from the side bars: set it in the lit town (the Lost City's arrival is too dark)
+        if not set_graphics(mode):
+            bad.append("graphics %s not set" % mode)
+            continue
+        try:
+            bad += t65_visit(mode, log, shots, rows)
+        except Exception as e:
+            bad.append("%s: script error %r" % (mode, e))
+    goto(1, timeout=60)
+    set_graphics("hd")
+    cheat("god 0")
+    rc_finish("tunnels65", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+              ["travel to %d by `h level` and into %d by `h level %d warp` (then out and in again by clicks)" % (T65_FROM, T65_LEVEL, T65_LEVEL), "god mode (cheat god 1)"] + (["`place` where a walk failed"] if any("placed" in r for r in rows) else []),
+              judged_by_hand="the ground round the platform in t65_hd_*.png against t65_legacy_*.png")
+
+
+CHECKS += [("tunnels65", check_tunnels65)]
+
 if __name__ == "__main__":
     main()
 
