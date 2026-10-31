@@ -857,6 +857,10 @@ def console_text(cmd, settle=0.6):
     return text
 
 
+HCMD_LOG_CHARS = int(os.environ.get("MXL_HCMD_LOG_CHARS") or 400)  # the run log keeps this much of each harness reply; more
+# (lane nmhell4: 20000) shows the whole `objects` / `state` list, e.g. the waypoint and the monsters near the player
+
+
 def hcmd(cmd, timeout=15):
     """Run one plugin test-harness gameplay command (plugin/src/harness_cmds.cpp, docs/testing.md "Harness commands"):
     `hcmd("kill nearest 156")`. The plugin calls the game's own functions (no mouse or keyboard), appends "h: ..."
@@ -876,7 +880,7 @@ def hcmd(cmd, timeout=15):
     else:
         lines.append(f"{verb} FAIL no answer in {timeout} s (not in a game?)")
     ok = bool(lines) and lines[-1].startswith(verb + " OK")
-    log(f"hcmd {cmd!r} -> {'OK' if ok else 'FAIL'}: " + " | ".join(lines)[:400])
+    log(f"hcmd {cmd!r} -> {'OK' if ok else 'FAIL'}: " + " | ".join(lines)[:HCMD_LOG_CHARS])
     return ok, lines
 
 

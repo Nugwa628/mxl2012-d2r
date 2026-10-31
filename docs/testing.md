@@ -4688,3 +4688,82 @@ logged once per launch: the lab copies the slot's d2rloader.log and counts it.
 Look: review sheet `mxl2012-runs/glowing/review.png` (legacy, HD before, HD now; crops follow the monster). Before: blue ghostly
 wisps, the body hardly seen; now: green-tinted hunched undead casters with a pale head, about the player's height. Not run in
 Travincal itself, and not in Nightmare (the HD unit and its clips do not depend on area or difficulty).
+
+## Lane nmhell4: Acts 2-5 on Nightmare and Hell with a live mercenary (2026-10-31 / 11-01, slot 4, background mode, build of lane/nmhell4 = lane/acts25 + harness fixes)
+
+Check `acts25` with `MXL_A25_DIFFICULTY=nightmare|hell`.
+
+- **Unlock:** the first run in a difficulty unlocks it by a closed save edit (`nmh_checks.unlock_edit`: the progression byte, and the earlier difficulties' act-boss quests set done), then Play in that difficulty.
+- The check is BLOCKED if the character is not in that difficulty.
+- **Character:** `Nmhfourpal` (paladin, level 80-83 by the xp award).
+- **SET-UP:** otherwise as acts25: god mode, all waypoint bits, the act's hireling bought by `hire_in` and geared by clicks, mercenary life 20,000.
+- **Graphics:** town, items and waypoints run in HD. Entries and fights run in `MXL_A25_GRAPHICS`: legacy for the sweeps, HD for one act per difficulty.
+
+Command:
+
+`MXL_RUN=<lock> MXL_SLOT=4 MXL_CHAR=Nmhfourpal MXL_CHAR_CLASS=paladin MXL_A25_DIFFICULTY=hell MXL_A25_ACTS=3 py -3 tools/game_checks.py all acts25`
+
+Harness fixes (unit tests: `tools/test_game_checks_acts25.py`, class `Nmhell4Fixes`):
+
+- **`hire_in` / `talk`:** the walk to the NPC has a deadline (`TALK_WALK_S`, 150 s; each preset is tried once), then a spawned copy is used. acts25's own hire run (Normal Act 3 HD) had walked 22 min. `HIRE_GOLD` is now 2,000,000: Greiz in Nightmare cost more than the old gold.
+- **Waypoint panel:** 3 tries in the area (hostiles cleared first, clicks nudged around the disc), then 2 from the act's town, then the warp fallback. The row says "by the panel from the town after a miss in the area".
+- **Quest-item pickups:**
+  - The game's pickup gate (#332) is set before the drop (`A25_PICKUP_SETUP`): ass Q9 bit 5; xyz Q20 bit 5; tr2 Q37 bit 8 with bit 7 clear; g34 after `remove j34` (the duplicate check).
+  - The click is nudged around the item's projection.
+  - A missed item is dropped a second time.
+- **Boss fights (`unstick`):**
+  - The character is placed next to the boss (rings of 2, 4, 6) after 3 casts in a row that do not start, or after a failed close-in walk.
+  - The close-in walk lasts 30 s and walks past the guards (god mode).
+  - Nihlathak: a deep-search walk to the level's far rooms (no fighting) before the spawn.
+- **Recovery:** after a crash or hang, `a25_recover` goes back to the run's difficulty and sets god mode again. Before, `rp_recover` entered on Normal without god mode: the Hell Act 4 bosses after the hang ran on Normal, and the character died twice.
+- **`MXL_HCMD_LOG_CHARS`** (game_ctl, default 400): keeps more of each harness reply in the run log, so whole `objects` / `state` lists can be read.
+
+| Difficulty, act | Run | Travel | Town NPCs / trade / hire | Quest items / waypoints | Click entries (judged) | Bosses (life before -> after) | `reassign` (units without a room) | Result |
+|---|---|---|---|---|---|---|---|---|
+| Normal 3 (HD, acts25's sample finished) | `checks-20261031-142551-s4`, 30 min | Meshif line -> 75: PASS | Asheara hired (150 s walk cap, then a copy), 4 gear pieces | 9 of 9; qf2 made. Waypoints 8 of 9 (76 by warp) | 3 of 3 | not run | 84 (0) | PASS |
+| Nightmare 2 | `checks-20261031-150055-s4`, 75 min | Warriv line -> 40: PASS | 7 menus (Atma, Drognan not found; Cain's copy no menu). Fara trade OK. Greiz hire failed on gold (fixed) | msf, vip, hst picked up; box, ass not (ass fixed). Waypoints 9 of 9 | 14 of 15 (46<->70 not entered; entered on Normal and Hell) | Radament 13.19M -> 5.79M; Creature of Flame 176M, no damage; Summoner 11.97M -> 5.63M; Duriel 63.05M -> 62.66M | 254 (70) | FAIL |
+| Nightmare 3 | `checks-20261031-162447-s4`, 87 min | Meshif -> 75: PASS | Hire OK | 9 of 9; qf2. Waypoints 8 of 9 (101 by warp) | 10 of 12 (97, 99: #518, fixed on main) | Azmodan 35.04M -> 34.67M; Mephisto no damage (moat) | 454 (28) | FAIL; bug #519 |
+| Nightmare 4 (HD) | `checks-20261031-175755-s4`, 17 min | Mephisto's portal -> 103: PASS | Cain (copy), Tyrael, Jamella, Halbu menus. Halbu trade OK | mss, hfh. Waypoints 3 of 3 | 106<->107: SET-UP failure | Izual 89.20M -> 85.42M; Hephasto 142.13M -> 135.59M; Diablo no damage (3 casts in 154 s: fixed) | 137 (2) | FAIL |
+| Nightmare 5 | `checks-20261031-182917-s4`, 62 min (bosses again: `checks-20261031-194110-s4`) | Portal 566 by click -> 109: PASS | Larzuk (copy), Malah, Cain (place) menus; Drehya, Nihlathak, Tyrael not found. Larzuk trade OK. Qual-Kehk hired, 3 pieces | ice, tr2. Waypoints 9 of 9 | 3 of 4 (120<->128) | Ancients 43.32M -> 39.34M; Nihlathak, Baal no damage | 93 (12) | FAIL |
+| Hell 2 | `checks-20261031-195030-s4`, 68 min | Warriv -> 40: PASS | 9 of 10 menus (Cain's copy none). Fara trade OK. Greiz hired, 4 pieces | ass, msf, vip, hst picked up; box not. Waypoints 9 of 9 | 18 of 18 (46<->70 entered) | Summoner 37.71M -> 35.15M; Duriel 192.00M -> 191.75M; Radament, Creature of Flame no damage | 182 (38) | FAIL |
+| Hell 3 | `checks-20261031-210432-s4`, 65 min | Meshif -> 75: PASS | Cain, Alkor, Ormus (copies), Hratli, Meshif menus; Asheara, Natalya not found. Hratli trade OK. Asheara hired, 4 pieces | 9 of 9; qf2. Waypoints 8 of 9 (76 by warp) | 13 of 17 (97, 99: #518; 80<->95; 83<->100) | Azmodan 62.90M -> 61.99M; Mephisto no damage | 190 (37) | FAIL |
+| Hell 4 (HD) | `checks-20261031-221550-s4`, 19 min | Mephisto's portal -> 103: PASS | All 4 menus. Halbu trade OK | mss, hfh. Waypoints 3 of 3 | 106<->107: the game hung in 107 (see below) | After the restart, on Normal without god mode (fixed): not Hell results | 16 (0) | FAIL |
+| Hell 5 | `checks-20261031-224101-s4`, 71 min | Portal 566 by click -> 109: PASS | Larzuk (copy), Malah menus; Cain's copy none. Larzuk trade OK. Qual-Kehk hired, 3 pieces | ice, tr2 (second drop). Waypoints 9 of 9 | 4 of 5 (120<->128) | Ancients 50.96M -> 48.35M; Nihlathak no damage; Baal 256M, left the loaded rooms | 294 (14) | FAIL |
+| Hell 3 + 4 (HD; waypoints and one entry each; whole replies) | `checks-20261031-235608-s4`, 19 min | - | - | Waypoints 7 of 9 (76, 101 by warp); 3 of 3 | 76<->84 entered; 106<->107 SET-UP failure, game alive 210 s in 107 | - | 55 (0) | PASS |
+
+Across the runs:
+
+- The game stayed up in every act except the one hang. No crash file was written.
+- The `reassign` guard caught 0 player units and 202 others.
+- **Engine asserts:**
+  - the known #54/#73 (`nDirectionIndex < nDirections`) in Normal 3, Nightmare 2 and 3, and Hell 2;
+  - the new #519 in Nightmare 3.
+
+Findings:
+
+- **Bug #519** (new, open): `BC_ASSERT: result` (animation_event_handler.cpp:608) in a Glowing One fight in Travincal, Nightmare. The stand-in is `wraith1`, with every mode bound (docs/bugs.md).
+- **River of Flame hang** (Hell Act 4 HD; not filed, not reproduced):
+  - What happened: in area 107 the frame rate fell from about 25 to 0.5 per second within 3 min. Then the harness got no answer and killed the game. No assert, no crash file.
+  - Missiles: ids rose from 125,056 to 286,464 in 2.5 min. The only ones seen are `rockboomcenter` and `newrockdelay`, from the Shower of Rocks chain (srvdofunc 15).
+  - The rerun stood 210 s in 107 at 25 frames per second (missile ids +3,700). The hang did not repeat, so there is no bug row.
+  - The caster is not known: the replies were still cut at 400 characters then.
+  - Evidence: `mxl2012-runs/nmhell4/evidence/run9-hell-a4-hd-hang/`.
+- **Kurast Docks waypoint** (76 came by warp in every difficulty): harness side.
+  - At the docks arrival, `objects` lists 16 objects (the loaded rooms, within 40) and `presets 2` lists 17 type-2 presets. Neither holds a waypoint, so the harness never clicks one.
+  - The level is D2R's own map (`Act3/Docktown/DockTown3.ds1`; the mod ships no copy), and the panel opens at every other Act 3 waypoint.
+  - A walk to the `presets 2` waypoint did not help, because none is listed. Next: walk to the docks' waypoint spot from the map.
+  - 101 (Durance 2) fell back to the warp the same way in two runs.
+- **Box pickup** (Normal, Nightmare, Hell): the click never picked it up.
+  - 1.14d's gate (`0x55cc90`) exempts `box` from the Horadric Staff rule and refuses it only as a duplicate.
+  - At the second drop, the harness's `remove box` found no carried copy.
+  - Cause not known.
+- **Not judged as bugs:**
+  - 120->128 needs the Ancients killed; the 40 s fight does not kill them.
+  - 83->100 needs the Compelling Orb smashed.
+  - 80<->95 failed in a different direction on each run. No token cause: `sv` is not in main's rename audit.
+- **Harness limits left:**
+  - Nihlathak gets out of melee reach within seconds.
+  - Baal and Mephisto stand where `place` finds no free spot.
+  - NPCs that `presets 1` does not list from the arrival were spawned copies: Atma, Drognan, Asheara, Natalya, Drehya, Tyrael.
+
+Evidence: the run logs `mxl2012-runs/nmhell4/run1-hd-a3.log` .. `run12-hell-a3-wp.log`, the per-run `report.md` and shots under `work/runs/<run>/`, and `mxl2012-runs/nmhell4/evidence/`.

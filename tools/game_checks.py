@@ -1585,14 +1585,26 @@ def check_skillprog():
            partial="; ".join(blocked + ["the client progression visuals (cltprg 25 / 28) need eyes on the screenshots"]))
 
 
-def find_waypoint_object():
+def nearest_waypoint(lines, ids):
+    """(id, class, dist) of the nearest waypoint object in `objects` lines, None when there is none. `objects` lists the objects
+    of the whole game, far levels too (dist 5000+): the first one listed sent the waypoint walk of lane acts25 to another
+    level's waypoint (42, 44, 76, 80, 115, 118, 129 came by the warp fallback)."""
+    best = None
+    for x in lines:
+        m = re.search(r"object id=(\d+) class=(\d+) mode=(\d+) dist=(\d+)", x)
+        if m and int(m.group(2)) in ids and (best is None or int(m.group(4)) < best[2]):
+            best = int(m.group(1)), int(m.group(2)), int(m.group(4))
+    return best
+
+
+WP_NEAR = 120  # a waypoint object farther than this is not the area's own one in reach (a far level's, or a room not loaded)
+
+
+def find_waypoint_object(near=None):
     ids = {int(r["*ID"]) for r in table("objects") if r.get("OperateFn") == "23" and r.get("*ID", "").isdigit()}
     _, ln = H("objects")
-    for x in ln:
-        m = re.search(r"object id=(\d+) class=(\d+) mode=(\d+) dist=(\d+)", x)
-        if m and int(m.group(2)) in ids:
-            return int(m.group(1)), int(m.group(2)), int(m.group(4))
-    return None
+    wp = nearest_waypoint(ln, ids)
+    return wp if wp is None or near is None or wp[2] <= near else None
 
 
 def check_pandewp():
@@ -2061,14 +2073,22 @@ def panels_closed():
             break
 
 
-def talk(npc_class, log):
-    """`interact` (the click on the NPC), then the menu once the greeting has played; the menu lines, None when it did not open."""
+TALK_WALK_S = 150  # the walk budget of `talk` (lane nmhell4: hire_in's walk to Asheara, 97-104 away, ran 22 min in run
+# checks-20261030-233629-s4: acts_approach walked 12 x 60 s to the first of her two presets per attempt)
+
+
+def talk(npc_class, log, walk_s=None):
+    """`interact` (the click on the NPC), then the menu once the greeting has played; the menu lines, None when it did not open.
+    The walks to the NPC share one budget (walk_s, default TALK_WALK_S); after it a copy next to the player (fixture, logged)."""
+    deadline = time.time() + (TALK_WALK_S if walk_s is None else walk_s)
     for attempt in range(5):
         close_menu()
         ok, lines = Hl("interact %d" % npc_class, log)
         far = first(lines, r"distance ([\d.]+)", cast=float)
-        if (not ok or far is None or far > 6) and attempt < 2:  # the real NPC first: the player walks to it, also to an
-            acts_approach(npc_class)                             # unloaded one's preset spot (a copy's gamble sold nothing)
+        left = deadline - time.time()
+        if (not ok or far is None or far > 6) and attempt < 2 and left > 5:  # the real NPC first: the player walks to it, also
+            if not acts_approach(npc_class, budget_s=left):                    # to an unloaded one's preset spot (a copy's
+                log.append("   talk: walk to NPC %d not there in %.0f s" % (npc_class, left))  # gamble sold nothing)
             continue
         if not ok or far is None or far > 6:  # not loaded, or no path to it: a copy next to the player
             Hl("spawn %d" % npc_class, log)
@@ -2169,13 +2189,17 @@ def level_player(want, log, rows):
 HIRE_QUEST = {150: (2, 0), 515: (36, 0)}  # the table byte is the quest id + 1 (Kashya 3 = the Burial Grounds quest, quest 2)
 
 
+HIRE_GOLD = 2000000  # the hire price fixture (carried up to the level cap): Greiz's Nightmare price 50,560 was above the old
+# 30,000 ("the server did not hire", lane nmhell4 run checks-20261031-150055-s4)
+
+
 def hire_in(act, area, npc, name, cls, log, rows, bad):
     st = goto(area)
     if st["player"].get("area") != area:
         bad.append("act %d: could not reach the town (area %s)" % (act, st["player"].get("area")))
         return None
     panels_closed()
-    set_gold(max(gold(), 30000))  # fixture: the hire price (D2R's price function decides it)
+    set_gold(max(gold(), HIRE_GOLD))  # fixture: the hire price (D2R's price function decides it)
     if npc in HIRE_QUEST:
         Hl("quest %d %d set" % HIRE_QUEST[npc], log)
         rows.append("%s: quest %d bit %d set (fixture: the hire gate)" % ((name,) + HIRE_QUEST[npc]))
@@ -2991,6 +3015,9 @@ def rc_stats(names=None, log=None):
     return out
 
 
+PICK_NUDGE_PX = ((0, 8), (0, -4), (14, 8), (-14, 8), (0, 18))  # pixel offsets of the pickup clicks of rc_obtain, in turn
+
+
 def rc_obtain(code, log, shortcut, quality=""):
     """SHORTCUT (named in the note): the harness puts a new item on the ground next to the character (as a drop would). Then the
     player path: a left click on it picks it up into the inventory. Returns the inventory item dict or None."""
@@ -3001,10 +3028,10 @@ def rc_obtain(code, log, shortcut, quality=""):
     if not made:
         return None
     gid = made[0]["id"]
-    for k in range(4):  # the ground item's world spot (x, y of the answer) projected like a monster's; hover first, then click
-        p = hstate()["player"]
+    for k in range(len(PICK_NUDGE_PX)):  # the ground item's world spot (x, y of the answer) projected like a monster's; hover
+        p = hstate()["player"]           # first, then click (later tries a few pixels off: the name label, the mercenary)
         dx, dy = made[0]["x"] - p["x"], made[0]["y"] - p["y"]
-        px, py = 800 + (dx - dy) * 27, 405 + (dx + dy) * 13.5 + 8
+        px, py = 800 + (dx - dy) * 27 + PICK_NUDGE_PX[k][0], 405 + (dx + dy) * 13.5 + PICK_NUDGE_PX[k][1]
         hover_px(px, py)
         g.click(px / 1600, py / 900)  # the player walks to the item and picks it up
         time.sleep(2.5)
@@ -3932,12 +3959,23 @@ WALK_DETOURS = ((15, -15), (-15, -25), (25, 15), (-25, 25), (0, -30), (30, 0), (
 EXPLORE_LEGS = ((0, -150), (150, 0), (0, 150), (-150, 0), (150, -150), (-150, -150), (150, 150), (-150, 150))
 
 
-def acts_approach(npc_class, reach=5, spot=None, explore=True):
+def approach_walk_s(deadline, cap=60):
+    """The time one walk leg of acts_approach may take: the cap, or what is left of the deadline (None: no deadline)."""
+    if deadline is None:
+        return cap
+    return max(0, min(cap, deadline - time.time()))
+
+
+def acts_approach(npc_class, reach=5, spot=None, explore=True, budget_s=None):
     """Walk up to an NPC: `moveto` while it is loaded and far, else to the spot a town sweep saw it at, else towards its preset
-    spot, else (with `explore`) one look around the arrival (an NPC that is not in the town, e.g. Act 1's Cain before Tristram,
-    costs one round of legs, not more)."""
+    spots (each preset of the class once: Asheara has two), else (with `explore`) one look around the arrival (an NPC that is not
+    in the town, e.g. Act 1's Cain before Tristram, costs one round of legs, not more). `budget_s` caps the whole walk."""
     explored, far_tried = not explore, False
+    deadline = None if budget_s is None else time.time() + budget_s
+    pres_left = None
     for _ in range(12):
+        if deadline is not None and time.time() >= deadline:
+            return False
         near = [m for m in hstate()["mons"] if m.get("class") == npc_class]
         if near and near[0].get("dist", 99) <= reach:
             return True
@@ -3950,15 +3988,17 @@ def acts_approach(npc_class, reach=5, spot=None, explore=True):
             u = parse_moveto(H("moveto nearest %d" % npc_class)[1])
             spot = (u["x"], u["y"]) if u else None
         if spot:
-            if not acts_walk(spot[0], spot[1], reach=10, timeout=60):
+            if not acts_walk(spot[0], spot[1], reach=10, timeout=approach_walk_s(deadline)):
                 H("place %d %d" % spot)  # a town wall the walk does not get round: travel help
                 time.sleep(2)
             spot = None
             continue
-        pres = [q for q in parse_presets(H("presets 1")[1]) if q["class"] == npc_class]
-        if pres:
-            if not acts_walk(pres[0]["x"], pres[0]["y"], reach=10, timeout=60):
-                H("place %d %d" % (pres[0]["x"], pres[0]["y"]))  # a town wall the walk does not get round: travel help
+        if pres_left is None:
+            pres_left = [(q["x"], q["y"]) for q in parse_presets(H("presets 1")[1]) if q["class"] == npc_class]
+        if pres_left:
+            xy = pres_left.pop(0)  # each preset once (the same one again and again walked 22 min)
+            if not acts_walk(xy[0], xy[1], reach=10, timeout=approach_walk_s(deadline)):
+                H("place %d %d" % xy)  # a town wall the walk does not get round: travel help
                 time.sleep(2)
             continue
         if explored:
@@ -4365,13 +4405,49 @@ def acts_build_calibrate():
            mark, [shot], log)
 
 
-def acts_fight(mon_id, timeout=240, ranged=False, focus=False):
+def cast_stall(lines):
+    """The distance of a melee cast that did not start (the reply says `dist N: mode now 1`, 2 or 3: neutral, walk or run,
+    farther than ACTS_SWING_REACH), else None. Lane acts25's Nihlathak: 18 casts at 9-14, every one `mode now 1`; nmhell4's
+    Nightmare Creature of Flame: `mode now 3` at 7-11 and no hit in 135 s. A run that does close in swings next time (resets)."""
+    m = re.search(r"dist (\d+): mode now (\d+)", " ".join(lines or ()))
+    if m and int(m.group(2)) in (1, 2, 3) and int(m.group(1)) > ACTS_SWING_REACH:
+        return int(m.group(1))
+    return None
+
+
+ACTS_SWING_REACH = 4  # a melee swing starts from here (the cast path did not walk the character up from 9-14)
+ACTS_STALLS = 3  # stalled casts in a row before the unstick step
+
+
+UNSTICK_SPOTS = tuple((r * dx, r * dy) for r in (2, 4, 6) for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1)))
+# rings of 2, 4, 6: Nightmare Baal on his throne had no free spot within 2 (run checks-20261031-182917-s4)
+
+
+def acts_unstick(mon_id, tries):
+    """The melee cast did not walk the character up: walk to the monster (reach 2); from the second time on, SET-UP `place` next
+    to it (named in STATE["fight_help"]). Returns a note."""
+    u = parse_moveto(H("moveto %d" % mon_id)[1])
+    if u is None:
+        return "unstick: monster not loaded"
+    if tries == 0 and acts_walk(u["x"], u["y"], reach=2, timeout=20, skip=(u["class"],)):
+        return "unstick: walked up"
+    for dx, dy in UNSTICK_SPOTS:
+        if H("place %d %d" % (u["x"] + dx, u["y"] + dy))[0]:
+            STATE.setdefault("fight_help", []).append("SET-UP place next to %s (cast path stalled)" % u["class"])
+            time.sleep(1)
+            return "unstick: SET-UP place"
+    return "unstick: no free spot"
+
+
+def acts_fight(mon_id, timeout=240, ranged=False, focus=False, unstick=False):
     """Fight one monster with the Attack skill (skill 0 through the cast path: the server walks the character up and swings), or
     with the spell build's skills by right clicks (acts_spell_fight) when the character has one. Returns (killed, deaths,
-    seconds). A death ends the fight (revived in town); nothing heals the character mid-fight."""
+    seconds). A death ends the fight (revived in town); nothing heals the character mid-fight. `unstick`: casts that do not start
+    (cast_stall) ACTS_STALLS times in a row walk the character up, then place it next to the monster (acts_unstick)."""
     if STATE.get("acts_build"):
         return acts_spell_fight(mon_id, timeout, focus)
     t0, deaths, last = time.time(), 0, None
+    stalls = unsticks = 0
     area0 = hstate()["player"].get("area")
     while time.time() - t0 < timeout:
         st = hstate()
@@ -4389,9 +4465,18 @@ def acts_fight(mon_id, timeout=240, ranged=False, focus=False):
         if life is None:  # gone: a kill only when the last read was already low (a unit whose room unloaded is not dead)
             return (last is not None and last < ACTS_GONE_LOW), deaths, int(time.time() - t0)
         last = life
-        if not acts_close_in(mon_id, reach=ACTS_BOW_REACH if ranged else ACTS_MELEE_REACH):
+        if not acts_close_in(mon_id, reach=ACTS_BOW_REACH if ranged else ACTS_MELEE_REACH,
+                             timeout=ACTS_UNSTICK_WALK_S if unstick and not ranged else 90,
+                             fight=not unstick):  # a boss fight walks past the guards (god mode; Nightmare Baal: 129 s on one)
+            if unstick and not ranged:  # a walk that did not get there: place next to it (a spot with no path; Nightmare
+                STATE.setdefault("fight_notes", []).append(acts_unstick(mon_id, 1))  # Diablo got 3 casts in 154 s of walks)
+                stalls, unsticks = 0, unsticks + 1
             continue  # died on the way (counted above) or still walking
-        H("cast 0 unit %d" % mon_id)
+        _ok, reply = H("cast 0 unit %d" % mon_id)
+        stalls = stalls + 1 if unstick and not ranged and cast_stall(reply) else 0
+        if stalls >= ACTS_STALLS:
+            STATE.setdefault("fight_notes", []).append(acts_unstick(mon_id, unsticks))
+            stalls, unsticks = 0, unsticks + 1
         time.sleep(1.0)
     return False, deaths, int(time.time() - t0)
 
@@ -4403,9 +4488,12 @@ ACTS_MELEE_REACH = 14  # beyond this the cast path does not walk a melee attacke
 # stood still for 240 s (run checks-20261028-191050-s2, every cast "mode now 1"); it was read as a hit-lock before
 
 
-def acts_close_in(mon_id, reach=ACTS_MELEE_REACH):
-    """Walk (the walk packet's server call, legs of 60, fighting what is in the way) until the monster is within `reach`.
-    False when it did not get there in 90 s or the character died."""
+ACTS_UNSTICK_WALK_S = 30  # the close-in walk of an `unstick` fight (then `place`): the fights are 40 s long
+
+
+def acts_close_in(mon_id, reach=ACTS_MELEE_REACH, timeout=90, fight=True):
+    """Walk (the walk packet's server call, legs of 60, fighting what is in the way unless not `fight`) until the monster is
+    within `reach`. False when it did not get there in `timeout` s or the character died."""
     u = parse_moveto(H("moveto %d" % mon_id)[1])
     if u is None:
         return True  # not in the loaded rooms: let the cast try
@@ -4415,7 +4503,7 @@ def acts_close_in(mon_id, reach=ACTS_MELEE_REACH):
     nested = STATE.get("closing_in", False)  # a fight on the way closes in once, without fighting again (no recursion)
     STATE["closing_in"] = True
     try:
-        return acts_walk(u["x"], u["y"], reach=reach, timeout=90, fight=not nested, skip=(u["class"],))
+        return acts_walk(u["x"], u["y"], reach=reach, timeout=timeout, fight=fight and not nested, skip=(u["class"],))
     finally:
         STATE["closing_in"] = nested
 
@@ -6818,6 +6906,9 @@ def rp_object_xy(oid):
     return None
 
 
+WP_CLICK_NUDGE = ((1, 1), (-1, 0), (0, -1), (2, 0))  # map offsets of the extra clicks on a waypoint that did not open
+
+
 def rp_waypoint_to(level, log):
     """Travel as a player does. Inside the act: walk to the area's waypoint (`moveto`), click it (the panel opens), click the
     destination's row. Another act: the town's NPC travel first (`level <town>`: D2R shows only the acts the character's quests
@@ -6835,19 +6926,37 @@ def rp_waypoint_to(level, log):
             goto(RP_ACT_TOWN[act])
         if level == RP_ACT_TOWN[act]:
             return hstate()["player"].get("area")
-    for attempt in range(3):
+    town_tried, attempt = False, 0
+    while True:
         close_right_panel()
-        wp = find_waypoint_object()
-        if wp is None:
-            log.append("no waypoint object near in area %s" % hstate()["player"].get("area"))
-            break
+        wp = find_waypoint_object(near=WP_NEAR)
+        if wp is None or attempt >= 3:
+            area = hstate()["player"].get("area")
+            if town_tried or area == RP_ACT_TOWN[act]:
+                log.append("no waypoint object near in area %s" % area if wp is None else "the waypoint panel did not open")
+                break
+            town_tried, attempt = True, 1  # the town's waypoint (every town's panel opened in lane acts25): 2 tries from there
+            log.append("%s in area %s: WAYPOINT RETRY from the town %d" % (
+                "no waypoint object near" if wp is None else "the panel did not open", area, RP_ACT_TOWN[act]))
+            goto(RP_ACT_TOWN[act])
+            time.sleep(2)
+            continue
+        attempt += 1
+        if hostiles_near(hstate(), 10):  # a click on a monster over the waypoint attacks it instead of operating the waypoint
+            acts_clear(10)
         xy = rp_object_xy(wp[0])  # (`moveto <id>` would take a monster of the same id: ids are per unit type)
         if xy is None:
             continue
         rp_click_toward(xy[0], xy[1], trade_panel_open)  # walks up and clicks the waypoint: its panel opens
         time.sleep(0.5)
+        for dx, dy in WP_CLICK_NUDGE:  # standing next to it: the disc's edges (the mercenary or the player may cover the middle)
+            if trade_panel_open():
+                break
+            fx, fy = rp_screen_xy(xy[0] + dx, xy[1] + dy)
+            g.click(fx, fy)
+            time.sleep(1.5)
         if not trade_panel_open():
-            log.append("the waypoint panel did not open (attempt %d)" % (attempt + 1))
+            log.append("the waypoint panel did not open (attempt %d%s)" % (attempt, ", from the town" if town_tried else ""))
             continue
         act_, _w, row = wps[level]
         if act_ > 1:  # the act's tab (the panel opens on act I's; packet 0x49 alone moves nobody)
@@ -7204,25 +7313,32 @@ def quest_done(save, word, difficulty=0):
         return False
 
 
-def rp_open_acts(acts, log):
-    """SET-UP by save (rc_setup, coordinator rule "PLAYER PATH vs SET-UP"): the act-completed quest words of Normal for the acts
-    before the highest one asked for, so the waypoint panel has those acts' tabs (round 1: only tab I was drawn, the row click
-    landed in act I's list). Done once per character (the words stay in its save). Returns the words set ([] = none needed)."""
+DIFF_IDS = {"normal": 0, "nightmare": 1, "hell": 2}
+
+
+def rp_open_acts(acts, log, difficulty="normal", extra=None):
+    """SET-UP by save (rc_setup, coordinator rule "PLAYER PATH vs SET-UP"): the act-completed quest words of `difficulty` for the
+    acts before the highest one asked for, so the waypoint panel has those acts' tabs (round 1: only tab I was drawn, the row click
+    landed in act I's list). Done once per character (the words stay in its save). `extra`: one more save edit made in the same
+    closed edit (the difficulty unlock of lane nmhell4); it forces the edit and the Play in `difficulty`. Returns the words set."""
+    d = DIFF_IDS[difficulty]
     need = [w for a in range(2, max(acts) + 1) for w in RP_ACT_OPEN[a]]
     path = os.path.join(SAVES, g.CHAR_NAME + ".d2s")
-    if not need or not os.path.isfile(path):
+    if (not need and extra is None) or not os.path.isfile(path):
         return []
     with open(path, "rb") as f:
         save = f.read()
-    missing = [w for w in need if not quest_done(save, w)]
-    if not missing:
+    missing = [w for w in need if not quest_done(save, w, d)]
+    if not missing and extra is None:
         return []
 
     def edit(s):
+        if extra is not None:
+            s = extra(s)
         for w in missing:
-            s = rc_setup.set_quest_bits(s, 0, w, rc_setup.DONE)
+            s = rc_setup.set_quest_bits(s, d, w, rc_setup.DONE)
         return s
-    rc2_closed_edit(edit, log)
+    rc2_closed_edit(edit, log, difficulty)
     return missing
 
 
@@ -12343,7 +12459,8 @@ CHECKS += [("jdg_path", check_jdg_path)]
 # warp-tile link of levels.txt both ways by clicks) and the act's bosses (the map's own unit, else a spawned one, fought for
 # MXL_A25_FIGHT_S seconds). Town, items and waypoints run in HD: their click spots are the HD panel's. SET-UP on every row:
 # character level A25_LEVEL by the xp award, god mode, mercenary life 20,000 after each hire, the waypoint bits and the acts'
-# tabs (save edit, rp_open_acts). The `reassign` guard's counters are read after each act.
+# tabs (save edit, rp_open_acts). The `reassign` guard's counters are read after each act. Lane nmhell4: MXL_A25_DIFFICULTY
+# nightmare / hell plays the same sweep there (SET-UP: lane nmhell's unlock save edit, then Play in the difficulty).
 A25_PARTS = ("travel", "town", "hire", "items", "wp", "entries", "bosses")
 A25_LEVEL = 75
 A25_HIRERS = {act: (area, npc, name, cls) for act, area, npc, name, cls in MERC_HIRERS}
@@ -12365,6 +12482,12 @@ A25_ITEMS = {2: [("box", None), ("ass", "use"), ("msf", None), ("vip", ("cube", 
                  ("qhr", None), ("qf1", ("cube", ("qey", "qbr", "qhr"), "qf2"))],
              4: [("mss", None), ("hfh", None)],
              5: [("ice", None), ("tr2", "use")]}
+# The game's own pickup gate of quest items (1.14d 0x55cc90, D2R 0x4734f0; bug #332, lane rulescheck2): Potion of Life needs
+# quest word 20 bit 5 (the Golden Bird given to Alkor), Malah's scroll word 37 bit 8 with bit 7 clear (Anya rescued, the scroll
+# handed out), and the Golden Bird is refused while its companion, the Jade Figurine, is held (the duplicate check 0x55ca40).
+# Lane acts25 read these refusals as missed clicks (g34, xyz, tr2). SET-UP before the drop: the quest bits, or j34 removed.
+A25_PICKUP_SETUP = {"ass": ("quest 9 5 set",), "xyz": ("quest 20 5 set",), "tr2": ("quest 37 8 set", "quest 37 7 clear"),
+                    "g34": ("remove j34",)}  # (the Book of Skill: word 9 bit 5, Radament killed)
 # how the act is entered from the previous one: (stage, from town, the boss quest bit SET-UP that opens the NPC line)
 A25_START = {121: 109}  # links whose source is entered from a town by a portal (Anya's), set up by harness travel
 
@@ -12414,6 +12537,9 @@ def a25_hire(act, log, rows, bad, shots):
         rows.append("act %d: no hirer (the mercenary of act %d stays)" % (act, act - 1))
         return merc_info()[0]
     area, npc, nm, cls = A25_HIRERS[act]
+    goto(area)
+    _u, how = a25_reach_npc(npc, log)  # the town NPC part's reach (moveto, presets 1, SET-UP place or copy): hire_in's own talk
+    rows.append("act %d %s reached for the hire: %s" % (act, nm, how))  # walk then starts next to the hirer
     m = hire_in(act, area, npc, nm, cls, log, rows, bad)
     if m is None:
         return None
@@ -12629,8 +12755,19 @@ def a25_items(act, log, rows, bad, shots):
         if held_item():
             drop_held(log)  # a left click with an item on the cursor drops it instead of picking up
         ven_wait_still()  # rc_obtain projects the drop from the player's spot: a still running walk made it miss (run 4)
+        for cmd in A25_PICKUP_SETUP.get(code, ()):
+            Hl(cmd, log)
         it = rc_obtain(code, log, [])
-        note = "picked up" if it else "NOT picked up"
+        again = False
+        if not it:  # one more drop after a still stand (the first two Nightmare drops of run -150055-s4 were not taken)
+            held = sorted("%s@%s" % (i.get("code"), i.get("page")) for i in rc_items(log) if i.get("code") == code)
+            log.append("%s not picked up; the character holds %s" % (code, held or "none of it"))
+            Hl("remove %s" % code, log)
+            time.sleep(1)
+            ven_wait_still()
+            it, again = rc_obtain(code, log, []), True
+        note = ("picked up" if it else "NOT picked up") + (" at the second drop" if again else "") + (
+            " (SET-UP for the game's pickup gate: %s)" % ", ".join(A25_PICKUP_SETUP[code]) if code in A25_PICKUP_SETUP else "")
         if it and then == "use":
             note += ", " + a25_use_click(it, log, shots)
         elif it and then:
@@ -12661,19 +12798,23 @@ def a25_items(act, log, rows, bad, shots):
 
 def a25_waypoints(act, log, rows, bad):
     wps = sorted((w, lvl) for lvl, (a, w, _k) in rp_waypoints().items() if a == act)
-    got, fell = [], []
+    got, fell, retried = [], [], []
     for _n, lvl in wps:
         n0 = sum(1 for ln in log if ln.startswith("WAYPOINT FALLBACK"))
+        r0 = sum(1 for ln in log if "WAYPOINT RETRY" in ln)
         a = rp_waypoint_to(lvl, log)
         (got if a == lvl else fell).append(lvl)
         if sum(1 for ln in log if ln.startswith("WAYPOINT FALLBACK")) > n0:
             fell.append("%d(warp)" % lvl)
+        elif sum(1 for ln in log if "WAYPOINT RETRY" in ln) > r0:
+            retried.append(lvl)
         if not game_alive():
             bad.append("act %d: the game died taking the waypoint to %d" % (act, lvl))
             return False
         a25_merc_ok(act, log, rows)
     rows.append("act %d waypoints: %d of %d by the panel; not by the panel: %s" % (act, len(got) - len([f for f in fell if isinstance(f, str)]),
-                                                                              len(wps), ",".join(str(f) for f in fell) or "none"))
+                                                                              len(wps), ",".join(str(f) for f in fell) or "none")
+                + ("; by the panel from the town after a miss in the area: %s" % ",".join(map(str, retried)) if retried else ""))
     return True
 
 
@@ -12708,11 +12849,67 @@ def a25_entries(act, log, rows, bad, gfx):
         g.log("acts25 " + rows[-1])
         if not alive:
             bad.append("act %d: the game died on %d<->%d" % (act, src, dest))
-            rp_recover("entry %d-%d" % (src, dest), log)
+            rows.append(a25_recover("entry %d-%d" % (src, dest), log))
             return entered, len(routes), setup_fail
         if not ok and "SET-UP" not in how:
             bad.append("act %d: %d<->%d not entered by clicks (%s)" % (act, src, dest, how[:120]))
     return entered, len(routes), setup_fail
+
+
+def a25_recover(label, log):
+    """rp_recover for the acts sweep: back in the run's difficulty (STATE["a25_diff"]) with god mode on again. rp_recover enters
+    as the menu stands (Normal), so after the Hell Act 4 HD hang (run checks-20261031-221550-s4) the bosses ran on Normal
+    without god mode and the character died twice. Returns a note for the act's rows."""
+    rp_recover(label, log)
+    diff = STATE.get("a25_diff", "normal")
+    if game_alive() and hstate()["player"].get("difficulty") != DIFF_IDS[diff]:
+        leave_and_reenter(difficulty=diff)
+    got = hstate()["player"].get("difficulty") if game_alive() else None
+    enable_debug()
+    cheat("god 1")
+    return "recovered after %s: difficulty %s (want %s), god mode set again" % (label, got, DIFF_IDS[diff])
+
+
+A25_DEEP_SEARCH = {"nihlathak": 420}  # stage: seconds of the search walk into the level's far rooms before a spawn (lane
+# acts25: Nihlathak was in no preset list of the 121 rooms of 124 from the arrival, the copy spawned at the stairs took no hit)
+
+
+def far_rooms(rooms, x, y, n=5, apart=40):
+    """The n room origins farthest from (x, y), farthest first, at least `apart` from each other (one leg per part of the map)."""
+    out = []
+    for r in sorted(rooms, key=lambda r: -math.hypot(r[0] - x, r[1] - y)):
+        if all(math.hypot(r[0] - o[0], r[1] - o[1]) >= apart for o in out):
+            out.append(r)
+        if len(out) >= n:
+            break
+    return out
+
+
+def a25_deep_find(cls, log, budget_s):
+    """The level's own unit of `cls` in a room far from the arrival: search walks to the farthest rooms of `presets rooms`,
+    `moveto nearest` and the type-1 presets looked at after each. Returns the monster dict or None. The walks do not fight (the
+    run has god mode): in Nightmare one 19M-life guard at the Halls of Vaught arrival held a fighting walk for the whole budget."""
+    t0 = time.time()
+    p = hstate()["player"]
+    rooms = [(int(r["x"]), int(r["y"])) for r in (kv(ln) for ln in H("presets rooms")[1] if ln.startswith("room x="))]
+    for x, y in far_rooms(rooms, p.get("x", 0), p.get("y", 0)):
+        left = budget_s - (time.time() - t0)
+        if left < 20:
+            break
+        acts_search_walk(x, y, log, budget_s=min(150, left), reach=20, fight=False)
+        pr = [q for q in parse_presets(H("presets 1")[1]) if q["class"] == cls]
+        if pr:
+            acts_search_walk(pr[0]["x"], pr[0]["y"], log, budget_s=60, reach=12, fight=False)
+        u = parse_moveto(H("moveto nearest %d" % cls)[1])
+        life = u and acts_mon_life(u["id"])
+        if life:
+            log.append("deep search: class %d found at %s,%s after %.0f s" % (cls, u["x"], u["y"], time.time() - t0))
+            return {"id": u["id"], "life": life}
+        if player_dead(hstate()["player"]):
+            revive_if_dead()
+            break
+    log.append("deep search: class %d not found in %.0f s" % (cls, time.time() - t0))
+    return None
 
 
 def a25_bosses(act, log, rows, bad, shots):
@@ -12733,6 +12930,9 @@ def a25_bosses(act, log, rows, bad, shots):
         time.sleep(4)
         mon = acts_find(cls, log, tries=3)
         how = "the map's own"
+        if mon is None and stage in A25_DEEP_SEARCH:
+            mon = a25_deep_find(cls, log, A25_DEEP_SEARCH[stage])
+            how = "the map's own (deep search)"
         if mon is None:
             p = hstate()["player"]
             for dx, dy in ((6, 6), (-6, 6), (6, -6), (-6, -6), (10, 0), (0, 10)):  # a 3x3 boss needs room (Azmodan by the
@@ -12747,8 +12947,11 @@ def a25_bosses(act, log, rows, bad, shots):
             bad.append("act %d: no %s" % (act, stage))
             continue
         life0 = acts_mon_life(mon["id"])
-        killed, deaths, t = acts_fight(mon["id"], timeout=secs)
+        STATE["fight_help"], STATE["fight_notes"] = [], []
+        killed, deaths, t = acts_fight(mon["id"], timeout=secs, unstick=True)
         life1 = acts_mon_life(mon["id"])
+        if STATE["fight_notes"]:
+            how += "; %s" % ", ".join(sorted(set(STATE["fight_notes"])))
         mi = merc_info()[0] if game_alive() else None
         shots.append(sh("a25_boss_%s" % stage))
         note = ""
@@ -12772,16 +12975,28 @@ def a25_bosses(act, log, rows, bad, shots):
 
 
 def check_acts25():
-    """Lane acts25: Acts 2-5 (MXL_A25_ACTS) on Normal with a live, equipped mercenary; see the block comment above."""
+    """Lane acts25: Acts 2-5 (MXL_A25_ACTS) with a live, equipped mercenary on Normal, or (lane nmhell4) on MXL_A25_DIFFICULTY
+    nightmare / hell (unlocked by a closed save edit first); see the block comment above."""
     name = "acts25"
     if not need_game():
         return add(name, "BLOCKED", "not in a game")
     acts = [int(a) for a in (os.environ.get("MXL_A25_ACTS") or "2,3,4,5").split(",") if a.strip()]
     parts = [p for p in (os.environ.get("MXL_A25_PARTS") or ",".join(A25_PARTS)).split(",") if p in A25_PARTS]
     gfx = os.environ.get("MXL_A25_GRAPHICS", "legacy")
+    diff = os.environ.get("MXL_A25_DIFFICULTY", "normal")
+    if diff not in DIFF_IDS:
+        return add(name, "BLOCKED", "MXL_A25_DIFFICULTY %r: not normal / nightmare / hell" % diff)
     revive_if_dead()
     setup_log = []
-    opened = rp_open_acts([max(acts)], setup_log)
+    unlock = None
+    if diff != "normal" and hstate()["player"].get("difficulty") != DIFF_IDS[diff]:
+        import nmh_checks  # lane nmhell's unlock: progression byte and the earlier difficulties' act-boss quests done (the save a
+        unlock = nmh_checks.unlock_edit(diff)  # player has after killing Baal), then Play in the difficulty's dialog button
+    opened = rp_open_acts([max(acts)], setup_log, diff, extra=unlock)
+    if hstate()["player"].get("difficulty") != DIFF_IDS[diff]:
+        return add(name, "BLOCKED", "not in %s (difficulty %s)" % (diff, hstate()["player"].get("difficulty")), log=setup_log)
+    tag = "acts25" if diff == "normal" else "acts25 " + diff
+    STATE["a25_diff"] = diff
     enable_debug()
     cheat("god 1")
     lvl = acts_level_up(A25_LEVEL)
@@ -12793,9 +13008,10 @@ def check_acts25():
     for s in (7, 6):
         Hl("stat merc %d set %d" % (s, 20000 << 8), setup_log)
     re0 = a25_reassign()
-    add("acts25 set-up", "PASS", "SET-UP: level %s by the xp award, god mode, all waypoint bits, acts' tabs %s, Rogue from Kashya with "
-        "gear by clicks, mercenary life 20,000; graphics for entries / bosses %s; reassign %s" % (lvl, opened or "already open", gfx, re0),
-        log=setup_log[-200:])
+    add(tag + " set-up", "PASS", "SET-UP: %slevel %s by the xp award, god mode, all waypoint bits, acts' tabs %s, Rogue from Kashya "
+        "with gear by clicks, mercenary life 20,000; graphics for entries / bosses %s; reassign %s" % (
+            "%s unlocked by a save edit (progression, earlier difficulties' boss quests done), " % diff if unlock else "",
+            lvl, opened or "already open", gfx, re0), log=setup_log[-200:])
     for act in acts:
         rows, bad, log, shots = [], [], [], []
         mark = engine_mark()
@@ -12831,11 +13047,11 @@ def check_acts25():
         except Exception as e:
             bad.append("script error %r" % (e,))
         if not game_alive():
-            rp_recover("act %d" % act, log)
+            rows.append(a25_recover("act %d" % act, log))
         r1 = a25_reassign()
         caught = (r1[1] - r0[1]) if r0 and r1 and r1[1] >= r0[1] else (r1[1] if r1 else None)
         rows.append("reassign guard: %s -> %s (units left without a room in this act: %s)" % (r0, r1, caught))
-        finish("acts25 act %d" % act, not bad, "%.0f min; " % ((time.time() - t0) / 60) + "; ".join(rows)
+        finish("%s act %d" % (tag, act), not bad, "%.0f min; " % ((time.time() - t0) / 60) + "; ".join(rows)
                + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots[:30], rows + log[-500:])
     cheat("god 0")
 
