@@ -309,7 +309,7 @@ for a Warlock. Expect the Necromancer look, a Flame Wave without its wave and sh
 6. Toggle G three times: once during a cast, once with the pets out. Leave the game and come back in classic.
 7. On a crash, keep the file in `d2rloader\crashes\`, the log, and the last skill / action. Findings go to bugs.md #498.
 
-## 9. The RotW stash pages in classic mode (lane rotwstash, 2026-10-30; built, not in the mod by default; lane rotwgate, 2026-10-31: the plugin wires the pages in classic, no crash without RotW, 9.6)
+## 9. The RotW stash pages in classic mode (lane rotwstash, 2026-10-30; built, not in the mod by default; lane rotwgate, 2026-10-31: the plugin wires the pages in classic, no crash without RotW, 9.6; lane stashtab: tab names that fit, 9.7)
 
 Owner request (2026-10-30): "make the new RotW stash pages work in legacy 'down renders'": the Gems, Materials and Runes tabs of
 Reign of the Warlock's stash (bug #510) get a classic version, its art down-rendered from D2R's own HD art. No new 3D models.
@@ -353,7 +353,8 @@ All generated from the D2R extraction at build time; nothing of Blizzard's is in
   slot recess and the cube window re-rendered at the classic cell size under the widget's rect (so a 28-pixel item picture sits
   exactly in its recess; the plain panel scale would make them 27 x 28 and the cube cells drift 2 pixels per cell), then
   quantised to D2R's units palette with Floyd-Steinberg (indices 1-224 only: 225-254 draw hot pink in D2R's UI, section 1).
-- **`rotwstash_tabs.dc6`** (HD `MKB_Tabs_195_TGA`, inactive and active, 63 x 24), **`rotwstash_cubecover.dc6`** (HD
+- **`rotwstash_tabs.dc6`** (HD `MKB_Tabs_195_TGA`, inactive and active, 63 x 24, 10 frames: each tab's name drawn in, frames
+  0-4 inactive, 5-9 active; lane stashtab, 9.7), **`rotwstash_cubecover.dc6`** (HD
   `HoradricCubeCover`, 87 x 116 = the classic cube grid), **`rotwstash_button.dc6`** (HD `FrontEnd_ButtonSmall`, 4 frames,
   101 x 27), **`rotwstash_notify.dc6`** (HD `StashNotification`, 54 x 18, the "an item went to this tab" mark).
 
@@ -364,8 +365,8 @@ of D2R's two `buyselltabs`). In HD a game without RotW shows only the first two 
 
 The layout parses; the codes and their order per page equal HD's; every slot is inside the panel below the tab band and
 overlaps no other slot; every `PANEL\...` file the layout names exists in the mod or in D2R, with the frame sizes the layout
-needs (4 panel tiles, 2 tabs of 63 x 24, the cover of the cube grid's size); each code's item row and classic picture (it must
-fit its slot); no `@key` left. Unit tests: `tools/tests/test_rotw_stash_legacy.py` (synthetic files).
+needs (4 panel tiles, 10 tabs of 63 x 24 (2 when the names are D2R's text), the cover of the cube grid's size); each tab name
+fits its tab in the classic font (9.7); each code's item row and classic picture (it must fit its slot); no `@key` left. Unit tests: `tools/tests/test_rotw_stash_legacy.py` (synthetic files).
 
 Result on the build of lane/rotwstash: no problem; 91 slots (gems 35, materials 23, runes 33); 71 codes are Median items whose
 classic pictures (28 x 28) fit their slots, 20 have no item in Median's tables (the keys, organs, essences, `ua*` / `xa*`), the
@@ -395,7 +396,7 @@ The layout also needs the `basicstash_container` crash solved first: the step wr
 and that crashes in classic even without the RotW pages. Next step for the layout if the owner's test is wanted: Personal /
 Shared at top level (tested fine above), and accept that they then draw on the RotW pages too.
 
-Also seen: "MATERIALS" does not fit a 63-pixel tab in D2R's classic font (it is cut to "MATERIAL:").
+Also seen: "MATERIALS" does not fit a 63-pixel tab in D2R's classic font (it is cut to "MATERIAL:"). Fixed in 9.7.
 
 Lane rotwgate found the cause of both crashes in D2R's code and made the plugin wire the pages in classic too (9.6). With it the
 step's full layout (`basicstash_container`, slots, cube) no longer crashes without RotW.
@@ -440,4 +441,33 @@ first G. With D2R's own classic layout: 5 more cycles, no crash, unchanged. 0 cr
 **Shipped by default since 2026-10-31 (owner)**: `tools/build.py` puts the layout into the mod; `MXL2012_ROTW_LEGACY=0` keeps
 it out. The text below is the state before that: a RotW account has not opened the pages in classic, and
 without RotW the step's tab bar is a small step back from D2R's own: "Personal" is cut to "PERSON" on the 63-pixel tab (D2R's
-own classic tabs are wider). Once the owner test passes, the layout can go into the mod by default; the part is already on.
+own classic tabs are wider; fixed in 9.7). Once the owner test passes, the layout can go into the mod by default; the part is
+already on.
+
+### 9.7 Tab names that fit (lane stashtab, 2026-10-31, slot 2; docs/testing.md "Lane stashtab")
+
+Five tabs of 63 pixels fill the 320-pixel panel, and D2R's classic tab text is too wide for them: "PERSONAL" showed as "PERSON",
+"MATERIALS" as "MATERIAL:" (D2R's own two classic tabs are 79 wide). Tried in game with the slot's layout changed by hand:
+
+| Layout change on `BankTabs` | Classic result |
+|---|---|
+| `textStyle` `{"pointSize": 8}` | no change: "PERSON" |
+| `textStyle` `{"spacing": {"kerning": 0.75}}` | no change |
+| `tabSizingMethod` `fitToContent` | no tabs drawn at all |
+
+So in classic the tab bar takes no font, size or spacing from the layout (D2R.exe: `TabBarWidget` has only `textStyle`; the
+classic font `fontType` is a `TextBoxWidget` field). Shorter names were not needed.
+
+**Fix:** the step draws the names into the tab art. `rotwstash_tabs.dc6` has 10 frames: the 5 names on the inactive tab in
+white (253, 253, 253), then on the active tab in gold (191, 169, 105), the two colours D2R's classic tab text has. The font is
+D2R's classic `font6` (`data/local/font/latin/font6.tbl` / `.dc6`, capitals as D2R's tab text). The baseline extraction has no
+fonts, so they come through `fxpaths.d2r_file` (listed in `fxpaths.CACHED_FILES`: the shared D2R cache, filled by
+`lane_setup.py`, or a slot's CASC). Widths of the names in it: PERSONAL 48, SHARED 37, GEMS 25, MATERIALS 52, RUNES 31, room 57
+(63 less 3 on each side). The names are centred, put on after the art's dither without dither of their own.
+The layout: `inactiveFrames` 0-4, `activeFrames` 5-9, `disabledFrames` -1 for Personal and the tab's own inactive frame for the
+others, `textStrings` empty. D2R still writes the Personal tab's name itself whatever `textStrings` says (seen in game: "PERSON"
+over the drawn name), so `activeTextColor` / `inactiveTextColor` are clear (alpha 0).
+
+Without the font (no cache and no slot) the step falls back to the old tab bar (2 frames, D2R's text, cut in classic) and
+says so in its report. The check measures each name in the font and fails on one wider than the room.
+Unit tests: `test_tab_names_fit`, `test_named_frames_carry_the_names`, `test_build_with_the_classic_font`.

@@ -4526,3 +4526,29 @@ Cause and fix: bugs.md #518 (objects.txt row 194 Token `sl` -> D2R's `9c` in `to
 Open: the way out from inside a temple by clicks failed now and then (acts25: 95->80 class 63, 96->81 class 62; here 96 in run 1 and
 98 in HD run 3) and worked in the next run. Not looked into in this lane. Also seen, left alone: objects rows 78 (Town1Ambient, Token
 `TA`) and 133 (ShrineMagicArcaneSanctuary1, `xx`) carry tokens D2R has no art for (maybe Median's intent; neither blocks a way).
+
+## Lane stashtab: RotW stash tab names that fit in classic (bug #516, 2026-10-31, slot 2, background mode)
+
+The step's classic tab bar (five 63 x 24 tabs, docs/legacy-graphics.md 9.7) showed D2R's own tab text cut: "PERSON",
+"MATERIAL:". Now the step draws the names into the tab art (D2R's classic `font6`, capitals, 10 frames) and D2R's text is
+left out (empty, and clear for the Personal name D2R writes itself). Build of lane/stashtab, dev plugin, mod by the normal
+`py -3 tools/build.py` (the layout is in the mod by default since main 23afb64). Character `StashTab` (Sorceress,
+`mxl2012-s2`, no RotW, so only Personal / Shared show). Each run: stash opened in HD by the harness, G to classic, a click on
+Shared, a click on Personal, G back to HD. Scratch driver (outside git): `mxl2012-runs/stashtab/{drv,shot,variant}.py`.
+
+| run | classic layout on slot 2 | result |
+|---|---|---|
+| `checks-20261031-180133-s2` (before) | the step's layout as on main | "PERSON" (cut), "SHARED" |
+| `checks-20261031-180430-s2` | + `textStyle` `pointSize` 8 (by hand) | unchanged: classic takes no point size |
+| `checks-20261031-180628-s2` | + `textStyle` `spacing` `kerning` 0.75 (by hand) | unchanged |
+| `checks-20261031-180800-s2` | + `tabSizingMethod` `fitToContent` (by hand) | no tabs drawn |
+| `checks-20261031-181401-s2` | names in the art, `textStrings` empty | Shared fine; Personal shows D2R's "PERSON" over the drawn name |
+| `checks-20261031-181550-s2` | + text colours clear (by hand) | PERSONAL and SHARED whole |
+| `checks-20261031-182828-s2` (final, normal build, nothing by hand) | the step's layout of this branch | **PASS**: PERSONAL (gold, active) and SHARED (white) whole and readable in classic, the active one swaps on the clicks, the Shared page as before ("Shared with offline characters"); HD stash unchanged |
+
+0 crash files, d2rloader.log 0 ERROR / ASSERT lines, mxl2012-core.log nothing new at the last stop. Gems / Materials / Runes
+cannot show on these accounts (no RotW); their names are checked by the step (`tab names in font6: PERSONAL 48, SHARED 37,
+GEMS 25, MATERIALS 52, RUNES 31 (room 57)`) and seen in the review sheet `mxl2012-runs/stashtab/sheet/rotwstash_*.png`.
+Unit tests `tools/tests/test_rotw_stash_legacy.py`: 9 OK (new: `test_tab_names_fit`, `test_named_frames_carry_the_names`,
+`test_build_with_the_classic_font`). Evidence: `mxl2012-runs/stashtab/evidence/` (the run folders above; `crops/` the tab bar
+x2: `before_*`, `final_*`, the trial crops).

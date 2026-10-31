@@ -16,7 +16,9 @@ This step writes, from the D2R extraction at build time (nothing of Blizzard's i
       panel (4 tiles), the top 29 rows the classic tab band of D2R's `expandedstash.dc6` (so the tab bar sits on the same band
       on all five tabs), every slot recess and the cube window re-rendered at the classic cell size (29 per cell) under the
       widget's rect, then quantised to D2R's units palette (indices 1-224, Floyd-Steinberg)
-  data/global/ui/panel/rotwstash_tabs.dc6        HD `MKB_Tabs_195_TGA` (inactive, active) down-rendered to 63 x 24
+  data/global/ui/panel/rotwstash_tabs.dc6        HD `MKB_Tabs_195_TGA` (inactive, active) down-rendered to 63 x 24 with the
+      tab names drawn in (5 inactive frames, then 5 active) in D2R's classic `font6`, capitals: D2R's own tab text is too wide
+      for a 63-pixel tab in classic ("PERSON", "MATERIAL:") and the classic tab bar takes no font or spacing (lane stashtab)
   data/global/ui/panel/rotwstash_cubecover.dc6   HD `HoradricCubeCover` down-rendered to the classic cube grid (87 x 116)
   data/global/ui/panel/rotwstash_button.dc6      HD `FrontEnd_ButtonSmall` (4 frames) down-rendered (the withdraw button)
   data/global/ui/panel/rotwstash_notify.dc6      HD `StashNotification` down-rendered (the "item went to this tab" mark)
@@ -39,6 +41,7 @@ import argparse
 import csv
 import json
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -63,6 +66,10 @@ TABS, COVER, BUTTON, NOTIFY = "rotwstash_tabs", "rotwstash_cubecover", "rotwstas
 TAB_W, TAB_H, TAB_PAD = 63, 24, 1   # five tabs across the 320-pixel panel (D2R's classic two are 79 x 24)
 TAB_BAND = 29                   # rows 0-28 of D2R's classic stash: the black band with its gold line, where the tabs sit
 TAB_TEXT = ["Personal", "Shared", "Gems", "Materials", "Runes"]  # D2R's English for @personal @shared @gems @materials @runes
+TAB_FONT = "font6"              # D2R's classic small font (data/local/font/latin, read through fxpaths.d2r_file)
+TAB_TEXT_MARGIN = 3             # free pixels left and right of a name inside the tab's rim
+TAB_COLOURS = ((253, 253, 253), (191, 169, 105))  # inactive, active: D2R's classic tab text (lane stashtab's shots)
+CLEAR = {"r": 0, "g": 0, "b": 0, "a": 0}
 CUBE_CELLS = (3, 4)             # D2R's stash cube window (HD layout); see docs/legacy-graphics.md 9 for Median's 10 x 8 cube
 HD_LAYOUT = Path("data/global/ui/layouts/bankexpansionlayouthd.json")
 SD_LAYOUT = Path("data/global/ui/layouts/bankexpansionlayout.json")
@@ -141,9 +148,10 @@ def merged(base: dict | None, child: dict) -> dict:
     return out
 
 
-def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None) -> dict:
+def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: bool = True) -> dict:
     """D2R's classic bankexpansionlayout.json in the HD layout's structure (see the module doc); `sd_base` is its basedOn
-    file (BankOriginalLayout.json), whose fields the moved children carry in full."""
+    file (BankOriginalLayout.json), whose fields the moved children carry in full. `named_tabs`: the tab art carries the
+    names (frames 0-4 inactive, 5-9 active) and D2R draws no tab text; else D2R's text on two frames (cut in classic)."""
     base = {c["name"]: c for c in (sd_base or {}).get("children", [])}
     kids = {c["name"]: merged(base.get(c["name"]), c) if c["name"] in MOVED else c for c in sd["children"]}
     for need in ("click_catcher", "background", "gold_max", "gold_amount", "gold_withdraw", "close", "grid",
@@ -170,8 +178,12 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None) -> dict:
             kids["click_catcher"], kids["background"], kids["close"],
             {"type": "TabBarWidget", "name": "BankTabs", "fields": {
                 "tabCount": 5, "filename": f"PANEL\\{TABS}",
-                "inactiveFrames": [0] * 5, "activeFrames": [1] * 5, "disabledFrames": tabs["disabledFrames"],
-                "textStrings": TAB_TEXT,
+                **({"inactiveFrames": list(range(5)), "activeFrames": list(range(5, 10)),
+                    "disabledFrames": [f if f < 0 else i for i, f in enumerate(tabs["disabledFrames"])],
+                    # D2R writes the Personal tab's name itself whatever textStrings says: drawn clear, it hides
+                    "textStrings": [""] * 5, "activeTextColor": CLEAR, "inactiveTextColor": CLEAR} if named_tabs else
+                   {"inactiveFrames": [0] * 5, "activeFrames": [1] * 5, "disabledFrames": tabs["disabledFrames"],
+                    "textStrings": TAB_TEXT}),
                 "tabSize": {"x": TAB_W, "y": TAB_H}, "tabPadding": {"x": TAB_PAD, "y": 0},
                 "onSwitchTabMessage": tabs["onSwitchTabMessage"],
                 "notificationIconTemplate": {"filename": f"PANEL\\{NOTIFY}"}}},
@@ -282,10 +294,11 @@ def panel_tiles(idx: np.ndarray) -> list[np.ndarray]:
 
 
 class D2R:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, use_cache: bool = False):
         self.root = Path(root)
         self.data = self.root / "data" if (self.root / "data").exists() else self.root
         self.pal = dc6.palette(self.data / "global" / "palette" / "units" / "pal.dat")
+        self.use_cache = use_cache
 
     def layout(self, rel: Path) -> dict:
         return lenient_json((self.data.parent / rel).read_text("utf-8-sig"))
@@ -295,6 +308,81 @@ class D2R:
 
     def classic_panel(self, name: str) -> Image.Image:
         return ui_art.panel_sets(self.data / "global" / "ui" / "panel" / f"{name}.dc6", self.pal)[0]
+
+    def font(self, name: str) -> "Font | None":
+        """A classic font of this extraction, else (`use_cache`) through fxpaths.d2r_file (the shared cache or a slot's
+        CASC: the baseline extraction has no fonts); None when neither has it."""
+        files = []
+        for ext in ("tbl", "dc6"):
+            rel = f"local/font/latin/{name}.{ext}"
+            p = self.data / rel
+            if not p.exists() and self.use_cache:
+                try:
+                    p = fxpaths.d2r_file(f"data/{rel}")
+                except SystemExit:
+                    return None
+            if not p.exists():
+                return None
+            files.append(p)
+        return Font(files[0].read_bytes(), dc6.read_dc6(files[1]), self.pal)
+
+
+class Font:
+    """A classic D2 font: the .tbl ("Woo!", a 12-byte head, then 14 bytes per glyph: char u16, u8, advance u8, height u8,
+    u8, u16, frame u16, u32) and its DC6 (one fixed cell per glyph, drawn from the cell's top left)."""
+
+    def __init__(self, tbl: bytes, frames: list, pal):
+        if tbl[:4] != b"Woo!":
+            raise ValueError("font .tbl: no Woo! head")
+        self.glyphs = {}
+        for i in range((len(tbl) - 12) // 14):
+            char, _a, adv, _h, _b, _c, frame, _d = struct.unpack_from("<HBBBBHHI", tbl, 12 + i * 14)
+            self.glyphs[char] = (adv, frame)
+        self.frames, self.pal = frames, pal
+
+    def width(self, text: str) -> int:
+        """Ink width of `text` as drawn."""
+        return self.render(text, (255, 255, 255)).width
+
+    def render(self, text: str, colour: tuple[int, int, int]) -> Image.Image:
+        """`text` in `colour` (the glyph's grey level scales it), cropped to its ink."""
+        cells = [self.glyphs.get(ord(c), self.glyphs.get(ord("?"), (0, 0))) for c in text]
+        h = max((self.frames[f][1] for _a, f in cells if f < len(self.frames)), default=1)
+        im = Image.new("RGBA", (sum(a for a, _f in cells) + 32, h))
+        x = 0
+        for adv, f in cells:
+            if f < len(self.frames):
+                w, fh, _ox, _oy, block = self.frames[f]
+                g = ui_art.to_image(dc6.decode_frame(w, fh, block, self.pal))
+                lum = g.convert("L")
+                im.alpha_composite(Image.merge("RGBA", [lum.point(lambda v, k=k: v * k // 255) for k in colour]
+                                               + [g.getchannel("A")]), (x, 0))
+            x += adv
+        box = im.getbbox()
+        return im.crop(box) if box else Image.new("RGBA", (0, h))
+
+
+def tab_label_fit(font: Font, labels: list[str] = TAB_TEXT) -> list[tuple[str, int, bool]]:
+    """(name as drawn, ink width, fits) per tab: a name fits inside TAB_W less TAB_TEXT_MARGIN on both sides."""
+    room = TAB_W - 2 * TAB_TEXT_MARGIN
+    return [(t.upper(), w, w <= room) for t, w in ((t, font.width(t.upper())) for t in labels)]
+
+
+def named_tab_frames(tabs: list[Image.Image], font: Font, pal) -> list[np.ndarray]:
+    """10 tab frames: the inactive art (tabs[0]) with each name, then the active art (tabs[1]) with each; the art
+    dithered as before, the names put on after it without dither (crisp glyphs)."""
+    out = []
+    for state in (0, 1):
+        base = quantise(tabs[state], pal)
+        for label in TAB_TEXT:
+            text = font.render(label.upper(), TAB_COLOURS[state])
+            layer = Image.new("RGBA", tabs[state].size)
+            layer.alpha_composite(text, ((TAB_W - text.width) // 2, (TAB_H - text.height) // 2))
+            ink = np.asarray(layer.getchannel("A")) >= 128
+            idx = base.copy()
+            idx[ink] = quantise(layer, pal, dither=False)[ink]
+            out.append(idx)
+    return out
 
 
 def page_picture(d2r: D2R, page: str, slots: list[tuple[str, tuple]], cube: tuple[tuple, tuple]) -> Image.Image:
@@ -312,7 +400,9 @@ def page_picture(d2r: D2R, page: str, slots: list[tuple[str, tuple]], cube: tupl
 
 def build(d2r: D2R, out: Path) -> list[str]:
     hd, sd = d2r.layout(HD_LAYOUT), d2r.layout(SD_LAYOUT)
-    lay = classic_layout(hd, sd, d2r.layout(SD_BASE))
+    font = d2r.font(TAB_FONT)
+    named = font is not None and all(fits for _t, _w, fits in tab_label_fit(font))
+    lay = classic_layout(hd, sd, d2r.layout(SD_BASE), named_tabs=named)
     lp = out / "global" / "ui" / "layouts" / SD_LAYOUT.name
     lp.parent.mkdir(parents=True, exist_ok=True)
     lp.write_text(json.dumps(lay, indent=1, ensure_ascii=False) + "\n", "utf-8", newline="")
@@ -331,8 +421,14 @@ def build(d2r: D2R, out: Path) -> list[str]:
     for name, (src, size) in singles.items():
         frames = d2r.sprite(src)
         w, h = size or (round(frames[0].width / SX), round(frames[0].height / SY))
-        (panel / f"{name}.dc6").write_bytes(dc6_bytes([quantise(down(f, w, h), d2r.pal) for f in frames]))
-        report.append(f"{name}.dc6: {src} -> {len(frames)} x {w} x {h}")
+        if name == TABS and named:
+            idx = named_tab_frames([down(f, w, h) for f in frames[:2]], font, d2r.pal)
+            note = f", the tab names drawn in {TAB_FONT}"
+        else:
+            idx = [quantise(down(f, w, h), d2r.pal) for f in frames]
+            note = f"; no classic font {TAB_FONT}: D2R draws the names (cut in classic)" if name == TABS else ""
+        (panel / f"{name}.dc6").write_bytes(dc6_bytes(idx))
+        report.append(f"{name}.dc6: {src} -> {len(idx)} x {w} x {h}{note}")
     return report
 
 
@@ -378,9 +474,21 @@ def check(d2r: D2R, out: Path, mod: Path | None = None) -> tuple[list[str], list
     if len(codes) != len(set(codes)):
         problems.append("an item code has two slots")
     notes.append(f"{len(codes)} slots: " + ", ".join(f"{p} {len(got[p])}" for p in PAGES))
+    named_tabs = not any((find(lay, "BankTabs") or {}).get("fields", {}).get("textStrings", ["?"]))
+    if named_tabs:   # the names are in the tab art: each must fit its tab
+        font = d2r.font(TAB_FONT)
+        if font is None:
+            notes.append(f"tab names: classic font {TAB_FONT} not found, their fit not checked")
+        else:
+            fit = tab_label_fit(font)
+            room = TAB_W - 2 * TAB_TEXT_MARGIN
+            problems += [f"tab name {t}: {w} wide in {TAB_FONT}, more than {room}" for t, w, ok in fit if not ok]
+            notes.append(f"tab names in {TAB_FONT}: " + ", ".join(f"{t} {w}" for t, w, _ok in fit) + f" (room {room})")
+    else:
+        notes.append(f"tab names drawn by D2R (no classic font {TAB_FONT} at build time): cut in classic (PERSON, MATERIAL:)")
     # the files the layout names, with the frame sizes it needs
     need = {**{PANEL_DC6[p]: [(256, 256), (64, 256), (256, 176), (64, 176)] for p in PAGES},
-            "expandedstash": None, "additionalstash": None, TABS: [(TAB_W, TAB_H)] * 2, COVER: None, BUTTON: None,
+            "expandedstash": None, "additionalstash": None, TABS: [(TAB_W, TAB_H)] * (10 if named_tabs else 2), COVER: None, BUTTON: None,
             NOTIFY: None, "miniconvert": None, "gemsocket": None, "buysellbtn": None, "goldcoinbtn": None}
     named = {m.lower() for m in re.findall(r'PANEL\\\\(\w+)', text)}
     for name in sorted(named - set(need)):
@@ -472,7 +580,9 @@ def mock_up(d2r: D2R, out: Path, page: str, tab: int, mod: Path, with_items: boo
     f = find(lay, "BankTabs")["fields"]
     for i, label in enumerate(f["textStrings"]):
         x = i * (TAB_W + TAB_PAD)
-        im.alpha_composite(tabs[1 if i == tab else 0], (x, 0))
+        im.alpha_composite(tabs[(f["activeFrames"] if i == tab else f["inactiveFrames"])[i]], (x, 0))
+        if not label:   # the name is in the art
+            continue
         tw = draw.textlength(label.upper())
         draw.text((x + (TAB_W - tw) / 2, 7), label.upper(), fill=(199, 179, 119) if i == tab else (150, 150, 150))
     def button(name: str, frame: int, widget: str) -> None:
@@ -530,7 +640,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=ROOT / "work" / "mod" / "data")
     ap.add_argument("--mod", type=Path, help="the mod's data folder (tables, item pictures) when --out is elsewhere")
     a = ap.parse_args(argv)
-    d2r = D2R(a.d2r)
+    d2r = D2R(a.d2r, use_cache=True)
     built = build(d2r, a.out) if a.cmd == "build" else []
     if a.cmd == "sheet":
         for p in sheet(d2r, a.out, a.dest or Path("rotwstash-sheet"), a.mod):
