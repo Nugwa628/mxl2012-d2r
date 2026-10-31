@@ -5,18 +5,36 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-- Classic graphics (G): the Reign of the Warlock stash pages (Gems, Materials, Runes) now have a classic look, drawn down from
-  D2R's HD pages, and pressing G with the stash open no longer risks a crash (#516). Without RotW only Personal and Shared show. The
-  tab names fit their tabs in full.
-- Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the unfolding stair in their doorway stayed shut and blocked the way (#518).
-- Arcane Sanctuary: its magic shrine is drawn again in legacy graphics, where it was invisible (#520).
-- Median XL's own sounds now play: skill shouts and item and monster sounds Median added (102 of its 108; the other 6 had
-  no audio in Median XL either), in HD and legacy, and boss taunts go out on D2R's boss-speech channel. Median's own versions of
-  the class-select sounds, the gem sound and the werebear bites replace D2R's, in HD and legacy.
+## D2R-XL 2012
+
+### 0.1.8 (2026-11-01)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.8:**
+
+- Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the
+  unfolding stair in their doorway stayed shut and blocked the way (#518).
 - Travincal (Act 3): fights with Glowing Ones no longer log an engine error when one dies; in HD they are now drawn as
   hunched green undead casters with a pale glowing head (#519).
+- Classic graphics (G): the Arcane Sanctuary's magic shrine is drawn again, where it was invisible (#520).
+- Classic graphics (G): pressing G with the stash open no longer risks a crash, and the stash tab names fit their tabs
+  in full (#516).
 
-## D2R-XL 2012
+**New:**
+
+- Classic graphics (G): the Reign of the Warlock stash pages (Gems, Materials, Runes) now have a classic look, drawn down
+  from D2R's HD pages (#516). Without Reign of the Warlock only Personal and Shared show.
+- Median XL's own sounds now play: skill shouts and item and monster sounds Median added (102 of its 108; the other 6
+  had no audio in Median XL either), in HD and classic, and boss taunts go out on D2R's boss-speech channel. Median's
+  own versions of the class-select sounds, the gem sound and the werebear bites replace D2R's, in HD and classic.
+
+**Known:** in HD, Median's runes still show their classic pictures scaled up, the Ancient Tunnels void around the
+platform is drawn as floor, Khalimgrad's cathedral has no tall pointed arch and long roofed walls yet, and the HD pet
+row shows at most 9 icons (D2R's own limit). Two of Median's sounds (the witch's taunt and Singing Sun) are not heard
+yet (#521).
 
 ### 0.1.7 (2026-10-31)
 
