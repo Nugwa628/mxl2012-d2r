@@ -5,6 +5,11 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+**Fixed:**
+
+- Median XL's own sounds (the witch's taunt, Singing Sun, skill shouts, item and monster sounds) are now heard
+  every time, in HD and classic; before, the game only found them for a moment after switching graphics (#521).
+
 ## D2R-XL 2012
 
 ### 0.1.8 (2026-11-01)

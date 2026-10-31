@@ -25,6 +25,9 @@
 // counted when it is off) see is counted per function, and the file is rewritten at most every
 // second with one line per id seen ("<id> <c7> <b0> <path> <pick> <variant> <unit sound 0x107dd0> <client play 0x1a0780>"), so a check can tell which sounds the game
 // resolved while it did something (lane sound, bugs #501 / #502).
+// MXL_SOUND_PROBE=<file> (lane sound521, bug #521): one line per instance start 0x1fe590 (id, flags, handle), per start failure
+// 0x200620 (name, path, channel, code) and per file load request 0x835060 (the path asked for, 3d, stream, channel, priority,
+// result), so a check can tell whether a silent sound stopped before the load or asked for a path the mod does not have.
 #include "sound_guard.h"
 
 #include "build_guard.h"
@@ -103,6 +106,77 @@ void Trace(int id, uint64_t site) noexcept {
 		std::fclose(f);
 	}
 	g_traceWriting = false;
+}
+// The dev probe (MXL_SOUND_PROBE=<file>, lane sound521, bug #521): one line per call of the instance start 0x1fe590 (sound id,
+// handle returned), the start-failure record 0x200620 (name, path, code) and the file load request 0x835060 (path, flags,
+// result), so a run shows where a played sound stops before its file is opened.
+char g_probePath[MAX_PATH] = "";
+SRWLOCK g_probeLock = SRWLOCK_INIT;
+using StartFn = uint64_t (*)(void* inst) noexcept;
+using FailFn = uint64_t (*)(uint64_t index, const char* name, const char* path, const char* channel, int32_t code) noexcept;
+using LoadFn = uint64_t (*)(void* out, const char* path, uint8_t notTwoD, uint8_t stream, uint32_t channel, uint8_t priority) noexcept;
+StartFn g_start = nullptr;
+FailFn g_fail = nullptr;
+LoadFn g_load = nullptr;
+constexpr uint64_t RvaStart = 0x1fe590;
+constexpr uint64_t RvaFail = 0x200620;
+constexpr uint64_t RvaLoad = 0x835060;
+constexpr uint8_t StartEntry[] = {0x40, 0x53, 0x55, 0x56, 0x57, 0x48, 0x81, 0xec, 0x48, 0x01, 0x00, 0x00};
+constexpr uint8_t FailEntry[] = {0x4c, 0x89, 0x44, 0x24, 0x18, 0x53, 0x55, 0x56, 0x57, 0x48, 0x83, 0xec, 0x48};
+constexpr uint8_t LoadEntry[] = {0x48, 0x8b, 0xc4, 0x44, 0x88, 0x48, 0x20, 0x44, 0x88, 0x40, 0x18, 0x48, 0x89, 0x48, 0x08};
+
+void Probe(const char* line) noexcept {
+	AcquireSRWLockExclusive(&g_probeLock);
+	FILE* f = nullptr;
+	if (fopen_s(&f, g_probePath, "a") == 0 && f != nullptr) {
+		std::fprintf(f, "%llu %s\n", static_cast<unsigned long long>(GetTickCount64()), line);
+		std::fclose(f);
+	}
+	ReleaseSRWLockExclusive(&g_probeLock);
+}
+
+uint64_t StartHook(void* inst) noexcept {
+	const int id = inst != nullptr ? *reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(inst) + 4) : -1;
+	const uint32_t flags = inst != nullptr ? *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(inst) + 0x44) : 0;
+	const uint64_t handle = g_start(inst);
+	const int idAfter = inst != nullptr ? *reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(inst) + 4) : -1;
+	char line[160];
+	std::snprintf(line, sizeof(line), "start id=%d flags=%x -> id=%d handle=%llx", id, flags, idAfter, static_cast<unsigned long long>(handle));
+	Probe(line);
+	return handle;
+}
+
+uint64_t FailHook(uint64_t index, const char* name, const char* path, const char* channel, int32_t code) noexcept {
+	char line[400];
+	std::snprintf(line, sizeof(line), "fail index=%llu name=%.80s path=%.120s channel=%.60s code=%d", static_cast<unsigned long long>(index),
+	              name != nullptr ? name : "", path != nullptr ? path : "", channel != nullptr ? channel : "", code);
+	Probe(line);
+	return g_fail(index, name, path, channel, code);
+}
+
+uint64_t LoadHook(void* out, const char* path, uint8_t notTwoD, uint8_t stream, uint32_t channel, uint8_t priority) noexcept {
+	const uint64_t r = g_load(out, path, notTwoD, stream, channel, priority);
+	char line[300];
+	std::snprintf(line, sizeof(line), "load path=%.160s 3d=%u stream=%u channel=%08x priority=%u -> %llx", path != nullptr ? path : "",
+	              notTwoD, stream, channel, priority, static_cast<unsigned long long>(r & 0xff));
+	Probe(line);
+	return r;
+}
+
+void InstallProbe(const D2RL::PluginContext* context) noexcept {
+	if (GetEnvironmentVariableA("MXL_SOUND_PROBE", g_probePath, sizeof(g_probePath)) == 0 || g_probePath[0] == '\0') {
+		g_probePath[0] = '\0';
+		return;
+	}
+	char line[160];
+	std::snprintf(line, sizeof(line), "probe hooks: start %d fail %d load %d",
+	              context->InstallInlineHook(RvaStart, StartEntry, sizeof(StartEntry), reinterpret_cast<void*>(&StartHook),
+	                                         reinterpret_cast<void**>(&g_start)) ? 1 : 0,
+	              context->InstallInlineHook(RvaFail, FailEntry, sizeof(FailEntry), reinterpret_cast<void*>(&FailHook),
+	                                         reinterpret_cast<void**>(&g_fail)) ? 1 : 0,
+	              context->InstallInlineHook(RvaLoad, LoadEntry, sizeof(LoadEntry), reinterpret_cast<void*>(&LoadHook),
+	                                         reinterpret_cast<void**>(&g_load)) ? 1 : 0);
+	Probe(line);
 }
 #else
 void Trace(int, uint64_t) noexcept {}
@@ -276,6 +350,7 @@ auto InstallSoundGuard(const D2RL::PluginContext* context, char* report, size_t 
 	              failed[0] != '\0' ? ")" : "", listening ? "" : " (NO LISTENER)",
 	              g_test == 0 ? "" : (g_test == 2 ? " (TEST 2: Neutral id -1 passed on)" : " (TEST 1: Neutral id -1)"));
 #ifndef MXL_RELEASE
+	InstallProbe(context);
 	if (g_tracePath[0] != '\0') {
 		const size_t len = std::strlen(report);
 		std::snprintf(report + len, reportSize - len, " (TRACE to %s)", g_tracePath);

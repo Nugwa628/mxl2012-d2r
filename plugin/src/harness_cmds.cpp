@@ -1288,6 +1288,30 @@ auto CmdCltDo(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `sound <sounds.txt id> [<client unit id> [<unit type>]]` (client side): the client play 0x1a0780(id, unit, 0, 0, 0), as the
+// client's own callers make it (0x99aea: an item sound on a unit), on the client player (or the given unit). Lane sound521:
+// plays a monsounds Taunt row whose AI does not taunt on a harness spawn, so a check can see the file opened
+// (MXL_SOUND_PROBE, diag log).
+auto CmdSound(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	constexpr uint64_t RvaClientPlay = 0x1a0780;
+	long long id = 0, unitId = g_playerId, type = 0;
+	if (t.n < 2 || !hcmd::ParseInt(t.tok[1], &id) || id < 0 || id > 0xffff || (t.n > 2 && !hcmd::ParseInt(t.tok[2], &unitId)) ||
+	    (t.n > 3 && !hcmd::ParseInt(t.tok[3], &type))) {
+		return Fail(c, "usage: sound <sounds.txt id> [<client unit id> [<unit type>]]");
+	}
+	if (unitId == 0) {
+		return Fail(c, "sound: no player seen yet (run a server verb such as state first)");
+	}
+	Unit* unit = Fn<ClientFindFn>(RvaClientFind)(static_cast<uint32_t>(unitId), static_cast<int32_t>(type));
+	if (unit == nullptr) {
+		return Fail(c, "sound: no client unit %lld of type %lld", unitId, type);
+	}
+	const uint64_t r = reinterpret_cast<uint64_t (*)(int32_t, Unit*, int32_t, int32_t, uint8_t)>(g_base + RvaClientPlay)(
+	    static_cast<int32_t>(id), unit, 0, 0, 0);
+	Out("sound id=%lld unit=%lld type=%lld -> 0x%llx", id, unitId, type, static_cast<unsigned long long>(r));
+	return true;
+}
+
 // `cltst <skill id> [orig]` (client side): the skill's client start function (record +0x148 = cltstfunc, table 0x235f590)
 // called for the client copy of the player. `orig` on slot 18 calls D2R's own 0x2b0df0 past the cltnomis wrapper: without a
 // cltmissilec it asserts (bug #6 control); the table entry returns 1 without an assert.
@@ -2858,7 +2882,7 @@ struct Verb {
 };
 const Verb Verbs[] = {
     {"help", CmdHelp, true},          {"echo", CmdEcho, true},           {"frames", CmdFrames, true},
-    {"cltdo", CmdCltDo, true},        {"cltst", CmdCltSt, true},         {"slot", CmdSlot, true},          {"watch", CmdWatch, true},
+    {"cltdo", CmdCltDo, true}, {"sound", CmdSound, true},        {"cltst", CmdCltSt, true},         {"slot", CmdSlot, true},          {"watch", CmdWatch, true},
     {"state", CmdState, false},       {"units", CmdUnits, false},        {"stat", CmdStat, false},        {"level", CmdLevel, false},        {"spawn", CmdSpawn, false},
     {"kill", CmdKill, false},         {"skill", CmdSkill, false},        {"setskill", CmdSetSkill, false},
     {"cast", CmdCast, false},         {"mcast", CmdMonsterCast, false},  {"missile", CmdMissile, false},

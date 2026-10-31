@@ -180,7 +180,10 @@ class BuildTests(unittest.TestCase):
             "global/sfx/taunt/boink.flac", "global/sfx/taunt/chant.flac", "global/sfx/taunt/frenzy1.flac",
             "hd/global/sfx/cursor/intro/amazon_select_hd.flac", "hd/global/sfx/item/gem_hd.flac",
             "hd/global/sfx/monster/bear/bite1_hd.flac", "hd/global/sfx/monster/bear/bite2_hd.flac",
+            "hd/global/sfx/taunt/boink.flac", "hd/global/sfx/taunt/chant.flac", "hd/global/sfx/taunt/frenzy1.flac",
         ])  # the missing file is not invented; other_hd.flac (also other_hd's) stays D2R's
+        for f in ("boink", "chant", "frenzy1"):  # bug #521: D2R asks for the main bank's file under data/hd in both modes
+            self.assertEqual((self.mod / "hd/global/sfx/taunt" / f"{f}.flac").read_bytes(), (out / f"{f}.flac").read_bytes())
         for f, n in (("global/sfx/item/gem.flac", 1000), ("hd/global/sfx/item/gem_hd.flac", 1000),
                      ("hd/global/sfx/cursor/intro/amazon_select_hd.flac", 900),
                      ("hd/global/sfx/monster/bear/bite1_hd.flac", 100), ("hd/global/sfx/monster/bear/bite2_hd.flac", 200)):

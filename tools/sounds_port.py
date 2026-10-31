@@ -23,12 +23,15 @@ own rows stay D2R's) with a .flac FileName; until this step they had no file and
             (data/hd/global/sfx/<HD name>.flac): HD mode plays the HD row, so both modes play Median's. A group head's
             Redirect maps member k to HD member k. An HD file a row outside these also plays stays D2R's (reported).
 
-No Redirect on Median's own rows: a D2R row without one plays its own file in HD mode too (1802 of D2R's own rows are like
-that), so one file serves both graphics modes. Median's files never go into git: the input is fxpaths.MXL (assets/median or
-extract-mpq), the output is work/mod (git-ignored).
+No Redirect on Median's own rows; their .flac is written twice, to data/global/sfx/<path>.flac and to the same path under
+data/hd/global/sfx (bug #521): D2R's sound player (0x1fe590 -> load request 0x835060) asks for the main bank's FileName under
+data/hd/global/SFX in both graphics modes (only the reload when the graphics mode changes asks for data/global/SFX), and a
+request for a file that is not there is dropped without a word, so with the SD copy alone a Median sound played only by
+chance (a looping sound alive when the mode changed). Median's files never go into git: the input is fxpaths.MXL
+(assets/median or extract-mpq), the output is work/mod (git-ignored).
 
-  py -3 -I tools/sounds_port.py [build]   convert + rows -> work/mod/data/global/sfx (+ data/hd/global/sfx for the
-                                          replaced files), both sounds.txt banks, work/mod/sounds_port.md
+  py -3 -I tools/sounds_port.py [build]   convert + rows -> work/mod/data/global/sfx and data/hd/global/sfx, both
+                                          sounds.txt banks, work/mod/sounds_port.md
   py -3 -I tools/sounds_port.py plan      the report only, nothing written
 Options: --median DIR (a folder holding data/global), --d2r DIR (D2R 93847 extraction), --mod DIR (default work/mod/data).
 """
@@ -211,7 +214,7 @@ class Converter:
 
 def run(median: Path, d2r_excel: Path, mod: Path, write: bool) -> tuple[int, list[str]]:
     excel = mod / "global" / "excel"
-    sfx_out = mod / "global" / "sfx"
+    sfx_out, hd_out = mod / "global" / "sfx", mod / "hd" / "global" / "sfx"  # D2R asks for hd_out in both modes (#521)
     audio = median_audio(median / "data" / "global" / "sfx")
     report = ["# sounds_port report (tools/sounds_port.py)", "",
               "| Sound | File | Audio | Channel | Used by |", "|---|---|---|---|---|"]
@@ -232,7 +235,7 @@ def run(median: Path, d2r_excel: Path, mod: Path, write: bool) -> tuple[int, lis
             src = audio.get(st)
             if src is None:
                 missing.add(st)
-            elif write and not conv.write(st, src, sfx_out / f"{st}.flac"):
+            elif write and not all([conv.write(st, src, out / f"{st}.flac") for out in (sfx_out, hd_out)]):
                 continue
             if src is not None:
                 rows[i][fi] = st.replace("/", "\\") + ".flac"

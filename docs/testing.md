@@ -4767,3 +4767,31 @@ Findings:
   - NPCs that `presets 1` does not list from the arrival were spawned copies: Atma, Drognan, Asheara, Natalya, Drehya, Tyrael.
 
 Evidence: the run logs `mxl2012-runs/nmhell4/run1-hd-a3.log` .. `run12-hell-a3-wp.log`, the per-run `report.md` and shots under `work/runs/<run>/`, and `mxl2012-runs/nmhell4/evidence/`.
+
+## Lane sound521: why Median's sounds were not opened (bug #521, 2026-11-01, slot 3, background mode, build of lane/sound521)
+
+Dev probe `MXL_SOUND_PROBE=<file>` (plugin/src/sound_guard.cpp, dev builds only): one line per sound instance start
+(0x1fe590: id, flags, handle), per start failure (0x200620: name, path, channel, code) and per file load request (0x835060:
+the path asked for, 3d, stream, channel hash, priority, result). New dev harness verb `sound <sounds.txt id> [<client unit id>
+[<unit type>]]` (client side): the client play 0x1a0780 on the player. Lab: `mxl2012-runs/sound521/lab.py`
+(`MXL_RUN=<lock> MXL_SLOT=N MXL_SOUND_TRACE=<file> MXL_SOUND_PROBE=<file> MXL_HARNESS_WORDS="volserial tag=sN diag"
+[LAB_MODES=hd,legacy] [LAB_BOSSES=<class>[@<subtiles east>],...] [LAB_SOUNDS=<row name>,...] py -3 lab.py <worktree> <out>`),
+SndPal in the Blood Moor per mode: `item 30@ unique 2186 ground` (Scepter of Tremain, dropsound `singing_sun`), `spawn 1722`
+(l4dwitch, Taunt `witch_awaken`), the LAB_BOSSES spawns (with `@D`: D subtiles east, then `moveto nearest <class>`), the
+LAB_SOUNDS plays. The opens are taken from the raw harness diag log (`NtCreateFile ... .flac`).
+
+| Run (`mxl2012-runs/sound521/`) | Build | Result |
+|-----|------|--------|
+| `runA` | before the fix | both sounds started (no failure) and their load request returned 1, for `data/hd/global/SFX/taunt/witchawaken.flac` / `singingsun.flac`, in HD and legacy; no file opened. The only `data/global/SFX` requests: one burst after the switch to legacy (`witchcrying.flac`, `malewitch.flac` opened then) |
+| `runB` | fix (`data/hd/global/sfx/taunt/` written) | `singingsun.flac`, `witchawaken.flac`, `witchcrying.flac`, `malewitch.flac`, `mcsdying.flac` opened from `data\hd\global\SFX\taunt\` in HD and in legacy (`runB/taunt-opens.txt`). LAB_BOSSES 1740, 1655, 1092, 1068, 1129, 1132, 1152: no taunt |
+| `runC` | fix, HD | LAB_BOSSES at 25 subtiles with a walk up: 402 (D2R's Smith), 250 (Summoner), 1068, 1197, 1318, 1740, 1092, 1129: no taunt, D2R's own rows neither (the harness spawn does not give the quest encounter) |
+| `runD` | fix | as runB with 1729: the two sounds opened in both modes again (`runD/taunt-opens.txt`). Its `sound` plays used 0x107dd0, which only asks whether a unit plays a sound (null, nothing started) |
+| `runE` | fix, `sound` on 0x1a0780 | stopped before the result (slot 3 handed back, owner rule 2026-11-01: one slot) |
+
+All finished runs: 0 asserts, game alive in both modes, shared files restored. Median's monsters with a monsounds Taunt:
+879 / 1740 malewitch (smitethewicked), 1068 quest_butcher (butcher_taunt), 1092 quest_inarius (inarius_taunt), 1129 quest_lucion
+and 1132 quest_primus (primus_taunt), 1152 rathma_primus (lucion_taunt), 1183-1187 robots (robot_taunt, no file in Median),
+1197 hiddenboss (god_taunt), 1318 omgitslaz (swallowyoursoul), 1655 mcsboss (mcs_awaken), 1722 / 1729 l4dwitch (witch_awaken);
+the others (andariel, duriel, summoner, smith, ... and their Median copies) use D2R's own taunt rows. Not proven: what the
+speakers play (no audio capture), the boss taunts other than the witch's (not triggered by a spawn).
+
