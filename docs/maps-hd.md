@@ -204,6 +204,22 @@ the three changes that fix what data could fix (for all 17 maps), and one that d
    terrain mesh (`MXL2012_BELIAL_TERRAIN=1`) or sancte's own terrain, also moved under the arrival, is not drawn there either. So
    skipping the plane needs a floor model for belial's platform, and the owner rule allows no new 3D models: **no fix shipped,
    no plugin part.** Testing and shots: docs/testing.md "Lane voidengine".
+   **Lane tunnelfloor (2026-11-01, owner: "option 1", review sheet first; approved: "this is good for now put it in"): fixed,
+   both halves on by default since 0.1.9.**
+   (a) Plugin part `void65` (off word `void65` in `mxl2012-core-off.txt`): the compare at `0x6b4b80`
+   jumps to a stub that skips the plane for level 74 **or** 65 (docs/d2r-addresses.md section 25); room activation
+   (`0x6a1958`) is left as D2R's, its plane being for room type 1 only. (b) the walkways (`MXL2012_BELIAL_WALKWAY=0` leaves them out; `walls_hd.walkway_maps`,
+   `walkway_pieces`, `walkway_cover`, `add_walkway`): the floor of D2R's own Arcane Sanctuary is the mesh of each Sanct
+   scene's `terrain` entity (`act2/arcane/sanctXX/terrain_lod0.model`); the 29 flat ones are the pieces. A greedy cover places
+   them whole, turned in 90 degree steps and moved by whole cells, over belial's 170 platform cells (`terrain_cells`), as plain
+   model entities `mxk_<n>` (D2R's terrain entity's model component, without the terrain component and the physics body,
+   which drew nothing in the earlier tries). No new model: D2R's meshes as they are. Result: 14 pieces cover all 170 cells
+   and draw 15 cells over the void (the inside of the top ring by the north bar, cells 14-16 x 8-9, and four other spots);
+   with no overhang allowed, 45 cells stay bare. In game (slot 2, runs `checks-20261101-044700-s2` now,
+   `-045013-s2` void65 only, `-044226-s2` both; sheet `mxl2012-runs/tunnelfloor/review.png`) with both on, HD shows D2R's
+   starry void round a Sanct stone platform, legacy is unchanged, walking is unchanged (the same 10 legs to the north bar in
+   every build and mode: the bar is reachable on foot), no assert, no crash file. The owner approved row 3 of the sheet; the 15 overhang cells stay (known). Testing,
+   including level 74, Hell and a save and reload with the default build: docs/testing.md "Lane tunnelfloor".
 
 **Arches, roofs and trees** (lane walls4, 2026-10-30). Owner rule: no new 3D models; only D2R's own wall, arch and roof
 models (any act's tile sets), placed with this pipeline; a cell with no fitting D2R model stays as it is and is listed.
@@ -312,15 +328,15 @@ crash file in either run**, VariantTransformTable peak 107 and 105 of 128 (bug #
 | act3/temple/temple5, temple6 | 96 Forgotten Reliquary (one of the two, identical in Median) | yes | temple walls and pillars as in classic; the HD floor is the Kurast biome's grass where classic has temple stone (biome, not walls) |
 | act1/caves/caveroom4 | 15 Hole Level 2 | yes (walls3) | cave rock walls where classic has walls, and the stairs at the arrival as in classic (lane walls3: D2R's `back_stairs01`, item 11). The room is small: 3 wall cells, 84 floor cells, 20 pieces |
 | act3/kurast/excelsior3 | 84 Spider Cave | yes | Kurast walls, stairs and the courtyard as in classic; 68 wall cells stay without (43 tiles no file of the level type has, 25 Kurast corner halves) |
-| act2/arcane/belial | 65 Ancient Tunnels | partial | trims and an arch on the platform; the void around it is still drawn as floor in HD, and classic's arches under the platform edge stay hidden under it (lane walls3: 22 edge pieces are placed there now; lane tunnels: a terrain mesh over the platform, indexed in model_lod_desc.bin, did not change the floor either, so it is not the scene's; closed as a known issue, item 12; lane tunnels65: the level already is a preset level, and the terrain named as D2R names its own did not change it either) |
+| act2/arcane/belial | 65 Ancient Tunnels | yes | trims, arches and gargoyles round the platform; since 0.1.9 (lane tunnelfloor, item 12) the platform floats over D2R's starry void on D2R's Sanct walkways (15 cells of walkway over the void by the north bar). Before: the void was drawn as floor in HD, and classic's arches under the platform edge stayed hidden under it (lane walls3: 22 edge pieces are placed there now; lane tunnels: a terrain mesh over the platform, indexed in model_lod_desc.bin, did not change the floor either, so it is not the scene's; closed as a known issue, item 12; lane tunnels65: the level already is a preset level, and the terrain named as D2R names its own did not change it either) |
 | expansion/morework/epicwhiners | 13 Cave Level 2 | yes | cave walls, stalagmites and rock mounds roughly where classic has them |
 | act1/cathedrl/inarius | 14 Underground Passage Level 2 | yes | cathedral walls, arches and windows as in classic |
 | expansion/icecave/rockisdead | 116 Drifter Cavern | yes | ice cave walls and ledges where classic has walls (classic is Median's brown cave colour) |
 | the 8 retextured maps | 60, 59, 95, 18, 98, 126, 125, 127 | yes | as in lanes walls / wallsfix; glados and cypherpunk now also show Kurast stairs and Travincal trench pieces on floor tiles; charismatic (lane walls3, items 9-10): the Fortress walls, gargoyle pillars and columns now stand along classic's walls (before they floated 3-4 tiles off) and 81 wall cells are left without a model (was 366); lane walls4 (items 13-15): charismatic's arcades have D2R's arches and gargoyle columns and its 7 roofed buildings D2R's Fortress huts; the tall pointed arch and the long roofed walls stay without; downtown has Harrogath's dead trees where classic has trees |
 
-Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 2 show only part of them (belial:
-the void drawn as floor; charismatic: arches and hut roofs since lane walls4, but not the tall pointed arch and the long
-roofed walls) and all 17 show D2R's stock walls, not Median's colours. Lane
+Known-issue count in the alpha release notes: 17 maps without walls in HD before, 0 now; 2 showed only part of them (belial:
+the void drawn as floor, fixed in 0.1.9 by lane tunnelfloor; charismatic: arches and hut roofs since lane walls4, but not
+the tall pointed arch and the long roofed walls) and all 17 show D2R's stock walls, not Median's colours. Lane
 walls3 (2026-10-30, slot 2, runs `checks-20261030-120504-s2` and `checks-20261030-121747-s2`, docs/testing.md "Lane walls3")
 re-checked caveroom4, belial, charismatic, glados and downtown in HD and classic. Lane walls4 (slot 3, run
 `checks-20261030-175423-s3`, docs/testing.md "Lane walls4") re-checked charismatic, downtown and macumba.

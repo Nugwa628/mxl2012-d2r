@@ -4795,3 +4795,72 @@ and 1132 quest_primus (primus_taunt), 1152 rathma_primus (lucion_taunt), 1183-11
 the others (andariel, duriel, summoner, smith, ... and their Median copies) use D2R's own taunt rows. Not proven: what the
 speakers play (no audio capture), the boss taunts other than the witch's (not triggered by a spawn).
 
+## Lane tunnelfloor: void65 and D2R's walkways in the Ancient Tunnels (2026-11-01, slot 2, background mode, build of lane/tunnelfloor; in 0.1.9)
+
+Owner (2026-11-01, "option 1", review sheet first): skip HD's ground plane on level 65 too, and floor belial's platform with
+D2R's own Arcane Sanctuary pieces. The owner approved row 3 of the review sheet ("this is good for now put it in"), so both
+are **on by default since 0.1.9**: the plugin part `void65` (off word `void65` in `mxl2012-core-off.txt`, as every other part)
+and the walkways (built unless `MXL2012_BELIAL_WALKWAY=0`; tools/walls_hd.py `walkway_maps`; the Sanct scenes and meshes
+are read from the D2R extraction, the shared cache, or once from a slot's CASC with `MXL_SLOT`). Addresses:
+docs/d2r-addresses.md section 25; what the pieces are: docs/maps-hd.md item 12.
+
+The review runs below were made while both were still off by default: then `void65` was opt-in by a line in a separate file
+`mxl2012-core-on.txt` (dropped when it went on by default) and the walkways needed `MXL2012_BELIAL_WALKWAY=1`.
+
+New check `tunnelfloor` (tools/game_checks.py, tests `tools/test_game_checks_tunnelfloor.py`): per mode (`MXL_TF_MODES`,
+default `hd,legacy`, G set in the Act 2 town) `h level 65`, a shot at the arrival, then the walk to the north bar in legs
+(`TF_ROUTE`, belial.ds1 cells; the monsters near the route killed by `kill` first, a lost leg retried once from the leg
+before), shots at the neck (cell 16,20) and the north bar (cell 16,7) on the way; in the first mode the game's `walkmap`
+from each leg's stop into `tf_<tag>_walkmap.txt`. `MXL_TF_TAG` names the build in the shot names. JUDGED: level reached,
+every leg walked, no assert; the look by hand. `place` is not used: the level is 40x40-sub-tile rooms and `place` is
+refused away from the active ones (first run `checks-20261101-041917-s2`).
+
+```
+py -3 tools/build.py                                  # both on (MXL2012_BELIAL_WALKWAY=0: no walkways; off word void65: no patch)
+MXL_RUN=tunnelfloor MXL_SLOT=2 MXL_CHAR=TunnelFloor MXL_CHAR_CLASS=paladin MXL_TF_TAG=default MXL_VOID_LEVELS=74 MXL_VOID_MODES=hd \
+  py -3 tools/game_checks.py all void_maps tunnelfloor tfreload tfhell
+```
+
+Checks `tfreload` (HD: the walk in 65 (`tf_visit`, tag `reload1`), Save and Exit from inside 65, Play, the `mxl` void65 line
+read again, the walk once more, tag `reload2`) and `tfhell` (Hell opened by a save edit of the closed character, rc_setup
+progression 10, entered from the difficulty dialog; the walk in HD, tag `hell`) cover the cases the review runs left out;
+`void_maps` with `MXL_VOID_LEVELS=74 MXL_VOID_MODES=hd` shows the Arcane Sanctuary with the patch.
+
+The lane ran one build (`MXL2012_BELIAL_WALKWAY=1`) and swapped belial.json and the on-file in the slot per run
+(`mxl2012-runs/tunnelfloor/scratch/slot_run.sh`: lock, install, run, remove the on-file, unlock):
+
+| run | build | result |
+|---|---|---|
+| `checks-20261101-044700-s2` | now: no on-file, belial without walkways | PARTIAL (look by hand): HD the stone plane over the void; all 10 legs walked in HD and legacy; no assert |
+| `checks-20261101-045013-s2` | patch: `void65`, belial without walkways | PARTIAL: HD the starry void, and the platform floor gone (edge trims and arches left), as lane voidengine's memory test; all legs walked; no assert |
+| `checks-20261101-044226-s2` | walk: `void65` + walkways | PARTIAL: HD D2R's Sanct floor on the platform, the starry void round it; all legs walked; no assert, no crash file |
+
+Walking and collision: the same 10 legs were walked from the arrival to the north bar in HD and legacy in all three builds,
+so **the north bar is reachable on foot** (the route: south block, neck, the 2-tile middle column, the top ring's west
+side; monsters standing in the column stopped the first walks, hence the `kill`). The merged walkmaps
+(`tf_now|patch|walk_walkmap.txt`, rays from the leg stops) have 976 / 940 / 954 free points, 929 of them common to all three; the
+rest are ray ends of stops a few sub-tiles apart. Collision is the server's (.ds1 / .dt1), which neither switch touches.
+
+Sheet: `mxl2012-runs/tunnelfloor/review.png` (rows HD now, HD void65 only, HD void65 + walkways, legacy; columns arrival,
+neck, north bar). Where the pieces do not line up: no gap (all 170 platform cells covered, by 14 pieces), but 15 cells of
+overhang, floor drawn where the game has void: the inside of the top ring next to the north bar (cells 14-16, 8-9: the bar
+shot shows floor beside the bar where legacy has void, with two square holes left), cells 19,11, 14,12, 20,12 and a strip
+west of the left column (x 9-11, rows 23-26). A cover with no overhang leaves 45 cells bare (the whole top ring and the
+right column), so it is not an option with these pieces.
+
+The owner chose (2026-11-01) row 3 with the overhang, on by default. Default build, one run (lock, install, run, unlock;
+`mxl2012-runs/tunnelfloor/scratch/slot_run_default.sh`):
+
+| check (run `checks-20261101-055117-s2`, character TunnelFloor) | result |
+|---|---|
+| `void_maps` 74 HD | PARTIAL (look by hand): the `mxl` line `void65: no HD ground plane on levels 74 and 65`; the Arcane Sanctuary keeps its Sanct floor and the starry void as before (`void_74_hd_0..2.png`); no assert |
+| `tunnelfloor` HD and legacy, Normal | PARTIAL (look by hand): HD as row 3 of the review sheet (the build's belial.json is byte for byte the reviewed walkway scene); all 10 legs walked in both modes; no assert |
+| `tfreload` HD | PARTIAL (look by hand): Save and Exit from inside 65, Play: back in the game (Lut Gholein, area 40), void65 installed again; 65 walked before and after with the same floor (`tf_reload1_*`, `tf_reload2_*`); no assert |
+| `tfhell` HD | PARTIAL (look by hand): Hell entered from the difficulty dialog (difficulty 2); 65 the same floor and void, all legs walked; no assert |
+
+d2rloader.log 0 ERROR / ASSERT lines in the run; the 5 mxl2012-core.log lines the report counts are the plugin's own start-up
+INFO lines (parts that skip D2R asserts); 0 crash files. Sheet: `mxl2012-runs/tunnelfloor/default_checks.png` (rows: 74 HD,
+65 HD Normal, 65 HD after the reload, 65 HD in Hell). Not tested: other classes (the floor is the same scene for every class).
+
+Evidence: `mxl2012-runs/tunnelfloor/` (`review.png`, `default_checks.png`, `run-default.log`, `run-now-final.log`, `run-patch-final.log`, `run-walk-final.log`,
+`install-*.log`, `scenes/belial_walk.json`, `scenes/belial_nowalk.json`, `scratch/`); shots and walkmaps in the run folders.

@@ -1128,7 +1128,7 @@ ControllerManager (`D2Client/src/Game/ControllerManager`), the same queue as the
 A targeted melee skill (`range h2h`, `TargetableOnly 1`) quick-cast with no monster under the cursor does nothing, in
 vanilla rows (Bash) and Median rows alike (bugs.md #54).
 
-## 25. The HD ground plane and the level-74 skip (lane voidengine, 2026-10-31; no plugin code)
+## 25. The HD ground plane and the level-74 skip (lane voidengine, 2026-10-31; plugin part `void65`, lane tunnelfloor)
 
 Why Median's Ancient Tunnels (level 65, `act2/arcane/belial.ds1`) show stone over the void in HD: docs/maps-hd.md item 12.
 
@@ -1144,6 +1144,23 @@ Why Median's Ancient Tunnels (level 65, `act2/arcane/belial.ds1`) show stone ove
 Test (memory patch of a running slot-1 game, not shipped): the byte at `0x6b4b86` 0x4a -> 0x41 makes level 65 skip the plane:
 the void shows, and so does the loss of the platform floor (run `checks-20261031-183526-s1`). A byte search of .text finds
 `cmp dword ptr [reg+0x1f8], 0x4a` only here and at `0x3f357b` (a compare through a register first is not covered by it).
+
+**Plugin part `void65` (lane tunnelfloor, 2026-11-01; on by default since 0.1.9, off word `void65`: `plugin/src/void_floor.cpp`, `void_floor_logic.h`).**
+It skips the plane for 74 **and** 65 (the byte patch above lost 74's skip). Room loop context, all compared before writing:
+
+| What | D2R 93847 |
+|---|---|
+| the room's level: `mov rax, qword ptr [r14+0x90]` | `0x6b4b79` (`49 8b 86 90 00 00 00`) |
+| the site (13 bytes, the compare and its `je`) -> `jmp 0x6b4a22` + 8 `nop` | `0x6b4b80` |
+| after the branch: `cmp byte ptr [rsi+8], 0` (the plane's own checks; the stub's way on) | `0x6b4b8d` |
+| next room: `add rsi,0x10 / cmp rsi,r13 / jne 0x6b4b76` (the stub's way for a skipped level) | `0x6b4e19` |
+| pad: 14 int3 bytes between the previous function and `0x6b4a30` -> `jmp qword ptr [rip]` to the stub | `0x6b4a22`-`0x6b4a2f` |
+
+The stub (plugin memory) is `cmp dword ptr [rax+0x1f8], 74 / je skip / cmp ..., 65 / je skip / jmp [rip] 0x6b4b8d / skip: jmp
+[rip] 0x6b4e19`: no register is changed, and flags are dead at both targets. Room activation (`0x6a1958`) is left as D2R's:
+its plane is for room type 1 only, and belial's rooms all come from its one preset (type 2; the game splits it into 40x40-sub-tile
+rooms, `presets rooms`); the memory test above showed the void with only
+the loop changed. No other int3 gap of 31+ bytes lies within `0x6a0000`-`0x6c0000`, hence the two jumps.
 
 ## Unknown / next steps
 

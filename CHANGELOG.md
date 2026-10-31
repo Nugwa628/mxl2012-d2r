@@ -5,12 +5,27 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-**Fixed:**
+## D2R-XL 2012
+
+### 0.1.9 (2026-11-01)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.9:**
 
 - Median XL's own sounds (the witch's taunt, Singing Sun, skill shouts, item and monster sounds) are now heard
-  every time, in HD and classic; before, the game only found them for a moment after switching graphics (#521).
+  every time, in HD and classic. In 0.1.8 the game only found them for a moment after switching graphics, so most
+  of them stayed silent (#521).
 
-## D2R-XL 2012
+**New in HD:**
+
+- The Ancient Tunnels now float over the starry void like the Arcane Sanctuary, on walkways of the Sanctuary's own
+  stone, where HD used to draw plain stone floor over the whole void.
+
+**Known:** in HD, Median's runes still show their classic pictures scaled up, Khalimgrad's cathedral has no tall
+pointed arch and long roofed walls yet, and the HD pet row shows at most 9 icons (D2R's own limit).
 
 ### 0.1.8 (2026-11-01)
 

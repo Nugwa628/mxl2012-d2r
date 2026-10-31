@@ -117,6 +117,143 @@ def terrain_maps(env=None) -> dict:
     """The maps that get a terrain mesh: TERRAIN_MAPS, plus TERRAIN_TRY when the environment has TERRAIN_SWITCH=1."""
     env = os.environ if env is None else env
     return {**TERRAIN_MAPS, **(TERRAIN_TRY if env.get(TERRAIN_SWITCH) == "1" else {})}
+
+
+# Lane tunnelfloor (2026-11-01, owner "option 1"; approved for 0.1.9, on by default): with the plugin's `void65` part D2R skips its
+# ground plane on level 65 too (docs/d2r-addresses.md section 25), and belial's platform loses its HD floor with it. The
+# floor then comes from D2R's own Arcane walkways: the terrain meshes of D2R's Sanct scenes (the walkway floor of each 13x13
+# Sanctuary room, flat ones only, no stairs) placed as plain model entities (no terrain component, no physics) over the
+# platform's floor cells, turned in steps of 90 degrees (walkway_cover). No new model: the scene names D2R's own files.
+WALKWAY_SWITCH = "MXL2012_BELIAL_WALKWAY"
+WALKWAY_TRY = {"act2/arcane/belial.ds1": "act2/arcane/"}   # map -> the D2R folder whose scenes' terrains are the pieces
+WALKWAY_PENALTY = 2.0     # walkway_cover: a cell drawn over the void costs this many platform cells covered
+
+
+def walkway_maps(env=None) -> dict:
+    """The maps that get D2R's walkway pieces: WALKWAY_TRY, none when the environment has WALKWAY_SWITCH=0."""
+    env = os.environ if env is None else env
+    return {} if env.get(WALKWAY_SWITCH) == "0" else dict(WALKWAY_TRY)
+
+
+def mesh_cells(pos, tris, flat=0.01):
+    """The tile cells a terrain mesh covers whole (the 4 quarter points of the cell on a triangle), None when the mesh is not
+    flat at y = 0 (a walkway with stairs or a lower floor: it would hang in the air on a flat platform)."""
+    if not pos or any(abs(p[1]) > flat for p in pos):
+        return None
+    g = Ground(pos, tris, near=0)
+    out = set()
+    for (cx, cz), lst in g.cells.items():
+        def on(x, z):
+            for n in lst:
+                a, b, c = (pos[i] for i in tris[n])
+                d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2])
+                if abs(d) < 1e-9:
+                    continue
+                u = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d
+                v = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d
+                if u >= -1e-6 and v >= -1e-6 and u + v <= 1 + 1e-6:
+                    return True
+            return False
+        if all(on((cx + qx) * TILE, (cz + qz) * TILE) for qx in (0.25, 0.75) for qz in (0.25, 0.75)):
+            out.add((cx, cz))
+    return out
+
+
+def walkway_pieces(scenes, scene_of=None, mesh_of=None) -> dict:
+    """{scene key: (terrain model game path, frozenset of cells)} of the given D2R scenes that have a flat terrain mesh.
+    scene_of(key) -> scene json (default d2r_scene); mesh_of(rel lod0 path) -> (positions, triangles) (default: read by
+    d2r_bytes and terrain_mesh)."""
+    import d2r_model
+    scene_of = scene_of or d2r_scene
+
+    def read_mesh(rel):
+        data = d2r_bytes(rel)
+        return terrain_mesh(d2r_model.parse_tree(d2r_model.Gr2File.read(data))) if data else ([], [])
+    mesh_of = mesh_of or read_mesh
+    out = {}
+    for key in sorted(scenes):
+        scene = scene_of(key)
+        rel = terrain_path(scene) if scene else None
+        if not rel:
+            continue
+        cells = mesh_cells(*mesh_of(rel))
+        if cells:
+            comp = next(c for c in scene["terrain"]["components"] if c.get("type") == "ModelDefinitionComponent")
+            out[key] = (comp["filename"], frozenset(cells))
+    return out
+
+
+def turn_cells(cells, r: int):
+    """Cells of a mesh turned r times by -90 degrees round the y axis (x, z -> -z, x; footprint()'s convention): cell
+    (x, z) spans x..x+1, z..z+1, so it lands on (-z - 1, x)."""
+    for _ in range(r % 4):
+        cells = [(-z - 1, x) for x, z in cells]
+    return list(cells)
+
+
+def walkway_cover(floor, pieces: dict, penalty=WALKWAY_PENALTY, turns=4):
+    """Greedy cover of the platform cells `floor` with the pieces (walkway_pieces), each placed whole, turned and moved by
+    whole cells. Each step takes the placement that covers the most cells still bare, less `penalty` per cell it adds over
+    the void; it stops when every cell is covered or no placement covers a new one.
+    -> ([(scene key, turns, dx, dz, frozenset of its cells)], covered cells, cells over the void)."""
+    floor = set(floor)
+    cands = {}
+    for key, (_model, cells) in sorted(pieces.items()):
+        for r in range(turns):
+            turned = turn_cells(cells, r)
+            for fx, fz in sorted(floor):
+                for ax, az in turned:
+                    dx, dz = fx - ax, fz - az
+                    if (key, r, dx, dz) not in cands:
+                        cands[(key, r, dx, dz)] = frozenset((x + dx, z + dz) for x, z in turned)
+    covered, over, chosen = set(), set(), []
+    order = sorted(cands)
+    while covered < floor:
+        best, score = None, 0.0
+        for k in order:
+            m = cands[k]
+            new = len((m & floor) - covered)
+            if not new:
+                continue
+            s = new - penalty * len(m - floor - over)
+            if best is None or s > score:
+                best, score = k, s
+        if best is None:
+            break
+        m = cands[best]
+        chosen.append(best + (m,))
+        covered |= m & floor
+        over |= m - floor
+    return chosen, covered, over
+
+
+def walkway_entity(model: str, r: int, dx: int, dz: int, n: int) -> dict:
+    """A plain model entity drawing D2R's walkway mesh `model` turned r times by -90 degrees and moved by (dx, dz) cells:
+    D2R's terrain entity's model component (sancte's) without the terrain component and the physics body."""
+    a = -math.pi / 2 * (r % 4)
+    name = "mxk_%d" % n
+    return {"type": "Entity", "name": name, "id": 0x6D7F0000 + n, "components": [
+        {"type": "TransformDefinitionComponent", "name": name + "_t", "position": {"x": dx * TILE, "y": 0.0, "z": dz * TILE},
+         "orientation": {"x": 0.0, "y": round(math.sin(a / 2), 9), "z": 0.0, "w": round(math.cos(a / 2), 9)},
+         "scale": {"x": 1.0, "y": 1.0, "z": 1.0}, "inheritOnlyPosition": False},
+        {"type": "ModelDefinitionComponent", "name": name + "_m", "filename": model, "visibleLayers": 1, "lightMask": 19,
+         "shadowMask": 3, "ghostShadows": False, "floorModel": False, "terrainBlendEnableYUpBlend": False, "terrainBlendMode": 1}]}
+
+
+def add_walkway(text: str, floor, pieces: dict):
+    """A scene_json() text with the walkway pieces over `floor` (walkway_cover), their models named in the dependencies.
+    -> (text, stats)."""
+    chosen, covered, over = walkway_cover(floor, pieces)
+    scene = json.loads(text)
+    ents = [walkway_entity(pieces[k][0], r, dx, dz, n) for n, (k, r, dx, dz, _m) in enumerate(chosen)]
+    scene["entities"] = scene.get("entities", []) + ents
+    have = {d["path"] for d in scene["dependencies"].get("models", [])}
+    scene["dependencies"]["models"] = scene["dependencies"].get("models", []) + [
+        {"path": m} for m in sorted({pieces[k][0] for k, *_ in chosen} - have)]
+    stats = {"walkway_pieces": len(chosen), "walkway_cells": len(set(floor)), "walkway_covered": len(covered),
+             "walkway_bare": sorted(set(floor) - covered), "walkway_over": sorted(over),
+             "walkway_placed": [(k, r, dx, dz) for k, r, dx, dz, _m in chosen]}
+    return json.dumps(scene, separators=(",", ":")), stats
 LOD_DESC = "data/hd/model_lod_desc.bin"
 KEEP_COMPONENTS = {"TransformDefinitionComponent", "ModelDefinitionComponent", "ModelVariationDefinitionComponent",
                    "ModelPlatformTierComponent", "WallTransparencyComponent"}
@@ -1098,13 +1235,15 @@ def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground
     return wanted, cells, lib
 
 
-def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None, terrain=None):
+def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None, terrain=None, walkways=None):
     """Write the wall scenes. -> {map: stats + bytes}. biomes: {map: biome name}; None = the biome of the scene maps_hd's
     build wrote into data_dir (a generated floor biome, maps_hd.floor_biomes), else the plan's. The maps of map_tint.TINTS get a
     copy of that biome with their own key light (tools/map_tint.py); read(rel) -> D2R json for it (default fxpaths).
     The maps of `terrain` also get their terrain mesh (terrain_model; d2r_read(rel) -> the template's bytes, default
     d2r_bytes), next to the scene as <map>/terrain_lod0.model, over floors[map] (floor_tiles; default: the map's cells);
-    the map's size is its cells' extent (the corner tiles). terrain: {map: template}, default terrain_maps()."""
+    the map's size is its cells' extent (the corner tiles). terrain: {map: template}, default terrain_maps().
+    walkways: {map: walkway_pieces()} (default none): those maps also get D2R's walkway meshes over terrain_cells(floors[map])
+    (add_walkway)."""
     terrain = terrain_maps() if terrain is None else terrain
     out, lods = {}, []
     for e in wanted:
@@ -1123,6 +1262,9 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
             text = add_terrain(text, "data/hd/env/preset/%s/terrain.model" % e["map"][:-4])
             lods.append(lod_entry(e["map"], terrain[e["map"]], model))
             st = dict(st, terrain_cells=len(ground), terrain_bytes=len(model))
+        if (walkways or {}).get(e["map"]):
+            text, ws = add_walkway(text, terrain_cells((floors or {}).get(e["map"]) or cells[e["map"]]), walkways[e["map"]])
+            st = dict(st, **ws)
         dest.write_text(text, encoding="utf-8")
         out[e["map"]] = dict(st, bytes=len(text.encode("utf-8")), biome=biome)
     write_lod_desc(data_dir, lods, d2r_read)
@@ -1181,7 +1323,14 @@ def main(argv=None):
     if a.cmd != "build":     # no maps_hd build in this folder: write the floor biomes here too
         maps, dt1s, _levels = maps_hd.plan(inp)
         biomes = maps_hd.floor_biomes(data_dir, maps, dt1s)
-    stats = build(data_dir, wanted, cells, lib, biomes, floors={m: floor_tiles(inp, m) for m in terrain_maps() if m in cells})
+    walk = {m: walkway_pieces([k[:-len(".ds1")] for k in inp.d2r_tiles.keys(".ds1") if k.startswith(folder)])
+            for m, folder in walkway_maps().items() if m in cells}
+    stats = build(data_dir, wanted, cells, lib, biomes, floors={m: floor_tiles(inp, m) for m in {**terrain_maps(), **walk} if m in cells},
+                  walkways=walk)
+    for m, st in stats.items():
+        if "walkway_pieces" in st:
+            print("%s: %d walkway pieces cover %d of %d platform cells; bare %s; over the void %s" % (
+                m, st["walkway_pieces"], st["walkway_covered"], st["walkway_cells"], st["walkway_bare"], st["walkway_over"]))
     table = md_table(stats, lib)
     if a.cmd in ("report", "docs"):
         f, t, n = self_check(inp, lib)

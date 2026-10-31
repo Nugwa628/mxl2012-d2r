@@ -59,6 +59,8 @@
 //      keeps them closed without RotW), and the classic item picture skips an item without a draw record (rotw_stash.cpp, off word rotwstash, #516);
 //   +  a unit other than the player that the client's unit reassign (server command 0x15) leaves without a client room is left
 //      so instead of D2R's "Could not get act!" end of the game (reassign_guard.cpp, off word reassign, #511 / #292);
+//   +  HD draws no ground plane on Median's Ancient Tunnels (level 65) either, as D2R does on 74, so its void shows round the
+//      platform the build floors with D2R's Arcane walkways (void_floor.cpp, off word void65, docs/maps-hd.md item 12);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
@@ -93,6 +95,7 @@
 #include "merc_equip.h"
 #include "translation_guard.h"
 #include "vo_chat.h"
+#include "void_floor.h"
 
 #include <windows.h>
 #include <tlhelp32.h>
@@ -105,7 +108,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.8";
+constexpr const char* PluginVersion = "0.1.9";
 constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -150,7 +153,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign savemode rotwstash), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign savemode rotwstash void65), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -430,6 +433,7 @@ char g_appleUseReport[192] = "";
 char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
 char g_rotwStashReport[256] = "";
+char g_voidFloorReport[160] = "";
 char g_harnessReport[192] = "";
 char g_saveModeReport[MAX_PATH + 160] = "";
 bool g_partsInstalled = false;
@@ -603,6 +607,7 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	std::snprintf(line, sizeof(line), "%s; stash inits %ld (classic: pages wired %ld, left as D2R %ld), item pictures skipped %ld; game type %d, %s",
 	              g_rotwStashReport, rs.inits, rs.classicWired, rs.classicLeft, rs.skipped, rs.gameType, rs.hd ? "HD" : "legacy");
 	SayPart(command, "rotwstash", line);
+	Say(command, Off("void65") ? "void65 off: left out by mxl2012-core-off.txt" : g_voidFloorReport);
 	std::snprintf(line, sizeof(line), "client wall calls %ld", ClientWallCalls());
 	Say(command, line);
 	std::snprintf(line, sizeof(line), "testharness %s", g_harnessReport[0] != '\0' ? g_harnessReport : "off");
@@ -802,6 +807,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("rotwstash")) {
 		InstallRotwStash(context, g_rotwStashReport, sizeof(g_rotwStashReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_rotwStashReport);
+		context->LogInfo(line);
+	}
+	if (!Off("void65")) {
+		InstallVoidFloor(context, g_voidFloorReport, sizeof(g_voidFloorReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voidFloorReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cltdostub")) {

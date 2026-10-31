@@ -81,8 +81,9 @@ What we know is wrong or different. Please don't report these again, unless you 
 - **Stand-in HD art.** Many Median-only monsters, missiles, effects and items show a borrowed or recoloured D2R model or
   picture in HD. Legacy graphics (G) show Median's own classic art where it has one.
 - **Median's own maps show D2R's walls in HD.** The 17 maps that Median added or changed have D2R's own walls in Median's
-  layout in HD, lit in each map's own colour as in legacy mode; 2 of them show only part of their walls (Ancient Tunnels: the void
-  around the platform is drawn as floor; Khalimgrad's cathedral: no tall pointed arch and long roofed walls). Legacy graphics (G) show them as Median drew them.
+  layout in HD, lit in each map's own colour as in legacy mode; the Ancient Tunnels float over the starry void on walkways of
+  the Arcane Sanctuary's stone, and Khalimgrad's cathedral still shows only part of its walls (no tall pointed arch and long
+  roofed walls). Legacy graphics (G) show them as Median drew them.
 - **Item pictures in HD:** most items use D2R's own HD pictures, many Median-only ones D2R's HD art in Median's colours;
   about 45 (Median's runes, the arcane crystals, catalysts and a few more) are still Median's classic pictures scaled up, so
   they look softer.

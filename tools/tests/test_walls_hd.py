@@ -4,6 +4,7 @@
 """
 import collections
 import json
+import math
 import struct
 import sys
 import tempfile
@@ -724,6 +725,82 @@ class PieceTest(unittest.TestCase):
         self.assertEqual(lib.fit({(10 + n, 7): k for n, k in enumerate(self.KEYS[:3])}), [])
         self.assertEqual(lib.fit({(10 + n % 3, 7 + n // 3): self.KEYS[0] for n in range(6)}), [])
         self.assertEqual(walls_hd.learn_library.__defaults__[-1], None)                  # no boxes: no set pieces by layout
+
+
+def quads(cells, y=0.0):
+    """(positions, triangles) of flat quads over tile cells, as a terrain mesh."""
+    pos, tris = [], []
+    for x, z in cells:
+        b = len(pos)
+        pos += [(x * 10.0, y, z * 10.0), ((x + 1) * 10.0, y, z * 10.0), ((x + 1) * 10.0, y, (z + 1) * 10.0), (x * 10.0, y, (z + 1) * 10.0)]
+        tris += [(b, b + 2, b + 1), (b, b + 3, b + 2)]
+    return pos, tris
+
+
+class WalkwayTest(unittest.TestCase):
+    """Lane tunnelfloor: D2R's Sanct walkway meshes over belial's platform, on by default, out with MXL2012_BELIAL_WALKWAY=0."""
+
+    def test_on_by_default_and_0_leaves_them_out(self):
+        self.assertEqual(walls_hd.walkway_maps({}), {"act2/arcane/belial.ds1": "act2/arcane/"})
+        self.assertEqual(walls_hd.walkway_maps({walls_hd.WALKWAY_SWITCH: "1"}), {"act2/arcane/belial.ds1": "act2/arcane/"})
+        self.assertEqual(walls_hd.walkway_maps({walls_hd.WALKWAY_SWITCH: "0"}), {})
+
+    def test_mesh_cells_whole_cells_only_and_flat(self):
+        pos, tris = quads([(1, 2), (2, 2)])
+        self.assertEqual(walls_hd.mesh_cells(pos, tris), {(1, 2), (2, 2)})
+        pos, tris = quads([(1, 2)], y=8.5)
+        self.assertIsNone(walls_hd.mesh_cells(pos, tris))       # stairs / a raised floor: not a piece
+        # a triangle over half a cell does not cover it
+        self.assertEqual(walls_hd.mesh_cells([(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (0.0, 0.0, 10.0)], [(0, 2, 1)]), set())
+
+    def test_turn_cells_matches_footprint(self):
+        # one turn: x, z -> -z, x; cell (x, z) spans x..x+1 so lands on (-z - 1, x); four turns are the identity
+        self.assertEqual(walls_hd.turn_cells([(0, 0), (3, 1)], 1), [(-1, 0), (-2, 3)])
+        self.assertEqual(walls_hd.turn_cells([(3, 1)], 4), [(3, 1)])
+        e = walls_hd.walkway_entity("m.model", 1, 0, 0, 0)
+        q = walls_hd.transform(e)["orientation"]
+        a = 2 * math.atan2(q["y"], q["w"])
+        # footprint()'s rotation of the point (5, 1) (inside cell (0, 0) of a 1-cell mesh at (0, 0), turned once)
+        x, z = 5 * math.cos(a) + 1 * math.sin(a), -5 * math.sin(a) + 1 * math.cos(a)
+        self.assertEqual((int(x // 10), int(z // 10)), walls_hd.turn_cells([(0, 0)], 1)[0])
+
+    def test_cover_prefers_inside_and_reports_overhang(self):
+        floor = {(x, 0) for x in range(6)} | {(0, 1)}
+        pieces = {"bar": ("bar.model", frozenset({(0, 0), (1, 0), (2, 0)})), "dot": ("dot.model", frozenset({(5, 5)}))}
+        chosen, covered, over = walls_hd.walkway_cover(floor, pieces)
+        self.assertEqual(covered, floor)
+        self.assertEqual(over, set())
+        self.assertTrue(all(m <= floor for *_k, m in chosen))
+        # a floor only a bigger piece reaches: covered, with the cells it hangs over the void listed
+        chosen, covered, over = walls_hd.walkway_cover({(0, 0), (1, 0)}, {"bar": pieces["bar"]})
+        self.assertEqual(covered, {(0, 0), (1, 0)})
+        self.assertEqual(len(chosen), 1)
+        self.assertEqual(len(over), 1)
+
+    def test_add_walkway_entities_and_dependencies(self):
+        text = walls_hd.scene_json("act2_arcane", [])
+        pieces = {"act2/arcane/sanctn": ("data/hd/env/preset/act2/arcane/sanctN/terrain.model", frozenset({(0, 0), (1, 0)}))}
+        out, st = walls_hd.add_walkway(text, {(4, 4), (5, 4)}, pieces)
+        scene = json.loads(out)
+        self.assertEqual(st["walkway_covered"], 2)
+        self.assertEqual(st["walkway_over"], [])
+        self.assertEqual(len(scene["entities"]), 1)
+        e = scene["entities"][0]
+        self.assertEqual({c["type"] for c in e["components"]}, {"TransformDefinitionComponent", "ModelDefinitionComponent"})
+        self.assertEqual(walls_hd.model_of(e), "data/hd/env/preset/act2/arcane/sanctN/terrain.model")
+        self.assertIn({"path": "data/hd/env/preset/act2/arcane/sanctN/terrain.model"}, scene["dependencies"]["models"])
+        pos = walls_hd.transform(e)["position"]
+        cells = walls_hd.turn_cells(pieces["act2/arcane/sanctn"][1], st["walkway_placed"][0][1])
+        self.assertEqual({(x + int(pos["x"] // 10), z + int(pos["z"] // 10)) for x, z in cells}, {(4, 4), (5, 4)})
+
+    def test_pieces_from_scenes(self):
+        scenes = {"a/flat": {"terrain": {"components": [{"type": "ModelDefinitionComponent", "filename": "data/hd/env/preset/a/Flat/terrain.model"}]}},
+                  "a/stairs": {"terrain": {"components": [{"type": "ModelDefinitionComponent", "filename": "data/hd/env/preset/a/Stairs/terrain.model"}]}},
+                  "a/none": {"terrain": {}}}
+        meshes = {"data/hd/env/preset/a/flat/terrain_lod0.model": quads([(0, 0)]),
+                  "data/hd/env/preset/a/stairs/terrain_lod0.model": quads([(0, 0)], y=-8.5)}
+        got = walls_hd.walkway_pieces(scenes, scene_of=scenes.get, mesh_of=meshes.get)
+        self.assertEqual(got, {"a/flat": ("data/hd/env/preset/a/Flat/terrain.model", frozenset({(0, 0)}))})
 
 
 if __name__ == "__main__":

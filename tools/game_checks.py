@@ -13204,5 +13204,191 @@ def check_void_maps():
 
 CHECKS += [("void_maps", check_void_maps)]
 
+# ---- lane tunnelfloor: the Ancient Tunnels with the void65 part and D2R's walkway pieces (on in 0.1.9) ----------------------
+# SHORTCUT (named in the notes): `h level` 40 and 65, god mode, `kill` of the monsters near the route. The shots are taken on the
+# player's own walk (`move` legs, no place), and the walk collision is the game's (`walkmap` from each leg's stop, merged).
+TF_SPOTS = (("neck", (16, 20)), ("bar", (16, 7)))   # belial.ds1 cells: the neck of the platform, the north bar
+TF_WALK_STEP = 2
+# The walk from the arrival to the north bar in legs, belial.ds1 cells on the route the .dt1 walk flags give (lane tunnelfloor,
+# scratch/walkgrid.py): `place` is refused where no room is active (the level is 40-sub-tile rooms) and one straight walk sticks
+# at the south block (run checks-20261101-041917-s2: at 20068,5111).
+TF_ROUTE = ((14, 27), (16, 25), (18, 23), (16, 20), (16, 16), (16, 13), (14, 11), (12, 9), (13, 7), (16, 7))
+
+
+def tf_grid_text(known, step=TF_WALK_STEP):
+    """The merged walk map as text rows (for the run folder: compared between builds)."""
+    if not known:
+        return []
+    xs, ys = [k[0] for k in known], [k[1] for k in known]
+    return ["%d %s" % (y, "".join(known.get((x, y), "?") if isinstance(known.get((x, y), "?"), str) else "o"
+                                  for x in range(min(xs), max(xs) + 1, step))) for y in range(min(ys), max(ys) + 1, step)]
+
+
+def tf_visit(mode, tag, log, shots, rows, bad, known=None):
+    """One visit of level 65 in the graphics already set: `h level 65`, a shot `tf_<tag>_<mode>_arrival`, then the walk to the
+    north bar in legs (TF_ROUTE; the monsters near the route killed first, a lost leg tried once more from the leg before),
+    shots at the neck and the bar on the way, the asserts of the visit. `known` (a dict): the game's walkmap at each leg's stop
+    merged into it. Rows and problems go to `rows` / `bad`. -> (origin, arrival) or None when 65 was not reached."""
+    m2 = engine_mark()
+    p = goto(T65_LEVEL, timeout=60)["player"]
+    if p.get("area") != T65_LEVEL:
+        bad.append("%s: 65 not reached (area %s)" % (mode, p.get("area")))
+        return None
+    time.sleep(6)  # the scene and its models stream in
+    arrival = (p.get("x"), p.get("y"))
+    shots.append(sh("tf_%s_%s_arrival" % (tag, mode)))
+    origin = t65_origin(Hl("presets rooms", log)[1])
+    if origin is None:
+        bad.append("%s: no room origin" % mode)
+        return None
+    legs, spot_cells, kills = [], dict((c, n) for n, c in TF_SPOTS), 0
+    if known is not None:
+        relp_merge(known, relp_walkmap(arrival[0], arrival[1], 120, TF_WALK_STEP))
+    route = t65_spots(origin, TF_ROUTE)
+    for i, (cell, (x, y)) in enumerate(zip(TF_ROUTE, route)):
+        for m in hostiles_near(hstate(), 25):  # monsters stand in the 2-tile column north of the neck (both modes, run
+            H("kill %d" % m["id"])             # checks-20261101-043157-s2); collision is not what is judged here
+            kills += 1
+        walked = acts_walk(x, y, reach=3, timeout=60)
+        if not walked:  # the detour legs lost the way (run checks-20261101-042647-s2, HD): back one leg, once more
+            acts_walk(*(route[i - 1] if i else arrival), reach=3, timeout=60)
+            walked = acts_walk(x, y, reach=3, timeout=90)
+        q = hstate()["player"]
+        legs.append("%d,%d %s" % (cell[0], cell[1], "ok" if walked else "NOT reached (at %s,%s)" % (q.get("x"), q.get("y"))))
+        if known is not None:
+            relp_merge(known, relp_walkmap(q.get("x"), q.get("y"), 60, TF_WALK_STEP))
+        if cell in spot_cells:
+            rows.append("%s %s %s,%s: %s, at %s,%s" % (mode, spot_cells[cell], x, y, "walked" if walked else "NOT reached",
+                                                      q.get("x"), q.get("y")))
+            time.sleep(4)
+            shots.append(sh("tf_%s_%s_%s" % (tag, mode, spot_cells[cell])))
+        if not walked:
+            bad.append("%s: walk leg to cell %d,%d not reached" % (mode, cell[0], cell[1]))
+            break
+    rows.append("%s walk in legs from the arrival %s,%s: %s; monsters killed on the way (`kill`): %d" % (
+        mode, arrival[0], arrival[1], "; ".join(legs), kills))
+    issues, known_issues = engine_issues(m2)
+    rows.append("%s asserts: %s" % (mode, "; ".join(issues + known_issues) or "none"))
+    if issues:
+        bad.append("%s: %s" % (mode, "; ".join(issues)))
+    return origin, arrival
+
+
+def tf_plugin_row():
+    """The plugin's void65 line of the `mxl` command."""
+    return "plugin: %s" % next((ln.strip() for ln in mxl_text().splitlines() if "void65" in ln), "no void65 line")
+
+
+TF_HELP = ["travel by `h level` to 40 and 65", "god mode (cheat god 1)", "monsters near the route killed by `kill`"]
+
+
+def check_tunnelfloor():
+    """Lane tunnelfloor (docs/testing.md "Lane tunnelfloor"): level 65 per graphics mode (MXL_TF_MODES, default hd,legacy),
+    shots `tf_<tag>_<mode>_<spot>` (MXL_TF_TAG names the build: now / patch / walk) at the arrival, the neck and the north bar;
+    each mode walks from the arrival to the north bar in legs (tf_visit), and the first mode merges the game's walk collision
+    (walkmap, step 2) at each leg into `tf_<tag>_walkmap.txt`. JUDGED: level reached, every leg walked, no assert; the look by
+    hand."""
+    if not need_game():
+        add("tunnelfloor", "BLOCKED", "not in the game")
+        return
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    modes = [m.strip() for m in (os.environ.get("MXL_TF_MODES") or "hd,legacy").split(",") if m.strip()]
+    tag = os.environ.get("MXL_TF_TAG") or "run"
+    enable_debug()
+    cheat("god 1")
+    rows.append(tf_plugin_row())
+    for k, mode in enumerate(modes):
+        goto(40, timeout=60)  # G is read from the side bars: set it in a lit town
+        if not set_graphics(mode):
+            bad.append("graphics %s not set" % mode)
+            continue
+        known = {} if k == 0 else None
+        got = tf_visit(mode, tag, log, shots, rows, bad, known)
+        if got and known is not None:
+            free = sum(1 for v in known.values() if v == ".")  # rays from each leg's stop: the walked legs are the route test
+            rows.append("walk collision (walkmap step %d, rays from each leg's stop): %d free points" % (TF_WALK_STEP, free))
+            with open(os.path.join(g.current_run(), "tf_%s_walkmap.txt" % tag), "w", encoding="utf-8") as f:
+                f.write("\n".join(["origin %s,%s arrival %s,%s" % (got[0] + got[1])] + tf_grid_text(known)) + "\n")
+    goto(1, timeout=60)
+    set_graphics("hd")
+    cheat("god 0")
+    rc_finish("tunnelfloor", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+              TF_HELP, judged_by_hand="the ground round the platform in tf_<tag>_hd_*.png against tf_<tag>_legacy_*.png")
+
+
+def check_tfreload():
+    """Lane tunnelfloor: a save and reload inside level 65 in HD. tf_visit (tag `reload1`), then Save and Exit from inside 65,
+    Play again (leave_and_reenter), the plugin's void65 line read again, and tf_visit once more (tag `reload2`). JUDGED: back
+    in the game, 65 reached and walked both times, void65 installed after the reload, no assert; the look by hand."""
+    if not need_game():
+        add("tfreload", "BLOCKED", "not in the game")
+        return
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    enable_debug()
+    cheat("god 1")
+    rows.append(tf_plugin_row())
+    goto(40, timeout=60)
+    if not set_graphics("hd"):
+        bad.append("graphics hd not set")
+    elif tf_visit("hd", "reload1", log, shots, rows, bad):
+        back = leave_and_reenter()
+        p = hstate()["player"] if back else {}
+        rows.append("Save and Exit inside 65, Play: %s, in area %s" % ("back in the game" if back else "NOT back", p.get("area")))
+        if not back:
+            bad.append("not back in the game after Save and Exit")
+        else:
+            enable_debug()
+            cheat("god 1")
+            line = tf_plugin_row()
+            rows.append("after the reload " + line)
+            if "no HD ground plane" not in line:
+                bad.append("void65 not installed after the reload")
+            goto(40, timeout=60)
+            if not set_graphics("hd"):
+                bad.append("graphics hd not set after the reload")
+            else:
+                tf_visit("hd", "reload2", log, shots, rows, bad)
+    goto(1, timeout=60)
+    cheat("god 0")
+    rc_finish("tfreload", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+              TF_HELP + ["Save and Exit / Play by the menu (player path)"],
+              judged_by_hand="tf_reload2_hd_*.png against tf_reload1_hd_*.png")
+
+
+def check_tfhell():
+    """Lane tunnelfloor: level 65 in Hell, HD. SET-UP by a save edit of the closed character (rc_setup: progression 10, Hell
+    open), entered from the difficulty dialog (rc2_closed_edit), then tf_visit (tag `hell`). JUDGED: in Hell (difficulty 2),
+    65 reached and walked, no assert; the look by hand."""
+    if not need_game():
+        add("tfhell", "BLOCKED", "not in the game")
+        return
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    try:
+        entered = rc2_closed_edit(lambda s: rc_setup.set_progression(s, "hell"), log, "hell")
+    except RuntimeError as e:
+        entered = False
+        log.append(str(e))
+    p = hstate()["player"] if entered else {}
+    rows.append("Hell entered: %s, difficulty %s" % (entered, p.get("difficulty")))
+    if not entered or str(p.get("difficulty")) != "2":
+        bad.append("not in Hell")
+    else:
+        enable_debug()
+        cheat("god 1")
+        rows.append(tf_plugin_row())
+        goto(40, timeout=60)
+        if not set_graphics("hd"):
+            bad.append("graphics hd not set")
+        else:
+            tf_visit("hd", "hell", log, shots, rows, bad)
+        goto(1, timeout=60)
+        cheat("god 0")
+    rc_finish("tfhell", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+              TF_HELP + ["Hell opened by a save edit of the closed character (rc_setup, progression 10)"],
+              judged_by_hand="tf_hell_hd_*.png against the Normal shots")
+
+
+CHECKS += [("tunnelfloor", check_tunnelfloor), ("tfreload", check_tfreload), ("tfhell", check_tfhell)]
+
 if __name__ == "__main__":
     main()
