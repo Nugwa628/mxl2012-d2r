@@ -187,9 +187,9 @@ verdicts are in the tool's docstring. Run of 2026-10-31 (rotw; base gives the sa
 |---|---|---|---|---|
 | objects | 556 | 2 | 1 renamed, 2 renamed-fixed, 12 renamed-exists (before the #520 fix: 2 renamed, 1 renamed-fixed) | below |
 | misc | 2977 | 1 | 479 median-missing | Median's own sounds (`shrine_boink` etc.), Clue Gem / `ab!` flippy `flpdss` / `flptail` and `zog` / `zoh` inventory art: known gaps (unported.md, legacy-graphics.md) |
-| missiles | 3563 | 0 | 1 missing, 30 median-missing, 9 emptied | sounds Median added (silent until the audio port); `emptied` = art_fix's DRAW_NOTHING rows and sound keys Median's own sounds.txt lacks |
+| missiles | 3563 | 0 | 1 missing, 30 median-missing, 9 emptied | sounds Median added (now ported: tools/sounds_port.py); `emptied` = art_fix's DRAW_NOTHING rows and sound keys Median's own sounds.txt lacks |
 | skills | 984 | 0 | 49 median-missing, 5 emptied | Median's own sounds; dangling sound keys Median had |
-| sounds | 4556 | 71 | 108 median-missing, 1 emptied | Median's 108 own sounds (`sound_rows`: silent until ported) |
+| sounds | 4556 | 71 | 108 median-missing, 1 emptied | Median's 108 own sounds (`sound_rows`; audio by `tools/sounds_port.py`, 101 play, 7 have no file in Median's MPQ) |
 | monsounds | 898 | 1 | 18 median-missing | Median's own sounds |
 | states | 230 | 0 | 1 missing, 17 median-missing | Median's own sounds |
 | uniqueitems | 14 | 0 | 12 median-missing | Median's own sounds |
@@ -198,7 +198,7 @@ verdicts are in the tool's docstring. Run of 2026-10-31 (rotw; base gives the sa
 
 The `missing` sound cells are both Median's own sounds on a row where D2R uses a vanilla one: missiles 678 `trapnova`
 TravelSound `forcewavetrap` (D2R `sorceress_nova`) and states 153 `cloak_of_shadows` onsound `darkness_falls` (D2R
-`assassin_cloakofdarkness`). They are silent like the other 108, not renames.
+`assassin_cloakofdarkness`). They are Median's own sounds like the other 108 (ported with them, see below), not renames.
 
 Objects:
 
@@ -211,6 +211,30 @@ Objects:
 - `renamed-exists`: rows 45, 277, 361, 363, 419, 425, 473, 504, 505, 509, 510, 511. These hold the 1.14d token, which D2R
   changed, but D2R still ships that token's legacy art. D2R's HD model is picked by row (objects.json is in row order), so
   both modes draw them and they stay. In the legacy probe every one of these that has art (not 45 / 78, Draw 0) appeared where it was spawned (testing.md "Lane renamesweep").
+
+## Median's own sounds (`tools/sounds_port.py`, art step, lane medsounds)
+
+108 sounds.txt rows play audio only Median's MPQ has (`data/global/sfx/taunt/*.wav`: boss taunts, skill / state / missile / item
+sounds such as `shrine_boink`). `sound_rows` appends them with a .flac FileName; `sounds_port.py` (after legacy_art.py in
+tools/build.py, both banks) makes them play:
+
+- **Audio**: each Median file a row names becomes `work/mod/data/global/sfx/<path>.flac` (88 files, 8.9 MB). D2R plays its legacy
+  sounds from `data/global/sfx` as .flac (CASC: 32830 .flac, no .wav); the mod's loose file is read first. Median's .wav files are
+  all 16-bit PCM mono (94 at 22050 Hz, 5 at 22028, 2 at 44100, 1 at 11025); the .flac keeps the samples and rate (lossless,
+  `tools/flac.py`, standard library + numpy, no audio package). Every file is decoded again and compared before it is written.
+- **HD**: a row without Redirect plays its own file in HD too (1802 of D2R's rows are like that); checked in game (docs/testing.md
+  "Lane medsounds"), so there is no `data/hd/global/sfx` copy.
+- **Channel**: blank (D2R has no taunt folder to take one from); set from what plays the row: monsounds -> `sfx/monster_sd`, only
+  items (misc / uniqueitems / weapons / armor / setitems) -> `sfx/items_sd`, else `sfx/player-skills_sd`; a row reached only as a
+  group member takes its head's.
+- **Silent as in 1.13c** (7 rows): their file is not in Median's MPQ: `robot_taunt` (resistanceisfutile), `shaman_boast`,
+  `seismicshockwave` (seismiccharge), `call_dragon1-3`, and `maenad1`, whose FileName has a typo (`ecstaticfrenzy1,.wav`; the
+  file `ecstaticfrenzy1.wav` exists).
+- **Not ported on purpose**: Median's MPQ also replaces vanilla files (`cursor/intro/*select.wav`, `item/gem.wav`,
+  `monster/werebear/bite1-4.wav`); those rows are D2R's and keep D2R's audio (sounds is d2r_wins).
+
+The report is `work/mod/sounds_port.md` (each row, its file, channel and the table cells that name it). Median's files never go
+into git (input: assets/median or extract-mpq; output: work/mod).
 
 ## Open items found here (for plugins / later phases)
 

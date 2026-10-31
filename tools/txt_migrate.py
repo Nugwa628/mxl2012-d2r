@@ -1462,7 +1462,8 @@ class Migrator:
         a .wav name where D2R's files are .flac. Rows that reuse a vanilla file (Whirlpool's "distilledwater" plays
         object\\sewerwater) copy those columns from the D2R row playing the same file, so they get its HD sound;
         Median's Volume becomes Volume Min/Max. Rows with Median's own audio (taunts etc.) get the channel D2R uses
-        for that folder and a .flac name: they stay silent until the audio itself is ported."""
+        for that folder and a .flac name; tools/sounds_port.py (an art step) converts that audio into the mod and
+        gives them a Channel."""
         mh_src, mrows_src = read_tsv(NAMED / "sounds.txt")
         volume = {r[0]: r[mh_src.index("Volume")] for r in mrows_src if r and r[0]}
         copied = custom = 0
@@ -1510,7 +1511,7 @@ class Migrator:
                     r[h.index("Volume Min")] = r[h.index("Volume Max")] = v
             write_tsv(p, h, rows)
         self.report.append(f"\nsounds: {copied} Median rows took a vanilla file's D2R audio columns, "
-                           f"{custom} play Median's own audio (silent until it is ported)")
+                           f"{custom} play Median's own audio (tools/sounds_port.py)")
 
     def player_voice_sounds(self) -> None:
         """Bug #504: D2R prints a chat line "<unit> says: <line>" whenever a voice file plays whose name is a key of its

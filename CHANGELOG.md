@@ -10,6 +10,8 @@ version being released (docs/release.md).
   tab names fit their tabs in full.
 - Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the unfolding stair in their doorway stayed shut and blocked the way (#518).
 - Arcane Sanctuary: its magic shrine is drawn again in legacy graphics, where it was invisible (#520).
+- Median XL's own sounds now play: boss taunts, skill shouts and item and monster sounds Median added (101 of its 108; the
+  other 7 had no audio in Median XL either), in HD and legacy.
 
 ## D2R-XL 2012
 

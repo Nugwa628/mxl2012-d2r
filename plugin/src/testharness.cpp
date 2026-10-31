@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <share.h>
 #include <cstring>
 
 namespace {
@@ -555,10 +556,11 @@ bool g_keepCookieReadOnly = false;
 			DiagUnicodeString(#name " (write refused)", ObjectName(c), static_cast<uint32_t>(b));                   \
 			return static_cast<int64_t>(static_cast<int32_t>(0xC0000022));                                          \
 		}                                                                                                           \
-		if (g_diag != nullptr) {                                                                                    \
-			DiagUnicodeString(#name, ObjectName(c), 0);                                                             \
+		const int64_t status = g_orig_##name(a, b, c, d, e, f, g, h, i, j, k, l);                                   \
+		if (g_diag != nullptr) { /* extra = the NTSTATUS: 0 opened, c0000034 / c000003a not there */               \
+			DiagUnicodeString(#name, ObjectName(c), static_cast<uint32_t>(status));                                 \
 		}                                                                                                           \
-		return g_orig_##name(a, b, c, d, e, f, g, h, i, j, k, l);                                                   \
+		return status;                                                                                              \
 	}
 FILE_OPEN_HOOK(NtCreateFile)
 FILE_OPEN_HOOK(NtOpenFile)
@@ -889,7 +891,7 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 	if (std::strstr(mode, "diag") != nullptr) {
 		char path[MAX_PATH];
 		std::snprintf(path, sizeof(path), "%smxl2012-testharness-diag-%lu.log", g_dir, static_cast<unsigned long>(GetCurrentProcessId()));
-		fopen_s(&g_diag, path, "wb");
+		g_diag = _fsopen(path, "wb", _SH_DENYWR);  // readable while the game runs (lane medsounds)
 		HMODULE ntdll = GetModuleHandleA("ntdll.dll");
 #define DIAG_INSTALL(module, name)                                                                                  \
 	if (void* stub = GetProcAddress(module, #name); stub != nullptr) {                                               \

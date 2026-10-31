@@ -683,7 +683,8 @@ shared name `Local\mxl2012-testharness-input`, which `game_ctl` still falls back
 slot 1). The console output file `mxl2012-testharness-console.txt` and the trace log live in the slot's own plugin folder.
 `mxl2012-testharness.txt` is a list of words written by `game_ctl start` (env `MXL_HARNESS_WORDS` overrides it): `volserial`,
 `tag=NAME`, `nocookie` (hide cookie.bin: only for experiments), `diag` (log named objects, file opens, C++ exceptions
-and process exit to `mxl2012-testharness-diag-<pid>.log`, plus the cookie record and CryptoBox input of D2RLoader 1.3.1).
+and process exit to `mxl2012-testharness-diag-<pid>.log`, plus the cookie record and CryptoBox input of D2RLoader 1.3.1;
+since lane medsounds each file open line ends in `extra=<NTSTATUS>`, 0 = opened, and the log can be read while the game runs).
 
 `py -3 tools/parallel_smoke.py [--slots 1,2,3,4,5] [--name N]` takes the locks (a slot whose lock is held is skipped),
 runs `game_ctl.py smoke --slot N` for each with `MXL_RUN=<N>-sN`, staggered by 4 s, samples the real cursor and the
@@ -4618,3 +4619,26 @@ scene `terrain` entity draws nothing in belial (indexed or not, D2R's own sancte
 stripping its scenes' terrain: 74's floor seems to come from the Sanct scenes' other models. (3) A fix would need a floor
 for belial's platform with the plane skipped (a new model, not allowed) or a way to make the plane leave blank cells
 undrawn; for the owner to rule on.
+
+## Lane medsounds: Median's own sounds play (2026-10-31, slot 3, background mode, build of lane/medsounds)
+
+New build step `tools/sounds_port.py` (docs/txt-migrate.md "Median's own sounds"): the 88 audio files of Median's 108 own
+sounds.txt rows go into the mod as .flac (`data/global/sfx/taunt/`), and the rows get a Channel. Lab: `mxl2012-runs/medsounds/lab.py`
+(`MXL_RUN=<lock> MXL_SLOT=N MXL_SOUND_TRACE=<file> MXL_HARNESS_WORDS="volserial tag=sN diag" [LAB=skills] py -3 lab.py <worktree> <out>`),
+character SndPal (Paladin). Two signals per trigger: the sound trace (sound_guard.cpp: the game asked for the row and the client
+played it) and the harness `diag` log's file opens with their status (the game found and read our file). Run A has the same
+build without the step's files (control).
+
+| Run (`mxl2012-runs/medsounds/`) | Trigger | Result |
+|-----|------|--------|
+| `runA2` (control, no .flac in the mod) | `item A0+ ground`, `item zog ground`, `spawn 1722` (l4dwitch) | the rows are asked for and played (`shrine_boink`, `pack_bonk`, `witch_cry_tobelooped`: path 1, client play 1) but no file open: silent, as before |
+| `runB` | the same, HD then legacy | `taunt\holy_boink.flac`, `taunt\packbonk.flac` (twice), `taunt\witchcrying.flac` opened, status 0, from `data\global\SFX\taunt\`; the first play of each was in HD, so HD plays the same file (no copy under the HD sfx folder needed) |
+| `runB3` (`LAB=skills`) | Merkabah (500) on the right button, 4 background right clicks per mode | `holyshout_1` and its group variants: `holyspell.flac`, `holyspell2.flac`, `holyspell3.flac` opened, status 0 |
+
+All runs: 0 asserts (`asserttrace count 0`), no crash file, game alive in both modes, shared files restored. The opens are in
+`flac-opens-*.txt` there; `sounds_port.md` lists the 108 rows. Not proven: what the speakers play (no audio capture on this
+PC); the files decode bit-exactly with libsndfile (`xcheck.py`, 90 files, 0 differences) and with tools/flac.py's own decoder
+at build time. Not triggered: item use sounds (`book_read`, `pack_life`: the harness has no `use` verb), state on sounds (no
+`setstate` verb; the Lionheart aura on the right button played no `paladin_chant`), Colosseum by left click (the clicks walked).
+Open: `singing_sun` (a state onsound) was asked for and passed to the client play in HD during the Merkabah casts, but its file
+was not opened; not looked into.

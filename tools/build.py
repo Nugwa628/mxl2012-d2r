@@ -48,6 +48,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   walls_hd.py build work/mod/data  wall scenes of D2R's own wall models for Median's 17 own maps (docs/maps-hd.md
                      "Walls"; D2R's scenes come from the shared cache, MXL_SLOT=2..5 fills it once)
   legacy_art.py      Median's classic (legacy-mode, Alt+G) art files -> work/mod/data/global (docs/legacy-graphics.md)
+  sounds_port.py     Median's own sounds (the sounds.txt rows on Median-only audio, taunt/*.wav) -> .flac in
+                     work/mod/data/global/sfx, their rows' FileName / Channel (both banks; docs/tables-status.md "sounds")
   rotw_stash_legacy.py build  classic layout + art of D2R's RotW Gems / Materials / Runes stash pages, down-rendered from
                      D2R's HD art (docs/legacy-graphics.md section 9); into the mod by default (owner, 2026-10-31);
                      MXL2012_ROTW_LEGACY=0 stages it in work/rotw_stash_legacy instead
@@ -127,6 +129,7 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
+             ["sounds_port.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
              # after legacy_art: its item pictures. In the mod by default (owner, 2026-10-31): the plugin's rotwstash part keeps
              # it from crashing without RotW (docs/legacy-graphics.md 9.6). MXL2012_ROTW_LEGACY=0 stages it outside the mod
              ["rotw_stash_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data"), "--out",
