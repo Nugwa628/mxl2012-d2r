@@ -5185,7 +5185,20 @@ DURIEL_TO_TYRAEL = (-57, -130)
 JERHYN_SPOTS = (122, 121)  # objects: Jerhyn's placeholders, inside the palace first (after Duriel he waits there)
 # NPCs a `moveto` from the arrival does not path to: the map's own spot (Lut Gholein's maps lut2 / lutn / lutw put Meshif at
 # (213, 78), the town's origin is 5000, 5000: Warriv's preset (146, 200) is at 5146, 5200)
-TOWN_NPC_SPOTS = {(40, 210): (5213, 5078)}
+TOWN_NPC_SPOTS = {(40, 210): (5213, 5078),
+                  # lane harnessgaps: NPCs `presets 1` no longer lists from the arrival (the town placed them already) and `moveto`
+                  # does not see from there. Lut Gholein: where the acts25 / nmhell4 runs found them (Atma 5135-5142,5040-5055,
+                  # Drognan 5088-5093,5028-5032, Cain 5130-5134,5086-5088: `moveto` answers of 60+ talks). Kurast Docks (one fixed
+                  # map, D2R's docktown3.ds1, origin 5000,5000 +- their walk): the map's NPC presets, Natalya (221, 111), Asheara
+                  # (33, 90; found at 5034-5038,5089-5093)
+                  (40, 176): (5140, 5045), (40, 177): (5091, 5032), (40, 244): (5132, 5087),
+                  (75, 297): (5221, 5111), (75, 252): (5036, 5092)}
+# Harrogath's map (townwest.ds1) has no preset of Drehya (512) or Tyrael (521): the quest code makes them. Anya comes to town
+# after her rescue from the Frozen River (quest 37, 1.14d Q33_SpawnAnyaAndPortal / Q33_IsAnyaInTown); Tyrael is made only by
+# SpawnTyrael (1.14d 0x58e920), called from Baal's fx missile and the portal arrival after Baal's death. Not there to find
+# before those steps: the row names them, not a failure
+TOWN_QUEST_NPCS = {512: "quest-placed: in town after Anya's rescue (quest 37)",
+                   521: "quest-placed: made after Baal's death (1.14d SpawnTyrael)"}
 JERHYN_MAP_SPOTS = ((5071, 5148), (5147, 5191))  # the placeholders of lutn / lutw ((71, 148), (147, 191)) when `presets 2`
 # does not list them (the rooms already placed their objects: run of lane acts2 22:00)
 ACT_END_TALKS = {"travel23": ((73, 251, "tyrael", 14), (40, 201, "jerhyn", 14)), "travel45": ((103, 367, None, 26),)}
@@ -12199,6 +12212,19 @@ def up_click_through(src, dest, log):
     """In `src`: the nearest loaded warp tile to `dest`, a walk up to it (harness `move`), then real left clicks on it (the
     projection first, then a ring round it for the legacy view). Returns (entered, note)."""
     want = up_tile_classes(src, dest)
+    gate = UP_GATE_OBJECTS.get((src, dest))
+    if gate is not None:  # (lane harnessgaps) the way in is a gateway object: walk up, left clicks on it (the first one opens it)
+        obj = a25_object_near(gate, log)
+        if obj is not None:
+            acts_walk(obj["x"], obj["y"] + 3, reach=5, timeout=60, fight=False)
+            for k in range(9):
+                if up_alive() and hstate()["player"].get("area") == dest:
+                    return True, "gateway object %d id %d by %d clicks" % (gate, obj["id"], k)
+                click_object(obj, up_px=(0, 40, 80)[k % 3])
+                time.sleep(3)
+            if up_alive() and hstate()["player"].get("area") == dest:
+                return True, "gateway object %d id %d by clicks" % (gate, obj["id"])
+            log.append("gateway object %d id %d: 9 clicks, still in %s; the warp tile next" % (gate, obj["id"], src))
     p = hstate()["player"]
     tiles = [t for t in cache_tiles(Hl("tiles", log)[1]) if t["area"] == src and t["class"] in want]
     if not tiles:  # (lane acts25) the warp's room is not loaded yet: walk to the map's warp preset, then look again
@@ -12620,6 +12646,8 @@ def a25_npcs(act, log, rows, bad):
         Hl("place %d %d" % (p0["x"], p0["y"]), log)  # back to the arrival (the sweep left the character wedged in a corner of
         time.sleep(2)                               # Lut Gholein, every later walk refused: run checks-20261030-191412-s4)
         menu, how = a25_npc_menu(cls, log, spot=spots.get(cls))
+        if not menu and cls in TOWN_QUEST_NPCS:
+            how += "; %s" % TOWN_QUEST_NPCS[cls]
         if menu:
             talked.append("%s[%s](%s)" % (nm, how, ",".join("%x" % s for _i, s, _h in menu["lines"])))
         else:
@@ -12743,6 +12771,40 @@ def a25_use_click(it, log, shots):
     return "right click: %s" % ("KEPT (not used)" if left else "used")
 
 
+def a25_pickup_probe(code, log):
+    """Evidence after a refused click pickup (lane harnessgaps, the cube): the item still on the ground, every item the player
+    carries (all pages, the whole reply), and the server's own pickup packet 0x16 for it (`pickup <id> inv`, a read of what the
+    server does with the request; the item is not judged picked up by it). Returns the ground item's id or None."""
+    ground = [kv(ln) for ln in Hl("ground %s" % code, log)[1] if ln.startswith("ground id=")]
+    log.append("pickup probe %s: on the ground %s; carried: %s" % (
+        code, [(gi.get("id"), gi.get("mode"), gi.get("dist")) for gi in ground],
+        sorted("%s@%s" % (i.get("code"), i.get("page")) for i in rc_items(log))))
+    if not ground:
+        return None
+    gid = int(ground[0]["id"])
+    Hl("pickup %d inv" % gid, log)
+    time.sleep(1.5)
+    took = any(i.get("id") == gid for i in rc_items(log))
+    log.append("pickup probe %s: the server's pickup packet for id %d: %s" % (code, gid, "TAKEN" if took else "refused"))
+    if took:
+        Hl("remove id %d" % gid, log)  # the click is what is judged: the probe's copy goes again
+    return gid
+
+
+def a25_drop_held_cube(log):
+    """SET-UP before the cube's pickup (lane harnessgaps): `packclear` keeps the backpack's cube, and the game refuses a second
+    `box` (1.14d ITEMMODE_CheckDuplicateQuestItem); the harness `remove` takes no cube that still holds items (an earlier run's
+    Khalim's Will stayed in it: run harnessgaps probe req-005..007). Its contents go first, then the cube. Returns a note or None."""
+    held = [i for i in rc_items(log) if i.get("code") == "box"]
+    if not held:
+        return None
+    inside = [i for i in rc_items(log) if i.get("page") == RC_PAGE_CUBE]
+    for i in inside:
+        Hl("remove id %d" % i["id"], log)
+    gone = sum(1 for i in held if Hl("remove id %d" % i["id"], log)[0])
+    return "SET-UP: the held cube removed first (%d of %d, %d items inside it removed)" % (gone, len(held), len(inside))
+
+
 def a25_items(act, log, rows, bad, shots):
     """Quest items: dropped next to the character (SHORTCUT, named), picked up by a click; used, or put in the Horadric Cube
     (the backpack's cube; act 2 picks one up) and transmuted by a click on Transmute (rc_transmute)."""
@@ -12757,9 +12819,11 @@ def a25_items(act, log, rows, bad, shots):
         ven_wait_still()  # rc_obtain projects the drop from the player's spot: a still running walk made it miss (run 4)
         for cmd in A25_PICKUP_SETUP.get(code, ()):
             Hl(cmd, log)
+        cube_note = a25_drop_held_cube(log) if code == "box" else None
         it = rc_obtain(code, log, [])
         again = False
         if not it:  # one more drop after a still stand (the first two Nightmare drops of run -150055-s4 were not taken)
+            a25_pickup_probe(code, log)
             held = sorted("%s@%s" % (i.get("code"), i.get("page")) for i in rc_items(log) if i.get("code") == code)
             log.append("%s not picked up; the character holds %s" % (code, held or "none of it"))
             Hl("remove %s" % code, log)
@@ -12768,6 +12832,8 @@ def a25_items(act, log, rows, bad, shots):
             it, again = rc_obtain(code, log, []), True
         note = ("picked up" if it else "NOT picked up") + (" at the second drop" if again else "") + (
             " (SET-UP for the game's pickup gate: %s)" % ", ".join(A25_PICKUP_SETUP[code]) if code in A25_PICKUP_SETUP else "")
+        if cube_note:
+            note += " (%s)" % cube_note
         if it and then == "use":
             note += ", " + a25_use_click(it, log, shots)
         elif it and then:
@@ -12818,21 +12884,170 @@ def a25_waypoints(act, log, rows, bad):
     return True
 
 
+# Lane harnessgaps: links whose way in the game keeps shut until a quest step (as D2; the nmhell4 runs clicked them 51 times):
+# Travincal -> Durance of Hate 1 opens when the Compelling Orb (object 404, OperateFn 53) is used twice with Khalim's Will (qf2)
+# as the weapon (1.14d OBJOP_A3Q5_NihlathakAltarLaunchOrb 0x5bb980: Khalim's Will, quest 18, done; the flail is taken); Arreat
+# Summit -> Worldstone Keep 1 when the Ancients are dead (1.14d OBJOP_A5Q5_WorldstoneStairPortal 0x58d6a0 reads the game's own
+# "Ancients defeated" flag, not a quest bit: `quest set` alone does not open it), through the gateway object 547.
+A25_QUEST_DOORS = {(83, 100): "orb", (120, 128): "ancients"}
+COMPELLING_ORB = 404
+KHALIMS_WILL = "qf2"
+QUEST_KHALIMS_WILL, QUEST_RITE = 18, 39
+UP_GATE_OBJECTS = {(120, 128): 547}  # the way in is this object, not the warp tile behind it
+
+
+def a25_object_near(cls, log, walk_s=120):
+    """The nearest loaded object of `cls`; when its room is not loaded, a walk to the map's type-2 preset of it first."""
+    objs = parse_objects(Hl("objects %d" % cls, log)[1])
+    if not objs:
+        for pr in [q for q in parse_presets(Hl("presets 2", log)[1]) if q["class"] == cls][:1]:
+            acts_walk(pr["x"], pr["y"], reach=8, timeout=walk_s, fight=False)
+            objs = parse_objects(Hl("objects %d" % cls, log)[1])
+    if not objs:  # its room not built yet: `presets 2` lists only the built rooms' units (Hell Travincal: 13 units of 64 rooms, no
+        objs = a25_object_deep(cls, log)  # orb 404; run checks-20261101-060118-s2)
+    return objs[0] if objs else None
+
+
+A25_OBJECT_SEARCH_S = 420  # the far-room walks looking for an object whose room is not built yet
+
+
+def a25_object_deep(cls, log, budget_s=A25_OBJECT_SEARCH_S):
+    """a25_deep_find for an object: search walks (no fighting) to the farthest rooms of `presets rooms`, `objects` and the
+    type-2 presets looked at after each. Returns the `objects` list (empty when not found)."""
+    t0 = time.time()
+    p = hstate()["player"]
+    rooms = [(int(r["x"]), int(r["y"])) for r in (kv(ln) for ln in H("presets rooms")[1] if ln.startswith("room x="))]
+    for x, y in far_rooms(rooms, p.get("x", 0), p.get("y", 0)):
+        left = budget_s - (time.time() - t0)
+        if left < 20:
+            break
+        if not acts_search_walk(x, y, log, budget_s=min(40, left), reach=20, fight=False):
+            a25_hop_towards(x, y, log, stop=20)  # the walk stuck at a wall by the Travincal arrival (run -070759-s2)
+        pr = [q for q in parse_presets(H("presets 2")[1]) if q["class"] == cls]
+        if pr:
+            if not acts_search_walk(pr[0]["x"], pr[0]["y"], log, budget_s=30, reach=8, fight=False):
+                a25_hop_towards(pr[0]["x"], pr[0]["y"], log, stop=8)
+        objs = parse_objects(H("objects %d" % cls)[1])
+        if objs:
+            log.append("object search: class %d found after %.0f s" % (cls, time.time() - t0))
+            return objs
+    log.append("object search: class %d not found in %.0f s" % (cls, time.time() - t0))
+    return []
+
+
+def a25_smash_orb(log):
+    """SET-UP for 83->100: Khalim's Will worn as the weapon (`equip`), a walk to the Compelling Orb and left clicks on it (the
+    player's use of it), the object's own OperateFn by harness only when the clicks did not finish quest 18. Returns a note."""
+    goto(83)
+    q0 = quest_bits(QUEST_KHALIMS_WILL)
+    orb = a25_object_near(COMPELLING_ORB, log)
+    if orb is None:
+        return "SET-UP orb: no Compelling Orb (object %d) found in 83" % COMPELLING_ORB
+    H("unequip rhand")
+    Hl("equip %s rhand" % KHALIMS_WILL, log)
+    acts_walk(orb["x"], orb["y"] + 3, reach=4, timeout=60, fight=False)
+    H("skill left 0")
+    how = None
+    for k in range(8):
+        if quest_bits(QUEST_KHALIMS_WILL) != q0 and not held_code(KHALIMS_WILL):
+            how = "%d clicks" % k
+            break
+        click_object(orb, up_px=(0, 40, 80)[k % 3])
+        time.sleep(2.5)
+    if how is None:  # the clicks did not use it: the object's own operate function, twice (named)
+        fn = next((int(r.get("OperateFn") or 0) for r in table("objects") if r.get("*ID") == str(COMPELLING_ORB)), 53)
+        for _ in range(2):
+            Hl("operate %d %d" % (orb["id"], fn), log)
+            time.sleep(2)
+        how = "harness `operate %d %d` x2 (the clicks did not)" % (orb["id"], fn)
+    time.sleep(4)
+    q1 = quest_bits(QUEST_KHALIMS_WILL)
+    acts_gear(acts_level_up(A25_LEVEL))  # the weapon back (the game took the flail)
+    return "SET-UP orb: Khalim's Will worn, Compelling Orb id %d used by %s; quest %d %s -> %s%s" % (
+        orb["id"], how, QUEST_KHALIMS_WILL, q0, q1, "" if q1 != q0 else " (UNCHANGED)")
+
+
+def held_code(code):
+    """True while the player carries an item of this code anywhere (backpack, cube, body)."""
+    return any(i.get("code") == code for i in rc_items())
+
+
+def a25_kill_ancients(log):
+    """SET-UP for 120->128: the altar used (its OperateFn, as acts_ancients), the three Ancients killed by the harness (the unit
+    death runs the quest kill hooks, which set the game's "Ancients defeated"). The fight itself is the `ancients` boss row.
+    Returns a note."""
+    goto(120)
+    q0 = quest_bits(QUEST_RITE)
+    door = next(iter(parse_objects(Hl("objects %d" % SUMMIT_DOOR, log)[1])), None)
+    if door:
+        acts_walk(door["x"] - 9, door["y"] - 40, reach=8, timeout=150, fight=False)
+    altar = a25_object_near(ANCIENTS_ALTAR, log)
+    if altar is None:
+        return "SET-UP ancients: no altar (object %d) found in 120" % ANCIENTS_ALTAR
+    acts_walk(altar["x"], altar["y"] + 3, reach=4, timeout=40, fight=False)
+    fn = next((int(r.get("OperateFn") or 0) for r in table("objects") if r.get("*ID") == str(ANCIENTS_ALTAR)), 65)
+    Hl("operate %d %d" % (altar["id"], fn), log)
+    found = {}
+    for _ in range(20):  # the speech plays first (about 30 s)
+        time.sleep(3)
+        for c in ANCIENT_CLASSES:
+            u = parse_moveto(H("moveto nearest %d" % c)[1])
+            if u and (acts_mon_life(u["id"]) or 0) > 0:
+                found[c] = u["id"]
+        if len(found) == len(ANCIENT_CLASSES):
+            break
+    time.sleep(3)
+    for c, mid in sorted(found.items()):
+        Hl("kill %d" % mid, log)
+        time.sleep(1.5)
+    time.sleep(6)
+    q1 = quest_bits(QUEST_RITE)
+    return "SET-UP ancients: altar used (`operate`), Ancients %s killed by the harness; quest %d %s -> %s" % (
+        sorted(found) or "NONE CAME", QUEST_RITE, q0, q1)
+
+
+def a25_open_quest_door(src, dest, log):
+    """The quest step before a link in A25_QUEST_DOORS (once per run). Returns the note or None."""
+    kind = A25_QUEST_DOORS.get((src, dest))
+    if kind is None or kind in STATE.setdefault("a25_doors", {}):
+        return STATE.get("a25_doors", {}).get(kind) if kind else None
+    note = a25_smash_orb(log) if kind == "orb" else a25_kill_ancients(log)
+    STATE["a25_doors"][kind] = note
+    g.log("acts25 " + note)
+    return note
+
+
+def a25_route_filter(spec):
+    """MXL_A25_ROUTES ("83-100,120-128", lane harnessgaps): only those entries (either order), for a short re-run of a door."""
+    out = set()
+    for part in (spec or "").split(","):
+        a, _, b = part.strip().partition("-")
+        if a.isdigit() and b.isdigit():
+            out |= {(int(a), int(b)), (int(b), int(a))}
+    return out
+
+
 def a25_entries(act, log, rows, bad, gfx):
     routes = a25_routes(act)
     most = int(os.environ.get("MXL_A25_ROUTES_MAX") or 0)
     if most:
         routes = routes[:most]
+    only = a25_route_filter(os.environ.get("MXL_A25_ROUTES"))
+    if only:
+        routes = [r for r in routes if r in only]
     entered = setup_fail = 0
     for src, dest in routes:
         if not game_alive():
             break
         a25_merc_ok(act, log, rows)
+        door = a25_open_quest_door(src, dest, log)
         if src in A25_START:
             goto(A25_START[src])
         mark = engine_mark()
         t0 = time.time()
         ok, how = up_enter(src, dest, log)
+        if door:
+            how = "%s; %s" % (door, how)
         time.sleep(6)
         alive = up_alive()
         mi = merc_info()[0] if alive else None
@@ -12912,6 +13127,175 @@ def a25_deep_find(cls, log, budget_s):
     return None
 
 
+def wm_free_near(wm, tx, ty, rmin=1, rmax=6):
+    """Free cells (".") of a `walkmap` grid between rmin and rmax (the larger of |dx|, |dy|) from (tx, ty), nearest first, as
+    `state` (x, y). Empty without a grid."""
+    if not wm:
+        return []
+    st, out = wm["step"], []
+    for r, row in enumerate(wm["grid"]):
+        y = wm["y0"] + r * st
+        for c, ch in enumerate(row):
+            if ch != ".":
+                continue
+            x = wm["x0"] + c * st
+            d = max(abs(x - tx), abs(y - ty))
+            if rmin <= d <= rmax:
+                out.append((d, abs(x - tx) + abs(y - ty), x, y))
+    return [(x, y) for _d, _m, x, y in sorted(out)]
+
+
+A25_REACH_SPOTS = 6  # free cells next to the boss `place` tries per re-place
+A25_REPLACE_AT = 2  # the boss is farther (larger of |dx|, |dy|) from the character: place again (Nihlathak walks off; a swing
+# from 4 played its animation and landed nothing, the Ancients took damage from 2: probe harnessgaps req-008)
+A25_NEAR_WALK_S = 12  # no free cell round the boss (his rooms not loaded near the character): a walk toward him this long first
+
+
+A25_HOP_STEPS = (10, 6, 3)  # `place` legs toward a far boss, longest first: the plugin's free-spot check answers "blocked" outside
+A25_HOPS = 8                # the player's room and its neighbours (harness_cmds.cpp CmdWalkMap), so one leg reaches a room or so
+
+
+def a25_hop_towards(tx, ty, log, stop=6):
+    """SET-UP: `place` legs toward (tx, ty) until within `stop` (Hell Nihlathak 20 from the end of the walk in the Halls of
+    Vaught maze, Baal 48 from the Worldstone Chamber's arrival: probe harnessgaps req-009/010). True when within `stop`."""
+    hops = 0
+    for _ in range(A25_HOPS):
+        p = hstate()["player"]
+        px, py = p.get("x", 0), p.get("y", 0)
+        if max(abs(px - tx), abs(py - ty)) <= stop:
+            break
+        for n in A25_HOP_STEPS:
+            if H("place %d %d" % step_towards(px, py, tx, ty, n))[0]:
+                hops += 1
+                time.sleep(0.5)
+                break
+        else:
+            break
+    p = hstate()["player"]
+    log.append("hopped %d `place` legs toward %d,%d, now at %s,%s" % (hops, tx, ty, p.get("x"), p.get("y")))
+    return max(abs(p.get("x", 0) - tx), abs(p.get("y", 0) - ty)) <= stop
+
+
+def a25_place_by(mon_id, log, near=A25_REPLACE_AT):
+    """SET-UP: `place` on a free cell of the game's walk collision next to the monster. The cells come from `walkmap` round the
+    monster (the rooms the character has loaded), then the old rings round its spot. No free cell there (Hell Nihlathak at
+    12756,5203, all `#`: his rooms not loaded near the character): a walk toward him (no fighting) and a look again. A spot counts
+    when the character ends within `near` of him. Returns the spot taken or None."""
+    u = parse_moveto(H("moveto %d" % mon_id)[1])
+    if u is None:
+        return None
+    rmax = max(near, 1)
+    cells = wm_free_near(relp_walkmap(u["x"], u["y"], half=10, step=1), u["x"], u["y"], rmax=rmax)
+    if not cells:
+        acts_walk(u["x"], u["y"], reach=max(near, 4), timeout=A25_NEAR_WALK_S, fight=False)
+        u = parse_moveto(H("moveto %d" % mon_id)[1]) or u
+        if not a25_hop_towards(u["x"], u["y"], log):
+            u = parse_moveto(H("moveto %d" % mon_id)[1]) or u
+        cells = wm_free_near(relp_walkmap(u["x"], u["y"], half=10, step=1), u["x"], u["y"], rmax=rmax)
+    spots = cells[:A25_REACH_SPOTS] + [(u["x"] + dx, u["y"] + dy) for dx, dy in UNSTICK_SPOTS]
+    for x, y in spots:
+        ok, lines = H("place %d %d" % (x, y))
+        if ok:
+            time.sleep(0.7)
+            p = hstate()["player"]
+            if max(abs(p.get("x", 0) - u["x"]), abs(p.get("y", 0) - u["y"])) <= near:
+                log.append("placed at %d,%d next to monster %d at %d,%d" % (x, y, mon_id, u["x"], u["y"]))
+                return x, y
+    log.append("no place spot next to monster %d at %d,%d (%d spots tried)" % (mon_id, u["x"], u["y"], len(spots)))
+    return None
+
+
+def a25_refind(cls, last, log, walk_s=60):
+    """The boss unit again after it left the loaded rooms (Hell Baal, run checks-20261031-224101-s4): `moveto nearest`, then a walk
+    (no fighting) to where it was last seen and a look again. Returns the unit id or None."""
+    u = parse_moveto(H("moveto nearest %d" % cls)[1])
+    if u is None and last:
+        acts_walk(last[0], last[1], reach=6, timeout=walk_s, fight=False)
+        u = parse_moveto(H("moveto nearest %d" % cls)[1])
+    if u and (acts_mon_life(u["id"]) or 0) > 0:
+        log.append("class %d found again: id %d at %d,%d" % (cls, u["id"], u["x"], u["y"]))
+        return u["id"]
+    return None
+
+
+def a25_reach_fight(mon_id, secs, log, ranged=False, cls=None, last=None):
+    """The boss fight's second and third phase (lane harnessgaps), after the walking melee fight landed nothing: SET-UP `place`
+    next to the boss (a free cell of `walkmap`), Attack (`cast 0 unit`) at him, placed again whenever he is farther than
+    A25_REPLACE_AT (Nihlathak leaves melee reach within seconds). With `ranged` a bow (acts_gear_ranged) shoots from wherever the
+    character stands, placed only when farther than ACTS_BOW_REACH (Mephisto across the moat, Baal on his platform). Returns
+    (killed, seconds, places, casts, unit id). `cls` / `last`: the boss's class and last spot from the caller (Hell Baal's unit was
+    gone before this phase's first `moveto`, so the class read from it was None and he was never looked for again)."""
+    t0, places, casts, refound = time.time(), 0, 0, 0
+    reach = ACTS_BOW_REACH - 4 if ranged else A25_REPLACE_AT
+    u = parse_moveto(H("moveto %d" % mon_id)[1])
+    cls = cls if cls is not None else (u or {}).get("class")
+    last = (u["x"], u["y"]) if u else last
+    while time.time() - t0 < secs:
+        life = acts_mon_life(mon_id)
+        if life is not None and life <= 0:
+            return True, int(time.time() - t0), places, casts, mon_id
+        if life is None:  # out of the loaded rooms (not dead: acts_fight's ACTS_GONE_LOW rule)
+            new = a25_refind(cls, last, log) if cls is not None and refound < 3 else None
+            if new is None:
+                break
+            mon_id, refound = new, refound + 1
+            continue
+        u = parse_moveto(H("moveto %d" % mon_id)[1])
+        if u:
+            last = (u["x"], u["y"])
+        p = hstate()["player"]
+        if player_dead(p):
+            revive_if_dead()
+            break
+        if u and max(abs(p.get("x", 0) - u["x"]), abs(p.get("y", 0) - u["y"])) > reach:
+            if a25_place_by(mon_id, log, near=reach):
+                places += 1
+            elif not ranged:
+                time.sleep(1)
+                continue
+        H("cast 0 unit %d" % mon_id)
+        casts += 1
+        time.sleep(0.8)
+    return False, int(time.time() - t0), places, casts, mon_id
+
+
+def a25_boss_fight(mon_id, secs, log, cls=None):
+    """The boss step: (1) the walking melee fight (acts_fight with unstick), (2) when his life did not move: placed next to him and
+    Attack, re-placed when he walks off, (3) still nothing: the bow from range. Judged by his life before and after (the caller).
+    Returns (killed, deaths, seconds, phases note, unit id)."""
+    life0 = acts_mon_life(mon_id)
+    u = parse_moveto(H("moveto %d" % mon_id)[1])
+    cls, last = (u["class"], (u["x"], u["y"])) if u else (cls, None)
+    killed, deaths, t = acts_fight(mon_id, timeout=secs, unstick=True)
+    phases = ["walk %d s" % t]
+    for ranged in (False, True):
+        life = acts_mon_life(mon_id)
+        if killed or deaths or life0 is None or (life is not None and life < life0) or not game_alive():
+            break
+        if ranged:
+            acts_gear_ranged(acts_level_up(A25_LEVEL), log)
+        k, t2, places, casts, mon_id = a25_reach_fight(mon_id, secs, log, ranged=ranged, cls=cls, last=last)
+        killed, t = k, t + t2
+        life1 = acts_mon_life(mon_id)
+        phases.append("%s %d s (%d SET-UP places, %d casts): %s -> %s" % ("bow" if ranged else "placed melee", t2, places, casts,
+                                                                          life, life1))
+        if ranged:
+            phases[-1] += "; " + a25_melee_back(log)
+    return killed, deaths, t, "; ".join(phases), mon_id
+
+
+def a25_melee_back(log):
+    """The axe back after the bow: the arrows stay in the other hand and the axe then does not fit (`equip ... rhand`: "occupied";
+    Hell Act 5, run checks-20261101-045424-s2: the Ancients and Baal after Nihlathak's bow phase were fought bare-handed, the
+    Ancients 3.8 life in 23 swings). Returns a note."""
+    H("unequip lhand")
+    acts_gear(acts_level_up(A25_LEVEL))
+    held = [i for i in rc_items(log) if i.get("code") == ACTS_WEAPON and i.get("body") == 4]
+    if not held:
+        log.append("melee weapon NOT back after the bow")
+    return "axe back" if held else "axe NOT back"
+
+
 def a25_bosses(act, log, rows, bad, shots):
     secs = int(os.environ.get("MXL_A25_FIGHT_S") or 40)
     for stage, area, cls, kill in A25_BOSSES[act]:
@@ -12948,10 +13332,14 @@ def a25_bosses(act, log, rows, bad, shots):
             continue
         life0 = acts_mon_life(mon["id"])
         STATE["fight_help"], STATE["fight_notes"] = [], []
-        killed, deaths, t = acts_fight(mon["id"], timeout=secs, unstick=True)
+        killed, deaths, t, phases, mid = a25_boss_fight(mon["id"], secs, log, cls=cls)
+        if mid != mon["id"]:  # found again under a new unit id (out of the loaded rooms and back)
+            phases += "; found again as id %d" % mid
+            mon = dict(mon, id=mid)
         life1 = acts_mon_life(mon["id"])
         if STATE["fight_notes"]:
             how += "; %s" % ", ".join(sorted(set(STATE["fight_notes"])))
+        how += "; phases: " + phases
         mi = merc_info()[0] if game_alive() else None
         shots.append(sh("a25_boss_%s" % stage))
         note = ""
@@ -12972,6 +13360,8 @@ def a25_bosses(act, log, rows, bad, shots):
             rp_recover("boss %s" % stage, log)
         elif life0 is not None and life1 is not None and life1 >= life0 and not killed:
             bad.append("act %d: %s took no damage in %d s" % (act, stage, t))
+        elif life0 is not None and life1 is None and not killed:  # out of the loaded rooms and not found again: not judged before
+            bad.append("act %d: %s lost (out of the loaded rooms) after %d s" % (act, stage, t))
 
 
 def check_acts25():

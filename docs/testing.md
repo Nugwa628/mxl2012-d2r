@@ -4864,3 +4864,61 @@ INFO lines (parts that skip D2R asserts); 0 crash files. Sheet: `mxl2012-runs/tu
 
 Evidence: `mxl2012-runs/tunnelfloor/` (`review.png`, `default_checks.png`, `run-default.log`, `run-now-final.log`, `run-patch-final.log`, `run-walk-final.log`,
 `install-*.log`, `scenes/belial_walk.json`, `scenes/belial_nowalk.json`, `scratch/`); shots and walkmaps in the run folders.
+
+## Lane harnessgaps: the acts25 harness gaps of the Nightmare / Hell sweep (2026-11-01, slot 4 until the owner's one-slot rule, then slot 2, background mode, build of lane/harnessgaps)
+
+The gaps lanes nmhell4 and acts25 left in `tools/game_checks.py` (the harness, not the mod). Unit tests: `tools/test_game_checks_harnessgaps.py`. Evidence: `mxl2012-runs/harnessgaps/` (`probe/req-*.py` + `ans-*.txt`: a live game driven one request at a time by `probe.py`; `s4-console-tail.txt`: the harness console of the last requests).
+
+- **Horadric Cube (`box`) never picked up: cause found, fixed, proven (Hell 2, Lut Gholein, probe req-005..007).**
+  - The save's backpack cube (kept by `packclear` by design) still held an earlier run's Khalim's Will (`qf2`).
+  - The game refuses a second `box` (1.14d ITEMMODE_CheckDuplicateQuestItem 0x55ca40, under SERVER_CheckIfPickable 0x55cc90). The click pickup and the server's own pickup packet 0x16 were both refused while the cube was held.
+  - `remove box` answered "no such item": the harness's inventory-change call does not take a cube that still holds items.
+  - Earlier rows said "holds none of it" because of the 400-character reply cut in the log. With `MXL_HCMD_LOG_CHARS=6000` the list shows `box@0`.
+  - Fix: `a25_drop_held_cube`, a SET-UP before the cube's drop that removes the cube's contents, then the cube (named in the row). With it, the dropped cube was picked up by the first click (id 21 at backpack 0,0).
+  - `a25_pickup_probe` logs the ground item, the whole carried list and the server packet's answer after any missed quest-item click.
+  - Not a mod or game bug: no bug row.
+- **Bosses never damaged: harness changes made, partly proven.**
+  - The boss step is now `a25_boss_fight`. Phase 1 is the walk melee fight as before. If his life did not move, phase 2 is SET-UP `place` next to him with Attack (`cast 0 unit`), placed again when he is farther than 2. Phase 3 is the bow (`acts_gear_ranged`) from up to 26. Each phase's life before -> after is in the row.
+  - A placed swing from 4 played its animation and landed nothing (Hell Nihlathak, req-008). The Ancients took damage from 2. So a spot now counts only within 2.
+  - The harness's free-spot check answers "blocked" outside the player's room and its neighbours. So `walkmap` / `place` round a far boss found nothing, and the walk through the Halls of Vaught maze stalled 20 from Nihlathak.
+  - New `a25_hop_towards`: `place` legs of 10 / 6 / 3 toward him, then the cells next to him. Live (req-011), the hops put the character next to Nihlathak (12746,5197 by 12752,5199; 12755,5203 by 12757,5203). He walked off again within seconds. The run was stopped by the slot rule before his life was read after the hits: **Nihlathak is not yet proven**.
+  - Hell Baal: his unit was gone 1 s after the arrival in the Worldstone Chamber, 57 from him. The re-find never ran because it read the class from the gone unit. The class and last spot now come from the caller. In req-009 he stayed tracked (life 256M, `kill` OK at the end), but no place spot was found before the hop existed: **not yet proven**.
+  - A boss lost out of the loaded rooms is now a row problem ("lost"), not silently unjudged.
+  - Ancients: damage landed (Hell, 40.88M -> 40.83M).
+  - The bow phase left the arrows in the other hand, and the axe then did not go back on ("occupied"). The bosses after a bow phase were fought bare-handed: the Ancients lost 3.8 life in 23 swings in run `checks-20261101-045424-s2`. New `a25_melee_back` takes the arrows off first and names "axe back" / "axe NOT back" in the row.
+  - Slot 2 proof runs (Hell): Radament 51.15M -> 46.99M and the Creature of Flame 210.50M -> 209.42M, both damaged now (they were never reached before). Nihlathak, Baal, Mephisto and Duriel are still undamaged. Nihlathak walks off between the place and the swing. The bow's casts at 4 stayed in mode 1 (no shot). Even the bosses that were hit lost very little (Azmodan about 4 life in 25 placed swings), so `cast 0 unit` lands little in Hell. Open.
+- **Quest doors 83->100 and 120->128: both open with the step set, proven by clicks (Hell, slot 2).**
+  - `a25_open_quest_door` runs once per run before those entries.
+  - 83->100: `a25_smash_orb` (Khalim's Will equipped, the Compelling Orb 404 clicked; fallback `operate <id> 53` twice; quest 18 before / after in the row).
+  - 120->128: `a25_kill_ancients` (the altar operated, classes 540-542 killed by the harness; quest 39 before / after). Then a click on the Worldstone gateway object 547 (`UP_GATE_OBJECTS`). 1.14d's OBJOP_A5Q5_WorldstoneStairPortal 0x58d6a0 reads the game's in-memory Ancients-defeated flag, not a quest bit, so the kill is needed, not a `quest` verb.
+  - 120->128 (run `checks-20261101-045424-s2`): the altar was used and the three Ancients killed by the harness, quest 39 0001000000000000 -> 1001000000000100. Then gateway object 547 by 2 clicks: entered 128.
+  - 83->100: the orb's room is not built at the arrival. `presets 2` lists only the built rooms' units, and the search walk stuck at a wall by the arrival (run `checks-20261101-070759-s2`). New `a25_object_deep` goes to the far rooms by walks, then `place` legs. In run `checks-20261101-071802-s2` it found orb id 68 after 81 s. Khalim's Will was worn and 2 clicks used it, quest 18 0000000000000000 -> 1000000000000100; then the tile by clicks: entered 100.
+  - No bug filed: both doors open once the step is set.
+  - `MXL_A25_ROUTES` (`83-100,120-128`, either order) limits the entries part to those routes, for a short re-run of a door.
+- **NPCs never found:**
+  - `TOWN_NPC_SPOTS` now has Atma, Drognan and Cain (Lut Gholein) and Natalya and Asheara (Kurast Docks, from docktown3.ds1).
+  - Drehya (512) and Tyrael (521) are named as quest-placed when not found: Anya comes to town after her rescue (quest 37), and 1.14d SpawnTyrael (0x58e920) runs only after Baal's death.
+  - Not run in game. 80<->95 was not looked at.
+
+Command (slot 2 only, from 2026-11-01):
+
+`MXL_RUN=<lock> MXL_SLOT=2 MXL_CHAR=<hell character> MXL_A25_DIFFICULTY=hell MXL_A25_ACTS=5 MXL_A25_PARTS=entries,bosses MXL_HCMD_LOG_CHARS=6000 py -3 tools/game_checks.py all acts25`
+
+| Probe | What | Result |
+|---|---|---|
+| req-004 | Hell entered (save edit, god mode, gear, waypoints) | difficulty 2 |
+| req-005 | `box` dropped and clicked, cube held | refused by click and by packet 0x16; held: `box@0` with `qf2@3` inside |
+| req-006 | `remove id 5` / `remove box` | "no such item" (the cube holds `qf2`) |
+| req-007 | `qf2` removed, then the cube, then the drop | picked up by the first click |
+| req-008 | Act 5 bosses, first boss phases | Nihlathak 128.0M no change (swings from 4; no spot 2 rooms away); Ancients 40.88M -> 40.83M; Baal lost after 1 s (class read from the gone unit) |
+| req-009 | same, place within 2 and class from the caller | Nihlathak, Baal no change (no place spot: the rooms are not neighbours) |
+| req-010 | `walkmap` from the walk's end | free cells only round the character |
+| req-011 | `place` hops (stopped by the slot rule) | placed next to Nihlathak twice, he walked off; life after not read |
+
+| Slot 2 run (Hell) | Parts | Result |
+|---|---|---|
+| `checks-20261101-045424-s2`, 56 min | Act 5 entries, bosses | 120->128 entered (Ancients step). Nihlathak 128.0M, Baal 256.0M: no change. Ancients 41.583M -> 41.582M (bare-handed after the bow: fixed). Other entries mostly SET-UP failures (way out not found, not judged) |
+| `checks-20261101-060118-s2`, 48 min | Act 3 entries, bosses | 83->100 not entered: orb not found (fixed). Azmodan 63.228M -> 63.227M; Mephisto 256.0M no change; "axe back" |
+| `checks-20261101-065131-s2`, 16 min | Act 2 bosses | Radament 51.15M -> 46.99M; Creature of Flame 210.50M -> 209.42M; Summoner 37.82M -> 35.48M; Duriel 192.0M no change (assert MissMode.cpp:2042: known #54 / #73) |
+| `checks-20261101-070759-s2`, 9 min | Act 3, 83->100 only | orb not found: the search walk stuck at the arrival (fixed by hops) |
+| `checks-20261101-071802-s2`, 6 min | Act 3, 83->100 only | orb found (81 s), used by 2 clicks, quest 18 done, entered 100: PASS |
