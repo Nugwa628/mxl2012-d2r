@@ -81,7 +81,7 @@ Generated from `work/mod/migrate_report.md` of `py -3 tools/build.py --data-only
 | skilldesc | keyed | 699 | 232 | 711 | 111 mapped, 8 D2R-only | done |
 | skills | indexed | 1038 | 427 | 1110 | 247 mapped, 53 D2R-only | done; idmap ids (Warlock 373-402 stay D2R's); slots remapped; GH->SQ, stop functions; rightskill; Abyss / Ring of Fire / Apocalypse -> `_mxl` |
 | soundenviron | d2r_wins_indexed | 50 | 76 | 76 | 20 mapped, 17 D2R-only | done |
-| sounds | d2r_wins | 4900 | 11895 | 12101 | 19 mapped, 18 D2R-only | done; D2R wins; 206 mod-only rows (98 on a vanilla file's audio columns; 108 on Median's own audio: `tools/sounds_port.py` converts the 88 files Median shipped to .flac in `data/global/sfx/taunt` and gives the rows a Channel, so 101 play; 7 name files Median never shipped and stay silent as in 1.13c) |
+| sounds | d2r_wins | 4900 | 11895 | 12101 | 19 mapped, 18 D2R-only | done; D2R wins; 206 mod-only rows (98 on a vanilla file's audio columns; 108 on Median's own audio: `tools/sounds_port.py` converts the 89 files Median shipped to .flac in `data/global/sfx/taunt` and gives the rows a Channel (boss lines on D2R's boss-speech channel), so 102 have their file; 6 name files Median never shipped and stay silent as in 1.13c; Median's 12 replacements of vanilla files (class select, gem, werebear bites) play in SD and HD, the rows stay D2R's) |
 | states | indexed | 255 | 232 | 302 | 68 mapped, 5 D2R-only | done; 255 -> 302 rows (D2R's added states keep their ids); gfxclass remapped |
 | storepage | d2r_wins | 4 | 4 | 8 | 2 mapped, 0 D2R-only | done |
 | superuniques | indexed | 84 | 66 | 83 | 20 mapped, 3 D2R-only | done; Median's "Expansion" separator restored, ids are vanilla's (bug #362, id-mapping.md) |

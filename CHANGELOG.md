@@ -10,8 +10,9 @@ version being released (docs/release.md).
   tab names fit their tabs in full.
 - Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the unfolding stair in their doorway stayed shut and blocked the way (#518).
 - Arcane Sanctuary: its magic shrine is drawn again in legacy graphics, where it was invisible (#520).
-- Median XL's own sounds now play: boss taunts, skill shouts and item and monster sounds Median added (101 of its 108; the
-  other 7 had no audio in Median XL either), in HD and legacy.
+- Median XL's own sounds now play: skill shouts and item and monster sounds Median added (102 of its 108; the other 6 had
+  no audio in Median XL either), in HD and legacy, and boss taunts go out on D2R's boss-speech channel. Median's own versions of
+  the class-select sounds, the gem sound and the werebear bites replace D2R's, in HD and legacy.
 - Travincal (Act 3): fights with Glowing Ones no longer log an engine error when one dies; in HD they are now drawn as
   hunched green undead casters with a pale glowing head (#519).
 

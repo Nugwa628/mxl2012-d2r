@@ -4643,6 +4643,29 @@ at build time. Not triggered: item use sounds (`book_read`, `pack_life`: the har
 Open: `singing_sun` (a state onsound) was asked for and passed to the client play in HD during the Merkabah casts, but its file
 was not opened; not looked into.
 
+### Follow-up (owner ruling 2026-10-31): Median's replacements of vanilla sounds, maenad1, boss channel
+
+The build now also writes Median's 12 replacements of vanilla files at D2R's SD path and at the HD row's file
+(`data/hd/global/sfx/...`, docs/txt-migrate.md), fixes `maenad1`'s typo and puts boss lines on `vo/eax/boss-dialog_sd`.
+Lab: `mxl2012-runs/medsounds/lab2.py` (same environment as lab.py; `LAB_BEAR=0` skips the werebear try, `LAB_BOSSES=<ids>` spawns
+bosses): main menu -> Create New, a click on each class figure, Toggle (the hero screen's legacy button), the clicks again, Back;
+then SndPal in the Blood Moor per mode: `item gcv ground` (Chipped Amethyst, dropsound `item_gem`), `spawn 1722` (l4dwitch, Taunt
+`witch_awaken`). The diag log is buffered: the file opens are counted over the whole log of the launch.
+
+| Run (`mxl2012-runs/medsounds/`) | Result |
+|-----|--------|
+| `runC3` | hero screen, HD: the 7 `data\hd\global\SFX\cursor\intro\<class>_select_hd.flac` of the mod opened, status 0 (the `cursor_<class>_select` rows played and redirected to their `_hd` rows); legacy: `amazon`, `assassin`, `barbarian`, `sorceress`, `druid_select.flac` from the mod's `data\global\SFX\cursor\intro` (the other two clicks missed a figure). Gem drop: HD opened `data\hd\global\SFX\item\item_gem_hd.flac`, legacy `data\global\SFX\item\gem.flac`, both the mod's. **369 asserts** (`ptUnit->eType == UNIT_PLAYER`): this run spawned monster 431 `bear` (AI NecroPet, a player's pet) with no owner; a test artefact, gone in runC4 / runE without that spawn |
+| `runC4` | the same plus the werebear try (`cast 880 self`, Merc Werebear, then attacks): the Paladin does not take the `bear` morph, no bite played. 0 asserts |
+| `runD` | experiment, not kept: Median's 50 rows with Falloff 1 set to 4: `witch_awaken` still not opened (see below) |
+| `runE` | witch and `LAB_BOSSES=1068,1318,1655` (Butcher, Lazarus, MCS): only the witch taunts on spawn; `witch_awaken` asked for and handed to the client play on `vo/eax/boss-dialog_sd` in both modes; `mcsdying.flac` opened at the MCS boss's death. 0 asserts |
+
+All runs: game alive in both modes, no crash file, shared files restored. Not triggered: the werebear bites (in Median only the
+Merc Werebear mercenary skill gives the `bear` morph; the files are in place at SD and HD paths, same mechanism as the class select
+and the gem). Open: `witch_awaken` (Taunt) and `singing_sun` (state onsound) are asked for, their path resolved and handed to the
+client play, but their file is never opened, on the old channel (runB, `sfx/monster_sd`) as on the boss channel (runE). Both have
+Falloff 1, every row seen opening its file has Falloff 4, but Falloff 4 did not change it (runD); not solved, so whether the
+boss taunts are audible is not proven.
+
 ## Lane glowing: Glowing One engine assert, new HD stand-in (2026-10-31, slot 2, background mode, build of lane/glowing, data only)
 
 Bug #519 (lane nmhell4, run `checks-20261031-162447-s4`): `BC_ASSERT: result` (animation_event_handler.cpp:608) in Travincal

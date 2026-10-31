@@ -95,7 +95,9 @@ class RowTests(unittest.TestCase):
         self.assertEqual(sp.own_rows(HEADER, rows, {"vanilla"}, {"object/a"}), [2])
 
     def test_channel_for(self):
-        self.assertEqual(sp.channel_for({"monsounds.Taunt", "skills.stsound"}), sp.CHANNEL_MONSTER)
+        self.assertEqual(sp.channel_for({"monsounds.Taunt", "skills.stsound"}), sp.CHANNEL_BOSS)
+        self.assertEqual(sp.channel_for({"monsounds.Neutral", "skills.stsound"}), sp.CHANNEL_MONSTER)
+        self.assertEqual(sp.channel_for({"missiles.TravelSound"}, "sanctum_speech"), sp.CHANNEL_BOSS)
         self.assertEqual(sp.channel_for({"misc.usesound", "uniqueitems.dropsound"}), sp.CHANNEL_ITEMS)
         self.assertEqual(sp.channel_for({"uniqueitems.dropsound", "states.onsound"}), sp.CHANNEL_SKILLS)
         self.assertEqual(sp.channel_for(set()), sp.CHANNEL_SKILLS)
@@ -115,22 +117,46 @@ class BuildTests(unittest.TestCase):
         self.tone = (np.sin(np.arange(2000) / 3) * 8000).astype(np.int64)
         write_wav(sfx / "taunt" / "Boink.wav", self.tone)
         write_wav(sfx / "taunt" / "chant.wav", self.tone[::-1], 22028)
-        write_wav(sfx / "item" / "gem.wav", self.tone)  # Median's replacement of a vanilla file: D2R's row keeps D2R's
+        write_wav(sfx / "taunt" / "frenzy1.wav", self.tone[:500])
+        # Median's replacements of vanilla files: Median's audio, D2R's rows
+        write_wav(sfx / "item" / "gem.wav", self.tone[:1000])
+        write_wav(sfx / "cursor" / "intro" / "amazon select.wav", self.tone[:900])
+        for k in (1, 2):
+            write_wav(sfx / "monster" / "bear" / f"bite{k}.wav", self.tone[:100 * k])
+        write_wav(sfx / "item" / "shared.wav", self.tone[:300])
+        self.d2r_rows = [
+            ["gem", "1", "gem_hd", "sfx/items_sd", "item\\gem.flac", "1", "1", "0"],
+            ["amazon_select", "2", "amazon_select_hd", "sfx/x_sd", "cursor\\intro\\amazon_select.flac", "1", "1", "0"],
+            ["bite_1", "3", "bite_hd1", "sfx/monster_sd", "monster\\bear\\bite1.flac", "1", "1", "2"],
+            ["bite_2", "4", "", "sfx/monster_sd", "monster\\bear\\bite2.flac", "1", "1", "0"],
+            ["shared", "5", "shared_hd", "sfx/items_sd", "item\\shared.flac", "1", "1", "0"],
+            ["gem_hd", "6", "", "sfx/items_hd", "item\\gem_hd.flac", "1", "1", "0"],
+            ["amazon_select_hd", "7", "", "sfx/x_hd", "cursor\\intro\\amazon_select_hd.flac", "1", "1", "0"],
+            ["bite_hd1", "8", "", "sfx/monster_hd", "monster\\bear\\bite1_hd.flac", "1", "1", "2"],
+            ["bite_hd2", "9", "", "sfx/monster_hd", "monster\\bear\\bite2_hd.flac", "1", "1", "0"],
+            ["shared_hd", "10", "", "sfx/items_hd", "item\\other_hd.flac", "1", "1", "0"],
+            ["other_hd", "11", "", "sfx/items_hd", "item\\other_hd.flac", "1", "1", "0"]]  # an HD file two rows play
         for bank in ("", "base"):
-            tsv(self.d2r / bank / "sounds.txt", HEADER, [["gem", "1", "", "sfx/items_sd", "item\\gem.flac", "1", "1", "0"]])
-            tsv(self.mod / "global" / "excel" / bank / "sounds.txt", HEADER, [
-                ["gem", "1", "", "sfx/items_sd", "item\\gem.flac", "1", "1", "0"],
-                ["shrine_boink", "2", "", "", "taunt\\Boink.flac", "128", "128", "0"],
-                ["chant_1", "3", "", "", "taunt\\chant.flac", "255", "255", "2"],
-                ["chant_2", "4", "", "", "taunt\\chant.flac", "255", "255", "0"],
-                ["robot_taunt", "5", "", "", "taunt\\resistanceisfutile.flac", "255", "255", "0"]])
+            tsv(self.d2r / bank / "sounds.txt", HEADER, self.d2r_rows)
+            tsv(self.mod / "global" / "excel" / bank / "sounds.txt", HEADER, [*self.d2r_rows,
+                ["shrine_boink", "12", "", "", "taunt\\Boink.flac", "128", "128", "0"],
+                ["chant_1", "13", "", "", "taunt\\chant.flac", "255", "255", "2"],
+                ["chant_2", "14", "", "", "taunt\\chant.flac", "255", "255", "0"],
+                ["robot_taunt", "15", "", "", "taunt\\resistanceisfutile.flac", "255", "255", "0"],
+                ["maenad1", "16", "", "", "taunt\\frenzy1,.flac", "255", "255", "0"],
+                ["witch_cry", "17", "", "", "taunt\\Boink.flac", "255", "255", "0"]])
             ex = self.mod / "global" / "excel" / bank
             tsv(ex / "misc.txt", ["name", "usesound"], [["Book", "shrine_boink"]])
             tsv(ex / "states.txt", ["state", "onsound"], [["chant", "chant_1"]])
-            tsv(ex / "monsounds.txt", ["Id", "Taunt"], [["robot", "robot_taunt"]])
+            tsv(ex / "monsounds.txt", ["Id", "Taunt", "Neutral"], [["robot", "robot_taunt", "witch_cry"]])
+        self._old_typo, sp.TYPO_FIXES = sp.TYPO_FIXES, {"taunt/frenzy1,": "taunt/frenzy1"}
 
     def tearDown(self):
+        sp.TYPO_FIXES = self._old_typo
         self.tmp.cleanup()
+
+    def files(self):
+        return sorted(p.relative_to(self.mod).as_posix() for p in self.mod.rglob("*.flac"))
 
     def rows(self, bank=""):
         h, rows = sp.read_tsv(self.mod / "global" / "excel" / bank / "sounds.txt")
@@ -141,29 +167,55 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(errors, 0)
         self.assertFalse((self.mod / "global" / "sfx").exists())
         self.assertEqual(self.rows()["shrine_boink"]["Channel"], "")
-        self.assertIn("4 rows play Median's own audio, 3 with a file", report[2])
+        self.assertIn("6 rows play Median's own audio, 5 with a file", report[2])
+        self.assertIn("5 D2R files play Median's replacement (9 SD + HD paths, 1 HD files left D2R's)", report[2])
 
     def test_build(self):
         errors, report = sp.run(self.median, self.d2r, self.mod, write=True)
         self.assertEqual(errors, 0)
         out = self.mod / "global" / "sfx" / "taunt"
-        self.assertEqual(sorted(p.name for p in (self.mod / "global" / "sfx").rglob("*") if p.is_file()),
-                         ["boink.flac", "chant.flac"])  # gem stays D2R's, the missing file is not invented
+        self.assertEqual(self.files(), [
+            "global/sfx/cursor/intro/amazon_select.flac", "global/sfx/item/gem.flac", "global/sfx/item/shared.flac",
+            "global/sfx/monster/bear/bite1.flac", "global/sfx/monster/bear/bite2.flac",
+            "global/sfx/taunt/boink.flac", "global/sfx/taunt/chant.flac", "global/sfx/taunt/frenzy1.flac",
+            "hd/global/sfx/cursor/intro/amazon_select_hd.flac", "hd/global/sfx/item/gem_hd.flac",
+            "hd/global/sfx/monster/bear/bite1_hd.flac", "hd/global/sfx/monster/bear/bite2_hd.flac",
+        ])  # the missing file is not invented; other_hd.flac (also other_hd's) stays D2R's
+        for f, n in (("global/sfx/item/gem.flac", 1000), ("hd/global/sfx/item/gem_hd.flac", 1000),
+                     ("hd/global/sfx/cursor/intro/amazon_select_hd.flac", 900),
+                     ("hd/global/sfx/monster/bear/bite1_hd.flac", 100), ("hd/global/sfx/monster/bear/bite2_hd.flac", 200)):
+            got, _ = flac.decode((self.mod / f).read_bytes())
+            self.assertTrue(np.array_equal(got[:, 0], self.tone[:n]), f)
         got, rate = flac.decode((out / "chant.flac").read_bytes())
         self.assertEqual(rate, 22028)
         self.assertTrue(np.array_equal(got[:, 0], self.tone[::-1]))
         for bank in ("", "base"):
             r = self.rows(bank)
-            self.assertEqual(r["gem"]["Channel"], "sfx/items_sd")
+            self.assertEqual([list(r[x[0]].values()) for x in self.d2r_rows], self.d2r_rows)  # D2R's rows untouched
+            self.assertEqual(r["maenad1"]["FileName"], "taunt\\frenzy1.flac")
+            self.assertEqual(r["witch_cry"]["Channel"], sp.CHANNEL_MONSTER)
             self.assertEqual((r["shrine_boink"]["FileName"], r["shrine_boink"]["Channel"]), ("taunt\\boink.flac", sp.CHANNEL_ITEMS))
             self.assertEqual(r["chant_1"]["Channel"], sp.CHANNEL_SKILLS)
             self.assertEqual(r["chant_2"]["Channel"], sp.CHANNEL_SKILLS)  # group member: the head's channel
             self.assertEqual((r["robot_taunt"]["FileName"], r["robot_taunt"]["Channel"]),
-                             ("taunt\\resistanceisfutile.flac", sp.CHANNEL_MONSTER))
+                             ("taunt\\resistanceisfutile.flac", sp.CHANNEL_BOSS))
             self.assertEqual(r["shrine_boink"]["Volume Min"], "128")
         text = "\n".join(report)
         self.assertIn("taunt/resistanceisfutile", text)
         self.assertIn("| chant_2 | taunt/chant.flac | Median | sfx/player-skills_sd | states.onsound (group of chant_1) |", text)
+        self.assertIn("| monster/bear/bite2.wav | bite_2, bite_hd2 | data/global/sfx/monster/bear/bite2.flac, "
+                      "data/hd/global/sfx/monster/bear/bite2_hd.flac |", text)
+        self.assertIn("- shared_hd (item/other_hd.flac) stays D2R's: also played by other_hd", text)
+
+    def test_rerun_moves_our_channel(self):
+        p = self.mod / "global" / "excel" / "sounds.txt"
+        h, rows = sp.read_tsv(p)
+        for r in rows:  # a first run's channel, and one set by hand
+            r[3] = {"robot_taunt": sp.CHANNEL_MONSTER, "chant_1": "sfx/someone_sd"}.get(r[0], r[3])
+        sp.write_tsv(p, h, rows)
+        sp.run(self.median, self.d2r, self.mod, write=True)
+        self.assertEqual(self.rows()["robot_taunt"]["Channel"], sp.CHANNEL_BOSS)
+        self.assertEqual(self.rows()["chant_1"]["Channel"], "sfx/someone_sd")
 
     def test_rerun_is_stable(self):
         sp.run(self.median, self.d2r, self.mod, write=True)
