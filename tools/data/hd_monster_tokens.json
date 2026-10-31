@@ -14,13 +14,13 @@
    "class": "reused",
    "ids": 2,
    "art_vs_prior": "identical",
-   "donor": "wraith1",
-   "scale": 1.0,
-   "colour": "hue -0.27 sat -0.17 val -0.52",
+   "donor": "unraveler1",
+   "scale": 0.9,
+   "colour": "hue +0.27 sat -0.27 val -0.26",
    "adjust": [
-    0.72,
-    -0.15,
-    -0.5,
+    0.28,
+    -0.25,
+    -0.25,
     1.0
    ],
    "tint": [
@@ -29,10 +29,10 @@
     0.0,
     0.0
    ],
-   "confidence": "low",
+   "confidence": "medium",
    "source": "pin",
-   "reason": "lane hdmon2 (Act 1-2 pass): Glowing one: hunched dark green figure with a glowing head (52x83 px). The earlier stand-in eagle has no model in D2R (invisible in HD); a ghostly Wraith until real art exists.",
-   "score": "; score -2.6, size x1.28",
+   "reason": "Glowing one: hunched dark green figure with a glowing head (52x83 px). Lane hdmon2 (Act 1-2 pass): the earlier stand-in eagle has no model in D2R (invisible in HD); a ghostly Wraith (wraith1 x1.0). Lane glowing (bug #519): on wraith1 the Glowing Ones logged the engine assert BC_ASSERT result (animation_event_handler.cpp:608) in fights, HD and legacy, as Howling did (section 12): wraith1 has only an attack1 clip and the Glowing One attacks in A1, A2 (Male Pounce) and casts in S1. Moved to the Unraveler unraveler1, a hunched gaunt undead caster with glowing eyes that has attack1, attack2 and cast clips.",
+   "score": "; score -2.3, size x0.79",
    "ids_mapped": 2,
    "monsters": [
     "glowingM",

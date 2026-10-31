@@ -4642,3 +4642,26 @@ at build time. Not triggered: item use sounds (`book_read`, `pack_life`: the har
 `setstate` verb; the Lionheart aura on the right button played no `paladin_chant`), Colosseum by left click (the clicks walked).
 Open: `singing_sun` (a state onsound) was asked for and passed to the client play in HD during the Merkabah casts, but its file
 was not opened; not looked into.
+
+## Lane glowing: Glowing One engine assert, new HD stand-in (2026-10-31, slot 2, background mode, build of lane/glowing, data only)
+
+Bug #519 (lane nmhell4, run `checks-20261031-162447-s4`): `BC_ASSERT: result` (animation_event_handler.cpp:608) in Travincal
+with Glowing Ones (`!!` on `wraith1`). Fix: `!!` -> `unraveler1` x0.9 (docs/hd-monsters.md section 17). Plugin: main's
+`build/plugin/Release/mxl2012-core.dll` (built after the last plugin commit) by `MXL_PLUGIN`, data of this branch,
+`install_mod.py --slot 2`. Lab script outside the repo: `MXL_RUN=glowing MXL_SLOT=2 py -3 mxl2012-runs/glowing/lab.py <worktree>
+<out> <modes> <rounds>`, character `GlowLane` (Barbarian, `mxl2012-s2`), Blood Moor (the HD unit does not depend on the area),
+god mode; per fight one Glowing One spawned 5 subtiles away, the player attacks it (skill 0) for 25 s, modes sampled, then its life
+set to 1 (SET-UP) and the player's hit kills it. The 608 assert is not counted by `asserttrace` (raised in D2Render) and is
+logged once per launch: the lab copies the slot's d2rloader.log and counts it.
+
+| Run (`mxl2012-runs/glowing/`) | Build | Result |
+|---|---|---|
+| `before` | wraith1 | 8 fights, HD + legacy, deaths by harness `kill`; modes 1 / 4 / 5 (A2) seen; `asserttrace` 0 (the engine log of that launch was not kept) |
+| `before2` | wraith1 | 8 fights, HD + legacy, deaths by the player's hit: **608 assert at 19:14:19, the first player-hit death (glowingM, HD)** (`before2/d2rloader.log`); `asserttrace` 0 |
+| `before3-legacy` | wraith1 | legacy-only launch, 4 player-hit deaths: **one 608 assert** |
+| `after-hd` | unraveler1 x0.9 | HD-only launch, 6 player-hit deaths (A1 and A2 seen): **0 engine asserts**, 0 crash files |
+| `after-legacy` | unraveler1 x0.9 | legacy-only launch, 6 player-hit deaths: **0 engine asserts**, 0 crash files |
+
+Look: review sheet `mxl2012-runs/glowing/review.png` (legacy, HD before, HD now; crops follow the monster). Before: blue ghostly
+wisps, the body hardly seen; now: green-tinted hunched undead casters with a pale head, about the player's height. Not run in
+Travincal itself, and not in Nightmare (the HD unit and its clips do not depend on area or difficulty).

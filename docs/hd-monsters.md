@@ -92,7 +92,7 @@ loaded at the peak, so roughly 50 tables would reach 120 of 128. Keep `COLOUR_TA
 
 | Token | Stand-in (D2R unit) | Scale; colour | Confidence | Monsters | Source / reason |
 |---|---|---|---|---|---|
-| `!!` | wraith1 | x1; hue -0.27 sat -0.17 val -0.52 | low | `glowingM`, `glowingM2` | pin: lane hdmon2 (Act 1-2 pass): Glowing one: hunched dark green figure with a glowing head (52x83 px) |
+| `!!` | unraveler1 | x0.9; hue +0.27 sat -0.27 val -0.26 | medium | `glowingM`, `glowingM2` | pin: Glowing one: hunched dark green figure with a glowing head (52x83 px) |
 | `!2` | councilmember1 | x0.75; hue +0.43 sat -0.04 val +0.51 | medium | `sumelite_1269`, `midnightfaes`, `darkfey1` +3 | pin: Small green-haired fey woman (Midnight Faes, Dark Fey): the reference modal donor (maggotbaby1) came from other monsters on the token; a small robed human |
 | `!3` | clawviper1 | x1; hue +0.42 sat -0.46 val +0.05 | high (review) | `res_couatlchild1`, `res_couatlchild2`, `res_couatlchild3` +3 | reused donors, 2012 names: the reference rows for this art disagree (43% for clawviper1, others {'sk_archer1': 2, 'nihlathakboss': 2}); 2012 monster names pick clawviper1 among them |
 | `!4` | clawviper1 | x1.4; hue +0.42 sat -0.10 val +0.05 (hand) | medium | `sumelite_1261`, `couatlfather1`, `couatlfather2` +3 | pin: lane hdmon3 (Act 3-5 pass): Couatl (NiVa, Couatl fathers): upright feathered serpent with a humanoid torso (82x116 px) |
@@ -1068,3 +1068,20 @@ in game at three moments): the vampire now, Nihlathak, the Oblivion Knight. To s
 
 **Owner, 2026-10-30:** "use oblivion knight for now": the `$f` entry is `doomknight3` x1.2, no colour change (the values of
 run `checks-20261030-204213-s3`), on.
+
+## 17. Glowing One off the Wraith (lane glowing, 2026-10-31, bug #519)
+
+`!!` Glowing One (`glowingM`, `glowingM2`; Act 3 Nightmare, Travincal) stood in on `wraith1` x1.0 (section 9.2). Lane nmhell4
+saw the engine assert `BC_ASSERT: result` (animation_event_handler.cpp:608) in a Travincal fight, also in legacy graphics. The
+same as Howling (section 12): the d2rloader.log details read "Attempted to trigger an AnimateMaterialProperty event, but the
+target mesh was not found!". It fires at a Glowing One's **real death** (the player's killing hit), once per game launch (the
+engine logs an assert ID once), and the plugin's `asserttrace` does not count it (it is raised in D2Render): only d2rloader.log
+shows it. A harness `kill` death did not show it.
+
+| Token | Change | Why (seen in game) |
+|---|---|---|
+| `!!` Glowing One | wraith1 x1.0 -> **unraveler1 x0.9** (colour scored again: hue +0.27, sat -0.27, val -0.26) | on wraith1 the 608 assert at the first player-hit death in HD and in a legacy-only launch. wraith1 has only an attack1 clip; the Glowing One attacks in A1 and A2 (Male Pounce, seen in game as mode 5) and has S1. The Unraveler has attack1, attack2 and cast clips and is a hunched, gaunt undead caster with a pale glowing skull head: in HD a green-tinted hunched figure with a pale head (the legacy art: dark green hunched figures with a pale glowing head, in packs). On the wraith they drew as blue ghostly wisps, the body hardly seen. 12 player-hit deaths over an HD and a legacy launch: 0 asserts, 0 crash files |
+
+Other candidates with attack1 + attack2 + a cast clip (`tools/data/d2r_unit_clips.json`): `nihlathakboss` (a robed man) and
+`mummy1` (a mummy, no glow); `willowisp1` (a glowing orb) has no attack2. Review sheet for the owner (outside git):
+`mxl2012-runs/glowing/review.png` (legacy, HD before, HD now). Runs: docs/testing.md "Lane glowing".

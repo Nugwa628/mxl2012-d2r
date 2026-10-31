@@ -12,6 +12,8 @@ version being released (docs/release.md).
 - Arcane Sanctuary: its magic shrine is drawn again in legacy graphics, where it was invisible (#520).
 - Median XL's own sounds now play: boss taunts, skill shouts and item and monster sounds Median added (101 of its 108; the
   other 7 had no audio in Median XL either), in HD and legacy.
+- Travincal (Act 3): fights with Glowing Ones no longer log an engine error when one dies; in HD they are now drawn as
+  hunched green undead casters with a pale glowing head (#519).
 
 ## D2R-XL 2012
 
