@@ -12935,6 +12935,58 @@ def check_tunnels65():
 
 CHECKS += [("tunnels65", check_tunnels65)]
 
+# ---- lane voidengine: the Arcane void in HD, Median's preset level 65 against the Sanctuary maze 74 -------------------------
+# SHORTCUT (named in the notes): the harness travels (`h level`, `place`), god mode; a graphics check, not a player path.
+VOID_LEVELS = (65, 74)            # belial.ds1 (one preset map) and the Arcane Sanctuary (D2R's Sanct rooms, a maze)
+VOID_OFFSETS = ((0, 0), (10, 10), (-10, 10))
+
+
+def void_levels():
+    """MXL_VOID_LEVELS (comma list) or VOID_LEVELS."""
+    got = [int(v) for v in os.environ.get("MXL_VOID_LEVELS", "").split(",") if v.strip().isdigit()]
+    return got or list(VOID_LEVELS)
+
+
+def check_void_maps():
+    """Lane voidengine (docs/testing.md "Lane voidengine"): levels 65 and 74 in HD and classic (MXL_VOID_MODES, default
+    hd,legacy), three shots each `void_<level>_<mode>_<n>` from the arrival. JUDGED: reached, no assert; the ground round the
+    platforms (void or floor) by hand."""
+    if not need_game():
+        add("void_maps", "BLOCKED", "not in the game")
+        return
+    mark, log, shots, rows, bad = engine_mark(), [], [], [], []
+    modes = [m.strip() for m in (os.environ.get("MXL_VOID_MODES") or "hd,legacy").split(",") if m.strip()]
+    enable_debug()
+    cheat("god 1")
+    for mode in modes:
+        goto(40, timeout=60)  # G is read from the side bars: set it in a lit town
+        if not set_graphics(mode):
+            bad.append("graphics %s not set" % mode)
+            continue
+        for lv in void_levels():
+            m2 = engine_mark()
+            p = goto(lv, timeout=60)["player"]
+            if p.get("area") != lv:
+                bad.append("%s %d: not reached (area %s)" % (mode, lv, p.get("area")))
+                continue
+            time.sleep(5)  # the scene and its models stream in
+            x0, y0 = p.get("x"), p.get("y")
+            for n, (dx, dy) in enumerate(VOID_OFFSETS):
+                if n and x0 is not None:
+                    H("place %d %d" % (x0 + dx, y0 + dy))
+                    time.sleep(3)
+                shots.append(sh("void_%d_%s_%d" % (lv, mode, n)))
+            issues, known = engine_issues(m2)
+            rows.append("%s %d: reached at %s,%s; asserts: %s" % (mode, lv, x0, y0, "; ".join(issues + known) or "none"))
+    goto(1, timeout=60)
+    set_graphics("hd")
+    cheat("god 0")
+    rc_finish("void_maps", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+              ["travel by `h level` / `place`", "god mode (cheat god 1)"],
+              judged_by_hand="the ground round the platforms in void_<level>_hd_*.png against void_<level>_legacy_*.png")
+
+
+CHECKS += [("void_maps", check_void_maps)]
+
 if __name__ == "__main__":
     main()
-

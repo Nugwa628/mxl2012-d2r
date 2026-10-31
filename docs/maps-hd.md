@@ -188,6 +188,22 @@ the three changes that fix what data could fix (for all 17 maps), and one that d
    either way. **Left off**; the HD floor comes from neither the level type nor the .ds1 nor the scene's terrain. What remains
    untried needs engine work (where HD fills a preset's empty cells) or a different map (one of D2R's Sanct layouts, which
    changes Median's level), so it stays a known issue.
+   **Lane voidengine (2026-10-31, owner: "dig into the engine. find what's wrong"): found, a level-74 hard-code in D2R.exe;
+   not fixable without new floor geometry.** The stone is D2R's ground plane `data/hd/env/model/global/terrain/outdoor_lod0.model`:
+   a routine (D2R 93847 `0x6b4a30`, called from `0x6b3fe8`; per-room loop at `0x6b4b76`) places one plane per room,
+   scaled to the room's size, on every level **except level id 74** (`0x6b4b80` `cmp dword ptr [level+0x1f8], 0x4a` / `je`;
+   room activation `0x6a1f44` places the same plane for room type 1). That plane is where HD draws a room's floor tiles, so it
+   covers the whole room, void cells included. D2R's Arcane Sanctuary skips it and gets its platform floor from its Sanct
+   scenes instead; Median's level 65 has no such floor, so it gets the plane. Classic has the same level-74 special case
+   (1.14d `DRLGROOMTILE_ProcessTile` `0x0066e9b0`, D2R `0x3f357b`: blank tile flags `0x1e00100` for 74, `0x1e00000` otherwise),
+   but in classic both values draw black. Data-side tests in game (slot 1) changed nothing: no terrain in D2R's 53 Sanct/summ
+   scenes (74 unchanged), sancte's terrain entity in belial (65 unchanged), the void cells of belial.ds1 filled with 74's blank
+   value (both unchanged). Engine test: the immediate at `0x6b4b86` patched in memory from 0x4a to 0x41 (65), run
+   `checks-20261031-183526-s1`: **65 in HD shows D2R's starry void** (no assert, no crash file, classic unchanged, 74
+   unchanged), **but the platform floor goes with it**: only the edge trims, arches and stairs are left in the void. A belial
+   terrain mesh (`MXL2012_BELIAL_TERRAIN=1`) or sancte's own terrain, also moved under the arrival, is not drawn there either. So
+   skipping the plane needs a floor model for belial's platform, and the owner rule allows no new 3D models: **no fix shipped,
+   no plugin part.** Testing and shots: docs/testing.md "Lane voidengine".
 
 **Arches, roofs and trees** (lane walls4, 2026-10-30). Owner rule: no new 3D models; only D2R's own wall, arch and roof
 models (any act's tile sets), placed with this pipeline; a cell with no fitting D2R model stays as it is and is listed.

@@ -4574,3 +4574,47 @@ The probe therefore shows whether an object is drawn, not whether it can be used
 
 Open: the harness crash on spawning 473 out of its Act 5 setting was not looked into (the row's functions are D2R's own). The
 item drop shots are too dark to show the flippy (the drops did not crash).
+
+## Lane voidengine: why HD draws stone over the Ancient Tunnels' void (2026-10-31, slot 1, background mode)
+
+Owner (2026-10-31): "dig into the engine. find what's wrong". Cause and addresses: docs/maps-hd.md item 12 and
+docs/d2r-addresses.md section 25 (D2R places a ground plane `global/terrain/outdoor_lod0.model` under every room except on
+level 74; that plane carries the HD floor, so it covers belial's void too). **No fix shipped**: skipping the plane for level
+65 shows the void but also takes the platform floor away, and a floor for it would be a new 3D model.
+
+New check `void_maps` (tools/game_checks.py, tests `tools/test_game_checks_void.py`): per mode (`MXL_VOID_MODES`, default
+`hd,legacy`, G set in the Act 2 town) and level (`MXL_VOID_LEVELS`, default `65,74`) SET-UP `h level`, three shots
+`void_<level>_<mode>_<n>` at the arrival and `place` +10,+10 / -10,+10; god mode. JUDGED: level reached, no assert; the
+ground by hand.
+
+```
+MXL_RUN=voidengine MXL_SLOT=1 MXL_CHAR=VoidWalk MXL_CHAR_CLASS=paladin py -3 tools/game_checks.py all void_maps
+```
+
+The experiments (one change each) ran with lane scratch scripts in `mxl2012-runs/voidengine/scratch/`: `make_exp.py` (A, B),
+`fill_ds1.py`, `voidpatch_run.py` (check `voidpatch`: writes one byte of our own running game's D2R.exe through
+WriteProcessMemory after comparing the 9 bytes at `0x6b4b80`; check `voidorigin`: shots on belial cells). Builds: main
+`23afb64`; plugin the main checkout's Release DLL of the same commit (this lane's plugin build was not allowed to run).
+
+| run | change | result |
+|---|---|---|
+| `checks-20261031-181028-s1` | none (before) | PARTIAL: 65 HD stone over the void, 74 HD D2R's starry void, both black in classic; no assert |
+| `checks-20261031-181350-s1` | A: D2R's 53 Sanct/summ scenes with `"terrain": {}` and B: belial with sancte's terrain entity | PARTIAL: no change in HD (74 keeps its floor and void, 65 its stone) |
+| `checks-20261031-183026-s1` | belial.ds1's 2131 empty floor cells set to 74's blank tile (`0x81e00102`) | PARTIAL: no change in HD or classic |
+| `checks-20261031-183526-s1` | in memory `0x6b4b86` 0x4a -> 0x41 (skip the plane for 65 instead of 74) | PARTIAL: **65 HD shows the starry void, and the platform floor is gone** (edge trims, arches, stairs left); 74 unchanged; classic unchanged; no assert, no crash file |
+| `checks-20261031-184452-s1` | the patch + `MXL2012_BELIAL_TERRAIN=1` build (belial terrain mesh, indexed) | PARTIAL: the same, the terrain is not drawn |
+| `checks-20261031-184850-s1`, `-185026-s1`, `-185200-s1` | the patch + sancte's own terrain in belial, last moved under the arrival | the character died / `place` refused void cells in the first two; in the last the terrain is not drawn |
+
+After the runs slot 1 got a clean install of main's build again (`install-final.log`: same file list as `work/mod`, no
+terrain, no index) and was unlocked.
+
+Evidence: `mxl2012-runs/voidengine/` sheets `base_sheet.png`, `AB_sheet.png`, `fill74_sheet.png`, `patch65_sheet.png` (rows:
+65 HD, 74 HD, 65 classic), `patch65_terrain_sheet.png`, `patch65_sanctE_moved.png`; the runs in `ingame/`; disassembly
+`dis_6b4b4c.txt`, `dis_6a1958.txt`, `dis_6aa420.txt`, `dis_3f332c.txt`.
+
+Open questions: (1) with the immediate set to 65, level 74 is no longer skipped either, yet its void stayed in the three
+shots: either 74's rooms do not reach the list at `0x6b4a30`, or its Sanct floor models hide the plane; not traced. (2) Why a
+scene `terrain` entity draws nothing in belial (indexed or not, D2R's own sancte mesh included) while 74's floor survives
+stripping its scenes' terrain: 74's floor seems to come from the Sanct scenes' other models. (3) A fix would need a floor
+for belial's platform with the plane skipped (a new model, not allowed) or a way to make the plane leave blank cells
+undrawn; for the owner to rule on.

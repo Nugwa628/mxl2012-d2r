@@ -1128,6 +1128,23 @@ ControllerManager (`D2Client/src/Game/ControllerManager`), the same queue as the
 A targeted melee skill (`range h2h`, `TargetableOnly 1`) quick-cast with no monster under the cursor does nothing, in
 vanilla rows (Bash) and Median rows alike (bugs.md #54).
 
+## 25. The HD ground plane and the level-74 skip (lane voidengine, 2026-10-31; no plugin code)
+
+Why Median's Ancient Tunnels (level 65, `act2/arcane/belial.ds1`) show stone over the void in HD: docs/maps-hd.md item 12.
+
+| What | D2R 93847 | 1.14d Game.exe |
+|---|---|---|
+| std::string `data/hd/env/model/global/terrain/outdoor_lod0.model` (set at `0x41320`) | `0x2402250` (text `0x1d4d378`) | - |
+| per-room ground planes: function (called from `0x6b3fe8` in `0x6b3e48`), room loop | `0x6b4a30`, loop `0x6b4b76`-`0x6b4e20` | - |
+| level-74 skip: `cmp dword ptr [rax+0x1f8], 0x4a` / `je 0x6b4e19` (`rax` = room+0x90, the level) | `0x6b4b80` (bytes `83 b8 f8 01 00 00 4a 0f 84 8c 02 00 00`) | - |
+| plane placed: model manager `0xe21140`, spawn `0xe234b0` (path `0x2402250`, position from room +0x60/+0x64, scale room +0x68/+0x6c x `0x1cbfd88` = 10.0) | `0x6b4cb0`-`0x6b4cd3` | - |
+| room activation (`level_translation.cpp`, "Activating room %s"): room type 1 gets the same plane, type 2 its scene (`0x6aa070`) | `0x6a1958`, test `0x6a1f44`, plane `0x6a2063` | - |
+| blank floor tile of a FillBlanks room: `0x1e00100` for level 74, `0x1e00000` otherwise | `0x3f357b` | `DRLGROOMTILE_ProcessTile` `0x0066e9b0` |
+
+Test (memory patch of a running slot-1 game, not shipped): the byte at `0x6b4b86` 0x4a -> 0x41 makes level 65 skip the plane:
+the void shows, and so does the loss of the platform floor (run `checks-20261031-183526-s1`). A byte search of .text finds
+`cmp dword ptr [reg+0x1f8], 0x4a` only here and at `0x3f357b` (a compare through a register first is not covered by it).
+
 ## Unknown / next steps
 
 Solved in lane d2r-addresses-2 (sections 4, 5, 7-11): warp destination and the lockout refusal point, game frame, spawn, TC executor,
