@@ -285,8 +285,12 @@ D2R_ALWAYS = {"plrmode": {"Code"}, "monmode": {"code"}}
 # Single values D2R renamed (table -> column -> {1.13c value: D2R value}): the cell takes D2R's value only where it still holds
 # 1.13c's and the matching D2R row holds the new one, so Median's own changes in the same column stay. objects Token "sl"
 # (UnfoldingStairLeft, row 194): D2R ships that stair's art and animation data as "9c" and has no "sl" at all, so the stair
-# never unfolds and its collision shuts the Kurast temple doorway it stands in (bug #518).
-D2R_RENAMED = {"objects": {"Token": {"sl": "9c"}}}
+# never unfolds and its collision shuts the Kurast temple doorway it stands in (bug #518). objects Token "xx"
+# (ShrineMagicArcaneSanctuary1, row 133): D2R's row is "az"; neither D2R nor 1.14d ships "xx" art, so in legacy
+# graphics the Arcane Sanctuary's magic shrine was invisible (bug #520; HD picks its model by row and drew it). D2R's
+# own row 375 (HellBridge) keeps "xx", so the D2R row's value decides. tools/rename_audit.py lists every such cell
+# (docs/txt-migrate.md "Rename audit").
+D2R_RENAMED = {"objects": {"Token": {"sl": "9c", "xx": "az"}}}
 
 
 def d2r_renamed(table: str, column: str, value: str, d2r_value: str) -> bool:

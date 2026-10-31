@@ -4552,3 +4552,25 @@ GEMS 25, MATERIALS 52, RUNES 31 (room 57)`) and seen in the review sheet `mxl201
 Unit tests `tools/tests/test_rotw_stash_legacy.py`: 9 OK (new: `test_tab_names_fit`, `test_named_frames_carry_the_names`,
 `test_build_with_the_classic_font`). Evidence: `mxl2012-runs/stashtab/evidence/` (the run folders above; `crops/` the tab bar
 x2: `before_*`, `final_*`, the trial crops).
+
+## Lane renamesweep: art / file / sound names D2R renamed (bug #520, 2026-10-31, slot 3, background mode, build of lane/renamesweep)
+
+Follows #518 (objects Token `sl` that D2R renamed `9c`). Static part: `tools/rename_audit.py` (docs/txt-migrate.md "Rename
+audit": counts per table and the triage). The hits that could break in game were checked with the probe
+`mxl2012-runs/renamesweep/obj_probe.py` (check `oprobe`, imports game_checks). It works per graphics mode in Cold Plains (3).
+It drops the items whose flippy / inventory art exists nowhere (`01-`, `ab!`, `zog`, `zoh`; control `wms`). Then, per object
+class, it does `object <class> 4 0`, a shot, background clicks on the object, the harness `operate` if the mode did not
+change, and another shot. Barbarian, level 1, god mode.
+
+| Run | Build | What | Result |
+|---|---|---|---|
+| `checks-20261031-180926-s3` (`probe-before.log`) | before | legacy; items; objects 133, 2 (control), 78, 45, 277, 361, 509, 504, 505, 425, 419, 363, 473 | Row 133 (`xx`) not drawn, while the control shrine and every listed row that has art were drawn. The items dropped without trouble (game up). Spawning 473 (CagedWussie1, InitFn 62, the same as D2R's row) ended the game (access violation at exe+0x1255802, crash report 09:15:06 UTC), so the HD pass did not run |
+| `checks-20261031-181717-s3` (`probe-before-hd.log`) | before | HD + legacy, 133 and 2 | HD draws 133 (the dark obelisk: D2R picks the HD model by row); legacy draws nothing |
+| `checks-20261031-182705-s3` (`probe-after.log`) | after (`xx` -> `az`) | legacy + HD, 133, 2, 375 (D2R's own `xx`) | 133 drawn in both modes; 375 unchanged |
+
+All objects spawned by the harness start in mode 1, the control shrine too, so neither the clicks nor `operate` change the mode.
+The probe therefore shows whether an object is drawn, not whether it can be used. Shots and reports:
+`mxl2012-runs/renamesweep/evidence/{before,after}/<run>/` (`op_<class>_<gfx>_{spawn,after}.png`, `op_item_<code>_legacy.png`).
+
+Open: the harness crash on spawning 473 out of its Act 5 setting was not looked into (the row's functions are D2R's own). The
+item drop shots are too dark to show the flippy (the drops did not crash).

@@ -93,7 +93,7 @@ skill Median's description and tree slot.
   | misc (via `book_cursors`) | spellicon of the books.txt scroll / tome codes = that row's `SpellIcon` | 1.13c takes a scroll's / tome's cursor from books.txt, D2R from misc `spellicon` (Median: -1 everywhere): `isc` / `ibk` get 0, the identify cursor (bug #485) |
   | skills (via `conversion_calcs`) | calc1 `dm56` / calc2 `par3` of every srvdofunc 51 row whose cell is blank | 1.13c's conversion (Mind Blast, Median's charms, Elvensong's spirit) takes the chance from Param5 / Param6 and the length from Param3 + rand(Param4); D2R evaluates calc1 / calc2 instead (its own Mind Blast row was moved the same way). Blank cells meant a 1 % chance and a 0-frame charm (bug #487); a set cell (Black Sleep's calc1 100) is kept |
   | plrmode / monmode | Code (always D2R's) | 1.13c spells Sequence and Knockback `GH`, D2R `SQ` / `KB` (trap 1) |
-  | objects | Token `sl` -> `9c` (`D2R_RENAMED`: only a cell that still holds 1.13c's value, on a row where D2R holds the new one) | UnfoldingStairLeft (row 194): D2R ships this stair's art and animation data as `9c` and has no `sl`; with `sl` the stair never unfolds and blocks the Kurast temple doorway (bug #518). Median's own Token changes (rows 45, 277, 284, 361, ...) stay |
+  | objects | Token `sl` -> `9c` (`D2R_RENAMED`: only a cell that still holds 1.13c's value, on a row where D2R holds the new one) | UnfoldingStairLeft (row 194): D2R ships this stair's art and animation data as `9c` and has no `sl`; with `sl` the stair never unfolds and blocks the Kurast temple doorway (bug #518). Token `xx` -> `az`: ShrineMagicArcaneSanctuary1 (row 133), D2R and 1.14d have no `xx` art, so the Arcane Sanctuary's magic shrine was invisible in legacy graphics (bug #520); D2R's own HellBridge (row 375) keeps `xx`. Rows whose token D2R changed while the old art is still there (45, 277, 361, ...: "Rename audit" below; 284 differs only in case) stay as Median has them |
   | skills (via `skill_rules`) | srvstopfunc / cltstopfunc | a mod row on a do function D2R pairs with a stop function (Whirlwind) gets D2R's; GH -> SQ in anim / seqtrans |
   | itemtypes | MaxSocketsLevelThreshold1/2 = 25 / 40 | 1.13c's fixed socket thresholds |
 
@@ -172,6 +172,45 @@ their tooltip lines). The step writes `data/warlock_rules.tsv` (366 formula / te
 `warputriddefiler`) into the RotW bank and stops on a cell that holds neither the recorded value before nor the new one (refit
 with `warlock_scale.py fit`); the Classic/LoD bank's Warlock rows are id placeholders and are not written. Method, comparables and the per-skill table:
 `docs/warlock-balance.md`.
+
+## Rename audit (`tools/rename_audit.py`, lane renamesweep)
+
+Bug #518 came from one cell that kept a vanilla value D2R had renamed. `py -3 -I tools/rename_audit.py [--bank rotw|base]`
+looks for every other cell of that class. It checks each art / file / code / sound name the built tables carry (objects Token,
+monstats Code, missiles CelFile and sounds, overlay Filename, item inv / flippy / alternate graphics, itemtypes InvGfx, lvlprest
+File1-6, lvltypes File 1-32, sounds FileName and every sound column). It compares Median's value, 1.14d's (read from the native
+install's `.bin` tables), D2R's for the matching row (idmap id, or the key of a keyed table) and the built one. It also notes
+where the asset exists (D2R's CASC, the mod, Median's MPQ, 1.14d's MPQs). It writes `work/mod/rename_audit.{tsv,md}`. The
+verdicts are in the tool's docstring. Run of 2026-10-31 (rotw; base gives the same hits on other row ids):
+
+| Table | ok | d2r-same | Hits | Triage |
+|---|---|---|---|---|
+| objects | 556 | 2 | 1 renamed, 2 renamed-fixed, 12 renamed-exists (before the #520 fix: 2 renamed, 1 renamed-fixed) | below |
+| misc | 2977 | 1 | 479 median-missing | Median's own sounds (`shrine_boink` etc.), Clue Gem / `ab!` flippy `flpdss` / `flptail` and `zog` / `zoh` inventory art: known gaps (unported.md, legacy-graphics.md) |
+| missiles | 3563 | 0 | 1 missing, 30 median-missing, 9 emptied | sounds Median added (silent until the audio port); `emptied` = art_fix's DRAW_NOTHING rows and sound keys Median's own sounds.txt lacks |
+| skills | 984 | 0 | 49 median-missing, 5 emptied | Median's own sounds; dangling sound keys Median had |
+| sounds | 4556 | 71 | 108 median-missing, 1 emptied | Median's 108 own sounds (`sound_rows`: silent until ported) |
+| monsounds | 898 | 1 | 18 median-missing | Median's own sounds |
+| states | 230 | 0 | 1 missing, 17 median-missing | Median's own sounds |
+| uniqueitems | 14 | 0 | 12 median-missing | Median's own sounds |
+| overlay | 512 | 0 | 4 emptied | art_fix's DRAW_NOTHING rows |
+| armor, weapons, itemtypes, lvlprest, lvltypes, monstats, soundenviron | all | 3 / 0 / 0 / 0 / 0 / 11 / 50 | none | |
+
+The `missing` sound cells are both Median's own sounds on a row where D2R uses a vanilla one: missiles 678 `trapnova`
+TravelSound `forcewavetrap` (D2R `sorceress_nova`) and states 153 `cloak_of_shadows` onsound `darkness_falls` (D2R
+`assassin_cloakofdarkness`). They are silent like the other 108, not renames.
+
+Objects:
+
+- `renamed`, real: row 133 ShrineMagicArcaneSanctuary1 `xx` (D2R `az`). It is drawn, can be clicked (OperateFn 2), and is placed at
+  random in the Arcane Sanctuary (objgroup 75, levels 59 / 65 / 74). In legacy graphics it was invisible (bug #520; HD draws it, because D2R picks the HD model by row), so
+  `D2R_RENAMED` now maps `xx` to `az`.
+- `renamed`, left alone: row 78 Town1Ambient `TA` (D2R `SS`). It is Draw 0, size 0 and has no functions, so no art is ever
+  drawn for it.
+- `renamed-fixed`: row 194 `sl` -> `9c` (#518).
+- `renamed-exists`: rows 45, 277, 361, 363, 419, 425, 473, 504, 505, 509, 510, 511. These hold the 1.14d token, which D2R
+  changed, but D2R still ships that token's legacy art. D2R's HD model is picked by row (objects.json is in row order), so
+  both modes draw them and they stay. In the legacy probe every one of these that has art (not 45 / 78, Draw 0) appeared where it was spawned (testing.md "Lane renamesweep").
 
 ## Open items found here (for plugins / later phases)
 

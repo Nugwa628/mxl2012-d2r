@@ -9,6 +9,7 @@ version being released (docs/release.md).
   D2R's HD pages, and pressing G with the stash open no longer risks a crash (#516). Without RotW only Personal and Shared show. The
   tab names fit their tabs in full.
 - Kurast: the Forgotten Temple (Upper Kurast) and the Disused Reliquary (Kurast Causeway) can be entered again; the unfolding stair in their doorway stayed shut and blocked the way (#518).
+- Arcane Sanctuary: its magic shrine is drawn again in legacy graphics, where it was invisible (#520).
 
 ## D2R-XL 2012
 
