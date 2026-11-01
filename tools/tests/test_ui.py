@@ -1,4 +1,5 @@
 """Unit tests of the HD UI tools on synthetic data (no game files). Run: py -3 -I -m unittest discover -s tools/tests -p "test_ui.py" """
+import json
 import sys
 import tempfile
 import unittest
@@ -257,35 +258,46 @@ class LayoutTests(unittest.TestCase):
         finally:
             ui_layouts.baseline = orig
 
-    def test_stash_cube_window_holds_the_whole_cube(self):   # bug #515: the RotW stash's 3 x 4 window
-        bank = """{ "children": [
+    def test_stash_cube_window_shows_the_cover(self):   # bug #515: the RotW stash's 3 x 4 window, as classic Median
+        bank = r"""{ "children": [
             { "type": "TabBarWidget", "name": "BankTabs", "fields": { "textStrings": [ "@personal", "@shared", "@gems", "@materials", "@runes" ] } },
-            { "type": "InventoryGridWidget", "name": "grid", "fields": { "rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 },
-              "cellSize": "$ItemCellSize" } },
+            { "type": "Widget", "name": "basicstash_container", "children": [
+                { "type": "InventoryGridWidget", "name": "grid", "fields": { "rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 },
+                  "cellSize": "$ItemCellSize" } },
+                { "type": "ButtonWidget", "name": "StashLeftArrow", "fields": { "rect": { "x": 29, "y": 13 } } },
+                { "type": "ButtonWidget", "name": "StashRightArrow", "fields": { "rect": { "x": 290, "y": 13 } } } ] },
+            { "type": "Widget", "name": "advancedstash_gems", "children": [
+                { "type": "AdvancedStashSlotWidget", "name": "gcv", "fields": { "rect": { "x": 470, "y": 214, "width": 98, "height": 98 }, "itemCode": "gcv" } } ] },
             { "type": "Widget", "name": "advancedstash_horadriccube", "children": [
                 { "type": "InventoryGridWidget", "name": "horadriccube_grid",
                   "fields": { "rect": { "x": 431, "y": 784 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize" } },
-                { "type": "ButtonWidget", "name": "convert", "fields": { "tooltipString": "@strUiMenu2" } },
+                { "type": "ButtonWidget", "name": "convert", "fields": { "rect": { "x": 520, "y": 1239 }, "tooltipString": "@strUiMenu2" } },
+                { "type": "ImageWidget", "name": "horadriccube_cover", "fields": { "rect": { "x": 432, "y": 786 }, "filename": "PANEL\\Stash\\AdditionalStash\\HoradricCubeCover" } },
                 { "type": "ButtonWidget", "name": "withdraw_button",
                   "fields": { "textString": "@AdvancedStashWithdraw", "tooltipString": "@AdvancedStashWithdrawTooltip" } } ] } ] }"""
-        row = {"gridX": 10, "gridY": 8}
         orig = ui_layouts.baseline
         ui_layouts.baseline = lambda name: bank
         try:
-            t = ui_layouts.stash_hd(row)
+            t = ui_layouts.stash_hd()
         finally:
             ui_layouts.baseline = orig
+        lay = json.loads(t)   # still JSON
         self.assertNotIn('"@', t)
         self.assertIn('"textStrings": [ "Personal", "Shared", "Gems", "Materials", "Runes" ]', t)
         s, e = ui_layouts.block_span(t, ui_layouts.STASH_CUBE_GRID)
-        g = t[s:e]
-        self.assertIn('"rect": { "x": 431, "y": 862, "scale": 0.3 }', g)   # 980 x 784 shrunk into 294 x 392, centred
-        self.assertIn('"cellCount": { "x": 10, "y": 8 }', g)
-        self.assertIn('"cellSize": { "x": 98, "y": 98 }', g)
+        g = t[s:e]   # D2R's grid, cells and count kept, off the panel
+        self.assertIn('"rect": { "x": -1500, "y": -1500 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize"', g)
+        cube = next(c for c in lay["children"] if c["name"] == "advancedstash_horadriccube")["children"]
+        self.assertEqual([c["name"] for c in cube], ["horadriccube_grid", "convert", "horadriccube_lid", "horadriccube_cover",
+                                                     "withdraw_button"])
+        self.assertEqual(cube[2]["fields"], cube[3]["fields"])   # the lid: D2R's cover, under a name D2R does not hide
+        self.assertEqual(cube[1]["fields"], {"rect": {"x": 520, "y": 1239}, "tooltipString": "Transmute"})
+        self.assertIn('"name": "gcv", "fields": { "rect": { "x": 470, "y": 214, "width": 98, "height": 98 }', t)   # slots: D2R's
         self.assertIn('"rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 }', t)   # the stash grid untouched
-        x, y, sc = ui_layouts.fit_cube_window(0, 0, (294, 392), 10, 8, 98)
-        self.assertLessEqual(10 * 98 * sc, 294)
-        self.assertLessEqual(8 * 98 * sc, 392)
+        arrows = lay["children"][1]["children"][1:]
+        for a in arrows:   # D2RLoader's bundled file's page arrow tooltip, as text
+            self.assertEqual(a["fields"]["tooltipString"], ui_layouts.PAGE_ARROW_TOOLTIP)
+            self.assertIs(a["fields"]["tooltipIsTopAligned"], True)
 
     def test_classic_skilltree_gets_a_warlock_cancel_position(self):   # bug #498: D2R's array stops at the Assassin
         t = '{ "cancelPositionX": [ 15, 100, 171 ],\n "cancelPositionCode": [ 321, 113, 131, 121, 313, 333, 231 ],\n }'

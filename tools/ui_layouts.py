@@ -17,7 +17,7 @@ The HD panels' title text is written out as a literal (docs/bugs.md #30): `"text
   in the mod's HD inventory and cube layouts (checked in game, with another key too), a literal text draws. The inventory has
   none (the head slot of the mod's picture sits where the title would be), the cube reads "Horadric Cube".
 The stash (10 x 10), trade, vendor and hireling layouts and every other panel stay D2R's, but for the RotW stash pages' cube
-window (`stash_hd`, bug #515: Median's 10 x 8 cube scaled into D2R's 3 x 4 frame). The HD skill tree layout stays D2R's too
+window (`stash_hd`, bug #515: the cube's cover, as in classic Median). The HD skill tree layout stays D2R's too
 (3 tabs; the tab titles come from strings, tools/skill_tree_art.py). The classic one (`skillstreepanel.json`) draws no tab title
 for the seven classic classes (docs/bugs.md #33, coordinator decision): the mod's skltree_*_back.dc6 art has its own labels on the
 tabs and D2R's text sat on top of them; its `textTab0-2` entries of those classes are empty literals, Warlock's keys stay. As for
@@ -222,28 +222,30 @@ STASH_KEYS = {"@personal": "Personal", "@shared": "Shared", "@gems": "Gems", "@m
                                                "Any items that won't fit must be removed manually."}  # D2R's English; the stash's other keys: rotw_stash_legacy.LITERALS
 
 
-def fit_cube_window(x: float, y: float, frame: tuple[float, float], cols: int, rows: int, cell: float) -> tuple[float, float, float]:
-    """(x, y, scale) of a cols x rows grid of `cell`-pixel cells shrunk to fit the frame (w, h) at (x, y), centred in it."""
-    s = min(frame[0] / (cols * cell), frame[1] / (rows * cell))
-    return x + (frame[0] - cols * cell * s) / 2, y + (frame[1] - rows * cell * s) / 2, s
+STASH_CUBE_OFF = (-1500, -1500)  # the stash cube window's grid: off the panel (bug #515; rotw_stash_legacy.CUBE_OFF in classic)
+# D2RLoader's bundled bankexpansionlayouthd.json is D2R's plus this tooltip on the shared tabs' page arrows (its key
+# D2RLoaderAdvancedStashPageTooltip, English text): ours replaces that file, so it carries the tooltip as text
+PAGE_ARROW_TOOLTIP = "Shift-click: Add 5 pages\nCtrl-click: add 10 pages"
 
 
-def stash_hd(row: dict[str, int], name: str = "bankexpansionlayouthd.json") -> str:
+def stash_hd(name: str = "bankexpansionlayouthd.json") -> str:
     """D2R's RotW stash (bankexpansionlayouthd.json) with its Horadric Cube window (`horadriccube_grid`, a 3 x 4 frame under
-    the Gems / Materials / Runes pages) holding the whole 10 x 8 cube, shrunk into that frame (bug #515). D2R draws a grid's
-    items at their cube cell whatever cellCount says, so at the stash cell size the cube's items past the third column / fourth
-    row ran out of the frame and the panel; a grid widget has no clipping, so the cells get smaller instead (`scale`, as for the
-    mod's own grids). The cube's own panel stays 10 x 8 at full size. `name`: also D2R's gamepad UI stash
-    (controller/bankexpansionlayouthd.json, a whole layout of its own with the same window)."""
+    the Gems / Materials / Runes pages) showing the cube's cover, as classic Median does: open the cube to see its items
+    (bug #515, owner 2026-11-01). D2R draws a grid's items at their cube cell whatever cellCount says, so Median's 10 x 8
+    cube ran out of the 3 x 4 frame; the grid keeps D2R's cell count and size but sits off the panel, and an image of D2R's
+    cover sits in the frame (D2R hides its own `horadriccube_cover` when the cube is there). The pages' slots, the Transmute
+    button and everything else stay D2R's; the `@` keys are written as text and the page arrows get D2RLoader's tooltip.
+    `name`: also D2R's gamepad UI stash (controller/bankexpansionlayouthd.json, a whole layout of its own with the same
+    window; its page arrows are button legends, no tooltip)."""
     t = baseline(name)
-    s, e = block_span(t, STASH_CUBE_GRID)
-    b = t[s:e]
-    x, y = (int(v) for v in re.search(r'"rect":\s*\{\s*"x":\s*(-?\d+),\s*"y":\s*(-?\d+)', b).groups())
-    cx, cy = (int(v) for v in re.search(r'"cellCount":\s*\{\s*"x":\s*(\d+),\s*"y":\s*(\d+)', b).groups())
-    gx, gy, scale = fit_cube_window(x, y, (cx * ITEM_CELL, cy * ITEM_CELL), row["gridX"], row["gridY"], ITEM_CELL)
-    t = set_grid(t, gx, gy, row["gridX"], row["gridY"], scale, STASH_CUBE_GRID)
-    t = re.sub(r'(%s.*?"cellSize":\s*)(?:"[^"]*"|\{[^}]*\})' % re.escape(STASH_CUBE_GRID),
-               lambda m: m.group(1) + f'{{ "x": {ITEM_CELL}, "y": {ITEM_CELL} }}', t, count=1, flags=re.S)
+    t = set_rect(t, "horadriccube_grid", rect(*STASH_CUBE_OFF))
+    s, e = block_span(t, '"name": "horadriccube_cover"')  # a copy of it before it, named otherwise: D2R hides the cover
+    t = t[:s] + t[s:e].rstrip(",").replace('"horadriccube_cover"', '"horadriccube_lid"') + ",\n" + t[t.rindex("\n", 0, s) + 1:s] + t[s:]
+    for arrow in ("StashLeftArrow", "StashRightArrow"):
+        if f'"type": "ButtonWidget", "name": "{arrow}"' in t:
+            a, b = block_span(t, f'"name": "{arrow}"')
+            f = t.index('"fields": {', a, b) + len('"fields": {')
+            t = t[:f] + f' "tooltipString": {json.dumps(PAGE_ARROW_TOOLTIP)}, "tooltipIsTopAligned": true,' + t[f:]
     from rotw_stash_legacy import LITERALS as STASH_LITERALS
     for key, literal in {**STASH_LITERALS, **STASH_KEYS}.items():
         t = t.replace(json.dumps(key), json.dumps(literal))
@@ -360,8 +362,8 @@ def build(out: Path = LAYOUT_OUT, table: Path = EXCEL / "inventory.txt") -> list
              "playerinventoryexpansionlayouthd.json": inventory_expansion_hd(),
              "horadriccubelayouthd.json": cube_hd(box),
              "controller/horadriccubelayouthd.json": cube_controller_hd(box),
-             "bankexpansionlayouthd.json": stash_hd(box),
-             "controller/bankexpansionlayouthd.json": stash_hd(box, "controller/bankexpansionlayouthd.json"),
+             "bankexpansionlayouthd.json": stash_hd(),
+             "controller/bankexpansionlayouthd.json": stash_hd("controller/bankexpansionlayouthd.json"),
              "playerinventoryoriginallayout.json": inventory_original(player),
              "playerinventoryexpansionlayout.json": inventory_expansion(),
              "horadriccubelayout.json": cube(box),

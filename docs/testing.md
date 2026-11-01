@@ -5043,3 +5043,23 @@ and `meslayer` are on every difficulty, so the looks of runs 1-6 hold for Terror
 Not done: a real (player-hit) death of the whole Wraith (the 608 assert of #519); the witch is immune (resistances 500). The
 Witch Queen's tower level (Tower Cellar Level 5) was not entered; `l4dwitch2` was spawned outdoors (same unit, same monprop
 but no crown aura).
+
+**Round 2 (owner 2026-11-01: "make it match classic mxl")**, slot 2, after b945ed5 was merged. The HD window now shows
+the cube's cover as classic does. Structural diff (`mxl2012-runs/cubeui/jdiff.py`, `@d2r:` keys counted as `@`): our
+`bankexpansionlayouthd.json` vs D2R's own: the `@` keys as text, the grid's rect, `horadriccube_lid`, the page arrow
+tooltip; vs D2RLoader's bundled one (`d2rloader-bundle/`): the grid's rect and the lid only. The gamepad file: the same
+less the tooltip. No slot of the three pages differs from D2R's. CubeRotw got gems and runes (`h item gcv inv` ... `r08`,
+then Ctrl+click from the backpack on the Gems / Runes page) and kept its 66 cube jewels.
+
+| Shots | Build | Result |
+|---|---|---|
+| `s515b_01`-`05` | 0.1.9 + b945ed5's generated HD / gamepad / classic stash files | HD: the 0.3 cube in the frame; classic: the cover; six gems, four runes in their slots |
+| `a515b_01_gems_hd`, `_03_runes_hd`, `_04_materials_hd` | 0.1.9 + this branch's files (copied in for the run, slot 2 restored after) | HD: the cover in the frame, no cube items; slots and items as before |
+| `a515b_02_transmute_hd` | as above | the stash's Transmute button: tooltip "Transmute", a click with the cube's jewels (no recipe) does nothing, no assert |
+| `a515b_07_cube_panel_hd` | as above | the cube's own panel: 10 x 8, the jewels in place |
+| `a515b_08_shared_hd`, `a515b_09_arrow_tooltip_hd` | as above | Shared page 1 / 5; the page arrow's tooltip "Shift-click: Add 5 pages / Ctrl-click: add 10 pages" back |
+| `a515b_10_legacy_toggle`, `a515b_11_runes_legacy`, `a515b_12_back_hd` | as above | classic Gems / Runes: the cover, slots at the classic cell; back to HD fine |
+| `sheet515b.png` | | before / after: HD Gems, HD Runes, classic Gems, classic Runes |
+
+0 ERROR / ASSERT lines in both runs, no crash files. Not seen: the gamepad stash (no gamepad). Run steps:
+`mxl2012-runs/cubeui/step.py` (outside git). Test: `test_ui.py` `test_stash_cube_window_shows_the_cover`.

@@ -410,10 +410,10 @@ panel shows the cube's contents through this window, items outside the first 3 x
 under the slots, 980 x 784 HD pixels). Not changed; to look at on a RotW account (docs/testing.md "Lane rotwstash").
 
 Seen in a RotW game (lane cubeui, 2026-11-01): the window draws every cube item at its 10 x 8 place from the 3 x 4 origin,
-so items past the first 3 x 4 cells run off the frame (HD and classic). Fixed: in HD the grid is 10 x 8 at scale 0.3 inside
-the frame (docs/hd-ui.md). Classic ignores the grid's scale for item pictures (they keep 28 pixels a cell and overlap), so
-`classic_layout` puts the grid off the panel (`CUBE_OFF`) and draws `rotwstash_cubecover` in the frame: no items there, the
-cube's own panel shows them.
+so items past the first 3 x 4 cells run off the frame (HD and classic). Classic ignores the grid's scale for item pictures
+(they keep 28 pixels a cell and overlap), so `classic_layout` puts the grid off the panel (`CUBE_OFF`) and draws
+`rotwstash_cubecover` in the frame: no items there, the cube's own panel shows them, as in classic Median. HD does the
+same since the owner's ruling (2026-11-01; a 10 x 8 grid at scale 0.3 came first): docs/hd-ui.md.
 
 ### 9.6 Why it crashed, and the plugin part `rotwstash` (lane rotwgate, 2026-10-31; docs/plugin-plan.md section 29)
 

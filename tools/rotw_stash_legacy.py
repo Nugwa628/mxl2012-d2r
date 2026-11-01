@@ -194,9 +194,9 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: 
                 {"type": "AdvancedStashSlotWidget", "name": code,
                  "fields": {"rect": rect(*classic_box(r)), "itemCode": code}} for code, r in pages[p]]} for p in PAGES),
             {"type": "Widget", "name": "advancedstash_horadriccube", "children": [
-                # Median's cube is 10 x 8 and the grid draws every item at its cube cell; classic draws item pictures at full
-                # size whatever the grid's scale or cellSize (HD shrinks the grid into the frame: ui_layouts.stash_hd), so the
-                # classic grid sits off the panel and the frame shows the cube's lid (bug #515)
+                # Median's cube is 10 x 8 and the grid draws every item at its cube cell, so the items ran out of the 3 x 4
+                # frame: as in classic Median (open the cube to see its items) the grid sits off the panel and the frame shows
+                # the cube's lid (bug #515; HD the same: ui_layouts.stash_hd)
                 {"type": "InventoryGridWidget", "name": "horadriccube_grid", "fields": {
                     "rect": rect(*CUBE_OFF), "cellCount": {"x": CUBE_CELLS[0], "y": CUBE_CELLS[1]},
                     "cellSize": "$ItemCellSize", "gemSocketFilename": "PANEL\\gemsocket"}},
