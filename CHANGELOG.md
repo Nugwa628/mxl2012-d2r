@@ -5,21 +5,36 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-- Witches (the sleeping witches of Terror's outdoor areas and the Witch Queen's tower) are now visible in HD, as a
-  whole glowing Wraith; before, only one arm and a few blue wisps were drawn. A few other ghostly monsters with the same
-  HD look (the Shadows among them) get their full body too. Classic graphics are unchanged (#524).
+## D2R-XL 2012
+
+### 0.1.10 (2026-11-01)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.10:**
+
+- Reign of the Warlock stash pages (Gems, Materials, Runes): the small Horadric Cube window under the pages no longer
+  draws the cube's items far past its frame. As in classic Median XL it shows the cube's lid; open the cube itself to see
+  and use its items. The gem, rune and material slots are the same as in the unmodded game (#515).
+- With a gamepad (D2R's controller UI) the Horadric Cube now uses Median XL's 10 x 8 cube and picture, not D2R's
+  small 3 x 4 picture with the items spilling out of it (#523).
 - Your own D2RLoader plugins in the game's `d2rloader\plugins` folder load next to D2R-XL 2012, as before. If one of them
   hooks game code that D2R-XL 2012 also changes, D2RLoader turns that hook down (that one feature of the plugin then does
   nothing). The `mxl2012` console command now names such a plugin and the D2R-XL 2012 part in the way
   (`plugin clashes: ...`), and the Downloader no longer deletes your `mxl2012-core-off.txt` (where that part's word turns it
   off) when it updates or repairs (#522).
-- With a gamepad (D2R's controller UI) the Horadric Cube now uses Median XL's 10 x 8 cube and picture, not D2R's
-  small 3 x 4 picture with the items spilling out of it (#523).
-- Reign of the Warlock stash pages (Gems, Materials, Runes): the small Horadric Cube window under the pages no longer
-  draws the cube's items far past its frame. As in classic Median XL it shows the cube's lid; open the cube itself to see
-  and use its items. The gem, rune and material slots are the same as in the unmodded game (#515).
 
-## D2R-XL 2012
+**New in HD:**
+
+- Witches (the sleeping witches of Terror's outdoor areas and the Witch Queen's tower) are now visible in HD, as a
+  whole glowing Wraith; before, only one arm and a few blue wisps were drawn. A few other ghostly monsters with the same
+  HD look (the Shadows among them) get their full body too. Classic graphics are unchanged (#524).
+
+**Known:** in HD, Median's runes still show their classic pictures scaled up, Khalimgrad's cathedral has no tall
+pointed arch and long roofed walls yet, and the HD pet row shows at most 9 icons (D2R's own limit). The stash's small
+cube window shows only the cube's lid: items can't be dropped on it there.
 
 ### 0.1.9 (2026-11-01)
 
