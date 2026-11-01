@@ -401,13 +401,19 @@ Also seen: "MATERIALS" does not fit a 63-pixel tab in D2R's classic font (it is 
 Lane rotwgate found the cause of both crashes in D2R's code and made the plugin wire the pages in classic too (9.6). With it the
 step's full layout (`basicstash_container`, slots, cube) no longer crashes without RotW.
 
-### 9.5 Median's 10 x 8 cube in the stash cube window (bug #515, open)
+### 9.5 Median's 10 x 8 cube in the stash cube window (bug #515, fixed by lane cubeui)
 
 D2R's stash cube window is 3 x 4 (D2R's cube). Median's Horadric Cube is 10 x 8 (`inventory.txt` "Transmogrify Box", the mod's
 own cube panel; docs/hd-ui.md). Both layouts (D2R's HD one, the step's classic one) draw the window with 3 x 4 cells. If the
 panel shows the cube's contents through this window, items outside the first 3 x 4 cells of Median's cube are not shown there
 (nothing is lost: the cube's own panel shows all 80 cells). A 10 x 8 window does not fit the pages (290 x 232 classic pixels
 under the slots, 980 x 784 HD pixels). Not changed; to look at on a RotW account (docs/testing.md "Lane rotwstash").
+
+Seen in a RotW game (lane cubeui, 2026-11-01): the window draws every cube item at its 10 x 8 place from the 3 x 4 origin,
+so items past the first 3 x 4 cells run off the frame (HD and classic). Fixed: in HD the grid is 10 x 8 at scale 0.3 inside
+the frame (docs/hd-ui.md). Classic ignores the grid's scale for item pictures (they keep 28 pixels a cell and overlap), so
+`classic_layout` puts the grid off the panel (`CUBE_OFF`) and draws `rotwstash_cubecover` in the frame: no items there, the
+cube's own panel shows them.
 
 ### 9.6 Why it crashed, and the plugin part `rotwstash` (lane rotwgate, 2026-10-31; docs/plugin-plan.md section 29)
 

@@ -71,6 +71,7 @@ TAB_TEXT_MARGIN = 3             # free pixels left and right of a name inside th
 TAB_COLOURS = ((253, 253, 253), (191, 169, 105))  # inactive, active: D2R's classic tab text (lane stashtab's shots)
 CLEAR = {"r": 0, "g": 0, "b": 0, "a": 0}
 CUBE_CELLS = (3, 4)             # D2R's stash cube window (HD layout); see docs/legacy-graphics.md 9 for Median's 10 x 8 cube
+CUBE_OFF = (-1500, -1500)       # the classic stash cube grid's place: off the panel (bug #515, classic_layout)
 HD_LAYOUT = Path("data/global/ui/layouts/bankexpansionlayouthd.json")
 SD_LAYOUT = Path("data/global/ui/layouts/bankexpansionlayout.json")
 HD_SPRITES = Path("data/hd/global/ui")
@@ -193,9 +194,14 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: 
                 {"type": "AdvancedStashSlotWidget", "name": code,
                  "fields": {"rect": rect(*classic_box(r)), "itemCode": code}} for code, r in pages[p]]} for p in PAGES),
             {"type": "Widget", "name": "advancedstash_horadriccube", "children": [
+                # Median's cube is 10 x 8 and the grid draws every item at its cube cell; classic draws item pictures at full
+                # size whatever the grid's scale or cellSize (HD shrinks the grid into the frame: ui_layouts.stash_hd), so the
+                # classic grid sits off the panel and the frame shows the cube's lid (bug #515)
                 {"type": "InventoryGridWidget", "name": "horadriccube_grid", "fields": {
-                    "rect": rect(grid[0], grid[1]), "cellCount": {"x": CUBE_CELLS[0], "y": CUBE_CELLS[1]},
+                    "rect": rect(*CUBE_OFF), "cellCount": {"x": CUBE_CELLS[0], "y": CUBE_CELLS[1]},
                     "cellSize": "$ItemCellSize", "gemSocketFilename": "PANEL\\gemsocket"}},
+                {"type": "ImageWidget", "name": "horadriccube_lid", "fields": {
+                    "rect": rect(grid[0], grid[1]), "filename": f"PANEL\\{COVER}"}},
                 {"type": "ButtonWidget", "name": "convert", "fields": {
                     "rect": scaled(conv["x"], conv["y"]), "filename": "PANEL\\miniconvert", "tooltipString": "Transmute",
                     "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": find(hd, "convert")["fields"]["onClickMessage"]}},

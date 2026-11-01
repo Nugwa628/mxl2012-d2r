@@ -76,6 +76,7 @@ def check_tables() -> tuple[list[str], list[str]]:
     # the generated layouts and the untouched ones agree with the table
     expect = {"playerinventoryoriginallayouthd.json": [mod["Amazon"]], "playerinventoryexpansionlayouthd.json": None,
               "horadriccubelayouthd.json": [mod["Transmogrify Box Page 1"]],
+              "controller/horadriccubelayouthd.json": [mod["Transmogrify Box Page 1"]],
               "playerinventoryoriginallayout.json": [mod["Amazon"]], "horadriccubelayout.json": [mod["Transmogrify Box Page 1"]]}
     for name, want in expect.items():
         if want is None:
@@ -151,7 +152,7 @@ def check_built(built: Path = BUILT) -> tuple[list[str], list[str]]:
 
 def check_layouts() -> tuple[list[str], list[str]]:
     problems, notes = [], []
-    for p in sorted(LAYOUT_OUT.glob("*.json")):
+    for p in sorted(LAYOUT_OUT.rglob("*.json")):
         text = p.read_text("utf-8")
         if text.count("{") != text.count("}") or text.count("[") != text.count("]"):
             problems.append(f"{p.name}: unbalanced brackets")
@@ -162,7 +163,7 @@ def check_layouts() -> tuple[list[str], list[str]]:
             for v in re.findall(r'"(?:x|y)":\s*(-?\d+)', m.group(1)):
                 if abs(int(v)) > 2000:
                     problems.append(f"{p.name}: rect value {v} off the panel")
-    notes.append(f"{len(list(LAYOUT_OUT.glob('*.json')))} layouts checked")
+    notes.append(f"{len(list(LAYOUT_OUT.rglob('*.json')))} layouts checked")
     return problems, notes
 
 

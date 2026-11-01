@@ -17,6 +17,7 @@ from ui_paths import BASE, BASE_UI, PAL  # noqa: E402
 
 LAYOUTS = ("playerinventoryoriginallayout", "playerinventoryexpansionlayout", "horadriccubelayout")
 CHECK_LAYOUTS = ("bankexpansionlayouthd", "tradelayouthd", "vendorpanellayouthd")  # only read by the check (grid sizes)
+CONTROLLER_LAYOUTS = ("horadriccubelayouthd", "bankexpansionlayouthd")  # layouts/controller: ui_layouts (gamepad UI)
 CLASSIC_LAYOUTS = ("skillstreepanel",)  # classic only (ui_layouts.skilltree_classic, bug #33)
 CLASS_PREFIXES = ("am", "so", "ne", "pa", "ba", "dr", "as")
 
@@ -32,6 +33,9 @@ def baseline(src: Path) -> int:
                          BASE_UI / "layouts" / f"{name}{suffix}.json"))
     for name in CHECK_LAYOUTS + CLASSIC_LAYOUTS:
         jobs.append((src / "data" / "global" / "ui" / "layouts" / f"{name}.json", BASE_UI / "layouts" / f"{name}.json"))
+    for name in CONTROLLER_LAYOUTS:
+        jobs.append((src / "data" / "global" / "ui" / "layouts" / "controller" / f"{name}.json",
+                     BASE_UI / "layouts" / "controller" / f"{name}.json"))
     for name in [f"{p}skilltree" for p in CLASS_PREFIXES] + ["panel_skilltreebg"]:  # bg: lane skillhd's candidates
         jobs.append((src / "data" / "hd" / "global" / "ui" / "spells" / "skill_trees" / f"{name}.sprite",
                      BASE_UI / "spells" / "skill_trees" / f"{name}.sprite"))

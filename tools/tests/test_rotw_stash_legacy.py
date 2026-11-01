@@ -141,6 +141,11 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual((gw["rect"], gw["filename"], gw["tooltipString"]), ({"x": 15, "y": 357}, "PANEL\\goldcoinbtn", "Withdraw"))
         self.assertEqual(rs.find(lay, "CurrentSharedStashText")["fields"]["text"], "Page %u / %u")
         self.assertEqual(sum(1 for c in lay["children"] if c["name"] == "grid"), 0)
+        # bug #515: classic draws the 10 x 8 cube's items full size, so the grid leaves the panel and the lid fills the frame
+        _box, frame = rs.cube_grid(HD)
+        self.assertEqual(rs.find(lay, "horadriccube_grid")["fields"]["rect"], {"x": -1500, "y": -1500})
+        lid = rs.find(lay, "horadriccube_lid")["fields"]
+        self.assertEqual((lid["rect"], lid["filename"]), ({"x": frame[0], "y": frame[1]}, f"PANEL\\{rs.COVER}"))
 
     def test_tab_names_fit(self):
         # 6-pixel advances: MATERIALS = 9 * 6 - 1 = 53 of ink, inside 63 less 3 + 3; 7 pixels: 62, too wide

@@ -16,7 +16,8 @@ Classic (G key, `....json`, no scaling): the mod's own invchar6.dc6 / supertrans
 The HD panels' title text is written out as a literal (docs/bugs.md #30): `"text": "@strpanel4"` / `"@box"` draw "Missing string"
   in the mod's HD inventory and cube layouts (checked in game, with another key too), a literal text draws. The inventory has
   none (the head slot of the mod's picture sits where the title would be), the cube reads "Horadric Cube".
-The stash (10 x 10), trade, vendor and hireling layouts and every other panel stay D2R's. The HD skill tree layout stays D2R's too
+The stash (10 x 10), trade, vendor and hireling layouts and every other panel stay D2R's, but for the RotW stash pages' cube
+window (`stash_hd`, bug #515: Median's 10 x 8 cube scaled into D2R's 3 x 4 frame). The HD skill tree layout stays D2R's too
 (3 tabs; the tab titles come from strings, tools/skill_tree_art.py). The classic one (`skillstreepanel.json`) draws no tab title
 for the seven classic classes (docs/bugs.md #33, coordinator decision): the mod's skltree_*_back.dc6 art has its own labels on the
 tabs and D2R's text sat on top of them; its `textTab0-2` entries of those classes are empty literals, Warlock's keys stay. As for
@@ -29,6 +30,7 @@ cube's the "Transmogrify Box Page 1" row; the picture items (tabs, gold, transmu
 
   py -3 -I tools/ui_layouts.py
 """
+import json
 import re
 import sys
 from pathlib import Path
@@ -117,9 +119,9 @@ def set_rect(text: str, name: str, value: str) -> str:
     return text[:s] + RECT.sub(lambda _m: f'"rect": {value}', text[s:e], count=1) + text[e:]
 
 
-def set_grid(text: str, x: float, y: float, cols: int, rows: int, scale: float | None) -> str:
+def set_grid(text: str, x: float, y: float, cols: int, rows: int, scale: float | None, marker: str = '"name": "grid"') -> str:
     """The grid widget of D2R's layouts: rect, cellCount and (HD) cellSize + scale."""
-    s, e = block_span(text, '"name": "grid"')
+    s, e = block_span(text, marker)
     b = text[s:e]
     value = rect(x, y, scale=scale)
     b = RECT.sub(lambda _m: f'"rect": {value}', b, count=1)
@@ -208,6 +210,70 @@ def cube_hd(row: dict[str, int]) -> str:
     return t
 
 
+def widget_rect(text: str, name: str) -> str:
+    s, e = block_span(text, f'"name": "{name}"')
+    return RECT.search(text, s, e).group(0)[len('"rect": '):].strip()
+
+
+STASH_CUBE_GRID = '"name": "horadriccube_grid"'
+STASH_KEYS = {"@personal": "Personal", "@shared": "Shared", "@gems": "Gems", "@materials": "Materials", "@runes": "Runes",
+              "@AdvancedStashWithdraw": "Withdraw",
+              "@AdvancedStashWithdrawTooltip": "Withdraw items from the previous season's advanced stash.\n"
+                                               "Any items that won't fit must be removed manually."}  # D2R's English; the stash's other keys: rotw_stash_legacy.LITERALS
+
+
+def fit_cube_window(x: float, y: float, frame: tuple[float, float], cols: int, rows: int, cell: float) -> tuple[float, float, float]:
+    """(x, y, scale) of a cols x rows grid of `cell`-pixel cells shrunk to fit the frame (w, h) at (x, y), centred in it."""
+    s = min(frame[0] / (cols * cell), frame[1] / (rows * cell))
+    return x + (frame[0] - cols * cell * s) / 2, y + (frame[1] - rows * cell * s) / 2, s
+
+
+def stash_hd(row: dict[str, int], name: str = "bankexpansionlayouthd.json") -> str:
+    """D2R's RotW stash (bankexpansionlayouthd.json) with its Horadric Cube window (`horadriccube_grid`, a 3 x 4 frame under
+    the Gems / Materials / Runes pages) holding the whole 10 x 8 cube, shrunk into that frame (bug #515). D2R draws a grid's
+    items at their cube cell whatever cellCount says, so at the stash cell size the cube's items past the third column / fourth
+    row ran out of the frame and the panel; a grid widget has no clipping, so the cells get smaller instead (`scale`, as for the
+    mod's own grids). The cube's own panel stays 10 x 8 at full size. `name`: also D2R's gamepad UI stash
+    (controller/bankexpansionlayouthd.json, a whole layout of its own with the same window)."""
+    t = baseline(name)
+    s, e = block_span(t, STASH_CUBE_GRID)
+    b = t[s:e]
+    x, y = (int(v) for v in re.search(r'"rect":\s*\{\s*"x":\s*(-?\d+),\s*"y":\s*(-?\d+)', b).groups())
+    cx, cy = (int(v) for v in re.search(r'"cellCount":\s*\{\s*"x":\s*(\d+),\s*"y":\s*(\d+)', b).groups())
+    gx, gy, scale = fit_cube_window(x, y, (cx * ITEM_CELL, cy * ITEM_CELL), row["gridX"], row["gridY"], ITEM_CELL)
+    t = set_grid(t, gx, gy, row["gridX"], row["gridY"], scale, STASH_CUBE_GRID)
+    t = re.sub(r'(%s.*?"cellSize":\s*)(?:"[^"]*"|\{[^}]*\})' % re.escape(STASH_CUBE_GRID),
+               lambda m: m.group(1) + f'{{ "x": {ITEM_CELL}, "y": {ITEM_CELL} }}', t, count=1, flags=re.S)
+    from rotw_stash_legacy import LITERALS as STASH_LITERALS
+    for key, literal in {**STASH_LITERALS, **STASH_KEYS}.items():
+        t = t.replace(json.dumps(key), json.dumps(literal))
+    return t
+
+
+CONTROLLER_CUBE_BG ='"Controller/Panel/HoradricCube/V2/HoradricCubeBG"'
+
+
+def cube_controller_hd(row: dict[str, int]) -> str:
+    """D2R's controller UI cube (layouts/controller/horadriccubelayouthd.json, `basedOn` the PC one, so it inherits the mod's
+    title and cell counts) puts back D2R's own 3 x 4 picture and moves the grid (dropping its `scale`), the transmute button
+    and the flourish to that picture's places: with a gamepad the mod's 10 x 8 items would spill over a 3 x 4 cube (lane
+    cubeui). The override keeps D2R's navigation and takes the picture, grid, button and flourish of the PC layout."""
+    t = baseline("controller/horadriccubelayouthd.json")
+    if CONTROLLER_CUBE_BG not in t:
+        raise ValueError("controller/horadriccubelayouthd.json: D2R's V2 cube picture not found")
+    t = t.replace(CONTROLLER_CUBE_BG, '"PANEL\\\\mxl\\\\cube"')
+    pc = cube_hd(row)
+    grid = '"type": "InventoryGridWidget", "name": "grid"'  # the convert button's navigation names "grid" first
+    t = set_grid(t, (row["gridLeft"] - row["invLeft"]) * SX, row["gridTop"] * SY, row["gridX"], row["gridY"], GRID_SCALE, grid)
+    s, e = block_span(t, grid)
+    if '"cellCount"' not in t[s:e]:  # D2R's controller grid names only rect: write the counts and cell size out too
+        t = t[:s] + RECT.sub(lambda m: f'{m.group(0)},\n                "cellCount": {{ "x": {row["gridX"]}, "y": {row["gridY"]} }},'
+                                       f'\n                "cellSize": {CELL}', t[s:e], count=1) + t[e:]
+    for name in ("convert", "flourish"):
+        t = set_rect(t, name, widget_rect(pc, name))
+    return t
+
+
 # ---- classic -------------------------------------------------------------------------------------------------------
 def inventory_original(row: dict[str, int]) -> str:
     t = baseline("playerinventoryoriginallayout.json")
@@ -293,12 +359,15 @@ def build(out: Path = LAYOUT_OUT, table: Path = EXCEL / "inventory.txt") -> list
     files = {"playerinventoryoriginallayouthd.json": inventory_original_hd(player),
              "playerinventoryexpansionlayouthd.json": inventory_expansion_hd(),
              "horadriccubelayouthd.json": cube_hd(box),
+             "controller/horadriccubelayouthd.json": cube_controller_hd(box),
+             "bankexpansionlayouthd.json": stash_hd(box),
+             "controller/bankexpansionlayouthd.json": stash_hd(box, "controller/bankexpansionlayouthd.json"),
              "playerinventoryoriginallayout.json": inventory_original(player),
              "playerinventoryexpansionlayout.json": inventory_expansion(),
              "horadriccubelayout.json": cube(box),
              "skillstreepanel.json": skilltree_classic()}
-    out.mkdir(parents=True, exist_ok=True)
     for name, text in files.items():
+        (out / name).parent.mkdir(parents=True, exist_ok=True)
         (out / name).write_text(literalize(text, name), "utf-8", newline="")
     return [f"{name}: {len(text)} bytes" for name, text in files.items()]
 

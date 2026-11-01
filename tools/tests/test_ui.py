@@ -217,6 +217,76 @@ class LayoutTests(unittest.TestCase):
         finally:
             ui_layouts.baseline = orig
 
+    def test_controller_cube_takes_the_mods_picture_grid_and_button(self):   # lane cubeui: gamepad UI cube
+        pc = """{ "type": "HoradricCubePanel", "children": [
+            { "type": "ImageWidget", "name": "background", "fields": { "filename": "PANEL\\\\Horadric_Cube\\\\HoradricCube_BG" } },
+            { "type": "TextBoxWidget", "name": "title", "fields": { "rect": "$InGamePanelTitleRect", "text": "@box" } },
+            { "type": "ButtonWidget", "name": "convert", "fields": { "rect": { "x": 520, "y": 969 } } },
+            { "type": "InventoryGridWidget", "name": "grid",
+              "fields": { "rect": { "x": 431, "y": 534 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize" } },
+            { "type": "AnimatedImageWidget", "name": "flourish", "fields": { "rect": { "x": 180, "y": 204, "scale":2 } } } ] }"""
+        ctrl = """{ "basedOn": "HoradricCubeLayoutHD.json", "children": [
+            { "type": "ImageWidget", "name": "background", "fields": { "filename": "Controller/Panel/HoradricCube/V2/HoradricCubeBG", } },
+            { "type": "ButtonWidget", "name": "convert", "fields": { "rect": { "x": 589, "y": 882 },
+              "navigation": { "up": { "name": "grid" }, }, } },
+            { "type": "InventoryGridWidget", "name": "grid", "fields": { "rect": { "x": 498, "y": 448 },
+              "navigation": { "down": { "name": "convert" }, }, } },
+            { "type": "AnimatedImageWidget", "name": "flourish", "fields": { "rect": { "x":251, "y": 115 }, } } ] }"""
+        row = {"invLeft": 0, "gridLeft": 16, "gridTop": 15, "gridX": 10, "gridY": 8}
+        orig = ui_layouts.baseline
+        files = {"horadriccubelayouthd.json": pc, "controller/horadriccubelayouthd.json": ctrl}
+        ui_layouts.baseline = lambda name: files[name]
+        try:
+            hd, t = ui_layouts.cube_hd(row), ui_layouts.cube_controller_hd(row)
+            self.assertIn('"filename": "PANEL\\\\mxl\\\\cube"', t)
+            self.assertNotIn("Controller/Panel/HoradricCube", t)
+            grid = ui_layouts.widget_rect(hd, "grid")
+            self.assertIn('"scale": 1.0746', grid)
+            s, e = ui_layouts.block_span(t, '"type": "InventoryGridWidget", "name": "grid"')
+            self.assertIn(f'"rect": {grid}', t[s:e])
+            self.assertIn('"cellCount": { "x": 10, "y": 8 }', t[s:e])
+            self.assertIn(f'"cellSize": {ui_layouts.CELL}', t[s:e])
+            self.assertIn('"up": { "name": "grid" }', t)   # D2R's gamepad navigation stays
+            self.assertIn('"down": { "name": "convert" }', t)
+            for name in ("convert", "flourish"):
+                self.assertEqual(ui_layouts.widget_rect(t, name), ui_layouts.widget_rect(hd, name))
+            self.assertEqual(ui_check.cell_counts(t), [(10, 8)])
+            files["controller/horadriccubelayouthd.json"] = ctrl.replace("Controller/Panel/HoradricCube/V2", "Other")
+            with self.assertRaises(ValueError):   # D2R changed its picture: fail loudly, not ship a 3 x 4 cube
+                ui_layouts.cube_controller_hd(row)
+        finally:
+            ui_layouts.baseline = orig
+
+    def test_stash_cube_window_holds_the_whole_cube(self):   # bug #515: the RotW stash's 3 x 4 window
+        bank = """{ "children": [
+            { "type": "TabBarWidget", "name": "BankTabs", "fields": { "textStrings": [ "@personal", "@shared", "@gems", "@materials", "@runes" ] } },
+            { "type": "InventoryGridWidget", "name": "grid", "fields": { "rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 },
+              "cellSize": "$ItemCellSize" } },
+            { "type": "Widget", "name": "advancedstash_horadriccube", "children": [
+                { "type": "InventoryGridWidget", "name": "horadriccube_grid",
+                  "fields": { "rect": { "x": 431, "y": 784 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize" } },
+                { "type": "ButtonWidget", "name": "convert", "fields": { "tooltipString": "@strUiMenu2" } },
+                { "type": "ButtonWidget", "name": "withdraw_button",
+                  "fields": { "textString": "@AdvancedStashWithdraw", "tooltipString": "@AdvancedStashWithdrawTooltip" } } ] } ] }"""
+        row = {"gridX": 10, "gridY": 8}
+        orig = ui_layouts.baseline
+        ui_layouts.baseline = lambda name: bank
+        try:
+            t = ui_layouts.stash_hd(row)
+        finally:
+            ui_layouts.baseline = orig
+        self.assertNotIn('"@', t)
+        self.assertIn('"textStrings": [ "Personal", "Shared", "Gems", "Materials", "Runes" ]', t)
+        s, e = ui_layouts.block_span(t, ui_layouts.STASH_CUBE_GRID)
+        g = t[s:e]
+        self.assertIn('"rect": { "x": 431, "y": 862, "scale": 0.3 }', g)   # 980 x 784 shrunk into 294 x 392, centred
+        self.assertIn('"cellCount": { "x": 10, "y": 8 }', g)
+        self.assertIn('"cellSize": { "x": 98, "y": 98 }', g)
+        self.assertIn('"rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 }', t)   # the stash grid untouched
+        x, y, sc = ui_layouts.fit_cube_window(0, 0, (294, 392), 10, 8, 98)
+        self.assertLessEqual(10 * 98 * sc, 294)
+        self.assertLessEqual(8 * 98 * sc, 392)
+
     def test_classic_skilltree_gets_a_warlock_cancel_position(self):   # bug #498: D2R's array stops at the Assassin
         t = '{ "cancelPositionX": [ 15, 100, 171 ],\n "cancelPositionCode": [ 321, 113, 131, 121, 313, 333, 231 ],\n }'
         out = ui_layouts.warlock_cancel_position(t)

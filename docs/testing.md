@@ -4983,3 +4983,42 @@ steps.
 ... could not install` lines, or now the `mxl2012` `plugin clashes` line). Global memory patches (`d2rloader\patches\*.json`)
 meet the same rule (a patch over our bytes fails its expected-bytes check: `memory patch could not be applied`); not run.
 
+## Lane cubeui: the owner's "Missing string" 3 x 4 cube (bug #523, 2026-11-01, slot 2, background mode)
+
+Owner shot (`mxl2012-runs/cubeui/report.png`, RotW game): D2R's 3 x 4 cube picture, title "Missing string", items outside the
+grid. Slot 2 had 0.1.9 (cube layouts byte-equal to the package's). Evidence: `mxl2012-runs/cubeui/` (outside git).
+
+**RotW character:** the create screen of the test account (RotW bought) now has a "Game Version" list that defaults to "Reign of
+the Warlock" (`m02_create.png`), so `game_checks.create_character` makes RotW characters unchanged (`HERO_X` Barbarian 0.44 still
+right among the eight figures); no harness change. Character `CubeRotw` (Barbarian, `mxl2012-s2`).
+
+| Shots | Build | Result |
+|---|---|---|
+| `before_rotw_cube_hd.png`, `t01`-`t06` | 0.1.9 | HD, cube in town: 10 x 8 on the mod's picture, "Horadric Cube"; same after G and back, with weapon swap (W), opened from the stash, 30 jewels in the cube: **not reproduced** |
+| `z00_1610_inv.png`, `z01_1610_cube.png` | 0.1.9 | 16:10 window (D2R's LV profile): same |
+| `x01_cube_vanilla_layout.png`, `d2rloader-run*.log` | 0.1.9 with D2R's `horadriccubelayouthd.json` put in by hand, then restored | "Missing string", 3 x 4, items run off right of the grid: D2R's own layout, but not the owner's grid place; otherwise the log names the mod's layout `[MOD]` |
+| `after_cube_hd.png`, `after_cube_hd_swapped.png`, `after_cube_legacy.png`, `after_cube_hd_again.png` | 0.1.9 + this branch's `controller/horadriccubelayouthd.json` (copied in for the run, removed after) | PC cube unchanged in HD, swapped and classic; the gamepad UI not seen (no gamepad) |
+| `s02_stash_hd_*.png`, `b03_stash_legacy_{gems,materials,runes}.png` | 0.1.9 (HD), 0.1.9 + gamepad file (classic) | #516: the three RotW pages draw in HD and classic; two D2R asserts (Items.cpp:1839 / 1990) right after the first classic Gems click, no crash (`d2rloader-after.log`) |
+| `y02_crop.png`, `b03_stash_legacy_gems.png` | as above | #515: the stash's 3 x 4 cube window draws the cube's 10 x 8 contents past its edge, HD and classic |
+
+Checks: `py -3 -I tools/hd_ui.py baseline <extraction>` then `py -3 -I tools/ui_layouts.py` (writes the gamepad file);
+`tools/tests/test_ui.py` `test_controller_cube_takes_the_mods_picture_grid_and_button`. Slot 2's d2rloader config restored by
+the slot tools (logging flags checked as before), lock released.
+
+### #515: the stash cube window (lane cubeui, 2026-11-01, slot 2)
+
+Owner shot `report-stashcube.png` (HD, Gems page): the window's cells are the frame's size (56 screen pixels), the items sit
+at their 10 x 8 cube places from the window's origin. CubeRotw's cube held 30+ jewels (`h item jew cube`).
+
+| Shots | Build | Result |
+|---|---|---|
+| `before515_*` | 0.1.9 | HD and classic: the items run off the frame (HD past the panel, classic over the inventory); the cube panel 10 x 8 |
+| `after515a_*` | 0.1.9 + hand-made layouts (`test515/`) | HD at scale 0.3: all 80 cells in the frame. Classic with the same scale: item pictures full size, overlapping (rejected) |
+| `after515_stash_{gems,runes,pick,put}_hd.png`, `after515_stash_{gems,runes}_legacy.png`, `after515_cube_panel_hd.png` | 0.1.9 + this branch's generated `bankexpansionlayouthd.json` and classic `bankexpansionlayout.json` (copied in for the run, slot 2 restored after) | HD: the whole cube small in the frame, an item picked up and put back (tooltip shown); classic: the cube cover in the frame, nothing spills; the cube panel still 10 x 8; 0 ERROR / ASSERT lines (`d2rloader-after515.log`) |
+| `sheet515.png` | | before / after, HD and classic, side by side |
+
+Harness note: the main menu sorts characters by last played, so a fixed click on the first row alternated between CubeRotw
+and lane globalplugins' `GPlugLane` (`ctlA_*`, `ctlB_*`; both loaded and saved twice, nothing changed in them); the run
+scripts (`run515.py`, `run515b.py`, outside git) pick the row by save time. The classic asserts of #516 (Items.cpp:1839 /
+1990) did not come back in about five later classic Gems clicks; cause not found. The gamepad stash file not seen in game.
+Tests: `test_ui.py` `test_stash_cube_window_holds_the_whole_cube`, `test_rotw_stash_legacy.py` `test_layout_follows_hd`.

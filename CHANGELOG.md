@@ -10,6 +10,11 @@ version being released (docs/release.md).
   nothing). The `mxl2012` console command now names such a plugin and the D2R-XL 2012 part in the way
   (`plugin clashes: ...`), and the Downloader no longer deletes your `mxl2012-core-off.txt` (where that part's word turns it
   off) when it updates or repairs (#522).
+- With a gamepad (D2R's controller UI) the Horadric Cube now uses Median XL's 10 x 8 cube and picture, not D2R's
+  small 3 x 4 picture with the items spilling out of it (#523).
+- Reign of the Warlock stash pages (Gems, Materials, Runes): the small Horadric Cube window under the pages now shows the
+  whole 10 x 8 cube, scaled down inside its frame, instead of drawing the items far past it. In classic graphics the
+  window shows the cube's cover; open the cube itself to see its items (#515).
 
 ## D2R-XL 2012
 
