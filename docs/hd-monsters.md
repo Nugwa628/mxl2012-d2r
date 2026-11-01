@@ -1085,3 +1085,23 @@ shows it. A harness `kill` death did not show it.
 Other candidates with attack1 + attack2 + a cast clip (`tools/data/d2r_unit_clips.json`): `nihlathakboss` (a robed man) and
 `mummy1` (a mummy, no glow); `willowisp1` (a glowing orb) has no attack2. Review sheet for the owner (outside git):
 `mxl2012-runs/glowing/review.png` (legacy, HD before, HD now). Runs: docs/testing.md "Lane glowing".
+
+## 18. The Wraith's body: every model of a slot (lane witches, 2026-11-01, bug #524)
+
+The owner found the witches (`l4dwitch`, `l4dwitch2`, token `@1`) invisible in HD. D2R's `wraith1.json` has three model entities
+on the one part slot torso / lit: `torso.model` (the glowing body, spine and skull), `l_torso.model` and `r_torso.model` (the
+arms with the bone blades). `hd_units.build_unit` indexed the donor's entities by (part, variant), so only the last one,
+`r_torso`, reached the Median unit: an arm and the particle wisps, no body. It now keeps all of a slot's entities (the first keeps
+its old name and id, the others get `_1`, `_2`), so the output of one-model donors is unchanged.
+
+| Donor | Units changed | Rows |
+|---|---|---|
+| wraith1 | `mxl_wraith1_7deee89` (`@1`), `mxl_wraith1_c7ceb3b`, `mxl_wraith1_f26773d` | `vengeances`, `l4dwitch`, `l4dwitch2`, `veilterror_rean`, `shadows_new` |
+| barricadewall2 | `mxl_barricadewall2_ae9100c` | 1 row (two torso models) |
+
+Seen in game on slot 2 (docs/testing.md "Lane witches"): before, the witch and `veilterror_rean` were a blade arm and blue wisps;
+a vanilla Wraith next to them drew its body. After, the whole Wraith in the pinned colour. Legacy is Median's own art (a pale
+translucent ghost woman in `meslayer`'s white cloud; monprop `fade` makes her translucent there by design) and is unchanged.
+Review sheet (outside git): `mxl2012-runs/witches/review-524.png` (HD before, HD after, legacy, D2R's own Wraith). The look is the
+pinned stand-in made whole, not a new pick; a pale female stand-in would need a donor with an attack2 clip for her A2 pounce, and
+no female D2R unit has one (`corruptrogue1`, `succubus1`, `succubuswitch1`, `andariel`: attack1 only).

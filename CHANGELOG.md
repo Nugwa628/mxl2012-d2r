@@ -5,6 +5,9 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Witches (the sleeping witches of Terror's outdoor areas and the Witch Queen's tower) are now visible in HD, as a
+  whole glowing Wraith; before, only one arm and a few blue wisps were drawn. A few other ghostly monsters with the same
+  HD look (the Shadows among them) get their full body too. Classic graphics are unchanged (#524).
 - Your own D2RLoader plugins in the game's `d2rloader\plugins` folder load next to D2R-XL 2012, as before. If one of them
   hooks game code that D2R-XL 2012 also changes, D2RLoader turns that hook down (that one feature of the plugin then does
   nothing). The `mxl2012` console command now names such a plugin and the D2R-XL 2012 part in the way

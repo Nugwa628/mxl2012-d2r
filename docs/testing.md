@@ -5022,3 +5022,24 @@ and lane globalplugins' `GPlugLane` (`ctlA_*`, `ctlB_*`; both loaded and saved t
 scripts (`run515.py`, `run515b.py`, outside git) pick the row by save time. The classic asserts of #516 (Items.cpp:1839 /
 1990) did not come back in about five later classic Gems clicks; cause not found. The gamepad stash file not seen in game.
 Tests: `test_ui.py` `test_stash_cube_window_holds_the_whole_cube`, `test_rotw_stash_legacy.py` `test_layout_follows_hd`.
+
+## Lane witches: the witches in HD (bug #524, 2026-11-01, slot 2, background mode, build of lane/witches)
+
+Scripts and evidence (outside git): `mxl2012-runs/witches/` (`lab.py`, `lab2.py`-`lab10.py`, one folder per run). Character
+WitchLane (Barbarian, made by the run, god mode); Tamoe Highland (7) and Cold Plains (3), both outdoors. The harness has no
+`difficulty` verb (it answers `unknown verb`): runs 1-6 were Hatred (Normal); runs 7-10 entered Terror (Nightmare) on the
+player path after the nmh lanes' save edit (`nmh_checks.unlock_edit("nightmare")`, `closed_edit_and_enter`). The witch's `fade`
+and `meslayer` are on every difficulty, so the looks of runs 1-6 hold for Terror (seen again in run 7).
+
+| Run | What | Result |
+|---|---|---|
+| `run1` | l4dwitch / l4dwitch2 / malewitch spawned, legacy and HD; stat 181 read | stat 181 `fade` = 1 and states 105, 232 on both witches (malewitch: fade 0, state 26). Legacy: a pale translucent long-haired ghost woman in a white cloud, also from 14 sub-tiles. HD: blue wisps and bone blades only |
+| `run2`, `run3` | each subject alone (witches, malewitch, `vengeances`, vanilla `wraith1` with and without stat 181 set) | HD: the vanilla Wraith draws its glowing body with or without `fade`; the witches and `vengeances` (same `@1` unit) show one blade arm and wisps. malewitch drawn (Blood Lord HD, Median art in legacy). 0 asserts |
+| `run4` | controls on the mxl wraith1 units: `veilterror_rean` (no `fade`), `shadows_new` (`fade`) | both without a body, like the witch: the built unit, not `fade`. Cause: one model per part slot kept (docs/hd-monsters.md section 18) |
+| `run5` | after the fix (`hd_monsters.py build`, installed), same subjects | HD: the whole Wraith (body, skull, both arms) for the witches, `vengeances`, `veilterror_rean`; legacy unchanged. 0 asserts; `review-524.png` |
+| `run7`-`run9` | Terror: witches, crown aura | entered with difficulty 1. The crown is `item_aura` 31 level 2 on the witch (`stat mon:<id> 151 31`): 5 of 20 witches. State 55 `witchquestaura` is on the **player** (server and client) inside her radius, not on the witch. Legacy `run9`: a white star flare on the player every few frames while near her |
+| `run10` | HD, a crowned witch spawned 31 sub-tiles away, the player walks in (40 shots 0.05 s apart) | state 55 on the player from shot 4; a white flash on the player in shots 3 and 6 (D2R's Sanctuary knockback art): the stars draw in HD, as a flash when the state comes on. She woke and pounced at shot 7, drawn as the whole Wraith |
+
+Not done: a real (player-hit) death of the whole Wraith (the 608 assert of #519); the witch is immune (resistances 500). The
+Witch Queen's tower level (Tower Cellar Level 5) was not entered; `l4dwitch2` was spawned outdoors (same unit, same monprop
+but no crown aura).

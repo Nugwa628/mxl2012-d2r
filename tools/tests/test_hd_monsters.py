@@ -167,6 +167,29 @@ class Units(unittest.TestCase):
         self.assertEqual(out["states"][0]["animationBindings"]["bow"], ["a"])
         self.assertEqual(sm["states"][0]["animationBindings"]["bow"], [])   # the donor's own is untouched
 
+    def test_build_unit_keeps_every_model_of_a_slot(self):
+        """Bug #524: wraith1 draws its body (torso.model) and both arms (l_ / r_torso.model) all at torso / lit; keeping one
+        entity per slot left the witches only an arm with blades in HD."""
+        def part(name, model):
+            return {"type": "Entity", "name": name, "id": 1, "components": [
+                {"type": "ModelDefinitionComponent", "name": name + "_ModelDefinition", "filename": model},
+                {"type": "UnitPartComponent", "name": name + "_UnitPart", "part": "torso", "variant": "lit"}]}
+        donor = {"name": "w", "dependencies": {"json": [], "variantdata": []}, "entities": [
+            {"type": "Entity", "name": "entity_root", "id": 2, "components": []},
+            part("entity_torso", "torso.model"), part("entity_l_torso", "l_torso.model"), part("entity_r_torso", "r_torso.model")]}
+        old = hd_units.load_json, hd_units.unit_path
+        hd_units.load_json, hd_units.unit_path = (lambda p: json.loads(json.dumps(donor))), (lambda u: Path(u))
+        try:
+            d, _ = hd_units.build_unit("w", "mxl_w", {"TR": ["lit"]}, None, None, None, "hth", None, "v.json")
+        finally:
+            hd_units.load_json, hd_units.unit_path = old
+        ents = [e for e in d["entities"] if e["name"] != "entity_root"]
+        models = sorted(c["filename"] for e in ents for c in e["components"] if c["type"] == "ModelDefinitionComponent")
+        self.assertEqual(models, ["l_torso.model", "r_torso.model", "torso.model"])
+        self.assertEqual(len({e["name"] for e in ents}), 3)
+        self.assertEqual(len({e["id"] for e in ents}), 3)
+        self.assertEqual(len({c["name"] for e in ents for c in e["components"]}), 6)
+
     def test_colour_fit_and_scale(self):
         c = {"rgb": (0.5, 0.5, 0.5), "hue": 0.1, "hue_conf": 1.0, "sat": 0.5, "val": 0.5, "w": 10, "h": 10}
         self.assertEqual(hd_donors.tint_of(c, c)[2], "none")

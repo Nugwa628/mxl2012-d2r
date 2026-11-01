@@ -333,31 +333,36 @@ def build_unit(donor: str, name: str, slots: dict, scale: float | None, adjust, 
     d = copy.deepcopy(load_json(unit_path(donor)))
     d["name"] = name
     dparts: dict[str, list[str]] = defaultdict(list)
-    ents_by_key: dict[tuple, dict] = {}
+    # a slot can hold several models (wraith1: torso, l_torso and r_torso are all torso / lit); all of them are kept (bug #524)
+    ents_by_key: dict[tuple, list[dict]] = defaultdict(list)
     base, others = [], []
     for e in d["entities"]:
         pc = next((c for c in e["components"] if c["type"] == "UnitPartComponent"), None)
         if pc is None:
             base.append(e)
             continue
-        dparts[pc["part"]].append(pc["variant"])
-        ents_by_key[(pc["part"], pc["variant"])] = e
+        if pc["variant"] not in dparts[pc["part"]]:
+            dparts[pc["part"]].append(pc["variant"])
+        ents_by_key[(pc["part"], pc["variant"])].append(e)
     rows, notes = remap_parts(dict(dparts), slots)
     if vmap:  # provenance: the (part, variant) the art was made from is drawn at that Median slot
         done = {(tp, tv) for tp, tv in vmap}
         rows = [r for r in rows if (r[2], r[3]) not in done] + [(sp, sv, tp, tv) for (tp, tv), (sp, sv) in vmap.items()]
     for dp, dv, tp, tv in rows:
-        e = copy.deepcopy(ents_by_key[(dp, dv)])
-        nm = f"entity_{tp}_{tv}_{dp}_{dv}"
-        e["name"] = nm
-        e["id"] = int(hashlib.md5((name + nm).encode()).hexdigest()[:8], 16)
-        for c in e["components"]:
-            if "part" in c:
-                c["part"] = tp
-            if "variant" in c:
-                c["variant"] = tv
-            c["name"] = c["name"].replace(f"_{dp}_{dv}", f"_{tp}_{tv}_{dp}_{dv}") if f"_{dp}_{dv}" in c["name"] else c["name"] + f"_{tp}_{tv}"
-        others.append(e)
+        for i, src in enumerate(ents_by_key[(dp, dv)]):
+            e = copy.deepcopy(src)
+            sfx = f"_{i}" if i else ""
+            nm = f"entity_{tp}_{tv}_{dp}_{dv}{sfx}"
+            e["name"] = nm
+            e["id"] = int(hashlib.md5((name + nm).encode()).hexdigest()[:8], 16)
+            for c in e["components"]:
+                if "part" in c:
+                    c["part"] = tp
+                if "variant" in c:
+                    c["variant"] = tv
+                c["name"] = (c["name"].replace(f"_{dp}_{dv}", f"_{tp}_{tv}_{dp}_{dv}") if f"_{dp}_{dv}" in c["name"]
+                             else c["name"] + f"_{tp}_{tv}") + sfx
+            others.append(e)
     d["entities"] = base + others
     for e in base:
         for c in e["components"]:
