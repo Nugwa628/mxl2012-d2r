@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 
 namespace other_plugins {
 
@@ -112,6 +113,61 @@ inline void ConflictNotice(char* out, size_t n, const char* pluginVersion, const
 	std::snprintf(out, n, "D2R-XL 2012 %s: another plugin (%s) writes the same engine slots; remove it from %s. The mod's engine changes are off.",
 	              pluginVersion != nullptr ? pluginVersion : "?", fileName != nullptr && fileName[0] != '\0' ? fileName : "unknown",
 	              where != nullptr && where[0] != '\0' ? where : "d2rloader\\plugins");
+}
+
+// --- Hook clashes with players' own plugins (docs/bugs.md #522) ------------------------------------------------------------
+// D2RLoader loads the mod's plugins first, so mxl2012-core's hooks and patches are in when a game-wide plugin asks for the same
+// address; D2RLoader then refuses that plugin's hook and logs (d2rloader.log, seen with D2RLoader 1.3.1-beta):
+//   "[...] [ERROR] Plugin <id> could not install a Native Hook at RVA 0x36BC50: game bytes did not match what the plugin expected"
+// (and a second line "...: MH_ERROR_ALREADY_CREATED" for a plugin that retries). The plugin still loads; only that feature of it
+// does nothing. True with `plugin` (the id) and `rva` filled for such a line.
+inline auto ParseHookRefusal(const char* line, char* plugin, size_t n, unsigned long long* rva) noexcept -> bool {
+	static constexpr char Head[] = "Plugin ";
+	static constexpr char Mid[] = " could not install a Native Hook at RVA 0x";
+	if (line == nullptr || plugin == nullptr || n == 0 || rva == nullptr) {
+		return false;
+	}
+	const char* mid = std::strstr(line, Mid);
+	const char* head = mid != nullptr ? std::strstr(line, Head) : nullptr;
+	if (head == nullptr || head > mid) {
+		return false;
+	}
+	const char* id = head + sizeof(Head) - 1;
+	const size_t len = static_cast<size_t>(mid - id);
+	if (len == 0 || len >= n) {
+		return false;
+	}
+	std::memcpy(plugin, id, len);
+	plugin[len] = '\0';
+	unsigned long long v = 0;
+	int digits = 0;
+	for (const char* p = mid + sizeof(Mid) - 1; digits < 16; ++p, ++digits) {
+		const char c = Lower(*p);
+		const int d = (c >= '0' && c <= '9') ? c - '0' : (c >= 'a' && c <= 'f') ? c - 'a' + 10 : -1;
+		if (d < 0) {
+			break;
+		}
+		v = (v << 4) | static_cast<unsigned>(d);
+	}
+	*rva = v;
+	return digits > 0;
+}
+
+// The part of mxl2012-core whose `mxl2012` report names `rva` ("0x36bc50 hooked", "at 0x37d744", "0x44b152 -> jmp ..."): the
+// off word of reports[i] (words[i]), or null. An address is matched whole: 0x36bc5 does not match 0x36bc50.
+inline auto PartOfAddress(unsigned long long rva, const char* const* words, const char* const* reports, size_t count) noexcept -> const char* {
+	char needle[24];
+	std::snprintf(needle, sizeof(needle), "0x%llx", rva);
+	const size_t nl = std::strlen(needle);
+	for (size_t i = 0; i < count; ++i) {
+		for (const char* p = reports[i] != nullptr ? std::strstr(reports[i], needle) : nullptr; p != nullptr; p = std::strstr(p + 1, needle)) {
+			const char next = Lower(p[nl]);
+			if (!((next >= '0' && next <= '9') || (next >= 'a' && next <= 'f'))) {
+				return words[i];
+			}
+		}
+	}
+	return nullptr;
 }
 
 }  // namespace other_plugins

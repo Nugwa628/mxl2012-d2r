@@ -28,6 +28,10 @@ Every mxl2012 run (game_ctl start ... stop, so also game_checks / parallel_smoke
 `game_slots.py unlock N` and `game_ctl stop` call end() too, so a crashed or killed tool is restored before the lock goes.
 
 CLI: py -3 tools/slot_share.py status|diff|restore N     (restore needs MXL_RUN = the lock owner)
+     MXL_RUN=<owner> py -3 tools/slot_share.py probe N add DLL...  the one exception to the empty global folders (lane
+                                                          globalplugins): our own test plugins (gp-probe-*.dll of tools/gp_probe,
+                                                          a mxl2012-core*.dll copy) go in d2rloader\\plugins for runs of this
+                                                          lock only; `probe N clear` and every unlock remove them
      MXL_RUN=<owner> py -3 tools/slot_share.py bootcheck N   start the loader minimized with -mod mxl2012 (no window or
                                                           input calls), wait for the log's mod mount, kill it, restore
      py -3 tools/slot_share.py scan N OUT.json            list every file of the slot (size, mtime) for a before/after report
@@ -87,15 +91,92 @@ def shared_files(game):
     return out
 
 
-def foreign_extensions(game):
+def probe_path(n):
+    return os.path.join(state_dir(n), "probe.json")
+
+
+def probes(n):
+    """{file name: sha256} of the test plugins `probe add` put in the slot's global plugin folder (lane globalplugins)."""
+    try:
+        with open(probe_path(n), encoding="utf-8") as f:
+            return json.load(f)["files"]
+    except (FileNotFoundError, ValueError, KeyError):
+        return {}
+
+
+def probe_add(n, owner, srcs, game=None):
+    """The one exception to "the global folders stay empty" (docs/testing.md "Lane globalplugins"): with the slot lock held,
+    copy test plugins into <slot>\\d2rloader\\plugins and list them (name and sha256) in probe.json. Only is_probe_name()
+    (our own throw-away test DLLs of tools/gp_probe, and a copy of mxl2012-core for the second-copy check) and only into
+    an empty folder or over files listed already. begin() lets exactly the listed files through; `probe clear` and every
+    unlock remove them."""
+    n = game_slots.require_slot(n)
+    game = game or game_slots.slot_dir(n)
+    _need_lock(n, owner)
+    if game_slots.slot_processes(game):
+        raise SystemExit(f"slot {n}: stop the game before test plugins are added")
+    listed = probes(n)
+    plug = os.path.join(game, "d2rloader", "plugins")
+    for f in (os.listdir(plug) if os.path.isdir(plug) else []):
+        if f not in listed:
+            raise SystemExit(f"slot {n}: d2rloader\\plugins holds {f}, not a test plugin of ours: nothing added")
+    for src in srcs:
+        name = os.path.basename(src)
+        if not is_probe_name(name):
+            raise SystemExit(f"{name}: only gp-probe-*.dll and mxl2012-core*.dll may go in a global folder for a test")
+        os.makedirs(plug, exist_ok=True)
+        shutil.copy2(src, os.path.join(plug, name))
+        listed[name] = sha256(os.path.join(plug, name))
+    os.makedirs(state_dir(n), exist_ok=True)
+    with open(probe_path(n), "w", encoding="utf-8") as f:
+        json.dump({"slot": n, "owner": owner, "files": listed}, f, indent=1)
+    return f"slot {n}: test plugins in d2rloader\\plugins: {', '.join(sorted(listed))}"
+
+
+def probe_clear(n, game=None):
+    """Remove the test plugins of probe.json from the global plugin folder (only files with the listed sha256), then
+    probe.json. Refuses while the game runs (the DLLs are loaded)."""
+    n = game_slots.require_slot(n)
+    listed = probes(n)
+    if not listed:
+        return f"slot {n}: no test plugins"
+    game = game or game_slots.slot_dir(n)
+    if game_slots.slot_processes(game):
+        raise SystemExit(f"slot {n}: game still running: stop it before the test plugins are removed")
+    plug = os.path.join(game, "d2rloader", "plugins")
+    for name, digest in listed.items():
+        p = os.path.join(plug, name)
+        if os.path.exists(p):
+            if sha256(p) != digest:
+                raise SystemExit(f"slot {n}: {p} changed since `probe add`: left in place, remove it by hand")
+            os.remove(p)
+    for name in listed:  # D2RLoader's log of a global test plugin (d2rloader\logs\<id>.log); copied to the run folder by the check
+        log = os.path.join(game, "d2rloader", "logs", os.path.splitext(name)[0] + ".log")
+        if name.lower().startswith("gp-probe-") and os.path.exists(log):
+            os.remove(log)
+    os.remove(probe_path(n))
+    return f"slot {n}: test plugins removed ({', '.join(sorted(listed))})"
+
+
+def is_probe_name(name):
+    low = name.lower()
+    return low.endswith(".dll") and (low.startswith("gp-probe-") or low.startswith("mxl2012-core"))
+
+
+def foreign_extensions(game, n=None):
     """Problems with plugins that would cross between the two projects: a DLL in a global extension folder (loads with
-    every mod), or a copy of mxl2012-core in another mod's folder."""
+    every mod), or a copy of mxl2012-core in another mod's folder. With slot `n`, the test plugins `probe add` listed
+    (same name and sha256, in d2rloader\\plugins) are no problem."""
     bad = []
+    listed = probes(n) if n is not None else {}
     for d in GLOBAL_EXT:
         root = os.path.join(game, *d.split("/"))
         for dirpath, _, files in os.walk(root):
             for f in files:
-                bad.append(f"{os.path.relpath(os.path.join(dirpath, f), game)}: global extension, loads with every mod")
+                p = os.path.join(dirpath, f)
+                if d == "d2rloader/plugins" and dirpath == root and f in listed and sha256(p) == listed[f]:
+                    continue
+                bad.append(f"{os.path.relpath(p, game)}: global extension, loads with every mod")
     mods = os.path.join(game, "mods")
     for m in (os.listdir(mods) if os.path.isdir(mods) else []):
         if m.lower() == game_slots.MOD.lower():
@@ -127,7 +208,7 @@ def begin(n, owner, game=None):
     msg = ""
     if pending(n):
         msg = "pending snapshot of an earlier run restored first: " + end(n, owner, game) + "; "
-    bad = foreign_extensions(game)
+    bad = foreign_extensions(game, n)
     if bad:
         raise SystemExit(f"slot {n}: refusing the run, " + "; ".join(bad))
     # end() must be able to put every shared file back, and the run writes the harness file into our mod folder
@@ -386,6 +467,13 @@ def main():
                                else "no pending snapshot"))
         bad = foreign_extensions(game_slots.slot_dir(n))
         print("extensions: " + ("; ".join(bad) if bad else "no plugin in the global folders, none of ours in another mod"))
+        if probes(n):
+            print("test plugins (probe add): " + ", ".join(sorted(probes(n))))
+    elif c == "probe" and len(a) >= 3 and a[2] == "add":
+        print(probe_add(n, os.environ.get("MXL_RUN"), a[3:]))
+    elif c == "probe" and len(a) >= 3 and a[2] == "clear":
+        _need_lock(n, os.environ.get("MXL_RUN"))
+        print(probe_clear(n))
     elif c == "diff":
         print("\n".join(f"{w:8} {r}" for r, w in diff(n)) or "no difference (or no pending snapshot)")
     elif c == "restore":

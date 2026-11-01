@@ -104,8 +104,9 @@ Json ManifestToJson(const Manifest& m);
 bool SafeRelativePath(const std::string& path);
 
 // Files under the mod folder that an update never deletes although the release does not list them: D2RLoader's own
-// output (d2rloader/logs/, d2rloader/crashes/) and the downloader's marker and downloads (mxl2012-install.json,
-// mxl2012-download/).
+// output (d2rloader/logs/, d2rloader/crashes/), the downloader's marker and downloads (mxl2012-install.json,
+// mxl2012-download/) and the player's mxl2012-core-off.txt next to the plugin (its off words, e.g. to give an address the plugin
+// hooks to the player's own D2RLoader plugin, docs/bugs.md #522; releases never ship one).
 bool RuntimeOutput(const std::string& path);
 // The copy of a preserve file kept before its save format is set (docs/bugs.md #512: by the downloader and by the plugin part
 // savemode): <preserve path> + this suffix is the player's too, never removed.

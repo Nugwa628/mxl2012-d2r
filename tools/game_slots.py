@@ -339,6 +339,12 @@ def release(n, owner=None, manual=False):
         except SystemExit as e:
             print(f"lock kept: {e}")
             return False
+    if slot_share.probes(n):  # test plugins of `slot_share probe add` (lane globalplugins) never outlive the lock
+        try:
+            print(slot_share.probe_clear(n))
+        except SystemExit as e:
+            print(f"lock kept: {e}")
+            return False
     for p in lock_paths(n):
         shutil.rmtree(p, ignore_errors=True)
     return True

@@ -5,6 +5,12 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Your own D2RLoader plugins in the game's `d2rloader\plugins` folder load next to D2R-XL 2012, as before. If one of them
+  hooks game code that D2R-XL 2012 also changes, D2RLoader turns that hook down (that one feature of the plugin then does
+  nothing). The `mxl2012` console command now names such a plugin and the D2R-XL 2012 part in the way
+  (`plugin clashes: ...`), and the Downloader no longer deletes your `mxl2012-core-off.txt` (where that part's word turns it
+  off) when it updates or repairs (#522).
+
 ## D2R-XL 2012
 
 ### 0.1.9 (2026-11-01)

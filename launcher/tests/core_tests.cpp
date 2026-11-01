@@ -205,7 +205,8 @@ void TestPlan() {
 	std::map<std::string, std::string> disk = {{"same.txt", H1}, {"changed.txt", H1}, {"gone.txt", H1},
 	                                           {"d2rloader/config/d2rloader.toml", H4}, {"d2rloader/logs/x.log", H1},
 	                                           {"d2rloader/config/d2rloader.toml.retail-backup", H1}, {"d2rloader/config/other.toml.retail-backup", H1},
-	                                           {"d2rloader/crashes/c.dmp", H1}, {"stray/own.txt", H1}};
+	                                           {"d2rloader/crashes/c.dmp", H1}, {"stray/own.txt", H1},
+	                                           {"d2rloader/plugins/mxl2012-core-off.txt", H1}, {"d2rloader/plugins/stray-off.txt", H1}};
 	auto cur = [&](const std::string& p) { auto it = disk.find(p); return it == disk.end() ? std::string() : it->second; };
 	auto local = [&] { std::vector<std::string> v; for (const auto& [k, _] : disk) v.push_back(k); return v; };
 	mxl::InstallPlan plan = mxl::PlanInstall(next, local(), cur);
@@ -222,8 +223,9 @@ void TestPlan() {
 	Check(hasS(plan.preserved, "d2rloader/config/d2rloader.toml") && !has(plan.fetch, "d2rloader/config/d2rloader.toml"),
 	      "existing preserve file never overwritten");
 	Check(hasS(plan.remove, "gone.txt") && hasS(plan.remove, "stray/own.txt") && hasS(plan.remove, "d2rloader/config/other.toml.retail-backup") &&
-	          plan.remove.size() == 3,
-	      "unlisted files removed, D2RLoader logs / crashes and the preserve file's .retail-backup (#512) kept");
+	          hasS(plan.remove, "d2rloader/plugins/stray-off.txt") && plan.remove.size() == 4,
+	      "unlisted files removed, D2RLoader logs / crashes, the preserve file's .retail-backup (#512) and the player's "
+	      "mxl2012-core-off.txt (#522) kept");
 	Check(plan.fetchBytes == 20 + 30 + 5, "fetch byte count");
 	disk.clear();
 	plan = mxl::PlanInstall(next, local(), cur);

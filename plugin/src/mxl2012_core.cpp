@@ -437,6 +437,84 @@ char g_voidFloorReport[160] = "";
 char g_harnessReport[192] = "";
 char g_saveModeReport[MAX_PATH + 160] = "";
 bool g_partsInstalled = false;
+char g_clashReport[768] = "";  // the `plugin clashes` line of `mxl2012` (#522), set 15 s after the start
+
+// Game-wide plugins whose hooks D2RLoader refused (other_plugins_logic.h ParseHookRefusal; docs/bugs.md #522): read from
+// d2rloader.log once the game-wide plugins are in. Each "<id> at 0x<rva> (<off word>)", the off word when a part's report
+// names the address. Players' plugins load after ours, so on an address both hook ours is in and theirs is refused.
+void FindHookClashes(char* out, size_t n) noexcept {
+	std::snprintf(out, n, "plugin clashes: none (no other plugin was refused a hook)");
+	wchar_t path[MAX_PATH * 2];
+	const DWORD len = GetModuleFileNameW(nullptr, path, MAX_PATH);
+	wchar_t* slash = len > 0 ? std::wcsrchr(path, L'\\') : nullptr;
+	if (slash == nullptr) {
+		return;
+	}
+	wcscpy_s(slash, sizeof(path) / sizeof(path[0]) - static_cast<size_t>(slash - path), L"\\d2rloader\\logs\\d2rloader.log");
+	HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
+	if (f == INVALID_HANDLE_VALUE) {
+		std::snprintf(out, n, "plugin clashes: not readable (d2rloader.log, error %lu)", GetLastError());
+		return;
+	}
+	static char text[1 << 20];  // the start's log is about 150 KB; only the loader's first 1 MB is read
+	DWORD got = 0;
+	const BOOL ok = ReadFile(f, text, sizeof(text) - 1, &got, nullptr);
+	CloseHandle(f);
+	text[ok ? got : 0] = '\0';
+	const char* words[64];
+	const char* reports[64];
+	size_t count = 0;
+	const struct {
+		const char* word;
+		const char* report;
+	} parts[] = {{"cltdo22", g_cltDoReport}, {"cltnomis", g_noMissileReport}, {"itemeffect", g_itemEffectReport},
+	             {"skillremove", g_skillRemoveReport}, {"dodgelist", g_dodgeListReport}, {"statelist", g_stateListReport},
+	             {"melttrail", g_meltTrailReport}, {"whirlwind", g_whirlwindReport}, {"cubedupe", g_cubeDupeReport},
+	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
+	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
+	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
+	             {"petspread", g_petSpreadReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport},
+	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"void65", g_voidFloorReport},
+	             {"cltdostub", g_stubReport}};
+	for (const auto& p : parts) {
+		words[count] = p.word;
+		reports[count++] = p.report;
+	}
+	for (size_t i = 0; i < orig_asserts::BlockCount && count < 64; ++i) {
+		words[count] = orig_asserts::Blocks[i].word;
+		reports[count++] = g_origAssertReport[i];
+	}
+	size_t used = std::snprintf(out, n, "plugin clashes:");
+	int found = 0;
+	char seen[512] = "";
+	for (char* line = text; line != nullptr && *line != '\0';) {
+		char* end = std::strchr(line, '\n');
+		if (end != nullptr) {
+			*end = '\0';
+		}
+		char id[80];
+		unsigned long long rva = 0;
+		if (other_plugins::ParseHookRefusal(line, id, sizeof(id), &rva) && std::strcmp(id, env_guard::OurPluginId) != 0) {
+			char key[112];
+			std::snprintf(key, sizeof(key), "|%s@%llx|", id, rva);
+			if (std::strstr(seen, key) == nullptr && std::strlen(seen) + std::strlen(key) < sizeof(seen)) {
+				strcat_s(seen, sizeof(seen), key);  // D2RLoader logs a refused retry again ("MH_ERROR_ALREADY_CREATED"): once is enough
+				const char* word = other_plugins::PartOfAddress(rva, words, reports, count);
+				const int w = std::snprintf(out + used, used < n ? n - used : 0, "%s %s at 0x%llx (%s)", found ? "," : "", id, rva,
+				                            word != nullptr ? word : "not a D2R-XL 2012 address");
+				used += w > 0 ? static_cast<size_t>(w) : 0;
+				++found;
+			}
+		}
+		line = end != nullptr ? end + 1 : nullptr;
+	}
+	if (found == 0) {
+		std::snprintf(out, n, "plugin clashes: none (no other plugin was refused a hook)");
+	} else if (used < n) {
+		std::snprintf(out + used, n - used, "; D2R-XL 2012 changes that game code first, so D2RLoader refused those hooks and that part of each "
+		                                    "plugin does nothing. A part's word in mxl2012-core-off.txt gives the address to the plugin.");
+	}
+}
 
 // Start-up log line of the other plugins: D2RLoader loads the game-wide plugins after the mod's, so a one-shot thread waits
 // until the loader is done (its plugin list is in d2rloader.log too). The environment check runs again then: a stray
@@ -461,6 +539,16 @@ DWORD WINAPI LogOtherPluginsLater(LPVOID) {
 	}
 	if (Off("otherplugins")) {
 		return 0;
+	}
+	if (g_context != nullptr) {
+		FindHookClashes(g_clashReport, sizeof(g_clashReport));
+		char msg[sizeof(g_clashReport) + 16];
+		std::snprintf(msg, sizeof(msg), "mxl2012-core: %s", g_clashReport);
+		if (std::strncmp(g_clashReport, "plugin clashes: none", 20) == 0) {
+			g_context->LogInfo(msg);
+		} else {
+			g_context->LogWarn(msg);
+		}
 	}
 	char line[384];
 	OtherPlugins(line, sizeof(line));
@@ -514,6 +602,7 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		OtherPlugins(line, sizeof(line));
 		Say(command, line);
 		g_context->LogInfo(line);  // also in the log, for crash reports
+		Say(command, g_clashReport[0] != '\0' ? g_clashReport : "plugin clashes: not read yet (about 15 s after the start)");
 	}
 	if (g_wrongBuild[0] != '\0') {
 		Say(command, g_wrongBuild);

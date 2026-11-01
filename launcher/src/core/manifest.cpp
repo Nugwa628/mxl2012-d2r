@@ -298,7 +298,7 @@ std::vector<ObjectFetch> GroupObjects(const std::vector<ManifestFile>& files) {
 bool RuntimeOutput(const std::string& path) {
 	std::string p = Lower(path);
 	return p.rfind("d2rloader/logs/", 0) == 0 || p.rfind("d2rloader/crashes/", 0) == 0 || p == "mxl2012-install.json" ||
-	       p.rfind("mxl2012-download/", 0) == 0;
+	       p.rfind("mxl2012-download/", 0) == 0 || p == "d2rloader/plugins/mxl2012-core-off.txt";
 }
 
 InstallPlan PlanInstall(const Manifest& next, const std::vector<std::string>& local,

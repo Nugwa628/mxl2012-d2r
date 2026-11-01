@@ -252,7 +252,7 @@ Use test-sessions.md to run these checks by character.
 | 0.69.15 (lane equip-crash) | **Circlet crash on pickup / wear, bugs #49 (Tiara) and #55 (Coronet)**: D2R's fixed item type ids moved to Median's (plugin/src/item_type_ids.cpp, off word `typeids`; tools/item_type_ids.py) | `MXL_SLOT=<n> MXL_RUN=<lock> MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mxl typeids equipall` with `MXL_EQUIP_MODE=ground MXL_EQUIP_ONLY=<circlet codes> MXL_EQUIP_QUALS=3,4` (pick up from the ground to the cursor and wear; and with the inventory flag, which puts the item on at once when the head is empty) or `MXL_EQUIP_MODE=packet` (every head base and unique by 0x19 / 0x1a); `MXL_GRAPHICS=legacy`, `MXL_CHAR_CLASS=<class>` for a new character of another class. By hand: pick up and wear a Tiara / Coronet; socket a rune into a circlet; drink a mana potion from the belt | `mxl`: `item type ids on: 25 of 25 ...`; `typeids` PASS (a Thul rune goes into a circlet's socket, the circlet is worn); `equipall` PASS, the game survives every item (another class's helms are refused as expected). Control (`typeids` in mxl2012-core-off.txt): wearing or picking up a circlet asserts `UnitGetType(hUnit) == UNIT_ITEM` (ItemMode.cpp:676) and the game dies or hangs. Run on slot 2 with the dev and the release install (Barbarian HD, Sorceress legacy). |
 | 0.69.9 (lane goblin-crash) | **Den boss / goblin sound crash, bugs #42 / #46** (plugin/src/sound_guard.cpp, off word `soundguard`; tools/txt_migrate.py hit-6 spawns; tools/validate.py `hit6_spawns`; check `denboss` now mortal) | `MXL_SLOT=3 MXL_RUN=<lock> MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mxl goblincrash denboss` (`MXL_DENBOSS_GOD=1` adds god-mode soak rounds; `MXL_SOUNDGUARD_TEST=1` on a dev DLL feeds the goblins' Neutral sound as -1, =2 reproduces the crash) | PASS: `goblincrash` shows `sound guard: 0 bad sound ids skipped`; `denboss` fights the boss mortal in HD and legacy (cold resist as is, 0, -100), the bone spear spawns 2835 (never 2818), the player lives, no crash file. Tell me: whether Median monster sounds play (goblin chatter) and your d2rloader.log `Loading sound data tables` lines |
 | 0.69.9 (lane goblin-crash) | **Treasure goblin crash, bug #46** (check `goblincrash`, tools/game_checks.py; plugin/src/goblins.cpp: monstats row check before the spawn, `goblin <id> rolled ... spawning` log line before the spawn call) | `MXL_SLOT=3 MXL_RUN=<lock> MXL_GOBLINS_FORCE=1 py -3 tools/game_checks.py all mxl goblincrash` on a developer install and on a release install (downloader `--cli install`, `launch_arguments` without `-txt`, save folder `mxl2012-sN/`, dev DLL swapped in) | PASS: in HD and legacy six goblin types spawn, run 20 s, cast their curse (2580) and Submerge (2582), die, and the plugin roll spawns one; no crash file, no new assert, `0 without a monstats row`. Tell me: on your install, the last mxl2012-core.log lines before any goblin crash |
-| 0.69.8 (lane env-guard) | **Which build runs, bug #53** (plugin/src/env_guard_logic.h, off word `envguard`; check `envguard`), and the mod toml's `[d2rloader.advanced] suppress_global_extensions = true` (tools/install_mod.py) | `MXL_SLOT=<n> MXL_RUN=<lock> MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mxl envguard otherplugins`; to see the warning: copy the dev mxl2012-core.dll into `<slot D2R>\d2rloader\plugins` (with and without suppress_global_extensions), start, run `mxl` | normal slot: first `mxl` line ends `| mod D2R-XL 2012 | file <slot>\mods\mxl2012\d2rloader\plugins\mxl2012-core.dll`, `environment ok`. With the global copy and suppress on: d2rloader.log loads no global plugin, `environment ok`. With suppress off: about 15 s after the start mxl2012-core.log has `environment WARNING: ... a second copy ...` and the red line shows at the top. **Not run yet** (slots 2 and 3 were busy). |
+| 0.69.8 (lane env-guard) | **Which build runs, bug #53** (plugin/src/env_guard_logic.h, off word `envguard`; check `envguard`), (the mod toml's `[d2rloader.advanced] suppress_global_extensions = true` was planned but never written by the tools; lane globalplugins: D2RLoader rejects a game-wide mxl2012-core itself, `Plugin is mod-only`) | `MXL_SLOT=<n> MXL_RUN=<lock> MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mxl envguard otherplugins`; to see the warning: copy the dev mxl2012-core.dll into `<slot D2R>\d2rloader\plugins` (with and without suppress_global_extensions), start, run `mxl` | normal slot: first `mxl` line ends `| mod D2R-XL 2012 | file <slot>\mods\mxl2012\d2rloader\plugins\mxl2012-core.dll`, `environment ok`. With the global copy and suppress on: d2rloader.log loads no global plugin, `environment ok`. With suppress off: about 15 s after the start mxl2012-core.log has `environment WARNING: ... a second copy ...` and the red line shows at the top. **Not run yet** (slots 2 and 3 were busy). |
 | 0.69.6 (lane den-crash) | **Den of Evil boss, bug #42** (check `denboss`, tools/game_checks.py) and the **other plugins line** (bug #44; plugin/src/other_plugins_logic.h, off word `otherplugins`) | `MXL_SLOT=3 MXL_RUN=<lock> MXL_CHAR=<throwaway> py -3 tools/game_checks.py all denboss otherplugins` (`MXL_DENBOSS_SECS` fight seconds per graphics mode, default 30; `MXL_DENBOSS_SEARCH` seconds of crawling for the Den's own superunique, default 30) | `denboss`: HD round and legacy round (G pressed in the town), boss class 2833 with its party fights, casts SkeletonRaise, is killed; no crash file, no new assert. PASS `checks-20261027-122930-s3`, `checks-20261027-123712-s3`, `checks-20261027-125047-s3`. `otherplugins`: `mxl` has `other plugins: none` on a test slot; mxl2012-core.log has the line ~15 s after the start |
 | lane pub-release (version not bumped; `mxl` first line now ends the version with `(dev)` or `(release)`) | **Player release package and wrong-build guard** (tools/package_release.py, docs/release.md; cmake `-DMXL_RELEASE=ON` compiles the test harness out; plugin/src/build_guard_logic.h) | `py -3 tools/package_release.py` after tools/build.py: dist/ gets the 7z (no zip since 2026-10-26), release-manifest.json, notes and SHA256SUMS. The release DLL cannot run on slots 2/3 (no harness, no `volserial`): test its folder with the dev DLL swapped in (`game_checks.py --slot 3 all mxl`). Wrong build: unit test `buildguard_tests` (no other D2R build installed) | Zip without harness / off / save files; `mxl` PASS on the release folder. On another D2R build the log has `D2R-XL 2012 <v> needs D2R build 93847; this is <n>`, the same line is drawn at the top of the screen and no hook goes in |
 | lane p4-ww-morph (plugin 0.63.0; run `mxl` and read the `whirlwind procs` line, `on: chance to cast on striking / on attack works during a spin (0x5896e0 hooked) (N casts let through during a spin, M refused)`; off word `wwproc`) | **Whirlwind chance-to-cast, real shapeshift death** (`whirlwind.cpp`, `tools/game_checks.py`) | Barbarian: wear a ring with chance to cast Fire Bolt on striking or on attack and spin through a pack with Median's Whirlwind (skill 1306): Fire Bolts appear, as with normal attacks. Druid: wear an axe, cast Werebear (1375), let a monster kill you: you die, the form ends, Esc respawns you in town. | No automatic checks needed: `py -3 tools/game_checks.py --slot N all wwproc morphdeath` is PASS (see "Lane p4-ww-morph" below) |
@@ -589,7 +589,8 @@ and must not see each other.
 5. Plugins load only from the active mod's folder: ours from `mods\mxl2012\d2rloader\plugins\`, the other mod's
    from its own folder. The global `<slot>\d2rloader\plugins\` and `patches\` (they load with *every*
    mod, `allow_global_extensions = true`) must stay empty: a run refuses to start when they hold anything, or when a
-   `mxl2012-core*` sits in another mod's folder.
+   `mxl2012-core*` sits in another mod's folder. The one exception: our own test plugins of lane globalplugins, put there with
+   `slot_share.py probe N add` for one lock only (section "Lane globalplugins").
 
 **What a run touches in the slot** (found by reading the tools and D2RLoader 1.3.1's config and log on slot 2):
 
@@ -4922,3 +4923,63 @@ Command (slot 2 only, from 2026-11-01):
 | `checks-20261101-065131-s2`, 16 min | Act 2 bosses | Radament 51.15M -> 46.99M; Creature of Flame 210.50M -> 209.42M; Summoner 37.82M -> 35.48M; Duriel 192.0M no change (assert MissMode.cpp:2042: known #54 / #73) |
 | `checks-20261101-070759-s2`, 9 min | Act 3, 83->100 only | orb not found: the search walk stuck at the arrival (fixed by hops) |
 | `checks-20261101-071802-s2`, 6 min | Act 3, 83->100 only | orb found (81 s), used by 2 clicks, quest 18 done, entered 100: PASS |
+
+## Lane globalplugins: players' own D2RLoader plugins next to D2R-XL 2012 (bug #522, 2026-11-01, slot 2, background mode, 0.1.9 package)
+
+Owner report: "Global plugins still not read in the 0.1.9 newest patch", then: a vendor refresh and a floating damage plugin
+do work. Evidence: `mxl2012-runs/globalplugins/` (`session-<phase>.log`, `d2rloader-<phase>.log`, `mxl2012-core-<phase>.log`,
+`gp-probe-*-<phase>.log`, before/after scans; run folders `work/runs/checks-20261101-*-s2`).
+
+**Not a blanket block.** Nothing turns global plugins off: D2RLoader 1.3.1-beta's `allow_global_extensions` is on by
+default; neither the release's mod toml, `install_mod.py`, `package_release.py` nor the downloader writes it or
+`suppress_global_extensions` (the keys exist in D2RLoader: `d2rloader.advanced.*`, "the active mod disables global plugins and
+patches"). The downloader's "stray plugins" are copies of our own plugin only (file name or version resource), so a player's
+plugin is never moved.
+
+**What fails: a hook on game code mxl2012-core already changed.** D2RLoader loads the mod's plugins first (`[SCAN] mod
+plugins`, `[PLUGIN] D2R-XL 2012 core ... [mod]`, then `[SCAN] global plugins`). mxl2012-core hooks or patches about 30
+addresses (each `mxl2012` line names its own: `0x36bc50 hooked`, `at 0x37d744`, `0x44b152 -> jmp ...`). A game-wide plugin
+that asks for one of them is refused, logged as `[ERROR]` in d2rloader.log only; the plugin keeps its other features.
+
+**Test plugins** (`tools/gp_probe`, built in the worktree: `cmake -S tools/gp_probe -B build/gp_probe -A x64
+-DMXL2012_PLUGINSDK_DIR=<PluginSDK>`; Client role, so no character plugin history and no multiplayer match):
+
+- `gp-probe-log.dll`: log lines only (`GPPROBE loaded from <path> (active mod mxl2012)`), console `gpprobe`.
+- `gp-probe-hook.dll`: a control hook on 0x373890 (item type test, only called by us) and the item requirement test 0x36bc50
+  (hooked by our `mercequip`) with the plain game's entry bytes, then with the live bytes; it logs D2RLoader's answers and
+  DiagnosticsService's owner of 0x36bc50. Every hook only calls the original. Console `gpprobehook`.
+
+**slot_share exception.** `begin()` still refuses a run while a global plugin or patch folder holds anything, except files
+that `MXL_RUN=<lock owner> py -3 tools/slot_share.py probe 2 add <dll>...` put in `d2rloader\plugins` and listed (name and
+sha256) in `<runs>/slot-share-s2/probe.json`. Only `gp-probe-*.dll` and `mxl2012-core*.dll` (the second-copy test) are
+accepted, only with the lock held, the game stopped and no foreign file in the folder. `probe 2 clear` removes exactly the
+listed files (and the probes' `d2rloader\logs\gp-probe-*.log`) and refuses a file whose bytes changed; every unlock of the slot
+does it too, so a test plugin never outlives the lock (the other mod's runs would load it). Unit tests in
+`tools/test_slot_share.py`.
+
+**Runs** (`mxl2012-runs/globalplugins/run.sh <phase>`: scan, `release_install.py install --slot 2 --package
+dist-019\D2R-XL-2012-0.1.9.7z`, `probe add`, `game_checks.py all mxl2012 globalplugins`, copy the logs, stop, `probe clear`,
+`release_install.py restore`, `slot_share.py restore`, scan and compare):
+
+| Phase | Global folder | Result |
+|---|---|---|
+| a | gp-probe-log, gp-probe-hook | `[PLUGIN] gp-probe-hook 0.0.1 ... [global]`, `[PLUGIN] gp-probe-log 0.0.1 ... [global]`; `gpprobe` answers; control hook installed; 0x36bc50 refused twice: `Plugin gp-probe-hook could not install a Native Hook at RVA 0x36BC50: game bytes did not match what the plugin expected` and `...: MH_ERROR_ALREADY_CREATED`; diagnostics `state 1 (tracked) kind 2 owners 1 owner 'mxl2012-core'`; `environment ok`; every part on, no FAILED. `globalplugins` PASS. (`mxl2012` FAIL only on `other plugins: none`: the check now accepts our listed probes.) |
+| b | + a copy of the 0.1.9 release mxl2012-core.dll | `[ERROR] D2R-XL 2012 core [global] — Plugin is mod-only` / `Move it into the active mod's D2RLoader plugins folder`, `3 plugins loaded; 1 plugin rejected`: D2RLoader rejects it (our PluginInfo flags 0x0F include `ModScopedOnly`); mxl2012-core `environment ok`. `globalplugins` PASS. |
+| c | gp-probe-log, gp-probe-hook; mxl2012-core with the new `plugin clashes` line | `mxl2012` PASS (36 lines, every part on, no FAILED; `other plugins: gp-probe-hook.dll (global), gp-probe-log.dll (global)`); `globalplugins` PASS: `plugin clashes: gp-probe-hook at 0x36bc50 (mercequip); D2R-XL 2012 changes that game code first, ...` (also `[WARN]` in mxl2012-core.log at +15 s). |
+
+After each phase: `test plugins removed`, `developer install back`, `no plugin in the global folders`, the shared
+`d2rloader\config` restored and verified; the whole-slot compare differs only in `blz-log.txt`, `d2rloader.log`, `dxdiag.txt`.
+
+**Fix.** mxl2012-core (`other_plugins_logic.h` `ParseHookRefusal` / `PartOfAddress`, unit-tested; `FindHookClashes` in
+`mxl2012_core.cpp`, off word `otherplugins`) reads D2RLoader's refusal lines from `<game>\d2rloader\logs\d2rloader.log` 15 s
+after the start and prints `plugin clashes: <id> at 0x<rva> (<our part>), ...` in `mxl2012` (a warning in mxl2012-core.log),
+or `plugin clashes: none (...)`. The part's word in `mods\mxl2012\d2rloader\plugins\mxl2012-core-off.txt` gives the address to
+the player's plugin. The downloader kept removing that file at each update / repair (every file of the mod folder not in the
+release); `RuntimeOutput` now keeps `d2rloader/plugins/mxl2012-core-off.txt` (launcher core test). No config key changed:
+the package, `install_mod.py` and the downloader's kept-config handling need nothing else, and the release notes no update
+steps.
+
+**Open (owner):** the player's failing plugins by name and their `d2rloader\logs\d2rloader.log` (the `[PLUGIN]` and `[ERROR]
+... could not install` lines, or now the `mxl2012` `plugin clashes` line). Global memory patches (`d2rloader\patches\*.json`)
+meet the same rule (a patch over our bytes fails its expected-bytes check: `memory patch could not be applied`); not run.
+

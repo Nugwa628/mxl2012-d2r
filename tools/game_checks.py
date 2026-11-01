@@ -1083,7 +1083,8 @@ def check_mxl2012():
             ("runeletter", r"^runeletter on: rune letters without a D2R key drawn from the gems cell"),
             ("skilltext", r"^skilltext skill tooltip labels in 1\.13c's words \(0x287a50 hooked\)"),
             ("dursync", r"^dursync worn items' durability loss reaches the client \(layer argument stored whole at 0x441c4b\)$"),
-            ("other plugins", r"^other plugins: none")]
+            ("other plugins", r"^other plugins: (none|gp-probe-\w+\.dll \(global\)(, gp-probe-\w+\.dll \(global\))*)$")]  # the
+    # test plugins of lane globalplugins (`slot_share.py probe`) are the only others a run may have
     missing = [n for n, p in want if not any(re.search(p, ln) for ln in lines)]
     failed = [ln for ln in lines if "FAILED" in ln]
     leak = [ln for ln in lines if re.search(r"0x6ab3782c|93847", re.sub(r"[A-Za-z]:\\\S+", "<path>", ln))]
@@ -7742,6 +7743,61 @@ def check_identify():
 
 
 CHECKS += [("identify", check_identify)]
+
+# --- lane globalplugins: players' own D2RLoader plugins in <game>\d2rloader\plugins next to D2R-XL 2012 (bug #522) -------------
+# Needs the test plugins of tools/gp_probe in the slot's global folder (`slot_share.py probe N add`): gp-probe-log (log lines
+# only) and gp-probe-hook (a control hook and a hook on 0x36bc50, which mxl2012-core hooks). A global mxl2012-core*.dll copy, if
+# listed too, must be skipped by D2RLoader (same plugin id: the mod's copy wins) or caught by the environment check.
+
+
+def gp_log_lines():
+    """d2rloader.log of this start plus the global probes' own logs (D2RLoader writes a plugin's log next to its folder)."""
+    out = []
+    for p in [g.LOADER_LOG] + [os.path.join(g.GAME_DIR, "d2rloader", "logs", f) for f in ("gp-probe-log.log", "gp-probe-hook.log")]:
+        try:
+            with open(p, encoding="utf-8-sig", errors="replace") as f:
+                out += [(os.path.basename(p), ln.rstrip()) for ln in f]
+        except OSError:
+            pass
+    return out
+
+
+def check_globalplugins():
+    """Global D2RLoader plugins load and run with D2R-XL 2012; a hook on a function mxl2012-core hooks is what D2RLoader refuses."""
+    mark = engine_mark()
+    if not need_game():
+        return add("globalplugins", "BLOCKED", "not in a game")
+    log = []
+    for cmd in ("gpprobe", "gpprobehook"):
+        g.console_bg(cmd)
+        time.sleep(1.0)
+    time.sleep(1.0)
+    lines = gp_log_lines()
+    keep = [f"{src}: {ln}" for src, ln in lines if re.search(r"\[SCAN\]|\[PLUGIN\]|gp-probe|GPPROBE|mxl2012-core|Native Hook|duplicate|"
+                                                             r"global plugin|extensions", ln, re.I)]
+    log += keep
+    txt = " \n".join(ln for _, ln in lines)
+    loaded = re.search(r"gp-probe-log: GPPROBE loaded from .*\\d2rloader\\plugins\\gp-probe-log\.dll \(active mod mxl2012\)", txt)
+    alive = re.search(r"gp-probe-log alive", txt)
+    hook = {k: (re.search(p, txt).group(1) if re.search(p, txt) else None) for k, p in (
+        ("control", r"control hook 0x373890 \(live \w+\): (\w+)"), ("clash", r"clash hook 0x36bc50 with the game's bytes: (\w+)"),
+        ("lenient", r"clash hook 0x36bc50 with the live bytes: (\w+)"), ("owner", r"diagnostics rva 0x36bc50 (.*)"))}
+    refused = [ln for _, ln in lines if "could not install a Native Hook" in ln]
+    mx = mxl_text().splitlines()
+    env = next((ln for ln in mx if ln.startswith("environment")), "-")
+    others = next((ln for ln in mx if ln.startswith("other plugins")), "-")
+    failed = [ln for ln in mx if "FAILED" in ln]
+    clash = next((ln for ln in mx if ln.startswith("plugin clashes")), "-")
+    log += ["mxl2012: " + ln for ln in mx]
+    # the refused hook is named, with the part to turn off for it (#522); a run without gp-probe-hook needs only "none"
+    clash_ok = ("gp-probe-hook at 0x36bc50 (mercequip)" in clash) if hook["clash"] else clash.startswith("plugin clashes: none")
+    ok = bool(loaded and alive) and env.startswith("environment ok") and not failed and clash_ok
+    finish("globalplugins", ok, "gp-probe-log loaded %s, console %s; hooks %s; D2RLoader refusals %s; %s; %s; mxl2012 FAILED %s" % (
+        "yes" if loaded else "NO", "yes" if alive else "NO", hook, [r[-160:] for r in refused] or "none", env[:160], others[:200],
+        failed or "none") + "; " + clash[:240], mark, [sh("globalplugins")], log)
+
+
+CHECKS += [("globalplugins", check_globalplugins)]
 
 # --- bug #395: the Heretics' skull swarm load (harness measurement, not a player-path verdict) --------------------------------
 SWARM_MONSTER = "cultist2"  # Heretic, monstats MissA1 skullswarmcenter (FetishBlowgun AI)

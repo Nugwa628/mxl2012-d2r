@@ -78,6 +78,10 @@ the `mxl2012` mod, but a stray DLL in the game-wide `d2rloader\plugins` loads wi
 conflicting module (or a second `mxl2012-core`) is in the process, mxl2012-core installs nothing and shows a notice
 naming the DLL to remove from d2rloader\plugins. XS.
 
+Players' own plugins (bug #522): D2RLoader rejects a game-wide copy of mxl2012-core by itself (`ModScopedOnly`: "Plugin is
+mod-only"). Any other game-wide plugin loads after ours; one that hooks an address we hook or patch is refused by D2RLoader
+(`could not install a Native Hook at RVA ...`), and `mxl2012` names it in `plugin clashes`.
+
 ## 2. A: client do 22 (Rock Shock, ParasiteSkill)
 
 **Median 2012 rows** (skills.txt): `Rock Shock` (row 28) and `ParasiteSkill` (row 408): srvdofunc 14, **cltdofunc 22**,

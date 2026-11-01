@@ -208,6 +208,46 @@ class Extensions(FakeSlot):
     def test_other_plugin_in_its_own_mod_is_fine(self):
         self.assertEqual(slot_share.foreign_extensions(self.game), [])
 
+    def probe_dll(self, name, body=b"MZ probe"):
+        p = Path(self.tmp, "src", name)
+        p.parent.mkdir(exist_ok=True)
+        p.write_bytes(body)
+        return str(p)
+
+    def test_listed_test_plugins_pass_and_unlock_removes_them(self):
+        self.lock()
+        with patch.object(game_slots, "slot_processes", return_value=[]):
+            slot_share.probe_add(2, "slots", [self.probe_dll("gp-probe-log.dll"), self.probe_dll("mxl2012-core.dll", b"MZ copy")])
+            self.assertEqual(slot_share.foreign_extensions(self.game, 2), [])
+            self.assertNotEqual(slot_share.foreign_extensions(self.game), [])  # without the slot: still a global plugin
+            slot_share.begin(2, "slots")
+            slot_share.end(2, "slots", running=[])
+            self.assertTrue(game_slots.release(2, "slots", manual=True))
+        self.assertEqual(os.listdir(os.path.join(self.game, "d2rloader", "plugins")), [])
+        self.assertEqual(slot_share.probes(2), {})
+        self.assertEqual(tree(self.game), self.before)
+
+    def test_probe_refuses_other_names_a_foreign_plugin_and_a_changed_file(self):
+        with self.assertRaises(SystemExit):
+            slot_share.probe_add(2, "slots", [self.probe_dll("gp-probe-log.dll")])  # no lock
+        self.lock()
+        with patch.object(game_slots, "slot_processes", return_value=[]):
+            with self.assertRaises(SystemExit):
+                slot_share.probe_add(2, "slots", [self.probe_dll("loot.dll")])
+            slot_share.probe_add(2, "slots", [self.probe_dll("gp-probe-log.dll")])
+            Path(self.game, "d2rloader", "plugins", "gp-probe-log.dll").write_bytes(b"MZ other bytes")
+            with self.assertRaises(SystemExit):
+                slot_share.begin(2, "slots")  # not the listed bytes: a plugin like any other
+            with self.assertRaises(SystemExit):
+                slot_share.probe_clear(2)  # left for a person to look at
+            Path(self.game, "d2rloader", "plugins", "gp-probe-log.dll").write_bytes(b"MZ probe")
+            Path(self.game, "d2rloader", "plugins", "loot.dll").write_bytes(b"MZ")
+            with self.assertRaises(SystemExit):
+                slot_share.probe_add(2, "slots", [self.probe_dll("gp-probe-hook.dll")])  # the folder holds a foreign plugin
+            os.remove(os.path.join(self.game, "d2rloader", "plugins", "loot.dll"))
+            print(slot_share.probe_clear(2))
+        self.assertEqual(os.listdir(os.path.join(self.game, "d2rloader", "plugins")), [])
+
 
 class LaunchArgs(FakeSlot):
     def test_toml_words_are_not_repeated(self):

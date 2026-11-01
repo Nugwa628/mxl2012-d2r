@@ -54,6 +54,31 @@ int main() {
 	Check(std::strstr(notice, "(unknown)") != nullptr && std::strstr(notice, "from d2rloader\\plugins.") != nullptr,
 	      "conflict notice defaults: unknown file, the game-wide folder");
 	other_plugins::ConflictNotice(nullptr, 0, "0.1.0", nullptr, nullptr);  // must not write
+
+	// Hook clashes (#522): D2RLoader 1.3.1-beta's refusal lines, as seen on slot 2 with the gp-probe-hook test plugin.
+	char id[64];
+	unsigned long long rva = 0;
+	Check(other_plugins::ParseHookRefusal("[2026-11-01 12:34:20.092] [ERROR] Plugin gp-probe-hook could not install a Native Hook at RVA 0x36BC50: "
+	                                      "game bytes did not match what the plugin expected",
+	                                      id, sizeof(id), &rva) &&
+	          std::strcmp(id, "gp-probe-hook") == 0 && rva == 0x36bc50,
+	      "refusal line: id and address");
+	Check(other_plugins::ParseHookRefusal("Plugin x could not install a Native Hook at RVA 0x1A0780: MH_ERROR_ALREADY_CREATED", id, sizeof(id), &rva) &&
+	          std::strcmp(id, "x") == 0 && rva == 0x1a0780,
+	      "second refusal line");
+	Check(!other_plugins::ParseHookRefusal("[INFO] Plugin x loaded", id, sizeof(id), &rva), "another line");
+	Check(!other_plugins::ParseHookRefusal("Plugin  could not install a Native Hook at RVA 0x10: y", id, sizeof(id), &rva), "no id");
+	Check(!other_plugins::ParseHookRefusal("Plugin x could not install a Native Hook at RVA 0x: y", id, sizeof(id), &rva), "no address");
+	Check(!other_plugins::ParseHookRefusal("Plugin a-very-long-plugin-id could not install a Native Hook at RVA 0x10", id, 8, &rva), "id too long");
+	Check(!other_plugins::ParseHookRefusal(nullptr, id, sizeof(id), &rva), "no line");
+	const char* words[] = {"skilltext", "mercequip", "ilvl"};
+	const char* reports[] = {"skill tooltip labels in 1.13c's words (0x287a50 hooked)", "mercenary weapons ...; 0x36bc50 hooked)",
+	                         "item levels 100-127 kept (clamp 99 -> 127 at 0x37d744)"};
+	Check(other_plugins::PartOfAddress(0x36bc50, words, reports, 3) != nullptr && std::strcmp(other_plugins::PartOfAddress(0x36bc50, words, reports, 3), "mercequip") == 0,
+	      "address -> part");
+	Check(std::strcmp(other_plugins::PartOfAddress(0x37d744, words, reports, 3), "ilvl") == 0, "address at the end of a report");
+	Check(other_plugins::PartOfAddress(0x36bc5, words, reports, 3) == nullptr, "a prefix of an address is no match");
+	Check(other_plugins::PartOfAddress(0x111111, words, reports, 3) == nullptr, "an address no part names");
 	if (failures == 0) {
 		std::printf("other plugins: all checks passed\n");
 	}
