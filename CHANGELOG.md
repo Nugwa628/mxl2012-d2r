@@ -8,6 +8,14 @@ version being released (docs/release.md).
 - Hole Level 2 shows its cave walls in HD, and Median XL's edits of ten more original maps (Duriel's Lair, the
   Chaos Sanctuary heart, the Cathedral, the Harem, the Act 3 temples and dungeons, ...) are used: the game had loaded its own
   versions of those maps instead (#525).
+- Batstrike and Bloodbath play their strike animations in HD, and Batstrike's nova spreads over its full radius in HD
+  (it uses a stand-in look: green, not classic's orange-red, until custom art is made). Batstrike now spends its charges
+  on the first Attack that lands, as all finishing moves do in classic, and its charm part converts monsters again (#526,
+  #527).
+- Not bugs, the same as in classic Median XL 2012: Batstrike works without a weapon (an empty hand passes its claw
+  requirement); swapping weapons releases the charges once with any weapon; Open Wounds comes only from the gnat family
+  (Death Gnat, Blood Stinger, Soul Sucker, Razor Sting, Buzzsaw, ShockSting: 100 % per hit), not from other monsters
+  (#527, #530).
 
 ## D2R-XL 2012
 
