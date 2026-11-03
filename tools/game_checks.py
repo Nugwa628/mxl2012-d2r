@@ -1079,6 +1079,7 @@ def check_mxl2012():
             ("cltnomis", r"^cltnomis cltdofunc 30 curse without client missile; cltstfunc 18 start without client missile"),
             ("melttrail", r"^melttrail state 22 without a list skill makes 1\.14d's trail \(missile 143, skill 173\)"),
             ("whirlwind", r"^whirlwind srvdofunc 76 hits as 1\.13c .*0x56ac00 hooked\)"),
+            ("charmlen", r"^charmlen on: srvdofunc 51 converts for Param3 \+ rand\(Param4\) frames as 1\.13c"),
             ("cubedupe", r"^cubedupe on: a second useitem output copies output a"),
             ("ilvl", r"^ilvl item levels 100-127 kept by the item serializer \(clamp 99 -> 127 at 0x37d744\)$"),
             ("runeletter", r"^runeletter on: rune letters without a D2R key drawn from the gems cell"),
@@ -14135,6 +14136,100 @@ def check_batstrike():
 
 
 CHECKS += [("batstrike", check_batstrike)]
+
+
+# bug #527, the charm's length: 1.13c's srvdo 51 (1.14d 0x5d76e0 / 0x5d7430) converts for Param3 + rand(Param4) frames;
+# Batstrike's row has Param3 250, Param4 1: 250 frames (10 s) at every level. D2R reads calc2 (`ulvl`, 60 frames at level 60)
+# unless the plugin part charmlen sends 0x570780's calc2 call to Param3.
+BS_CHARM_FRAMES = 250
+
+
+def bs_charm_watch(ids, log, secs=20.0):
+    """After the release: per target the server frames state 53 (conversion) was first and last seen, its list's end frame (the
+    `end=` of `states`: game frame + length, 0x5727e0) and the first frame it was seen gone, polled for `secs`.
+    {id: (first seen, last seen, end, first gone or None)}."""
+    seen = {}
+    t0 = time.time()
+    while time.time() - t0 < secs:
+        f = hstate()["player"].get("frame", 0)  # a sight is at this frame or later, a miss at the frame after the reads or earlier
+        got = {}
+        for mid in bs_near(ids):
+            _ok, st = H("states mon:%d" % mid)
+            got[mid] = next((re.search(r"end=(\d+)", ln) for ln in st if re.match(r"server state %d:" % BS_CONVERSION, ln)), None)
+        f2 = hstate()["player"].get("frame", 0)
+        for mid, m in got.items():
+            a = seen.get(mid)
+            if m:
+                seen[mid] = (a[0] if a else f2, f, int(m.group(1)), None)
+            elif a and a[3] is None:
+                seen[mid] = (a[0], a[1], a[2], f2)
+        time.sleep(0.2)
+    log.append("charm watch: %s" % seen)
+    return seen
+
+
+def bs_charm_round(mode, log, shots, rows, bad):
+    goto(1)
+    if not set_graphics(mode):
+        bad.append("%s: graphics not set" % mode)
+        return
+    goto(2)
+    kill_all_near()
+    bs_wear(log, BS_CLAW, BS_CLAW)
+    ids = bs_targets(log)
+    time.sleep(0.8)
+    charges = bs_charge(ids, log)
+    if max(charges) < 3:
+        bad.append("%s: Batstrike did not charge to 3 (%s)" % (mode, charges))
+        return
+    Hl("skill left %d" % BS_ATTACK, log)
+    f0 = hstate()["player"].get("frame", 0)
+    for k in range(2):  # the release needs a landed hit (1.14d 0x5d5220): a second Attack if the first missed
+        bs_click(ids)
+        shots.append(sh("bs_charm_%s_%d" % (mode, k)))
+        if (rd("player", BS_CHARGES) or 0) == 0:
+            break
+    Hl("skill left %d" % BS_BLOODBATH, log)  # no more Attacks on the converted
+    watch = bs_charm_watch(ids, log)
+    shots.append(sh("bs_charm_%s_after" % mode))
+    rows.append("%s: charges %s, Attack at frame %d; converted %d of %d; per zombie (first seen, last seen, end, gone at): %s" % (
+        mode, charges, f0, len(watch), len(ids), sorted(watch.values())))
+    if not watch:
+        bad.append("%s: the charm converted no target" % mode)
+    for mid, (a, b, end, gone) in watch.items():
+        # applied between the Attack (f0) and the first sample that saw it: end - length lies in [f0, a]
+        if not f0 <= end - BS_CHARM_FRAMES <= a:
+            bad.append("%s: zombie %d: end %d - %d not between the Attack %d and the first sight %d (D2R's calc2 ulvl: ~60 frames)" % (
+                mode, mid, end, BS_CHARM_FRAMES, f0, a))
+        if gone is None or b > end or gone < end:
+            bad.append("%s: zombie %d: state 53 last seen %d, gone at %s, end %d" % (mode, mid, b, gone, end))
+    kill_all_near()
+
+
+def check_bscharm():
+    """Bug #527: Batstrike's charm (third charge, srvprgfunc3 51) lasts 1.13c's Param3 + rand(Param4) = 250 frames (10 s) at
+    level 60, HD and legacy: per converted zombie the end frame of its state 53 list minus 250 lies between the Attack and the
+    first sample that saw the state, and the state is gone from that end frame on (1.14d's expire 0x5d7310: hostile again,
+    state off; D2R's 0x573950 does the same). The part's log line names the skill and frames."""
+    mark = engine_mark()
+    log, shots, rows, bad = [], [], [], []
+    mx0 = mxl_mark()
+    if not be_class(6):
+        return finish("bscharm", False, "could not play an assassin", mark)
+    with Mana(), Level(60), Tank():
+        learn(BS_SKILL, 20)
+        learn(BS_BLOODBATH, 1)
+        for mode in ("hd", "legacy"):
+            bs_charm_round(mode, log, shots, rows, bad)
+        set_graphics("hd")
+    logged = [ln.strip() for ln in (g._read_from(g.MXL_LOG, mx0) or "").splitlines() if "mxl2012-core charmlen:" in ln]
+    rows.append("log: %s" % (logged[:2] or "no charmlen line"))
+    if not any("skill %d " % BS_SKILL in ln and "Param3 %d" % BS_CHARM_FRAMES in ln for ln in logged):
+        bad.append("no charmlen log line for skill %d with Param3 %d" % (BS_SKILL, BS_CHARM_FRAMES))
+    finish("bscharm", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log)
+
+
+CHECKS += [("bscharm", check_bscharm)]
 
 if __name__ == "__main__":
     main()

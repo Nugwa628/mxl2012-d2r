@@ -157,7 +157,8 @@ BOOK_CODE_COLUMNS = ("ScrollSpellCode", "BookSpellCode")
 # `par3`. Median's rows leave both blank: 1 % chance, a charm of 0 frames (Elvensong "works like a curse, no conversion").
 # A charge-up reaches the same function through srvprgfunc1-3 (1.14d's release 0x5d5220 calls SKILLSRVDOFUNCS[srvprgfunc]):
 # Batstrike's third charge, its charm (bug #527). Its calc2 stays: function 119 (its second charge, the bats) reads calc2 as the
-# summon's level in 1.13c too, so on D2R the charm lasts calc2 (ulvl) frames instead of Param3.
+# summon's level in 1.13c too; the plugin part charmlen (plugin/src/charm_length.cpp) gives function 51 Param3 as the length
+# instead of calc2, so the charm lasts Param3 frames as in 1.13c (with the part off: ulvl frames).
 CONVERSION_DO = "51"
 CONVERSION_CALCS = (("calc1", "dm56"), ("calc2", "par3"))
 CONVERSION_PRG = ("srvprgfunc1", "srvprgfunc2", "srvprgfunc3")

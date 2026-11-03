@@ -26,6 +26,8 @@
 //      skill 173, instead of nothing (melt_trail.cpp, off word melttrail, #52);
 //   +  Whirlwind's 1.13c hit rate (srvdofunc 76: Whirlwind, Spin To Win, Danse Macabre, Harvest) instead of D2R 2.4's
 //      (whirlwind.cpp, off word whirlwind, #281);
+//   +  skill server do 51 (Mind Blast's conversion, Batstrike's charm) converts for Param3 + rand(Param4) frames as 1.13c,
+//      where D2R reads calc2 (charm_length.cpp, off word charmlen, #527);
 //   +  a second `useitem` cube output (Median's Oil of Duplication) copies output a as 1.13c did, where D2R makes nothing
 //      (cube_dupe.cpp, off word cubedupe, #350);
 //   +  mercenaries wield only the weapon / shield types of 1.13c's hireling WType1 / WType2 (Rogue bow, Desert polearm / spear,
@@ -92,6 +94,7 @@
 #include "state_lists.h"
 #include "testharness.h"
 #include "whirlwind.h"
+#include "charm_length.h"
 #include "merc_equip.h"
 #include "translation_guard.h"
 #include "vo_chat.h"
@@ -153,7 +156,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign savemode rotwstash void65), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign savemode rotwstash void65), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -417,6 +420,7 @@ char g_dodgeListReport[160] = "";
 char g_stateListReport[160] = "";
 char g_meltTrailReport[160] = "";
 char g_whirlwindReport[160] = "";
+char g_charmLengthReport[160] = "";
 char g_cubeDupeReport[160] = "";
 char g_itemLevelReport[160] = "";
 char g_runeLetterReport[192] = "";
@@ -469,7 +473,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 		const char* report;
 	} parts[] = {{"cltdo22", g_cltDoReport}, {"cltnomis", g_noMissileReport}, {"itemeffect", g_itemEffectReport},
 	             {"skillremove", g_skillRemoveReport}, {"dodgelist", g_dodgeListReport}, {"statelist", g_stateListReport},
-	             {"melttrail", g_meltTrailReport}, {"whirlwind", g_whirlwindReport}, {"cubedupe", g_cubeDupeReport},
+	             {"melttrail", g_meltTrailReport}, {"whirlwind", g_whirlwindReport}, {"charmlen", g_charmLengthReport}, {"cubedupe", g_cubeDupeReport},
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
@@ -634,6 +638,10 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	WhirlwindStats(&wwCalls, &wwD2R, &wwDelay);
 	std::snprintf(line, sizeof(line), "%s; hit delays answered %ld (last: D2R %ld frames -> %ld)", g_whirlwindReport, wwCalls, wwD2R, wwDelay);
 	SayPart(command, "whirlwind", line);
+	long clCalls = 0, clSkill = 0, clLength = 0;
+	CharmLengthStats(&clCalls, &clSkill, &clLength);
+	std::snprintf(line, sizeof(line), "%s; lengths answered %ld (last: skill %ld, %ld frames)", g_charmLengthReport, clCalls, clSkill, clLength);
+	SayPart(command, "charmlen", line);
 	long dupMade = 0, dupNoRoom = 0, dupFailed = 0;
 	CubeDupeCounts(&dupMade, &dupNoRoom, &dupFailed);
 	std::snprintf(line, sizeof(line), "%s; copies made %ld, no room %ld, refused %ld", g_cubeDupeReport, dupMade, dupNoRoom, dupFailed);
@@ -821,6 +829,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("whirlwind")) {
 		InstallWhirlwind(context, g_whirlwindReport, sizeof(g_whirlwindReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_whirlwindReport);
+		context->LogInfo(line);
+	}
+	if (!Off("charmlen")) {
+		InstallCharmLength(context, g_charmLengthReport, sizeof(g_charmLengthReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: charmlen %s", g_charmLengthReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cubedupe")) {

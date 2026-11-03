@@ -12,6 +12,8 @@ version being released (docs/release.md).
   (it uses a stand-in look: green, not classic's orange-red, until custom art is made). Batstrike now spends its charges
   on the first Attack that lands, as all finishing moves do in classic, and its charm part converts monsters again (#526,
   #527).
+- Batstrike's charm lasts 10 seconds at every level, as in classic; it lasted only as many frames as the character's
+  level (2.4 s at level 60) (#527).
 - Not bugs, the same as in classic Median XL 2012: Batstrike works without a weapon (an empty hand passes its claw
   requirement); swapping weapons releases the charges once with any weapon; Open Wounds comes only from the gnat family
   (Death Gnat, Blood Stinger, Soul Sucker, Razor Sting, Buzzsaw, ShockSting: 100 % per hit), not from other monsters

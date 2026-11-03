@@ -5102,6 +5102,37 @@ program); the tint was taken out afterwards, so the committed build draws D2R's 
 owner: the nova's colour (classic orange-red, HD green) and the charm's length on D2R (calc2 = ulvl frames, 1.13c Param3 =
 250 frames; calc2 is also the bats' level). Tests: `tools/tests/test_hd_skill_anims.py`, `test_txt_migrate_finishing.py`,
 `test_txt_migrate_conversion_calcs.py`.
+## Lane charm: Batstrike's charm length (bug #527, 2026-11-04, slot 2, background mode, build of lane/batstrike)
+
+Scripts and evidence (outside git): `mxl2012-runs/batstrike/charm/` (Ghidra decompiles of D2R's function 51 path in `out/`:
+`0x5727e0.c` the apply, `0x573950.c` the expire, `0x34c730.c` the target test; `q2.log` the disassembly of 0x570780; run
+logs and shots). Plugin part `charmlen` (`plugin/src/charm_length.cpp`): 0x570780's calc2 call (0x57091b) goes through the
+int3 pad 0x570772 to Param3, so srvdo 51 converts for Param3 + rand(Param4) frames as 1.13c does (1.14d 0x5d76e0 /
+0x5d7430). Unit test `charmlength_tests` (`plugin/tests/charm_length_test.cpp`). `mxl` lists `charmlen on: ...; lengths
+answered N (last: skill S, F frames)`, the startup check wants the `charmlen on:` line.
+
+Check `bscharm` (tools/game_checks.py): Assassin BatStrike at level 60, Batstrike 20, Katars in both hands, 3 zombies with
+raised life; per graphics mode (HD, legacy): 3 Batstrike clicks, then Attack (a second one if the first missed), then
+Bloodbath on the left button so no more Attacks land; every ~0.2 s the server frame and state 53 (conversion) of each zombie
+for 20 s. PASS: at least one zombie converted, state 53 seen for 225-252 frames (1.13c: Param3 250 + rand(Param4 1) = 250,
+10 s), gone after 20 s, and the log has `mxl2012-core charmlen: skill 326 level .. -> Param3 250 frames`. Before the part:
+ulvl = 60 frames at level 60.
+
+Run: `MXL_RUN=batstrike MXL_SLOT=2 MXL_CHAR=BatStrike py -3 tools/game_checks.py --slot 2 all mxl bscharm`.
+
+| Run | What | Result |
+|-|-|-|
+| `run1` (`checks-20261104-024225-s2`) | first start | BLOCKED: the loader wrote nothing within 3 min (start failure, no crash file); retried |
+| `run2` (`checks-20261104-025243-s2`) | first form of the check (sight frames only) | `mxl2012` PASS (37 lines, `charmlen on: ...`); the log has `charmlen: skill 326 level 12 -> Param3 250 frames`; the list end frames gave 250 (`end=950`, Attack at 666), but the check judged the sightings, which start ~100 frames late (clicks, shots): changed to the end frame |
+| `run3` (`checks-20261104-030803-s2`) | end-frame check | `mxl2012` PASS; HD: end 945, applied between 661 and 761 (end - 250 = 695); legacy: end 2414, applied in 2124-2223 (2164). FAIL only on the check's own gone-frame read (taken before the `states` calls); fixed |
+| `run4` (`checks-20261104-031101-s2`, control `MXL_CONTROL=charmlen`) | D2R's own length | legacy: end 1527, first sight 1472: at most 55 frames after that, ulvl 60 as expected; HD did not charge (clicks missed) |
+| `run5` (`checks-20261104-032927-s2`) | the fix | **PASS**: HD 2 of 3 converted, end 938, applied in 660-781 (688), gone at 957; legacy 3 of 3, end 2397, applied in 2106-2238 (2147), gone at 2423; log `charmlen: skill 326 level 12 -> Param3 250 frames` twice. 250 frames = 10 s, as 1.13c's Param3 |
+| `run6` (`checks-20261104-033229-s2`, control `MXL_CONTROL=charmlen`) | D2R's own length | FAIL as expected: HD end 819 (end - 60 = 759 in 670-795), legacy end 2276 (2216 in 2118-2252): 60 frames, 2.4 s at level 60 |
+
+Shots and reports: `mxl2012-runs/batstrike/charm/evidence/<run>/` (`bs_charm_<mode>_0.png`: the release with nova, bats and
+the converted zombie; `_after.png` 20 s later). Open: only the length was changed; Black Sleep (calc1 `100`, 1.13c's Param5/6
+gives 66 %) keeps D2R's calc1 as lane batstrike decided (#487).
+
 ## Lane statranges: Ctrl stat ranges and monprop state colours (bugs #528, #529, 2026-11-02, slot 2, background mode)
 
 Scripts and evidence (outside git): `mxl2012-runs/statranges/`. Character RangeLane (Assassin, made by the run, god mode),

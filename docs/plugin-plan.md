@@ -490,6 +490,7 @@ realpath audits the crash guards; this lane covers the non-crash rules).
 |---|---|---|---|
 | ~~`uniquecarry`~~ (bug #280; data since lane pluginplan2, section 14.5) | D2R's carry1 is a number compared between records; Median's 45 carry1 uniques all have 1, so one relic / quest charm blocked every other one. 1.13c refuses only a second copy of the same unique | Median 2012 `uniqueitems.txt` (pure v005 and the integ build: 45 rows, all `1`; D2R's own: 1001 / 1002 / 1003); D2R's placement test `0x473960` (loader type 2 at +0x30) | `uniquecarry` |
 | `whirlwind` (bug #281) | D2R 2.4 reworked the hit rate of srvdofunc 76; Median 2012 has four skills on 1.13c's function 76 | Median 2012 `skills.txt` srvdofunc 76: Whirlwind, Spin To Win, Danse Macabre, Harvest; D2R `0x568f40` / `0x56ac00`, 1.13c D2Game `0x6fce1470`, D2Common 10564 | `whirlwind` |
+| `charmlen` (bug #527, lane charm) | D2R's srvdofunc 51 takes the conversion length from calc2; 1.13c from Param3 + rand(Param4). Batstrike's calc2 is the bats' level (function 119), so its charm lasted ulvl frames | 1.14d `Game.exe` 0x5d76e0 / 0x5d7430; D2R `0x570780` (calc2 call 0x57091b, int3 pad 0x570772), apply `0x5727e0`; `charm_length.cpp` | `bscharm` |
 
 ### 14.2 Existing parts looked at and not ported
 
