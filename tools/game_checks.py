@@ -13939,5 +13939,202 @@ def check_tfhell():
 
 CHECKS += [("tunnelfloor", check_tunnelfloor), ("tfreload", check_tfreload), ("tfhell", check_tfhell)]
 
+
+# lane batstrike (bugs #526 / #527 / #530): Batstrike (326) and Bloodbath (65) on an Assassin, HD and legacy
+BS_SKILL, BS_BLOODBATH, BS_ATTACK = 326, 65, 0
+BS_CHARGES = 321  # stat progressive_fire (Batstrike's aurastat1); state 125 of the same name
+BS_CONVERSION, BS_OPENWOUNDS = 53, 62  # states: srvdo 51's conversion (the charm), openwounds
+BS_CLAW, BS_NAGINATA = "j20", "!01"  # Katar (Grade 1), Naginata (Grade 1)
+BS_OW_MONSTERS = ("zombie1", "fallen1", "quillrat1", "skeleton1", "gnat1")  # gnat1: monprop openwounds 100 (the control)
+
+
+def bs_mon_row(mid_name):
+    return next((i for i, r in enumerate(table("monstats")) if r.get("Id") == mid_name), None)
+
+
+def bs_targets(log, n=3, life=200000):
+    """n zombies around the spot right of the player, their life raised (set-up): ids."""
+    px, py = player_xy()
+    _ok, sp = Hl("spawn 5 %d %d %d" % (n, px + 3, py), log)
+    ids = [int(x) for ln in sp for x in re.findall(r"id=(\d+)", ln)]
+    for mid in ids:
+        for s in (7, 6):
+            setstat("mon:%d" % mid, s, life << 8)
+    return ids
+
+
+def bs_near(ids):
+    alive = {m["id"]: m for m in hstate()["mons"] if "id" in m}
+    return [i for i in ids if i in alive]
+
+
+def bs_wear(log, right, left=None):
+    Hl("unequip rhand", log)
+    Hl("unequip lhand", log)
+    if right:
+        Hl("equip %s rhand" % right, log)
+    if left:
+        Hl("equip %s lhand" % left, log)
+
+
+def bs_click(ids, shots=None, tag=None, burst=0):
+    """A left click on the first target still there (the player path), with an optional burst of shots."""
+    live = bs_near(ids)
+    if not live or not click_unit(live[0]):
+        return False
+    for i in range(burst):
+        time.sleep(0.2)
+        shots.append(sh("%s_%d" % (tag, i)))
+    time.sleep(max(0.4, 1.6 - 0.2 * burst))
+    return True
+
+
+def bs_charge(ids, log, shots=None, tag=None, burst=0, hits=3):
+    """Batstrike on the left button, `hits` clicks; the charges after each."""
+    Hl("skill left %d" % BS_SKILL, log)
+    out = []
+    for k in range(hits):
+        bs_click(ids, shots, "%s_%d" % (tag, k) if tag else None, burst if k == 0 else 0)
+        out.append(rd("player", BS_CHARGES) or 0)
+    return out
+
+
+def bs_release(ids, log, shots=None, tag=None, burst=0):
+    """One Attack click (the finisher): (charges after, knocknova missiles, familiar bats near, targets converted)."""
+    Hl("skill left %d" % BS_ATTACK, log)
+    Hl("missiles reset", log)
+    bs_click(ids, shots, tag, burst)
+    time.sleep(1.0)
+    after = rd("player", BS_CHARGES) or 0
+    _ok, ms = Hl("missiles", log)
+    nova = missiles_seen(ms).get(missile_id("knocknova"), 0)
+    bats_row = bs_mon_row("familiarbats")
+    bats = sum(1 for m in hstate()["mons"] if m.get("class") == bats_row)
+    conv = 0
+    for mid in bs_near(ids):
+        _ok, st = Hl("states mon:%d" % mid, log)
+        conv += any(re.match(r"server state %d:" % BS_CONVERSION, ln) for ln in st)
+    return after, nova, bats, conv
+
+
+def bs_usable(log, mid):
+    """The usability code `cast` prints for Batstrike on a unit (0 usable, 2 item types)."""
+    _ok, ln = Hl("cast %d unit %d" % (BS_SKILL, mid), log)
+    return first(ln, r"usab\w*[= ](-?\d+)")
+
+
+def bs_round(mode, log, shots, rows):
+    """Charge, release, second release, Bloodbath: the looks in `mode` (shots) and the numbers."""
+    goto(1)
+    if not set_graphics(mode):
+        rows.append("%s: graphics not set" % mode)
+        return None
+    goto(2)
+    kill_all_near()
+    bs_wear(log, BS_CLAW, BS_CLAW)
+    ids = bs_targets(log)
+    time.sleep(0.8)
+    charges = bs_charge(ids, log, shots, "bs_%s_cast" % mode, burst=5)
+    rel1 = bs_release(ids, log, shots, "bs_%s_release" % mode, burst=5)
+    rel2 = bs_release(ids, log, shots, "bs_%s_release2" % mode, burst=5)
+    shots.append(sh("bs_%s_after" % mode))
+    Hl("skill left %d" % BS_BLOODBATH, log)
+    bb = bs_click(ids, shots, "bs_%s_bloodbath" % mode, burst=5)
+    rows.append("%s: charges %s; 1st Attack -> charges %s, knocknova %s, bats %s, converted %s; 2nd Attack -> charges %s, "
+                "knocknova %s; Bloodbath clicked %s" % (mode, charges, rel1[0], rel1[1], rel1[2], rel1[3], rel2[0], rel2[1], bb))
+    kill_all_near()
+    return charges, rel1, rel2
+
+
+def bs_judge(what, rel1, rel2, bad):
+    """1.14d's release (0x5d5220) needs a landed hit, so either Attack may be the one: exactly one releases (nova, bats, the
+    charm's conversion), and no charge is left after it."""
+    released = [r for r in (rel1, rel2) if r[1]]
+    if len(released) != 1:
+        bad.append("%s: %d of 2 Attacks released (want 1)" % (what, len(released)))
+    elif rel1[1] and rel1[0]:
+        bad.append("%s: %s charges left after the release" % (what, rel1[0]))
+    if rel2[0]:
+        bad.append("%s: %s charges left after two Attacks" % (what, rel2[0]))
+    return released[0] if released else None
+
+
+def check_batstrike():
+    """Bugs #526 / #527: Batstrike's charges are spent by the finisher (1.13c: all of them), the naginata swap (Median's own rule:
+    any Attack releases the charges, once), the charm (third charge, srvprgfunc3 51, conversion state 53), unarmed use (1.14d
+    0x643d90: an empty hand passes itypea1 h2h, so usable as in 1.13c), and the HD / legacy looks of Batstrike and Bloodbath
+    (shots, judged by eye). Bug #530: which monsters leave Open Wounds (state 62) on the player."""
+    mark = engine_mark()
+    log, shots, rows, bad = [], [], [], []
+    if not be_class(6):
+        return finish("batstrike", False, "could not play an assassin", mark)
+    with Mana(), Level(60), Tank():
+        learn(BS_SKILL, 20)
+        learn(BS_BLOODBATH, 1)
+        for mode, got in (("hd", bs_round("hd", log, shots, rows)), ("legacy", bs_round("legacy", log, shots, rows))):
+            if not got:
+                bad.append("%s: no round" % mode)
+                continue
+            charges, rel1, rel2 = got
+            if max(charges) < 3:
+                bad.append("%s: Batstrike did not charge to 3 (%s)" % (mode, charges))
+            rel = bs_judge(mode, rel1, rel2, bad)
+            if rel and not rel[3]:
+                bad.append("%s: the third charge's charm converted no target" % mode)
+        set_graphics("hd")
+        goto(2)
+        # unarmed: the claw requirement (itypea1 h2h)
+        kill_all_near()
+        bs_wear(log, None)
+        ids = bs_targets(log, 1)
+        code = bs_usable(log, ids[0]) if ids else None
+        Hl("skill left %d" % BS_SKILL, log)
+        bs_click(ids)
+        bs_click(ids)
+        unarmed = rd("player", BS_CHARGES) or 0
+        rows.append("unarmed: cast usability %s, charges after two clicks %s (1.13c: usable)" % (code, unarmed))
+        if not unarmed:
+            bad.append("Batstrike did not charge unarmed (1.13c's rule lets it)")
+        # naginata: charge with claws, swap, Attack
+        kill_all_near()
+        bs_wear(log, BS_CLAW, BS_CLAW)
+        ids = bs_targets(log)
+        nag_ch = bs_charge(ids, log)
+        bs_wear(log, BS_NAGINATA)
+        time.sleep(0.5)
+        nrel1 = bs_release(ids, log)
+        nrel2 = bs_release(ids, log)
+        rows.append("naginata swap: charges %s; Attack with the naginata -> charges %s, knocknova %s; again -> knocknova %s" % (
+            nag_ch, nrel1[0], nrel1[1], nrel2[1]))
+        bs_judge("naginata", nrel1, nrel2, bad)
+        # Open Wounds (#530): each monster kind next to the tanked player for a while
+        bs_wear(log, BS_CLAW, BS_CLAW)
+        ow = {}
+        for name in BS_OW_MONSTERS:
+            kill_all_near()
+            Hl("setstate player %d 0" % BS_OPENWOUNDS, log)
+            row = bs_mon_row(name)
+            if row is None:
+                ow[name] = "no row"
+                continue
+            px, py = player_xy()
+            Hl("spawn %d 3 %d %d" % (row, px + 1, py), log)
+            seen = False
+            for _ in range(6):
+                time.sleep(1.5)
+                setstat("player", 6, 30000 << 8)
+                if BS_OPENWOUNDS in server_states(log):
+                    seen = True
+                    break
+            ow[name] = seen
+        rows.append("Open Wounds on the player after 9 s next to 3 of each: %s" % ow)
+        kill_all_near()
+        bs_wear(log, BS_CLAW, BS_CLAW)
+    finish("batstrike", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial="the HD / legacy looks (bs_*_cast / release / bloodbath shots) by eye")
+
+
+CHECKS += [("batstrike", check_batstrike)]
+
 if __name__ == "__main__":
     main()

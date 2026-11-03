@@ -5081,3 +5081,24 @@ hole2_room wall_maps`. Seen in passing: Duriel stands at the arrival of his lair
 (`room_73_duriel.png`, no god mode in hole2_room). Not checked in game: bivouac, magqueen, heart, caveroom5 (Median's object
 edits now used), a release (no -txt) package. Open: why lane walls3 (2026-10-30) arrived on Median's caveroom4; D2R,
 D2RLoader and the CASC files are unchanged since 2026-10-20. Tests: `tools/tests/test_ds1_paths.py`.
+
+## Lane batstrike: Batstrike and Bloodbath, Open Wounds (bugs #526, #527, #530, 2026-11-03, slot 2, background mode, build of lane/batstrike)
+
+Scripts and evidence (outside git): `mxl2012-runs/batstrike/` (run logs `run3.log`, `run4.log`, builds `build4.log` /
+`build5.log`, Ghidra decompiles of D2R's release `ghidra/out/0x56c3e0.c`, `0x56bfe0.c` and function 51 `0x570780.c`; shots in
+`evidence/`). Character BatStrike (Assassin, made by the run). Check `batstrike` (tools/game_checks.py): per graphics mode,
+Batstrike (326) charged by 3 left clicks on spawned zombies with a Katar in each hand, then two Attack clicks (shots during
+both), then Bloodbath (65); unarmed use; charge with claws then Attack with a Naginata; Open Wounds (state 62) on the player
+next to zombie1, fallen1, quillrat1, skeleton1 and gnat1 (the control).
+
+| Run | What | Result |
+|-|-|-|
+| `run3` (`checks-20261103-220840-s2`) | after the finishing / animation / nova fixes | charges spent: legacy first Attack -> 0 (nova 64, bats 1), a second Attack nothing; HD's first Attack missed (1.13c releases only on a landed hit), the second released once. The charm converted nobody (calc1 blank). Open Wounds: gnat1 only |
+| `run4` (`checks-20261103-223811-s2`) | + Batstrike calc1 `dm56` | PARTIAL (looks judged by eye, all numbers pass): HD and legacy: nova 64, bats 1, converted 1 / 2 (state 53), charges 0, second Attack nothing; naginata: one release; unarmed usable (code 0, as in 1.13c). HD: sequence strike and Bloodbath swings (`evidence/hd_cast_bloodbath_strip.png`), Poison Nova ring at the full radius (`bs_hd_release_2.png`); legacy orange-red ring (`bs_legacy_release_2.png`). 0 crash files |
+
+Run: `MXL_RUN=batstrike MXL_SLOT=2 MXL_CHAR=BatStrike py -3 tools/game_checks.py --slot 2 all batstrike`. run4's install had
+a `fire` gradient tint on the nova that drew the same green as without it (Poison Nova's colours are in its particle
+program); the tint was taken out afterwards, so the committed build draws D2R's own Poison Nova (same look). Open for the
+owner: the nova's colour (classic orange-red, HD green) and the charm's length on D2R (calc2 = ulvl frames, 1.13c Param3 =
+250 frames; calc2 is also the bats' level). Tests: `tools/tests/test_hd_skill_anims.py`, `test_txt_migrate_finishing.py`,
+`test_txt_migrate_conversion_calcs.py`.

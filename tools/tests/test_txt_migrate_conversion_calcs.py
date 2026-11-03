@@ -47,6 +47,15 @@ class ConversionCalcTests(unittest.TestCase):
         tm.conversion_calcs(HEADER, r)
         self.assertEqual(r[0][3:5], ["dm56", "par3"])
 
+    def test_charge_up_release(self):
+        """Bug #527: Batstrike's third charge runs function 51 through srvprgfunc3; its calc2 (the bats' level) stays."""
+        h = HEADER + ["srvprgfunc1", "srvprgfunc2", "srvprgfunc3"]
+        r = [["Batstrike", "326", "35", "", "ulvl", "250", "100", "100", "22", "119", "51"],
+             ["Fists of Fire", "259", "35", "", "", "", "", "", "143", "38", "39"]]
+        self.assertEqual(tm.conversion_calcs(h, r), ["326 Batstrike: calc1 dm56"])
+        self.assertEqual(r[0][3:5], ["dm56", "ulvl"])
+        self.assertEqual(r[1][3:5], ["", ""])
+
     def test_no_calc_columns(self):
         self.assertEqual(tm.conversion_calcs(["skill", "srvdofunc"], [["a", "51"]]), [])
 
@@ -62,6 +71,8 @@ class ConversionCalcTests(unittest.TestCase):
                    if len(r) > h.index("calc2") and r[h.index("srvdofunc")] == "51"}
             self.assertEqual(got.get("Elvensong Spell"), ("dm56", "par3"), bank or "rotw")
             self.assertTrue(all(a and b for a, b in got.values()), (bank or "rotw", got))
+            bat = next(r for r in rs if r[h.index("skill")] == "Batstrike")
+            self.assertEqual((bat[h.index("calc1")], bat[h.index("calc2")]), ("dm56", "ulvl"), bank or "rotw")
 
 
 if __name__ == "__main__":

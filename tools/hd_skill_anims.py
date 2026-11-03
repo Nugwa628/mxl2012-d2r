@@ -6,7 +6,8 @@ an AnimationState with modeId 18 (SQ, the sequence mode) and skillIndex = the sk
 1306), so without a state of their own the HD model shows no sequence animation (no spin while whirlwinding).
 
 For every class, each Median skill that uses the sequence mode (anim SQ) with the same sequence (seqnum, not empty)
-as a D2R skill that has such a state gets a copy of that state with its own skillIndex. Only skills a player can have
+as a D2R skill that has such a state gets a copy of that state with its own skillIndex, unless the class's machine
+already has a sequence state on that skillIndex (D2R's own skill on the same id). Only skills a player can have
 (charclass of that class, or no class but a skilldesc: item skills such as windform) are added. Transitions: the new
 state copies the source state's transition group, and every group gets an entry to the new state copied from its
 entry to the source state.
@@ -73,6 +74,7 @@ def main() -> int:
         path = f"data/hd/character/player/{cls}/{cls}_state_machine.json"
         sm = json.loads(fxpaths.d2r_file(path).read_text("utf-8-sig"))
         by_seq: dict[str, tuple[int, str]] = {}  # seqnum -> (source stateId, D2R skill)
+        has_state = {s.get("skillIndex") for s in sm["states"] if s.get("modeId") == SEQUENCE_MODE}
         for s in sm["states"]:
             k = s.get("skillIndex", -1)
             if s.get("modeId") == SEQUENCE_MODE and k in d2r_by_id:
@@ -82,7 +84,9 @@ def main() -> int:
         added = 0
         for r in mrows:
             sid = int(r[mi["*Id"]])
-            if r[mi["anim"]] != "SQ" or sid in d2r_by_id or r[mi["seqnum"]] not in by_seq:
+            # skip only an id this class's machine already animates: a D2R row on the same id is often another skill
+            # (bug #526: Batstrike 326 is D2R's BearSmite, Bloodbath 65 its Cold Mastery; neither has a sequence state)
+            if r[mi["anim"]] != "SQ" or sid in has_state or r[mi["seqnum"]] not in by_seq:
                 continue
             if not (r[mi["charclass"]] == code or (not r[mi["charclass"]] and r[mi["skilldesc"]])):
                 continue

@@ -41,6 +41,7 @@ NAMED = ROOT / "work" / "named"
 D2R = localconfig.default_d2r_extract() / "data" / "global" / "excel"
 OUT = ROOT / "work" / "mod"
 CLT_NOVA = "25"  # skills.txt cltdofunc of D2R's client nova ring
+FINISH_CONSUMES = 3  # prgchargesconsumed of a 1.13c finishing row: all charges (D2R's release counts 3 at most)
 
 # 1.13c column -> D2R column, per table. Case-only differences are matched automatically.
 RENAMES = {
@@ -154,20 +155,26 @@ BOOK_CODE_COLUMNS = ("ScrollSpellCode", "BookSpellCode")
 # (+0x150 / +0x154). D2R's (0x570780, Mind Blast) evaluates calc1 as the chance (rand % 100 <= calc1, 0x572892) and calc2
 # as the length (+ rand(Param4), record +0x1c4, 0x5728fc); its own Mind Blast row was moved to calc1 `dm56+...`, calc2
 # `par3`. Median's rows leave both blank: 1 % chance, a charm of 0 frames (Elvensong "works like a curse, no conversion").
+# A charge-up reaches the same function through srvprgfunc1-3 (1.14d's release 0x5d5220 calls SKILLSRVDOFUNCS[srvprgfunc]):
+# Batstrike's third charge, its charm (bug #527). Its calc2 stays: function 119 (its second charge, the bats) reads calc2 as the
+# summon's level in 1.13c too, so on D2R the charm lasts calc2 (ulvl) frames instead of Param3.
 CONVERSION_DO = "51"
 CONVERSION_CALCS = (("calc1", "dm56"), ("calc2", "par3"))
+CONVERSION_PRG = ("srvprgfunc1", "srvprgfunc2", "srvprgfunc3")
 
 
 def conversion_calcs(header: list[str], rows: list[list[str]]) -> list[str]:
-    """Fill a blank calc1 / calc2 of every srvdofunc 51 row with 1.13c's chance / length (in place); a set cell (Black Sleep's
-    calc1, read by its start function too) is kept. Returns 'Id skill: calc1 dm56, ...' lines for the report."""
+    """Fill a blank calc1 / calc2 of every srvdofunc 51 row (or srvprgfunc1-3 51, a charge-up's release) with 1.13c's chance /
+    length (in place); a set cell (Black Sleep's calc1, read by its start function too) is kept. Returns 'Id skill: calc1 dm56,
+    ...' lines for the report."""
     if "srvdofunc" not in header or any(c not in header for c, _ in CONVERSION_CALCS):
         return []
-    di, ni = header.index("srvdofunc"), header.index("skill")
+    funcs = [header.index(c) for c in ("srvdofunc", *CONVERSION_PRG) if c in header]
+    ni = header.index("skill")
     ii = header.index("*Id") if "*Id" in header else None
     done = []
     for r in rows:
-        if len(r) <= di or r[di].strip() != CONVERSION_DO:
+        if not any(i < len(r) and r[i].strip() == CONVERSION_DO for i in funcs):
             continue
         set_ = []
         for col, value in CONVERSION_CALCS:
@@ -677,9 +684,18 @@ class Migrator:
             rs = h.index("rightskill")
             pst, pst1, au = h.index("passivestate"), h.index("passivestat1"), h.index("aura")
             used = [h.index(c) for c in ("srvstfunc", "srvdofunc", "srvmissile", "srvmissilea", "cltstfunc", "cltdofunc", "aura")]
+            fin = h.index("finishing") if "finishing" in h else None
+            consumed = h.index("prgchargesconsumed") if "prgchargesconsumed" in h else None
+            n_fin = 0
             for r in rows:
                 if not is_record(r):
                     continue
+                if fin is not None and consumed is not None and r[fin] == "1" and r[consumed] in ("", "0"):
+                    # D2R's release (0x56c3e0, cleanup 0x56bfe0) takes the finishing skill's prgchargesconsumed off the
+                    # charges and ends the charge-up state below 1; blank is 0, so the charges were never spent (bug #527:
+                    # Batstrike released by every Attack). 1.13c has no such column and spends all charges (3 at most)
+                    r[consumed] = str(FINISH_CONSUMES)
+                    n_fin += 1
                 if r[an] == "GH" or r[st] == "GH":
                     r[an] = "SQ" if r[an] == "GH" else r[an]
                     r[st] = "SQ" if r[st] == "GH" else r[st]
@@ -711,7 +727,8 @@ class Migrator:
             if bank == "base":
                 self.report.append(f"\nskills: {n_stop} given D2R's stop function for their do function (Whirlwind); {n_seq} "
                                    f"anim/seqtrans GH -> SQ; {n_right} passives given rightskill 0, {n_right1} usable skills rightskill 1; rows on the plugin's cltdofunc 113 (was 22): {', '.join(plugin) or 'none'}; "
-                                   f"client nova (cltdofunc 25) without cltmissilea, cltdofunc emptied (bug #51): {', '.join(no_nova) or 'none'}")
+                                   f"client nova (cltdofunc 25) without cltmissilea, cltdofunc emptied (bug #51): {', '.join(no_nova) or 'none'}; "
+                                   f"{n_fin} finishing rows given prgchargesconsumed {FINISH_CONSUMES} (bug #527)")
 
     def stat_send_bits(self) -> None:
         """A state's stat list goes to the client with each stat cut to its itemstatcost `Send Bits`. `modifierlist_skill` (350,
@@ -1006,7 +1023,8 @@ class Migrator:
         self.report.append("\nmisc spellicon of scrolls / tomes from books.txt SpellIcon (bug #485): " + (", ".join(done) or "none"))
 
     def conversion_calcs(self) -> None:
-        """calc1 / calc2 of the srvdofunc 51 rows: 1.13c's conversion chance and length where D2R reads them (bug #487)."""
+        """calc1 / calc2 of the srvdofunc / srvprgfunc 51 rows: 1.13c's conversion chance and length where D2R reads them (bugs
+        #487, #527)."""
         done: list[str] = []
         for bank in ("base", ""):
             p = OUT / "data" / "global" / "excel" / bank / "skills.txt"
@@ -1017,7 +1035,7 @@ class Migrator:
             write_tsv(p, h, rows)
             if bank == "base":
                 done = lines
-        self.report.append("\nskills srvdofunc 51 conversion chance / length into calc1 / calc2 (bug #487): " + ("; ".join(done) or "none"))
+        self.report.append("\nskills srvdofunc / srvprgfunc 51 conversion chance / length into calc1 / calc2 (bugs #487, #527): " + ("; ".join(done) or "none"))
 
     def hireling_level_difference(self) -> None:
         """hireling.HiringMaxLevelDifference is D2R's column for a rule 1.13c keeps in code: how far a mercenary's level may
