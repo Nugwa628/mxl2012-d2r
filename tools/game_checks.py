@@ -21,6 +21,7 @@ verdicts of docs/median-rules-audit.md): rcbook rcdelay rctoken rclife rcscroll 
 rpnames rpequip; bug #395 load probe: swarm; lane rulescheck2 (a SET-UP character, tools/rc_setup.py): rc2setup rc2quest rc2refund rc2delay rc2death; lane realpath (player-path checks, no god mode, no Tank, no `item ... inv`: docs/testing.md
 "Player-path checks"): rp_items rp_vendors rp_death rp_areas rp_persist rp_use; lane isinside (bug #242): ins_levels; lane identify (bug #485): identify; lane elvensong (bug #487): elvensong; lane uiplus (bugs #488 / #489): lvlup_ui; lane unported (unported.md item use, ME9 mercenary level): iu_use ml_merc; lane totems (bug #493): totem_spread.
 """
+import collections
 import ctypes
 import ctypes.wintypes as wt
 import datetime
@@ -9162,6 +9163,108 @@ def wall_maps():
 
 
 CHECKS += [("wall_maps", wall_maps)]
+
+# ---- lane hole2: which .ds1 the game built a preset level from (bug #525: Hole Level 2 from D2R's caveroom4, not Median's) ---
+# level -> Median's edit of a D2R map (its D2R path) whose HD scene the mod ships (MXL_ROOM_LEVELS=15,...)
+ROOM_MAPS = {15: ("act1/caves/caveroom4.ds1",), 90: ("act3/jungle/dungrm6a.ds1",),
+             96: ("act3/temple/temple5.ds1", "act3/temple/temple6.ds1")}  # 96 loads one of the two
+# levels of moved maps on a copy of D2R's scene (tools/ds1_paths.py): Median's map differs from D2R's in a few objects only, so
+# the spots cannot tell them apart; an HD screenshot shows the copied scene drawn (judged by hand)
+ROOM_SHOTS = {73: "duriel", 33: "cathy3", 50: "harem2"}
+ROOM_MIN_MATCH = 3
+
+
+def ds1_object_spots(path):
+    """{(x, y)} of a .ds1's objects and monsters (sub-tiles from the map's corner); None when the file is not there."""
+    import ds1_remap
+    try:
+        with open(path, "rb") as f:
+            d = ds1_remap.Ds1(f.read())
+    except OSError:
+        return None
+    return {(o[2], o[3]) for o in d.objects}
+
+
+def preset_spots(lines):
+    """{(x, y)} of `presets` lines relative to the level's corner (the smallest room origin of `presets rooms`)."""
+    rooms = [tuple(map(int, m.groups())) for m in (re.match(r"room x=(-?\d+) y=(-?\d+)", ln) for ln in lines) if m]
+    units = [tuple(map(int, m.groups())) for m in (re.match(r"preset type=\d+ class=-?\d+ x=(-?\d+) y=(-?\d+)", ln)
+                                                    for ln in lines) if m]
+    if not rooms:
+        return set()
+    ox, oy = min(x for x, _ in rooms), min(y for _, y in rooms)
+    return {(x - ox, y - oy) for x, y in units}
+
+
+def ds1_source(spots, candidates):
+    """The candidate whose .ds1 object spots the level's preset spots hold best (at least half of them: a chest or monster of
+    the map may roll away), else None. candidates: [(name, {(x, y)} or None)]."""
+    best = max(((ds1_overlap(spots, want), name) for name, want in candidates if want), default=(0.0, None))
+    return best[1] if best[0] >= 0.5 else None
+
+
+def ds1_overlap(spots, want):
+    """The share of matching spots at the best shift (a map that is one of several presets of its level does not start at the
+    level's corner), out of the smaller set: `presets` sees only the rooms round the player in a large map. Fewer than
+    ROOM_MIN_MATCH matches count as none (one spot fits any map at some shift)."""
+    shifts = collections.Counter((x - a, y - b) for x, y in spots for a, b in want)
+    if not shifts:
+        return 0.0
+    dx, dy = shifts.most_common(1)[0][0]
+    hits = len({(a + dx, b + dy) for a, b in want} & spots)
+    return hits / min(len(want), len(spots)) if hits >= ROOM_MIN_MATCH else 0.0
+
+
+def hole2_room():
+    """Bug #525 (lane hole2): the room a preset level is built from in game must be the mod's .ds1, the one its HD scene
+    (tools/walls_hd.py) was made for. Travel by `h level`, then `presets rooms` and `presets`: the object and monster spots of the
+    level against those of the mod's .ds1 (work/mod, moved under data/global/tiles/mxl2012/ by tools/ds1_paths.py) and
+    D2R's own (the D2R extract). PASS: the mod's map in every level of
+    ROOM_MAPS; FAIL: D2R's (the HD scene then belongs to another room: no walls drawn) or neither."""
+    mark = engine_mark()
+    log, shots, bad = [], [], []
+    only = {int(v) for v in os.environ.get("MXL_ROOM_LEVELS", "").split(",") if v.strip().isdigit()}
+    import fxpaths
+    d2r = str(fxpaths.D2R)
+    mod_data = os.path.dirname(os.path.dirname(EXCEL))
+    goto(1, timeout=60)
+    if not set_graphics("hd"):  # the screenshots show the HD scene
+        bad.append("HD not set")
+    for lv, rels in ROOM_MAPS.items():
+        if only and lv not in only:
+            continue
+        st = goto(lv, timeout=60)
+        if st["player"].get("area") != lv:
+            bad.append("%d not reached" % lv)
+            continue
+        time.sleep(3)
+        _ok, rooms = Hl("presets rooms", log)
+        _ok, units = Hl("presets", log)
+        spots = preset_spots(rooms + units)
+        cands = [(side + " " + rel, ds1_object_spots(os.path.join(root, *rel.split("/"))))
+                 for rel in rels for side, root in (("mod", os.path.join(mod_data, "global", "tiles", "mxl2012")),
+                                                    ("d2r", os.path.join(d2r, "data", "global", "tiles")))]
+        src = ds1_source(spots, cands)
+        log.append("%d: built from %s (level spots %s; %s)" % (lv, src or "neither", sorted(spots),
+                                                           "; ".join("%s %s" % (n, sorted(w or [])) for n, w in cands)))
+        shots.append(sh("room_%d" % lv))
+        if not (src or "").startswith("mod "):
+            bad.append("%d from %s" % (lv, src or "neither"))
+    for lv, name in ROOM_SHOTS.items():
+        if only and lv not in only:
+            continue
+        st = goto(lv, timeout=60)
+        if st["player"].get("area") != lv:
+            bad.append("%d not reached" % lv)
+            continue
+        time.sleep(5)  # the scene and its models stream in
+        shots.append(sh("room_%d_%s" % (lv, name)))
+        log.append("%d %s: reached (screenshot)" % (lv, name))
+    rc_finish("hole2_room", not bad, "; ".join(bad) or "every level built from the mod's .ds1", mark, shots, log,
+              ["travel by `h level`"], judged_by_hand="HD scenes in room_<level>*.png" if ROOM_SHOTS else None)
+
+
+CHECKS += [("hole2_room", hole2_room)]
 
 # ---- lane tints: per-TransLvl colours (tools/hd_translvl.py) and gradient-tinted effects (tools/hd_recolour.py) -----------
 def tint_class(mid):

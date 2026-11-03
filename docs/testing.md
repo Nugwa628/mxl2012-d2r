@@ -5063,3 +5063,21 @@ then Ctrl+click from the backpack on the Gems / Runes page) and kept its 66 cube
 
 0 ERROR / ASSERT lines in both runs, no crash files. Not seen: the gamepad stash (no gamepad). Run steps:
 `mxl2012-runs/cubeui/step.py` (outside git). Test: `test_ui.py` `test_stash_cube_window_shows_the_cover`.
+
+## Lane hole2: Hole Level 2 without walls in HD (bug #525, 2026-11-03, slot 2, background mode, build of lane/hole2)
+
+Scripts and evidence (outside git): `mxl2012-runs/hole2/` (`report.png` the player's shot, `shadow.py` the list of mod .ds1
+files at a D2R path, `score.py`, run logs `run-room*.log`, `run-exp-path.log`, `run-fix.log`, screenshots `fix-shots/`).
+Character HoleTwo (Barbarian, made by the run). Travel by `h level` (warp 0x488180).
+
+| Run | What | Result |
+|-|-|-|
+| `run-room1`-`run-room5` | before the fix: `presets rooms` / `presets` in 15, 90, 96, plugin parts off one by one, then all off | every level built from D2R's .ds1 (preset spot overlap 0.89 for D2R against 0.17 / 0.44 / 0.22 for the mod), in HD and classic, with or without the plugin. HD load screen 0.24 s in 15 (1.87 s when the scene loads) |
+| `run-exp-path` (`checks-20261103-205519-s2`) | by hand on the slot: caveroom4 copied to a mod-only path, lvlprest cell pointed there | built from the mod's .ds1, HD walls and stairs, Median's units (class 273) |
+| `run-fix` (`checks-20261103-210420-s2`) | after `tools/ds1_paths.py build`, `all hole2_room wall_maps`, MXL_WALL_LEVELS=15,13,14,116 | hole2_room PARTIAL: 15, 90, 96 built from the mod's .ds1 (15: all 6 Median spots). HD: cave walls, stairs and torches in Hole Level 2 (`wall_caveroom4_hd_0.png`), temple walls in 96; 13, 14, 116 as before. 0 new crash files |
+
+Run: `MXL_RUN=hole2 MXL_SLOT=2 MXL_CHAR=HoleTwo MXL_WALL_LEVELS=15,13,14,116 py -3 tools/game_checks.py --slot 2 all
+hole2_room wall_maps`. Seen in passing: Duriel stands at the arrival of his lair now (Median's map) and killed the character
+(`room_73_duriel.png`, no god mode in hole2_room). Not checked in game: bivouac, magqueen, heart, caveroom5 (Median's object
+edits now used), a release (no -txt) package. Open: why lane walls3 (2026-10-30) arrived on Median's caveroom4; D2R,
+D2RLoader and the CASC files are unchanged since 2026-10-20. Tests: `tools/tests/test_ds1_paths.py`.

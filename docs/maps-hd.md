@@ -341,6 +341,37 @@ walls3 (2026-10-30, slot 2, runs `checks-20261030-120504-s2` and `checks-2026103
 re-checked caveroom4, belial, charismatic, glados and downtown in HD and classic. Lane walls4 (slot 3, run
 `checks-20261030-175423-s3`, docs/testing.md "Lane walls4") re-checked charismatic, downtown and macumba.
 
+## Edited D2R maps (lane hole2, bug #525, 2026-11-03)
+
+D2R builds a preset from the .ds1 in its own CASC whenever the CASC has that path, not from the mod's copy at the same path
+(D2RLoader 1.3.1-beta, both graphics modes). Median's edits of D2R's own maps were therefore never used: Hole Level 2 (15,
+lvlprest `Act1/Caves/CaveRoom4.ds1`) was D2R's large caveroom4 with D2R's units, while the mod's HD scene for that path (made
+by walls_hd for Median's small room) was loaded on it, so HD drew no walls near the player. Maps at paths only the mod has
+(Median's own `expansion/...` maps: 13, 14, 116 and the rest) were never affected.
+
+`tools/ds1_paths.py build` (build step after legacy_art, tests `tools/tests/test_ds1_paths.py`) moves every .ds1 of the mod
+whose path D2R has with other bytes to `data/global/tiles/mxl2012/<path>`, prefixes the lvlprest File cells naming it (excel
+and excel/base) with `mxl2012/`, and moves its HD scene along: the mod's own scene, or a copy of D2R's scene, whose terrain
+(`preset/<path>/terrain.model`) is named by its full D2R path and still loads. 11 of the 21 mod .ds1 files at a D2R path differ:
+
+| Map | lvlprest row (Def) | HD scene |
+|-|-|-|
+| act1/caves/caveroom4 | Act 1 - Cave Treasure 4 (106): Hole Level 2 (15) | the mod's (walls_hd) |
+| act1/caves/caveroom5 | Act 1 - Cave Treasure 5 (107) | D2R's copied |
+| act1/cathedrl/cathy3 | Act 1 - Cathedral (257) | D2R's copied |
+| act1/outdoors/bivouac | Act 1 - Bivouac (50) | D2R's copied |
+| act2/maggot/magqueen | Act 2 - Lair Tight Spot S (509) | D2R's copied |
+| act2/palace/harem2 | Act 2 - Harem (353) | D2R's copied |
+| act2/tomb/duriel | Act 2 - Duriel's Lair (481) | D2R's copied |
+| act3/jungle/dungrm6a | Act 3 - Dungeon Treasure 1 (703): Swampy Pit 3 (90) | the mod's (walls_hd) |
+| act3/temple/temple5 | Act 3 - Temple 3 (750): 96 | the mod's (walls_hd) |
+| act3/temple/temple6 | Act 3 - Temple 3 (750): 96 | the mod's (walls_hd) |
+| act4/diab/heart | Act 4 - Diablo Heart (862) | D2R's copied |
+
+So Median's object and unit edits of these maps (Duriel's lair, the Chaos heart, the cathedral, the harem, ...) take
+effect now; before they were D2R's in both modes. Check `hole2_room` (tools/game_checks.py) reads the preset unit spots of
+levels 15, 90 and 96 (`presets`) and names the .ds1 they belong to (mod or D2R), with HD screenshots also of 73, 33 and 50.
+
 ## Median's look on the 8 retextured maps (lane maptint, 2026-10-30)
 
 `tools/map_tint.py` (build step inside `walls_hd.py build`, tests `tools/tests/test_map_tint.py`; pixel reader

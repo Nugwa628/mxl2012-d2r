@@ -5,6 +5,10 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Hole Level 2 shows its cave walls in HD, and Median XL's edits of ten more original maps (Duriel's Lair, the
+  Chaos Sanctuary heart, the Cathedral, the Harem, the Act 3 temples and dungeons, ...) are used: the game had loaded its own
+  versions of those maps instead (#525).
+
 ## D2R-XL 2012
 
 ### 0.1.10 (2026-11-01)
