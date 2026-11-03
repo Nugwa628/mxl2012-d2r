@@ -8,5 +8,10 @@
     "key": "d2r:baallaugh1",
     "text": "LOL",
     "why": "bugs.md #508 (owner ruling 2026-10-30): Median reuses Baal's laugh (voice file baallaugh1) as a sound on many skills and missiles (Spawn Edyrem of dark_master1/2 and evil4spw, Spawn Dragon, Belial Volcano ...); D2R prints its vo.json line as \"Baal says: *Laughing*\" each time. The owner wants \"Baal says: LOL\" (also Baal's own laugh in the Throne); plugin part vochat limits the line to once every 30 s."
+  },
+  {
+    "key": "d2r:ChroniclePropertyGroupListBullet",
+    "text": "- ",
+    "why": "bugs.md #528: D2RLoader's Ctrl stat-range tooltip (D2RCore item_stat_ranges) starts each \"Possible base rolls\" line with this key, D2R's \"\\u2022 \". The classic (legacy graphics) font has no bullet glyph and draws a crossed-out box instead; a hyphen draws in both fonts."
   }
 ]

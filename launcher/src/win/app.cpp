@@ -1148,6 +1148,7 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 	SaveState();
 	if (!EnsureExtendedSaves(mod, error))
 		return false;
+	EnsureStatRangesOff(mod);
 	Report("D2R-XL 2012 " + feed_.version + " is in " + Utf8(mod) + ". " + HowToPlay);
 	return true;
 }
@@ -1182,6 +1183,27 @@ bool Launcher::EnsureExtendedSaves(const std::wstring& mod, std::string& error) 
 	       ": set [d2rcore.save_format] mode = \"extended\" (D2R-XL 2012 saves need it); nothing else in it changed. " +
 	       (backedUp ? "The old file is " : "An older copy is kept as ") + Utf8(backup) + ".");
 	return true;
+}
+
+// docs/bugs.md #528 (owner decision 2026-11-03): D2RLoader's Ctrl stat ranges print repeated lines for Median's items, so
+// the release turns them off; a kept d2rloader.toml of an older release gets [d2rcore.items] item_stat_ranges = false too.
+// Only that key changes. Not fatal: the game runs either way.
+void Launcher::EnsureStatRangesOff(const std::wstring& mod) {
+	std::wstring path = JoinPath(mod, Wide(ModLoaderConfigRel));
+	std::string text;
+	if (!ReadWholeFile(path, text))
+		return;
+	std::string was = ItemStatRanges(text);
+	if (was == "false")
+		return;
+	if (!WriteFileAtomic(path, SetItemStatRangesOff(text))) {
+		Report("Could not turn off D2RLoader's Ctrl stat ranges in " + Utf8(path) + " (" + Utf8(LastErrorText(GetLastError())) +
+		       "): set item_stat_ranges = false under [d2rcore.items] there yourself; with them on, Ctrl shows repeated lines.");
+		return;
+	}
+	Report("Your " + std::string(ModLoaderConfigRel) + " had " + (was.empty() ? std::string("no item_stat_ranges") : "item_stat_ranges = " + was) +
+	       ": set [d2rcore.items] item_stat_ranges = false (D2RLoader's Ctrl stat ranges show repeated lines for D2R-XL 2012 items); "
+	       "nothing else in it changed.");
 }
 
 // ---------------------------------------------------------------- actions

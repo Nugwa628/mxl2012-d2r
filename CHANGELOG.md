@@ -16,6 +16,10 @@ version being released (docs/release.md).
   requirement); swapping weapons releases the charges once with any weapon; Open Wounds comes only from the gnat family
   (Death Gnat, Blood Stinger, Soul Sucker, Razor Sting, Buzzsaw, ShockSting: 100 % per hit), not from other monsters
   (#527, #530).
+- Holding Ctrl over an item no longer adds D2RLoader's "Possible base rolls" block: it printed the same line twice (or
+  more) for many D2R-XL 2012 items, so D2RLoader's stat ranges are off for this mod for now (#528). The downloader also turns
+  them off in a `d2rloader.toml` kept from an older release (`[d2rcore.items] item_stat_ranges = false`; nothing else in the
+  file changes).
 
 ## D2R-XL 2012
 

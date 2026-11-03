@@ -129,6 +129,7 @@ private:
 	bool PrepareTarget(std::string& error);  // marker, writable, not running
 	bool EnsureMod(bool verify, std::string& error);
 	bool EnsureExtendedSaves(const std::wstring& mod, std::string& error);  // docs/bugs.md #512
+	void EnsureStatRangesOff(const std::wstring& mod);                     // docs/bugs.md #528
 	bool LoadState();
 	bool SaveState();
 	void Report(const std::string& text, double fraction = -1);

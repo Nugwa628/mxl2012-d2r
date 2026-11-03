@@ -1,0 +1,806 @@
+{
+ "_doc": "tools/hd_translvl.py states (bugs.md #529): per (classic token, states.txt colorshift) of the monsters whose monprop keeps such a state on, the shift from the classic level-0 colour to the colour through Pal.pl2 table colorshift + 1; hd_translvl.py build adds it to the units' variant tables as customColorShiftEntries.",
+ "colours": [
+  {
+   "token": "!2",
+   "colorshift": 20,
+   "ids": [
+    "darkfey1",
+    "darkfey3",
+    "uq_darkfey3"
+   ],
+   "adj": [
+    0.78,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.22 sat +0.02 val -0.00"
+  },
+  {
+   "token": "$a",
+   "colorshift": 20,
+   "ids": [
+    "veilterror_rean"
+   ],
+   "adj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "none"
+  },
+  {
+   "token": "$f",
+   "colorshift": 69,
+   "ids": [
+    "rathma_primus"
+   ],
+   "adj": [
+    0.0,
+    -0.05,
+    0.2,
+    1.0
+   ],
+   "tint": [
+    1.0,
+    0.6,
+    0.6,
+    0.4
+   ],
+   "label": "hue +0.00 sat -0.07 val +0.19 tint 0.38"
+  },
+  {
+   "token": "$g",
+   "colorshift": 101,
+   "ids": [
+    "mcsboss"
+   ],
+   "adj": [
+    0.0,
+    0.55,
+    0.3,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.01 sat +0.58 val +0.29"
+  },
+  {
+   "token": "(1",
+   "colorshift": 20,
+   "ids": [
+    "quest_inarius"
+   ],
+   "adj": [
+    0.78,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.22 sat -0.01 val -0.01"
+  },
+  {
+   "token": "(m",
+   "colorshift": 20,
+   "ids": [
+    "shadows_new"
+   ],
+   "adj": [
+    0.76,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.24 sat +0.00 val -0.01"
+  },
+  {
+   "token": "2#",
+   "colorshift": 101,
+   "ids": [
+    "l_slayer"
+   ],
+   "adj": [
+    0.04,
+    0.3,
+    0.15,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.05 sat +0.33 val +0.17"
+  },
+  {
+   "token": "22",
+   "colorshift": 20,
+   "ids": [
+    "overlords"
+   ],
+   "adj": [
+    0.0,
+    -0.1,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.00 sat -0.09 val -0.03"
+  },
+  {
+   "token": "5p",
+   "colorshift": 20,
+   "ids": [
+    "quest_overlord",
+    "quest_subordinate"
+   ],
+   "adj": [
+    0.76,
+    -0.2,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.23 sat -0.18 val -0.05"
+  },
+  {
+   "token": "7#",
+   "colorshift": 20,
+   "ids": [
+    "sirens"
+   ],
+   "adj": [
+    0.82,
+    -0.15,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.17 sat -0.16 val -0.02"
+  },
+  {
+   "token": "8$",
+   "colorshift": 20,
+   "ids": [
+    "devilcat"
+   ],
+   "adj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "none"
+  },
+  {
+   "token": "9$",
+   "colorshift": 20,
+   "ids": [
+    "companion"
+   ],
+   "adj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "none"
+  },
+  {
+   "token": "^3",
+   "colorshift": 20,
+   "ids": [
+    "sumelite_1316",
+    "uq_wyrdwolf2",
+    "wyrdwolf2"
+   ],
+   "adj": [
+    0.78,
+    -0.05,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.21 sat -0.05 val -0.02"
+  },
+  {
+   "token": "ae",
+   "colorshift": 20,
+   "ids": [
+    "super_summoner",
+    "totembtt",
+    "ureh_breaker"
+   ],
+   "adj": [
+    0.76,
+    -0.05,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.25 sat -0.03 val -0.03"
+  },
+  {
+   "token": "an",
+   "colorshift": 40,
+   "ids": [
+    "toraja_lilith"
+   ],
+   "adj": [
+    0.62,
+    -0.3,
+    -0.45,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.38 sat -0.32 val -0.45"
+  },
+  {
+   "token": "b7",
+   "colorshift": 34,
+   "ids": [
+    "th_bear"
+   ],
+   "adj": [
+    0.4,
+    -0.15,
+    -0.35,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.41 sat -0.15 val -0.33"
+  },
+  {
+   "token": "bb",
+   "colorshift": 101,
+   "ids": [
+    "shockbeasts"
+   ],
+   "adj": [
+    0.98,
+    0.1,
+    0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.01 sat +0.11 val +0.05"
+  },
+  {
+   "token": "c#",
+   "colorshift": 101,
+   "ids": [
+    "totembounds"
+   ],
+   "adj": [
+    0.02,
+    0.25,
+    0.15,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.03 sat +0.27 val +0.16"
+  },
+  {
+   "token": "cr",
+   "colorshift": 20,
+   "ids": [
+    "corruptrogue3"
+   ],
+   "adj": [
+    0.84,
+    0.0,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.15 sat -0.02 val -0.04"
+  },
+  {
+   "token": "cw",
+   "colorshift": 102,
+   "ids": [
+    "goldencalf"
+   ],
+   "adj": [
+    0.06,
+    0.05,
+    0.25,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.06 sat +0.07 val +0.23"
+  },
+  {
+   "token": "dm",
+   "colorshift": 20,
+   "ids": [
+    "rampagors"
+   ],
+   "adj": [
+    0.78,
+    -0.3,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.23 sat -0.29 val -0.06"
+  },
+  {
+   "token": "fa",
+   "colorshift": 101,
+   "ids": [
+    "elite_fallenchildA",
+    "sumelite_1324"
+   ],
+   "adj": [
+    0.04,
+    0.4,
+    0.25,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.04 sat +0.42 val +0.23"
+  },
+  {
+   "token": "fr",
+   "colorshift": 20,
+   "ids": [
+    "elite_stormcaster3",
+    "sumelite_1266",
+    "voidarchons"
+   ],
+   "adj": [
+    0.76,
+    -0.2,
+    0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.25 sat -0.21 val +0.03"
+  },
+  {
+   "token": "fs",
+   "colorshift": 101,
+   "ids": [
+    "elite_fallenfatherA",
+    "sumelite_1332"
+   ],
+   "adj": [
+    0.02,
+    0.25,
+    0.2,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.01 sat +0.26 val +0.19"
+  },
+  {
+   "token": "im",
+   "colorshift": 20,
+   "ids": [
+    "necromorb"
+   ],
+   "adj": [
+    0.74,
+    0.0,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.25 sat -0.02 val -0.04"
+  },
+  {
+   "token": "im",
+   "colorshift": 101,
+   "ids": [
+    "lantern"
+   ],
+   "adj": [
+    0.46,
+    0.55,
+    0.2,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.46 sat +0.56 val +0.21"
+  },
+  {
+   "token": "n#",
+   "colorshift": 20,
+   "ids": [
+    "saclamb"
+   ],
+   "adj": [
+    0.84,
+    -0.2,
+    -0.15,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.15 sat -0.20 val -0.16"
+  },
+  {
+   "token": "sb",
+   "colorshift": 20,
+   "ids": [
+    "darklings",
+    "hostiledarkling"
+   ],
+   "adj": [
+    0.8,
+    -0.3,
+    -0.2,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.21 sat -0.28 val -0.22"
+  },
+  {
+   "token": "si",
+   "colorshift": 101,
+   "ids": [
+    "elite_quills4",
+    "sumelite_1270"
+   ],
+   "adj": [
+    0.94,
+    0.6,
+    0.35,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.06 sat +0.62 val +0.35"
+  },
+  {
+   "token": "sl",
+   "colorshift": 69,
+   "ids": [
+    "rathma_dog"
+   ],
+   "adj": [
+    0.88,
+    0.15,
+    0.45,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.13 sat +0.13 val +0.47"
+  },
+  {
+   "token": "um",
+   "colorshift": 101,
+   "ids": [
+    "elite_undeadknight3",
+    "elite_undeadknight5",
+    "sumelite_1260"
+   ],
+   "adj": [
+    0.88,
+    0.45,
+    0.25,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.12 sat +0.45 val +0.24"
+  },
+  {
+   "token": "va",
+   "colorshift": 101,
+   "ids": [
+    "daystars",
+    "elite_evilpriestA",
+    "set_daystar",
+    "sumelite_1312"
+   ],
+   "adj": [
+    0.98,
+    0.5,
+    0.35,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.02 sat +0.51 val +0.33"
+  },
+  {
+   "token": "wr",
+   "colorshift": 20,
+   "ids": [
+    "lamias"
+   ],
+   "adj": [
+    0.74,
+    0.0,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.26 sat -0.01 val -0.03"
+  },
+  {
+   "token": "ww",
+   "colorshift": 20,
+   "ids": [
+    "elite_wispA",
+    "sumelite_1298"
+   ],
+   "adj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "none"
+  },
+  {
+   "token": "ww",
+   "colorshift": 101,
+   "ids": [
+    "elite_wisp4",
+    "sumelite_1257"
+   ],
+   "adj": [
+    0.0,
+    0.7,
+    0.3,
+    1.0
+   ],
+   "tint": [
+    1.0,
+    0.4,
+    0.0,
+    0.55
+   ],
+   "label": "hue +0.00 sat +0.72 val +0.32 tint 0.54"
+  },
+  {
+   "token": "x4",
+   "colorshift": 20,
+   "ids": [
+    "rathma_ghost"
+   ],
+   "adj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "none"
+  },
+  {
+   "token": "zm",
+   "colorshift": 15,
+   "ids": [
+    "turbo_dead",
+    "ureh_dead"
+   ],
+   "adj": [
+    0.56,
+    -0.05,
+    0.0,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.44 sat -0.05 val -0.02"
+  },
+  {
+   "token": "zz",
+   "colorshift": 20,
+   "ids": [
+    "shadows"
+   ],
+   "adj": [
+    0.0,
+    0.25,
+    0.1,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue +0.00 sat +0.25 val +0.10"
+  },
+  {
+   "token": "~b",
+   "colorshift": 20,
+   "ids": [
+    "rampagors_new"
+   ],
+   "adj": [
+    0.76,
+    -0.25,
+    -0.05,
+    1.0
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "label": "hue -0.24 sat -0.27 val -0.04"
+  }
+ ]
+}

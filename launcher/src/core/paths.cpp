@@ -164,11 +164,13 @@ std::string GetTomlKey(const std::string& text, const std::string& section, cons
 
 namespace {
 constexpr const char* SaveFormatSection = "d2rcore.save_format";
-constexpr const char* SaveFormatDotted = "d2rcore.save_format.mode";
 
-// The line of the save format key and the line of the [d2rcore.save_format] header (-1 when missing).
-void FindSaveFormat(const std::vector<std::string>& lines, int& keyLine, int& headerLine, std::string* value) {
+// The line of `key` in [table] (or the dotted key `<table>.<key>` before the first table) and the line of the [table] header
+// (-1 when missing).
+void FindTableKey(const std::vector<std::string>& lines, const std::string& table, const std::string& key, int& keyLine, int& headerLine,
+                  std::string* value) {
 	keyLine = headerLine = -1;
+	const std::string dotted = table + "." + key;
 	std::string section;
 	bool top = true;
 	for (int i = 0; i < int(lines.size()); ++i) {
@@ -176,15 +178,33 @@ void FindSaveFormat(const std::vector<std::string>& lines, int& keyLine, int& he
 		if (IsHeader(lines[size_t(i)], &name)) {
 			top = false;
 			section = name;
-			if (name == SaveFormatSection && headerLine < 0)
+			if (name == table && headerLine < 0)
 				headerLine = i;
 			continue;
 		}
-		if (keyLine < 0 && ((!top && section == SaveFormatSection && KeyLine(lines[size_t(i)], "mode", value, nullptr)) ||
-		                    (top && KeyLine(lines[size_t(i)], SaveFormatDotted, value, nullptr))))
+		if (keyLine < 0 && ((!top && section == table && KeyLine(lines[size_t(i)], key, value, nullptr)) ||
+		                    (top && KeyLine(lines[size_t(i)], dotted, value, nullptr))))
 			keyLine = i;
 	}
 }
+
+void FindSaveFormat(const std::vector<std::string>& lines, int& keyLine, int& headerLine, std::string* value) {
+	FindTableKey(lines, SaveFormatSection, "mode", keyLine, headerLine, value);
+}
+
+// A `key = ...` line (or the dotted `<table>.<key> = ...`) with the value replaced; indent, comment and a CR kept.
+std::string ReplaceKeyValue(const std::string& line, const std::string& table, const std::string& key, const std::string& value) {
+	const std::string dottedKey = table + "." + key;
+	std::string comment;
+	bool dotted = KeyLine(line, dottedKey, nullptr, &comment);
+	if (!dotted)
+		KeyLine(line, key, nullptr, &comment);
+	bool cr = !line.empty() && line.back() == '\r';
+	return line.substr(0, line.find_first_not_of(" \t")) + (dotted ? dottedKey : key) + " = " + value + comment + (cr ? "\r" : "");
+}
+
+constexpr const char* ItemsSection = "d2rcore.items";
+constexpr const char* StatRangesKey = "item_stat_ranges";
 }  // namespace
 
 std::string SaveFormatMode(const std::string& text) {
@@ -206,13 +226,7 @@ std::string SetExtendedSaveFormat(const std::string& text) {
 	int keyLine = 0, headerLine = 0;
 	FindSaveFormat(lines, keyLine, headerLine, nullptr);
 	if (keyLine >= 0) {
-		std::string& l = lines[size_t(keyLine)];
-		std::string comment;
-		bool dotted = KeyLine(l, SaveFormatDotted, nullptr, &comment);
-		if (!dotted)
-			KeyLine(l, "mode", nullptr, &comment);
-		bool cr = !l.empty() && l.back() == '\r';
-		l = l.substr(0, l.find_first_not_of(" \t")) + (dotted ? SaveFormatDotted : "mode") + " = \"extended\"" + comment + (cr ? "\r" : "");
+		lines[size_t(keyLine)] = ReplaceKeyValue(lines[size_t(keyLine)], SaveFormatSection, "mode", "\"extended\"");
 	} else if (headerLine >= 0) {
 		if (noFinalNewline && headerLine == int(lines.size()) - 1) {  // the header is the last line: it gets its newline
 			lines[size_t(headerLine)] += eol;
@@ -229,6 +243,35 @@ std::string SetExtendedSaveFormat(const std::string& text) {
 	if (noFinalNewline)
 		out.pop_back();  // keep a missing final newline missing
 	return out;
+}
+
+std::string ItemStatRanges(const std::string& text) {
+	std::string t = text.rfind("\xEF\xBB\xBF", 0) == 0 ? text.substr(3) : text;
+	int keyLine = 0, headerLine = 0;
+	std::string value;
+	FindTableKey(Lines(t), ItemsSection, StatRangesKey, keyLine, headerLine, &value);
+	return keyLine < 0 ? "" : TomlUnquote(value);
+}
+
+std::string SetItemStatRangesOff(const std::string& text) {
+	if (ItemStatRanges(text) == "false")
+		return text;
+	bool bom = text.rfind("\xEF\xBB\xBF", 0) == 0;
+	std::string t = bom ? text.substr(3) : text;
+	auto lines = Lines(t);
+	int keyLine = 0, headerLine = 0;
+	FindTableKey(lines, ItemsSection, StatRangesKey, keyLine, headerLine, nullptr);
+	std::string out;
+	if (keyLine < 0) {
+		out = SetTomlKey(t, ItemsSection, StatRangesKey, "false");  // a commented template line, else under the header, else a new table
+	} else {
+		lines[size_t(keyLine)] = ReplaceKeyValue(lines[size_t(keyLine)], ItemsSection, StatRangesKey, "false");
+		for (const auto& l : lines)
+			out += l + "\n";
+		if (!t.empty() && t.back() != '\n')
+			out.pop_back();  // keep a missing final newline missing
+	}
+	return bom ? "\xEF\xBB\xBF" + out : out;
 }
 
 bool PathIsOrUnder(const std::string& path, const std::string& dir) {

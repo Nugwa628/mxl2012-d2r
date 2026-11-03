@@ -1105,3 +1105,50 @@ translucent ghost woman in `meslayer`'s white cloud; monprop `fade` makes her tr
 Review sheet (outside git): `mxl2012-runs/witches/review-524.png` (HD before, HD after, legacy, D2R's own Wraith). The look is the
 pinned stand-in made whole, not a new pick; a pale female stand-in would need a donor with an attack2 clip for her A2 pounce, and
 no female D2R unit has one (`corruptrogue1`, `succubus1`, `succubuswitch1`, `andariel`: attack1 only).
+
+## 19. Monprop state colours: Cog's yellow (lane statranges, 2026-11-02, bug #529)
+
+Cog (`elite_fallenchildA`, token `FA`, TransLvl 2, HD unit `fallen1`) does not take its colour from its level. Its monprop gives
+it state 52 `preventheal`, which has states.txt colorshift **101**. While a state with a colorshift is on, 1.14d draws the unit
+through Pal.pl2 colour table colorshift + 1 instead of the `palshift.dat` table of its level (section 15: the state with the
+highest `colorpri` wins). Measured on Cog's classic art (`mxl2012-runs/statranges/measure101.py`): table 102 against level 0
+gives hue +0.04 sat +0.42 val +0.23, the saturated yellow-orange of classic. Table 101 gives red, so the index is 1-based. D2R's
+HD renderer has a colour of its own only for the colorshifts of D2R's own states: 73 (revive), 100 (red), 103-107 (sigils and
+poison), 108 (cold), and 130 (bound demons, through `customColorShiftEntries`). For 101 it draws nothing, so HD shows the plain
+`fallen1` red.
+
+**Which monsters.** 39 (token, colorshift) pairs on 37 HD units. All come from monprop states that stay on for the monster's
+whole life:
+
+- colorshift 20 (`necroshadowspirit`, `devilish`), hue about -0.22: Shadows, Darklings, Lamias, Overlords, Void Archons, Dark
+  Fey, Wyrd Wolves and others.
+- colorshift 101 (`preventheal`, `passive_lockout`): Cog and the Cog shaman elite, Daystars, the elite Undead Knights, the Quill
+  and Wisp elites, Shock Beasts, `l_slayer`, `mcsboss`, `lantern`, `totembounds`.
+- colorshift 15 (`ureh_dead`, `turbo_dead`), 34 (`th_bear`), 40 (`toraja_lilith`), 69 (`rathma_primus`, `rathma_dog`) and 102
+  (`goldencalf`).
+
+The full list with the shifts is in `work/mod/hd_translvl.md`, "State colour shifts".
+
+**The fix.** `hd_translvl.py states` measures each pair once and writes the result to the committed
+`tools/data/hd_state_colours.json` (the build has no Pal.pl2). The measure is the token's classic art through table colorshift + 1
+against its level-0 colour (`level_shift`). `hd_translvl.py build` then adds a `CustomVariantColorShiftMap` to the variant table
+of every unit those Ids draw: `colorShiftIndex` N, and the table's level-0 entry with the shift on top (names `S<N>`). The table
+is either the mod's copy of D2R's unit table or the stand-in's shared `enemy/mxl/v_*` table. D2R itself uses this mechanism for
+130.
+
+Each (table, colorshift) gets one entry. Where two tokens share a stand-in table, the one with more Ids wins. That happens for 3
+pairs: `lantern` loses to `mcsboss` on `v_3632852f`, `rampagors_new` to `necromorb`, and `shadows_new` to the Wyrd Wolves. 5 pairs
+measure below the threshold and get no entry. The result is 31 entries in 28 tables.
+
+**The number of tables does not change** (30 stand-in tables, `COLOUR_TABLE_LIMIT`). A D2R unit's copy grows by the entry (about
+1.2 KB), so it is not held to the D2R-size limit of `fit()`. Tests: `StateColours` in `tools/tests/test_hd_translvl.py`.
+
+**Seen in game: HD does not use these entries** (lane statranges, 2026-11-04, slot 2, `mxl2012-runs/statranges/run3`..`run14`). Cog stays red in HD with the entry under 101. What HD does with a state colorshift:
+
+- An index with D2R's own HD colour (73, 100, 103-108) draws that colour.
+- Any other index up to 128 draws the stand-in's plain model: the custom entry and the unit's TransLvl entry are both ignored while the state is on (Cog at TransLvl 5 with the colour in entry 7: still red; `fallen8` at TransLvl 5 without the state: entry 7 drawn). Seen for 1, 101, 115, 120 and 122-128.
+- From 129 up HD draws the custom entry (129, 130, 131: Cog yellow-orange with the hand colour hue +0.08 sat +0.5 val +0.3; the measured +0.04 still reads red, run7 sweep).
+
+Legacy reads the classic table through Pal.pl2 row 1328 + N up to 128 (rows for 115-128 are flat and unused, so a table copied there draws exactly the classic colour: run10, run12). From 129 up legacy does not read that row: 129 and 130 draw Cog dark (not visible on the shot), 131 green, also with the table copied into row 1328 + N or 1072 + N (run11, run13b, run14). **No index works in both modes**, so a slot remap (tried as `state_slots.py`, kept outside git in `mxl2012-runs/statranges/slots529.patch`) cannot fix it.
+
+Route left, for the owner to decide: the coloured units get a copy of their monprop state without colorshift, and their colour moves to a free TransLvl. Classic draws it from the token's `palshift.dat` table for that level (the state's Pal.pl2 table applied to the unit's current level table: the same pixels as before). HD draws the variant entry of that level, which it does use when no state colour is on. Costs: new states.txt rows, classic `palshift.dat` edits per token, a free level per token (not every token has one), and the skill-given states (Mon Rust Storm's `preventheal`) keep their colorshift as now.

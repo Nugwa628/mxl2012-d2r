@@ -208,5 +208,103 @@ class PlanAndBuild(unittest.TestCase):
         self.assertEqual({p["rat1"][2]["state"], p["rat1"][4]["state"]}, {"too large"})
 
 
+class StateColours(unittest.TestCase):
+    """bugs.md #529: monprop states with a colorshift D2R's HD renderer has no colour for (Cog: colorshift 101)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        r = Path(self.tmp.name)
+        self.d2r, self.data = r / "d2r", r / "mod" / "data"
+        enemy = self.d2r / "data" / "hd" / "character" / "enemy"
+        (enemy / "rat1").mkdir(parents=True)
+        (enemy / "rat1" / "rat1_variant.json").write_text(json.dumps(table({2: (0.1, 0.2, 0.0, 1.0)})), "utf-8")
+        unit = {"entities": [{"components": [{"type": "VariantDefinitionComponent",
+                                              "filename": "data/hd/character/enemy/rat1/rat1_variant.json"}]}]}
+        (enemy / "rat1.json").write_text(json.dumps(unit), "utf-8")
+        ex = self.data / "global" / "excel"
+        tsv(ex / "states.txt", ["state", "*ID", "colorshift"],
+            [["preventheal", "52", "101"], ["freeze", "11", "108"], ["calm", "60", "0"], ["dark", "90", "20"]])
+        tsv(ex / "monprop.txt", ["Id", "prop1", "par1", "prop1 (N)", "par1 (N)", "prop2", "par2"],
+            [["cogprop", "state", "preventheal", "state", "52", "", ""], ["coldprop", "state", "freeze", "", "", "", ""],
+             ["calmprop", "state", "calm", "", "", "", ""], ["twoprop", "state", "dark", "state", "52", "res-fire", "10"]])
+        tsv(ex / "monstats.txt", ["Id", "Code", "TransLvl", "MonStatsEx", "MonProp", "enabled"],
+            [["cog", "RT", "2", "cog", "cogprop", "1"], ["cold", "RT", "0", "rat1", "coldprop", "1"],
+             ["calm", "RT", "0", "rat1", "calmprop", "1"], ["off", "RT", "0", "rat1", "cogprop", "0"],
+             ["two", "XX", "0", "two", "twoprop", "1"]])
+        self.excel = ex
+        self.mj = {"cog": "rat1", "cold": "rat1", "calm": "rat1", "off": "rat1", "two": "mxl_two_abc"}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_only_shifts_hd_has_no_colour_for(self):
+        self.assertEqual(t.state_shifts(self.excel), {"cogprop": [101], "twoprop": [20, 101]})  # by name or by ID
+
+    def test_uses_group_by_token_and_shift(self):
+        uses = t.state_uses(self.excel, self.mj)
+        self.assertEqual({k: dict(v) for k, v in uses.items()},
+                         {("rt", 101): {"rat1": [("cog", "cog")]}, ("xx", 20): {"mxl_two_abc": [("two", "two")]},
+                          ("xx", 101): {"mxl_two_abc": [("two", "two")]}})   # `off` is disabled
+
+    def test_state_is_measured_through_table_colorshift_plus_one(self):
+        asked = []
+
+        def pl2_table(n):
+            asked.append(n)
+            return bytes(range(256))
+        class Art:   # every palette index once, a grey ramp
+            pal = [(i, i, i) for i in range(256)]
+
+            def __init__(self, roots):
+                pass
+
+            def stats(self, side, tok, r2, w):
+                return {"hist": [1] * 256}
+        tsv(self.excel / "monstats2.txt", ["Id", "BaseW"], [["cog", "hth"]])
+        real = t.ClassicArt
+        t.ClassicArt = Art
+        try:
+            out = t.measure_states({("rt", 101): {"rat1": [("cog", "cog")]}}, self.excel, self.d2r, None, pl2_table)
+        finally:
+            t.ClassicArt = real
+        self.assertEqual(asked, [102])
+        self.assertEqual(out[0]["label"], "none")     # the identity table: no change
+        self.assertEqual(out[0]["ids"], ["cog"])
+
+    def test_build_adds_a_custom_entry_on_top_of_level0(self):
+        colours = [{"token": "rt", "colorshift": 101, "ids": ["cog"], "adj": [0.04, 0.4, 0.25, 1.0],
+                    "tint": [0.0] * 4, "label": "hue +0.04"},
+                   {"token": "rt", "colorshift": 20, "ids": ["cog"], "label": "none"}]
+        rows = t.add_state_entries(colours, self.mj, self.data, self.d2r)
+        self.assertEqual([(r["colorshift"], r["state"]) for r in rows], [(20, "no shift"), (101, "added")])
+        out = self.data / "hd" / "character" / "enemy" / "rat1" / "rat1_variant.json"
+        v = json.loads(out.read_text("utf-8"))
+        c = v["customColorShiftEntries"]
+        self.assertEqual([(x["type"], x["colorShiftIndex"]) for x in c], [("CustomVariantColorShiftMap", 101)])
+        a = c[0]["entry"]["transforms"][0]["colorAdjustment"]
+        self.assertEqual((a["x"], a["y"], a["z"]), (0.14, 0.6, 0.25))   # level0 (0.1, 0.2, 0) + the shift
+        self.assertEqual(len(v["entries"]), 8)
+        t.add_state_entries(colours, self.mj, self.data, self.d2r)      # a second run replaces, never duplicates
+        self.assertEqual(len(json.loads(out.read_text("utf-8"))["customColorShiftEntries"]), 1)
+
+    def test_shared_table_keeps_the_record_with_more_ids(self):
+        self.mj.update(a="rat1", b="rat1")
+        colours = [{"token": "aa", "colorshift": 20, "ids": ["a"], "adj": [0.5, 0.0, 0.0, 1.0], "tint": [0.0] * 4,
+                    "label": "x"},
+                   {"token": "bb", "colorshift": 20, "ids": ["b", "cog"], "adj": [0.2, 0.0, 0.0, 1.0],
+                    "tint": [0.0] * 4, "label": "y"}]
+        rows = t.add_state_entries(colours, self.mj, self.data, self.d2r)
+        self.assertEqual(sorted(r["state"] for r in rows), ["added", "shared table: `bb` kept"])
+        v = json.loads((self.data / "hd" / "character" / "enemy" / "rat1" / "rat1_variant.json").read_text("utf-8"))
+        self.assertAlmostEqual(v["customColorShiftEntries"][0]["entry"]["transforms"][0]["colorAdjustment"]["x"], 0.3)
+
+    def test_committed_colours_cover_cog(self):
+        d = json.loads(t.STATE_COLOURS.read_text("utf-8"))["colours"]
+        cog = [r for r in d if "elite_fallenchildA" in r["ids"]]
+        self.assertEqual([r["colorshift"] for r in cog], [101])
+        self.assertGreater(cog[0]["adj"][1], 0.2)    # classic draws Cog a saturated yellow-orange
+        self.assertFalse({r["colorshift"] for r in d} & t.HD_STATE_SHIFTS)
+
+
 if __name__ == "__main__":
     unittest.main()

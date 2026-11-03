@@ -28,6 +28,11 @@ tokens, which ship no palshift.dat: classic draws them in one colour, as the sta
 
   py -3 -I tools/hd_translvl.py plan     report only (work/mod/hd_translvl.md)
   py -3 -I tools/hd_translvl.py build    report + the variant tables (tools/build.py runs this after hd_monsters.py build)
+  py -3 -I tools/hd_translvl.py states   measure the monprop state colours (Median's Pal.pl2) into tools/data/hd_state_colours.json
+
+State colours (bugs.md #529): a state a monster's monprop keeps on, with a states.txt colorshift D2R's HD renderer has no
+colour for, recolours the monster in classic only. build adds the measured colour to the variant table of the unit as a
+customColorShiftEntries entry (docs/hd-monsters.md section 19).
 """
 import argparse
 import csv
@@ -44,6 +49,14 @@ LEVEL0 = 2      # entry index of TransLvl 0 (after cold, poison)
 ENTRIES = 8
 MAX_LEVEL = ENTRIES - 1 - LEVEL0   # TransLvl 5 -> entry 7 (`misc`); 6 and 7 have no entry
 ZERO4 = {"x": 0.0, "y": 0.0, "z": 0.0, "w": 0.0}
+# states.txt colorshifts D2R's own states use; its HD renderer colours them itself (red, poison, cold, sigils, revive, and
+# 130 through the bound demons' customColorShiftEntries). Others draw no tint in HD (1 draws green, docs/hd-monsters.md 14).
+HD_STATE_SHIFTS = {73, 100, 103, 104, 106, 107, 108, 130}
+STATE_COLOURS = Path(__file__).resolve().parent / "data" / "hd_state_colours.json"
+STATE_COLOURS_DOC = ("tools/hd_translvl.py states (bugs.md #529): per (classic token, states.txt colorshift) of the monsters "
+                     "whose monprop keeps such a state on, the shift from the classic level-0 colour to the colour through "
+                     "Pal.pl2 table colorshift + 1; hd_translvl.py build adds it to the units' variant tables as "
+                     "customColorShiftEntries.")
 
 
 # ------------------------------------------------------------------ tables
@@ -322,9 +335,158 @@ def summary(p: dict, excel: Path, mj: dict) -> dict:
     return out
 
 
+# ------------------------------------------------------------------ state colour shifts
+def state_shifts(excel: Path) -> dict[str, list[int]]:
+    """{monprop Id: [colorshift, ...]} of the states a monprop row gives (any difficulty) whose states.txt colorshift is one
+    D2R's HD renderer has no colour of its own for (not 0, not in HD_STATE_SHIFTS)."""
+    st: dict[str, int] = {}
+    for bank in bank_dirs(excel):
+        for r in read_rows(bank / "states.txt"):
+            cs = int(r.get("colorshift") or 0)
+            for k in (r.get("state"), r.get("*ID") or r.get("ID")):
+                if k:
+                    st.setdefault(k, cs)
+    out: dict[str, list[int]] = {}
+    for bank in bank_dirs(excel):
+        for r in read_rows(bank / "monprop.txt"):
+            for k, v in r.items():
+                cs = st.get(r.get(k.replace("prop", "par"), ""), 0) if k.startswith("prop") and v == "state" else 0
+                if cs and cs not in HD_STATE_SHIFTS and cs not in out.setdefault(r["Id"], []):
+                    out[r["Id"]].append(cs)
+    return {k: v for k, v in out.items() if v}
+
+
+def state_uses(excel: Path, mj: dict) -> dict[tuple[str, int], dict[str, list[tuple[str, str]]]]:
+    """{(classic token, colorshift): {HD unit: [(Id, monstats2 row)]}} of the enabled monsters drawing an HD unit whose
+    monprop gives such a state (the state is on for the monster's whole life)."""
+    shifts = state_shifts(excel)
+    uses: dict = defaultdict(lambda: defaultdict(list))
+    for bank in bank_dirs(excel):
+        for r in read_rows(bank / "monstats.txt"):
+            u = mj.get(r["Id"], "")
+            if not u or not r.get("Code") or not enabled(r):
+                continue
+            for cs in shifts.get(r.get("MonProp", ""), []):
+                ids = uses[(r["Code"].lower(), cs)][u]
+                if (r["Id"], r.get("MonStatsEx", "")) not in ids:
+                    ids.append((r["Id"], r.get("MonStatsEx", "")))
+    return uses
+
+
+def measure_states(uses: dict, excel: Path, d2r: Path, mxl_monsters: Path | None, pl2_table) -> list[dict]:
+    """One record per (token, colorshift): the shift turning the token's classic level-0 colour (palshift.dat table 2, or
+    the plain palette for a token without one) into its colour through the state's table (`pl2_table(colorshift + 1)`,
+    Pal.pl2's tables are 1-based: 1.14d draws colorshift N through table N + 1, seen in game on Cog, colorshift 101)."""
+    rows2: dict[str, dict] = {}
+    for bank in bank_dirs(excel):
+        for r in read_rows(bank / "monstats2.txt"):
+            rows2.setdefault(r["Id"], r)
+    d2r_mon = d2r / "data" / "global" / "monsters"
+    art = ClassicArt([mxl_monsters, d2r_mon])
+    out = []
+    for (tok, cs), units in sorted(uses.items()):
+        hist = [0] * 256
+        for r2id in dict.fromkeys(x for ids in units.values() for _, x in ids):
+            r2 = rows2.get(r2id)
+            st = art.stats("d2r", tok, r2, r2.get("BaseW") or "hth") if r2 else None
+            if st:
+                hist = [a + b for a, b in zip(hist, st["hist"])]
+        rec = {"token": tok, "colorshift": cs, "ids": sorted({i for ids in units.values() for i, _ in ids})}
+        if not sum(hist):
+            out.append({**rec, "label": "no art"})
+            continue
+        pals = palshift_of(d2r_mon, tok)
+        adj, tint, label = level_shift(hist, art.pal, list(pl2_table(cs + 1)), pals[LEVEL0] if pals else None)
+        out.append({**rec, "adj": adj, "tint": tint, "label": label})
+    return out
+
+
+def table_of(data: Path, d2r: Path, unit: str) -> str | None:
+    """The data-relative path of a unit's variant table (its VariantDefinitionComponent), the mod's unit file first."""
+    rel = Path("hd") / "character" / "enemy" / f"{unit}.json"
+    for root in (data, d2r / "data"):
+        if (root / rel).is_file():
+            d = json.loads((root / rel).read_text("utf-8-sig"))
+            for ent in d.get("entities", []):
+                for c in ent.get("components", []):
+                    if c.get("type") == "VariantDefinitionComponent" and c.get("filename", "").startswith("data/"):
+                        return c["filename"][len("data/"):]
+            return None
+    return None
+
+
+def state_entry(v: dict, cs: int, adj: list, tint: list) -> dict:
+    """The CustomVariantColorShiftMap of colorshift cs for table v: its level-0 entry with the shift on top (fill_entry)."""
+    e = fill_entry(v["entries"][LEVEL0], v["entries"][LEVEL0], adj, tint)
+    e["name"] = f"S{cs}"
+    for j, t in enumerate(e["transforms"]):
+        t["name"] = f"S{cs}{'RGB'[j] if j < 3 else j}"
+    return {"type": "CustomVariantColorShiftMap", "name": f"S{cs}", "colorShiftIndex": cs, "entry": e}
+
+
+def add_state_entries(colours: list[dict], mj: dict, data: Path, d2r: Path) -> list[dict]:
+    """Adds each measured state colour to the variant table of every unit its Ids draw (the mod's copy, else a copy of
+    D2R's): one entry per (table, colorshift), the record with the most Ids of that table wins. Returns one row per
+    (table, colorshift) for the report: the table, its Ids, the shift, its state (`added`, `no table`, `no shift`)."""
+    want: dict[tuple[str, int], tuple[dict, list[str]]] = {}
+    rows = []
+    # the stand-in tables (hd_monsters.py) outlive a run of this step alone: drop the state entries an earlier run added
+    for p in sorted((data / "hd" / "character" / "enemy" / "mxl").glob("v_*.json")):
+        v = json.loads(p.read_text("utf-8-sig"))
+        keep = [c for c in v.get("customColorShiftEntries", []) if c.get("name") != f"S{c.get('colorShiftIndex')}"]
+        if len(keep) != len(v.get("customColorShiftEntries", [])):
+            v["customColorShiftEntries"] = keep
+            p.write_bytes(dump(v))
+    for rec in colours:
+        by_table: dict[str, list[str]] = defaultdict(list)
+        for i in rec["ids"]:
+            u = mj.get(i)
+            t = table_of(data, d2r, u) if u else None
+            by_table[t or f"(unit {u})"].append(i)
+        for t, ids in by_table.items():
+            row = {"table": t, "colorshift": rec["colorshift"], "token": rec["token"], "ids": ids,
+                   "shift": rec.get("label", "")}
+            if t.startswith("(") or rec.get("label", "none") in ("none", "no art"):
+                rows.append({**row, "state": "no table" if t.startswith("(") else "no shift"})
+                continue
+            old = want.get((t, rec["colorshift"]))
+            if old and len(ids) <= len(old[1]):
+                rows.append({**row, "state": f"shared table: `{old[0]['token']}` kept"})
+                continue
+            if old:
+                rows.append({"table": t, "colorshift": rec["colorshift"], "token": old[0]["token"], "ids": old[1],
+                             "shift": old[0]["label"], "state": f"shared table: `{rec['token']}` kept"})
+            want[(t, rec["colorshift"])] = (rec, ids)
+    for (t, cs), (rec, ids) in sorted(want.items()):
+        p = data / t if (data / t).is_file() else d2r / "data" / t
+        v = json.loads(p.read_text("utf-8-sig"))
+        if len(v.get("entries", [])) != ENTRIES:
+            rows.append({"table": t, "colorshift": cs, "token": rec["token"], "ids": ids, "shift": rec["label"],
+                         "state": "table layout"})
+            continue
+        v["customColorShiftEntries"] = [c for c in v.get("customColorShiftEntries", []) if c.get("colorShiftIndex") != cs]
+        v["customColorShiftEntries"].append(state_entry(v, cs, rec["adj"], rec["tint"]))
+        (data / t).parent.mkdir(parents=True, exist_ok=True)
+        (data / t).write_bytes(dump(v))
+        rows.append({"table": t, "colorshift": cs, "token": rec["token"], "ids": ids, "shift": rec["label"], "state": "added"})
+    return rows
+
+
+def state_report(rows: list[dict]) -> str:
+    lines = ["", "## State colour shifts (`customColorShiftEntries`)", "",
+             f"States a monster's monprop keeps on, with a states.txt colorshift D2R's HD renderer has no colour for (not "
+             f"{sorted(HD_STATE_SHIFTS)}): the classic colour through Pal.pl2 table colorshift + 1, measured by "
+             f"`hd_translvl.py states` into tools/data/hd_state_colours.json, added to the unit's variant table.", "",
+             "| Table | Colorshift | Token | State | Shift | Ids |", "|---|---:|---|---|---|---|"]
+    for r in sorted(rows, key=lambda r: (r["table"], r["colorshift"], r["token"])):
+        lines.append(f"| {r['table']} | {r['colorshift']} | `{r['token']}` | {r['state']} | {r['shift']} | "
+                     f"{', '.join(r['ids'])} |")
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("cmd", choices=["plan", "build"])
+    ap.add_argument("cmd", choices=["plan", "build", "states"])
     ap.add_argument("--mod", default=str(fxpaths.MOD), help="work/mod (data/global/excel, data/hd/character/monsters.json)")
     ap.add_argument("--d2r", default=str(fxpaths.D2R), help="D2R 93847 baseline extract")
     ap.add_argument("--median-monsters", default=str(fxpaths.MXL / "monsters"))
@@ -337,14 +499,27 @@ def main() -> int:
         print(f"{mjp} missing: run tools/hd_monsters.py build first")
         return 1
     hd.configure(Path(a.median_monsters), d2r)
-    p = plan(excel, json.loads(mjp.read_text("utf-8")), d2r, a.keep_d2r_levels)
+    mj = json.loads(mjp.read_text("utf-8"))
+    if a.cmd == "states":
+        import palshift   # Median's Pal.pl2 (C:\games\median-xl\d2data.mpq): measured here, not in the build
+        colours = measure_states(state_uses(excel, mj), excel, d2r, Path(a.median_monsters), palshift.table)
+        STATE_COLOURS.write_text(json.dumps({"_doc": STATE_COLOURS_DOC, "colours": colours}, indent=1) + "\n",
+                                 encoding="utf-8")
+        print(f"{len(colours)} (token, colorshift) colours -> {STATE_COLOURS}")
+        return 0
+    p = plan(excel, mj, d2r, a.keep_d2r_levels)
     measure(p, excel, d2r, Path(a.median_monsters))
     done = build_tables(p, d2r, mod / "data") if a.cmd == "build" else {}
-    (mod / "hd_translvl.md").write_text(report(p, done), encoding="utf-8")
+    srows = []
+    if a.cmd == "build" and STATE_COLOURS.exists():
+        srows = add_state_entries(json.loads(STATE_COLOURS.read_text("utf-8"))["colours"], mj, mod / "data", d2r)
+    (mod / "hd_translvl.md").write_text(report(p, done) + state_report(srows), encoding="utf-8")
     (mod / "hd_translvl.json").write_text(json.dumps(summary(p, excel, json.loads(mjp.read_text("utf-8"))), indent=1),
                                           encoding="utf-8")
     st = Counter(e["state"] for lv in p.values() for e in lv.values())
-    print(f"{dict(st)}; {len(done)} variant tables, {sum(b for _, b, _ in done.values())} bytes -> {mod / 'hd_translvl.md'}")
+    sst = Counter(r["state"] for r in srows)
+    print(f"{dict(st)}; {len(done)} variant tables, {sum(b for _, b, _ in done.values())} bytes; state colours "
+          f"{dict(sst)} -> {mod / 'hd_translvl.md'}")
     return 0
 
 

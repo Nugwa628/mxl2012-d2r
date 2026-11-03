@@ -43,6 +43,7 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn('[d2rcore.save_format]\nmode = "extended"', toml)
         self.assertNotIn("add_shared_tabs", toml)
         self.assertIn("[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true", toml)  # bugs.md #498
+        self.assertIn("[d2rcore.items]\nitem_stat_ranges = false", toml)  # bugs.md #528
         self.assertTrue((mod / "d2rloader" / "plugins" / "mxl2012-core.dll").is_file())
         self.assertTrue((mod / "d2rloader" / "patches").is_dir())
 

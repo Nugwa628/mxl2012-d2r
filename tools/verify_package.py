@@ -86,6 +86,8 @@ def check_mod_folder(mod: Path, version: str) -> list:
     toml = mod / "d2rloader" / "config" / "d2rloader.toml"
     if not toml.is_file() or 'mode = "extended"' not in toml.read_text("utf-8"):
         problems.append("d2rloader/config/d2rloader.toml lacks [d2rcore.save_format] mode = \"extended\"")
+    elif "item_stat_ranges = false" not in toml.read_text("utf-8"):
+        problems.append("d2rloader/config/d2rloader.toml lacks [d2rcore.items] item_stat_ranges = false (bug #528)")
     dll = mod / "d2rloader" / "plugins" / "mxl2012-core.dll"
     if dll.is_file():
         problems += pr.check_release_plugin(dll, pr.plugin_version())

@@ -84,8 +84,16 @@ class SaveFormatKeyTests(unittest.TestCase):
         self.assertIn('[d2rcore.save_format]\nmode = "extended"\n', out)
 
     def test_installed_file_unchanged(self):
-        text = '[d2rcore.save_format]\nmode = "extended"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n'
+        text = ('[d2rcore.save_format]\nmode = "extended"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n'
+                '\n[d2rcore.items]\nitem_stat_ranges = false\n')
         self.assertEqual(self.ensure_all(text), text)
+
+    def test_stat_ranges_off(self):
+        """docs/bugs.md #528 (owner decision 2026-11-03): D2RLoader's Ctrl stat ranges are off in the mod's config."""
+        out = self.ensure_all('[d2rcore.save_format]\nmode = "extended"\n')
+        self.assertIn("[d2rcore.items]\nitem_stat_ranges = false\n", out)
+        out = self.ensure_all("[d2rcore.items]\n# item_stat_ranges = true\nmaximum_sockets = true\n")
+        self.assertIn("[d2rcore.items]\nitem_stat_ranges = false\nmaximum_sockets = true\n", out)
 
 
 if __name__ == "__main__":

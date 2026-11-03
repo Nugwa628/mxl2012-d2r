@@ -47,9 +47,11 @@ EXTRA_SHARED_TABS = 0  # 2012 has one personal stash page; extra PlugY pages are
 # by tools/warlock_legacy_check.py; still untested on a RotW account).
 # The save format first: a d2rloader.toml that was already there (another mod's copy, an old install) can lack it, and then
 # D2RLoader writes retail saves, which cannot hold Median's stats 511-537 (docs/bugs.md #512; the plugin part savemode does the same
-# repair for players).
+# repair for players). D2RCore's Ctrl stat ranges are off (owner decision 2026-11-03, bug #528: repeated lines for Median's
+# automagic rows, D2RLoader/PluginSDK issue 6); the downloader sets the key in a kept file too (launcher EnsureStatRangesOff).
 TOML_KEYS = [("d2rcore.save_format", "mode", '"extended"', "D2RLoader's extended saves, bug #512"),
-             ("d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", "G toggle in RotW games")]
+             ("d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", "G toggle in RotW games"),
+             ("d2rcore.items", "item_stat_ranges", "false", "Ctrl stat ranges off, bug #528")]
 if EXTRA_SHARED_TABS > 0:
     TOML_KEYS.append(("d2rcore.stash", "add_shared_tabs", str(EXTRA_SHARED_TABS), "extra shared tabs"))
 

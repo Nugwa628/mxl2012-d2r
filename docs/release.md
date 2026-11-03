@@ -36,7 +36,8 @@ mxl2012.mpq/data/...              install_mod.build_data: work/mod/data + global
 modinfo.json                       copy at the mod root (D2RLoader guide layout)
 d2rloader/metadata.json            schemaVersion 1, namespace "mxl2012", metadata.modVersion = <version>,
                                    metadata.website = https://github.com/Nugwa628/mxl2012-d2r
-d2rloader/config/d2rloader.toml    [d2rcore.save_format] mode = "extended" (no extra shared tabs: install_mod.EXTRA_SHARED_TABS = 0)
+d2rloader/config/d2rloader.toml    [d2rcore.save_format] mode = "extended" (no extra shared tabs: install_mod.EXTRA_SHARED_TABS = 0),
+                                   [d2rcore.items] item_stat_ranges = false (bug #528)
 d2rloader/plugins/mxl2012-core.dll     the RELEASE plugin (cmake -DMXL_RELEASE=ON)
 d2rloader/patches/                 empty
 ```

@@ -57,6 +57,13 @@ class FixTests(unittest.TestCase):
         fixes = {f["key"]: f["text"] for f in json.loads(m.FIXES.read_text("utf-8"))}
         self.assertEqual(fixes.get("d2r:baallaugh1"), "LOL")
 
+    def test_stat_range_bullet_is_plain_ascii(self):
+        # bugs.md #528: the legacy font lacks D2R's bullet glyph, so the Ctrl stat-range list uses "- "
+        fixes = {f["key"]: f["text"] for f in json.loads(m.FIXES.read_text("utf-8"))}
+        bullet = fixes.get("d2r:ChroniclePropertyGroupListBullet")
+        self.assertEqual(bullet, "- ")
+        self.assertTrue(bullet.isascii())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5102,3 +5102,32 @@ program); the tint was taken out afterwards, so the committed build draws D2R's 
 owner: the nova's colour (classic orange-red, HD green) and the charm's length on D2R (calc2 = ulvl frames, 1.13c Param3 =
 250 frames; calc2 is also the bats' level). Tests: `tools/tests/test_hd_skill_anims.py`, `test_txt_migrate_finishing.py`,
 `test_txt_migrate_conversion_calcs.py`.
+## Lane statranges: Ctrl stat ranges and monprop state colours (bugs #528, #529, 2026-11-02, slot 2, background mode)
+
+Scripts and evidence (outside git): `mxl2012-runs/statranges/`. Character RangeLane (Assassin, made by the run, god mode),
+Rogue Encampment for the items and Blood Moor for the monsters. Ctrl is held with the harness's virtual modifier
+(`g._set_mods(("ctrl",))` plus a posted Ctrl key), which D2RCore reads like a real Ctrl.
+
+| Run | What | Result |
+|---|---|---|
+| `run1` | `item <code> q=<n> inv`, hovered without and with Ctrl, HD and legacy: Blade Talons `j25` q2 / q4, items 145 and 115 | With Ctrl, D2RCore adds "Possible base rolls: 1 of the following:" and the same automagic line twice (the socket and no-socket rows, the socket stat is hidden). Legacy draws D2R's bullet "• " as a crossed-out box. `itemdesc` is not a harness verb in plugin 0.1.9. The backpack was not emptied, so legacy items 115 had no room |
+| `run2` (not run) | `lab2.py`: Mega Impact items (`!08`, `!01`, `!35`, `9@B`, `j17`) with and without Ctrl after the bullet fix; Cog, Shadows and Daystars next to a plain `fallen3`, with the build's `fallen1` / `zealot1` / `vampire1` tables copied into slot 2's mod for the run only (`SR_VARIANT`) | Three starts failed because of the PC's load. A 2-hour wait (`slotready.ps1`: bench game gone and CPU under 60 %, checked every 5 minutes) did not clear on 2026-11-02/03 |
+
+Later runs (2026-11-03/04, `lab2.py`; fresh characters RangeLaneB..L because the first one's backpack was full; the slot's installed files patched for the probes and restored from backups after each):
+
+| Run | What | Result |
+|-|-|-|
+| `run3` | build with the custom entry under 101, HD and legacy, Cog next to `fallen1`; Ctrl on `j25` | HD Cog red, legacy orange: HD ignores the entry. No stat-range block with Ctrl |
+| `run4` | Cog at TransLvl 5, the state colour in `fallen1` entry 7 (`lvl5patch.py`) | HD still red |
+| `run6` | loud test colours: entry 2 cyan, custom 101 green, `fallen8` at TransLvl 5 | entry 2 and entry 7 drawn, custom 101 not |
+| `run7` | hue sweep on Cog's entry (`sweep.py`) | +0.08 reads as the classic orange-yellow, +0.04 (measured) red |
+| `run8` | Cog with its state at several TransLvl values | HD draws the plain model whatever the level |
+| `run9` | `preventheal` -> 131 with a custom 131 | HD yellow; legacy green |
+| `run10` | `preventheal` -> 115, Pal.pl2 row 115 = row 101 | legacy right, HD red |
+| `final` | build with slots 115-121 (`state_slots.py`), Ctrl items `!08` q4 and `j25` q4, ten units | #528: no range block, HD and legacy (`final/*_ctrl.png`). #529: legacy right, HD Cog red |
+| `run11` | 131 with the table copied into row 1328 + 131 (`probe131.py`) | HD yellow, legacy green |
+| `run12` | slots 122-128 (`probe7.py`), nine units | legacy right for all, HD plain for all |
+| `run13`, `run13b` | 101 -> 129, 20 -> 130 | HD Cog yellow; legacy Cog not visible (dark) |
+| `run14` | as run13 with the tables also in rows 1072 + 129 / 130 | legacy Cog still not visible |
+
+Result: #528 PASS (HD and legacy). #529 open: HD uses a custom entry only from 129 up, legacy reads the classic table only up to 128 (docs/hd-monsters.md section 19). The slot code was not committed. Slot 2 was left with the `final` build (slots 115-121) installed.

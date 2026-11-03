@@ -574,6 +574,32 @@ void TestSaveFormat() {
 	Check(mxl::SaveFormatMode("[d2rcore.save_format]\n# mode = \"extended\"\n").empty(), "a commented key does not count");
 }
 
+// docs/bugs.md #528: the kept mod d2rloader.toml gets [d2rcore.items] item_stat_ranges = false, nothing else changes.
+void TestStatRangesOff() {
+	// The 0.1.10 release file: save format and player tables, no items table.
+	std::string shipped = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n";
+	Check(mxl::ItemStatRanges(shipped).empty(), "0.1.10 file: no stat ranges key");
+	std::string fixed = mxl::SetItemStatRangesOff(shipped);
+	Check(fixed == shipped + "\n[d2rcore.items]\nitem_stat_ranges = false\n", "0.1.10 file: table appended, the rest as it was");
+	Check(mxl::ItemStatRanges(fixed) == "false" && mxl::SaveFormatMode(fixed) == "extended", "0.1.10 file: off, saves still extended");
+	Check(mxl::SetItemStatRangesOff(fixed) == fixed, "already off: unchanged");
+	// D2RLoader's own template: the key is true with its comment; another table's key of the same name is not touched.
+	std::string tmpl = "[d2rcore.items]\n# Hold Ctrl ...\n  item_stat_ranges = true  # default\nmaximum_sockets = true\n[x]\nitem_stat_ranges = true\n";
+	Check(mxl::ItemStatRanges(tmpl) == "true", "template read");
+	Check(mxl::SetItemStatRangesOff(tmpl) ==
+	          "[d2rcore.items]\n# Hold Ctrl ...\n  item_stat_ranges = false # default\nmaximum_sockets = true\n[x]\nitem_stat_ranges = true\n",
+	      "true replaced in place, indent and comment kept, other table untouched");
+	Check(mxl::SetItemStatRangesOff("[d2rcore.items]\n# item_stat_ranges = true\n[b]\n") == "[d2rcore.items]\nitem_stat_ranges = false\n[b]\n",
+	      "commented template replaced");
+	Check(mxl::SetItemStatRangesOff("[d2rcore.items]\nshow_ground_sockets = true") == "[d2rcore.items]\nitem_stat_ranges = false\nshow_ground_sockets = true",
+	      "table without key: under the header, no final newline stays without one");
+	Check(mxl::SetItemStatRangesOff("d2rcore.items.item_stat_ranges = true\n[b]\n") == "d2rcore.items.item_stat_ranges = false\n[b]\n",
+	      "top-level dotted key replaced (no second key)");
+	std::string crlf = "\xEF\xBB\xBF[d2rcore.save_format]\r\nmode = \"extended\"\r\n";
+	Check(mxl::SetItemStatRangesOff(crlf) == crlf + "\r\n[d2rcore.items]\r\nitem_stat_ranges = false\r\n", "BOM and CRLF kept");
+	Check(mxl::ItemStatRanges(mxl::SetItemStatRangesOff("")) == "false", "an empty file gets the table");
+}
+
 // docs/bugs.md #53: D2RLoader's default mod and stray copies of the plugin.
 void TestEnvironment() {
 	const std::string bs(1, char(92));
@@ -695,6 +721,7 @@ int main() {
 	TestGameProcessName();
 	TestToml();
 	TestSaveFormat();
+	TestStatRangesOff();
 	TestEnvironment();
 	TestSvg();
 	std::printf("%d checks, %d failures\n", checks, failures);

@@ -83,6 +83,16 @@ line goes right under an existing header; else the table is appended. Every othe
 and the CRLF/LF endings are unchanged. The panel/log line says what the old value was and where
 the backup is. If the backup or the write fails, the install stops with an error that names the key.
 
+**Ctrl stat ranges off in a kept config** (bug #528, owner decision 2026-11-03). D2RLoader's
+Ctrl "Possible base rolls" block repeats lines for Median's automagic rows (upstream:
+D2RLoader/PluginSDK issue 6), so the release ships `[d2rcore.items] item_stat_ranges = false`.
+After `EnsureExtendedSaves`, `EnsureStatRangesOff` reads the same kept file; if the key is not
+`false` (missing, `true`, a commented template), only that key is set (`SetItemStatRangesOff`,
+paths.h): an existing line in place with its indent and comment, a commented template line, else
+under the header, else the table is appended; BOM and line endings stay. No backup (one key), and
+a failed write is only reported: the game runs either way. A player who sets it back to `true`
+gets `false` again at the next update or repair while this owner decision stands.
+
 The downloader chooses the release **7z** when the objects needed are larger than the
 archive, otherwise individual **objects**. `--via auto|7z|objects` overrides this choice.
 Archive failures fall back to objects in auto mode; forced 7z mode reports the failure.
@@ -166,7 +176,7 @@ Tests can also be configured separately with `cmake -S launcher/tests -B build/l
 CI cross-builds with the existing xwin toolchain and runs portable tests on Linux.
 
 Tests cover detection, manifest/installation plans, hashes, marker/path protection,
-7z decoding and corruption, coexistence, TOML preservation, the save format key (`TestSaveFormat`), plugin identification,
+7z decoding and corruption, coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesOff`), plugin identification,
 other-mod warnings, and protection of other mods from automatic cleanup. No downloader or
 in-game integration run is required for this cleanup; unit tests do not access a real
 D2R installation. Previous copied documentation's release/game test results are not

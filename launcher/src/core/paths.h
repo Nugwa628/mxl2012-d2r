@@ -66,6 +66,17 @@ std::string SaveFormatMode(const std::string& text);
 // appended. Every other line, a UTF-8 BOM and the line endings stay as they were; an extended file comes back unchanged.
 std::string SetExtendedSaveFormat(const std::string& text);
 
+// ---- D2RLoader's Ctrl stat ranges (docs/bugs.md #528, owner decision 2026-11-03). D2RCore's `[d2rcore.items]
+// item_stat_ranges` prints repeated "Possible base rolls" lines for Median's automagic rows, so the mod's d2rloader.toml
+// turns it off; the kept (`preserve`) file of an older install gets the key too.
+// The value of `item_stat_ranges` in [d2rcore.items] (or the dotted `d2rcore.items.item_stat_ranges` before the first
+// table), unquoted; "" when missing.
+std::string ItemStatRanges(const std::string& text);
+// The text with `item_stat_ranges = false`: an existing key line gets the value in place (indent and comment kept), else a
+// commented template line `# item_stat_ranges = ...` of [d2rcore.items] becomes the key, else the key goes under the
+// header, else the table is appended. A BOM and the line endings stay; a file already at false comes back unchanged.
+std::string SetItemStatRangesOff(const std::string& text);
+
 // True for a path the official Median XL owns or this downloader must never use: <localAppData>\mxl-launcher (its
 // launcher), <roamingAppData>\MedianXL (its saves), <localAppData>\MedianXL, and a classic Diablo II folder (any path
 // segment named "Diablo II"). Case-insensitive, '\' or '/'.
