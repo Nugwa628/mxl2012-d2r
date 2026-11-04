@@ -11,6 +11,10 @@ over is his; this project only moves it to Diablo II: Resurrected.
 - Median XL 2012 and its files (the source of the mod files this port uses): <https://modsbylaz.vn.cz/>
 - Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods): <https://www.nexusmods.com/profile/EnaiSiaion/mods>
 
+Third-party D2RLoader plugins planned to ship with the port, credited to their authors: Buff HUD by **Lukaszpg**
+(<https://github.com/Lukaszpg/d2rl-buff-hud>, MIT) and PyreFly's plugins by **PyreFly**
+(<https://github.com/Pyre-Flies/D2R-Mods>, by permission). See [docs/bundled-plugins.md](docs/bundled-plugins.md).
+
 Diablo II and Diablo II: Resurrected belong to Blizzard Entertainment. D2RLoader is its own project
 (<https://d2rloader.net>). This port is not affiliated with or endorsed by Brother Laz or Blizzard. See [NOTICE.md](NOTICE.md).
 

@@ -19,10 +19,18 @@ owner, 2026-11-04). Their READMEs state no licence, so the permission is the bas
 
 All five target D2RLoader 1.3.1 and plugin ABI 4 on Windows x64, the same loader the port uses.
 
+## Buff HUD by Lukaszpg
+
+[d2rl-buff-hud](https://github.com/Lukaszpg/d2rl-buff-hud) by **Lukaszpg** (MIT licence; copyright and licence notices
+ship with it): a 3x7 panel of the player's timed buffs. Version 1.1.0 loads with the mod but shows "?" icons and no
+names on Median's tables and breaks in legacy graphics (tested 2026-11-04). We ship our fork
+[Nugwa628/d2rl-buff-hud](https://github.com/Nugwa628/d2rl-buff-hud) with those fixes and a buff list for Median XL 2012's
+states, and offer each fix back to Lukaszpg as a pull request.
+
 ## Checks before shipping (after 0.1.11)
 
 - Each plugin loads next to mxl2012-core without hook conflicts, in HD and in legacy graphics.
 - The mod-specific data (controller skill profile, loot filter, deposit item types) is written for Median XL 2012.
 - Item-roll-ranges vs D2RLoader's stat ranges (off in the mod, #528): only one may draw.
 - The installer and the Downloader install them into `mods\mxl2012\d2rloader\plugins\`, pinned by checksum like D2RLoader.
-- Release notes and README credit PyreFly.
+- Release notes and README credit PyreFly and Lukaszpg.
