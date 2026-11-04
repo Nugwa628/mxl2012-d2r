@@ -99,12 +99,15 @@ struct ModConfigKey {
 	const char* value;  // TOML text
 	bool keepHandSet;   // true: a value the player set stays (EnsureTomlKey); false: always this value (ForceTomlKey)
 	const char* why;    // for the panel / log line
+	bool atLeast = false;  // an integer minimum: a larger integer stays, a smaller one (or not an integer) becomes `value`
 };
 // [d2rcore.save_format] mode = "extended" (#512, forced, with a backup: Launcher::EnsureExtendedSaves),
 // [d2rcore.items] item_stat_ranges = false (#528, forced),
 // [d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true (#498, the G toggle in a RotW game; forced, owner
-// decision 2026-11-04: a false set by hand or left by D2RLoader's template becomes true).
-extern const ModConfigKey ModConfigKeys[3];
+// decision 2026-11-04: a false set by hand or left by D2RLoader's template becomes true),
+// [d2rcore.stash] add_shared_tabs at least 2 (#535: 5 shared stash pages in every game, as a RotW game has; a larger value
+// stays, lowering it would hide the items on the pages past it).
+extern const ModConfigKey ModConfigKeys[4];
 // The text with that key applied (unchanged when nothing is to do); `was` (optional) gets the old value ("" missing).
 std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, std::string* was = nullptr);
 

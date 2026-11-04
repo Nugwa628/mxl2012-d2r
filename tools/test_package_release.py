@@ -41,7 +41,7 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual(meta["metadata"]["website"], "https://github.com/Nugwa628/mxl2012-d2r")
         toml = (mod / "d2rloader" / "config" / "d2rloader.toml").read_text()
         self.assertIn('[d2rcore.save_format]\nmode = "extended"', toml)
-        self.assertNotIn("add_shared_tabs", toml)
+        self.assertIn("[d2rcore.stash]\nadd_shared_tabs = 2", toml)  # bugs.md #535
         self.assertIn("[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true", toml)  # bugs.md #498
         self.assertIn("[d2rcore.items]\nitem_stat_ranges = false", toml)  # bugs.md #528
         self.assertTrue((mod / "d2rloader" / "plugins" / "mxl2012-core.dll").is_file())

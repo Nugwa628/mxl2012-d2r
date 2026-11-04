@@ -43,7 +43,7 @@ built row against the rule and that each panel's layout, the mod's or D2R's own,
 | Player inventory (all 8 classes, Warlock incl.) | Amazon .. Warlock, ...2 | 10 x 6 | 10 x 4 | **10 x 6 (Median)** | mod: `playerinventory{original,expansion}layout{hd,}.json` |
 | Horadric Cube (Transmogrify Box) | Transmogrify Box Page 1 / Box2 | 10 x 8 | 3 x 4 | **10 x 8 (Median)** | mod: `horadriccubelayout{hd,}.json` |
 | Personal stash | Big Bank Page 1 / Page2 | 10 x 10 (one page) | 10 x 10 | **10 x 10 (D2R)** | D2R's `bankexpansionlayout{hd,}.json` |
-| Shared stash tabs | Big Bank Page 1 (each tab) | none (PlugY pages were a repack feature) | 10 x 10 per tab, D2R's tab count | **D2R's, unchanged** (owner: "as D2R has it") | D2R's |
+| Shared stash tabs | Big Bank Page 1 (each tab) | none (PlugY pages were a repack feature) | 10 x 10 per tab, D2R's tab count | **D2R's pages + 2** (owner 2026-11-04, bug #535: as many as RotW has; D2R: 3 in a classic / expansion game, 5 in a RotW game; `add_shared_tabs` at least 2) | D2R's |
 | Materials / gems stack tab (RotW) | - (AdvancedStash slots) | none | D2R's | **D2R's** (owner: keep) | D2R's (a classic layout + art down-rendered from D2R's HD pages is built but kept out of the mod: it crashes D2R without RotW, docs/legacy-graphics.md section 9) |
 | Classic bank (non-expansion characters) | Bank Page 1 / Page2 | 6 x 4 | 6 x 4 | 6 x 4 (D2R) | D2R's `bankoriginallayout{hd,}.json` |
 | Trade, each side | Trade Page 1 / 2 | 10 x 4 | 10 x 4 | 10 x 4 (D2R) | D2R's |
@@ -154,7 +154,8 @@ Items draw at D2R's HD size (98 px per cell) whatever `cellSize` says, so the HD
 ## Not generated (and why)
 
 - **Stash, trade, vendor, hireling, character sheet panels**: sizes equal D2R's, so D2R's HD panels stay. The stash is one 10 x 10
-  personal page (no extra pages: PlugY's pages were a repack feature), so no stash-page work applies.
+  personal page (no extra pages: PlugY's pages were a repack feature) and D2R's shared pages (2 more by D2RLoader's
+  `add_shared_tabs`, bug #535: a data setting, no panel work), so no stash-page work applies.
 - **Warlock keeps D2R's UI**: its skill page (`waskilltree`) and tab strings are untouched. The inventory and cube panels are
   one shared layout for all classes, so Warlock gets the mod's 10 x 6 / 10 x 8 grids too (`inventory.txt` has no `Warlock` /
   `Warlock2` row in the mod, D2R has: the tables lane must add them with the mod's 10 x 6, otherwise the grid the layout draws

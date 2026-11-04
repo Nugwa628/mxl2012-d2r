@@ -6,7 +6,8 @@
   d2rloader/metadata.json           schemaVersion 1 + "namespace": "mxl2012" (Median-only strings, docs/strings-namespace.md;
                                     the folder MPQ needs no (listfile): it is a directory, not a packed archive)
   d2rloader/config/d2rloader.toml   [d2rcore.save_format] mode = "extended" (Median's wider item/stat IDs)
-                                    Native D2R shared stash tabs; no extra tabs by default.
+                                    [d2rcore.stash] add_shared_tabs >= 2 (5 shared pages in every game, as a RotW game
+                                    has; a higher value set by hand stays: items on those pages, bug #535)
                                     [d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true (G in RotW games)
   mxl2012.mpq/data/...             copy of work/mod/data (folder-style MPQ) + global/dataversionbuild.txt
                                     + Median's classic tiles/maps (global/tiles)
@@ -41,7 +42,9 @@ PLUGIN = Path(os.environ.get("MXL_PLUGIN") or ROOT / "build" / "plugin" / "Relea
 D2R_FILELIST = fxpaths.D2R_FILELIST
 
 
-EXTRA_SHARED_TABS = 0  # 2012 has one personal stash page; extra PlugY pages are undecided.
+# D2R 3.3 gives a classic / expansion game 3 shared stash pages and a RotW game 5 (plus the Gems / Materials / Runes pages);
+# D2RLoader's add_shared_tabs adds pages after the vanilla ones. Owner 2026-11-04 (bug #535): as many tabs as RotW has.
+EXTRA_SHARED_TABS = 2
 # Keys of the mod's own d2rloader.toml (D2RLoader lays an active mod's config over the game-wide one): (section, key, value,
 # why). The G toggle in RotW games is on (owner decision 2026-10-29, bugs.md #498: the Warlock's classic files are checked
 # by tools/warlock_legacy_check.py; still untested on a RotW account).
@@ -51,12 +54,12 @@ EXTRA_SHARED_TABS = 0  # 2012 has one personal stash page; extra PlugY pages are
 # automagic rows, D2RLoader/PluginSDK issue 6). The G toggle in a RotW game is on (owner decision 2026-11-04, bug #498: the
 # game-wide file says false and the mod's file must win). Forced keys get their value whatever the file says; the others keep a
 # value set by hand. The downloader sets the same keys in a kept file with the same rules (launcher ModConfigKeys /
-# EnsureModConfigKeys). (section, key, value, forced, why)
+# EnsureModConfigKeys). The shared tabs are a minimum ("min"): a smaller value is raised, a larger one (set by hand, another mod's
+# file) stays, as lowering it would hide the items on the pages past it (bug #535). (section, key, value, forced, why)
 TOML_KEYS = [("d2rcore.save_format", "mode", '"extended"', True, "D2RLoader's extended saves, bug #512"),
              ("d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", True, "G toggle in RotW games, bug #498"),
-             ("d2rcore.items", "item_stat_ranges", "false", True, "Ctrl stat ranges off, bug #528")]
-if EXTRA_SHARED_TABS > 0:
-    TOML_KEYS.append(("d2rcore.stash", "add_shared_tabs", str(EXTRA_SHARED_TABS), False, "extra shared tabs"))
+             ("d2rcore.items", "item_stat_ranges", "false", True, "Ctrl stat ranges off, bug #528"),
+             ("d2rcore.stash", "add_shared_tabs", str(EXTRA_SHARED_TABS), "min", "5 shared stash pages as in RotW, bug #535")]
 
 
 def _toml_header(line: str):
@@ -281,6 +284,45 @@ def build_data(data: Path, game: Path) -> None:
 DEV_METADATA = {"modVersion": "0.1.0-dev", "description": "D2R-XL 2012: work-in-progress port of Median XL to D2R.", "website": ""}
 
 
+def _toml_value(line: str, key: str) -> str:
+    """The value of a `key = value  # comment` line, as written (quotes kept)."""
+    rest, quote = line.strip()[len(key):].lstrip()[1:], None
+    for i, c in enumerate(rest):
+        if quote:
+            quote = None if c == quote else quote
+        elif c in "\"'":
+            quote = c
+        elif c == "#":
+            return rest[:i].strip()
+    return rest.strip()
+
+
+def ensure_toml_min(text: str, section: str, key: str, value: str) -> str:
+    """`key` in [section] at least the integer `value`: a larger integer (set by hand) is kept, a smaller one or one that is not an
+    integer gets `value` in place; a missing key as ensure_toml_key. The downloader does the same (paths.h ApplyModConfigKey)."""
+    body = text[1:] if text.startswith("﻿") else text
+    lines, table, top = body.splitlines(), None, True
+    for line in lines:
+        name = _toml_header(line)
+        if name is not None:
+            table, top = name, False
+            continue
+        for k in ((key,) if table == section else ()) + ((f"{section}.{key}",) if top else ()):
+            if _is_key_line(line.strip(), k):
+                old = _toml_value(line, k)
+                if old.isdigit() and int(old) >= int(value):
+                    return text
+                return ensure_toml_key(text, section, key, value, True)
+    return ensure_toml_key(text, section, key, value)
+
+
+def apply_toml_key(text: str, section: str, key: str, value: str, forced) -> str:
+    """One TOML_KEYS entry applied: forced True (always this value), False (a value set by hand stays) or "min"."""
+    if forced == "min":
+        return ensure_toml_min(text, section, key, value)
+    return ensure_toml_key(text, section, key, value, forced)
+
+
 def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, metadata: dict = None) -> None:
     """Everything of the mod folder except <name>.mpq/data: modinfo.json, d2rloader/{metadata.json, plugins, config, patches}.
     metadata: modVersion / description / website for d2rloader/metadata.json (default: the dev install's)."""
@@ -309,7 +351,7 @@ def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, 
         toml.write_text('[d2rcore.save_format]\nmode = "extended"\n', encoding="utf-8")
     for section, key, value, forced, why in TOML_KEYS:
         text = toml.read_text(encoding="utf-8")
-        added = ensure_toml_key(text, section, key, value, forced)
+        added = apply_toml_key(text, section, key, value, forced)
         if added != text:
             toml.write_text(added, encoding="utf-8")
             print(f"d2rloader.toml: {key} = {value} ({why})")

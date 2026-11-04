@@ -29,7 +29,8 @@ before the game sees it.
 |---|---|
 | `<name>.d2s` | the character (below) |
 | `<name>.d2rl` | D2RLoader sidecar: `D2RL`, u16 version 2, u16 header size 0x2c, u32 body length at +0x08, SHA-256 of the body at +0x0c. The body (from +0x2c) holds the save's checksum at +0x34, its size at +0x38, a SHA-256 of the whole `.d2s` at +0x3c, then the game build (`3.3.0`, `93847`), the mod (`mxl2012`, its description and version) and the plugin list (`mxl2012-core`). After an edit all four values must follow, or the character disappears from character select. Items are not in the sidecar. |
-| `SharedStashSoftCoreV2.d2i` | shared stash: pages of a 64-byte header (0xaa55aa55, u32 flags, u32 version 0x69, u32 gold, u32 page size, 44 bytes) followed by a `JM` item list; D2RLoader's extra shared tabs (`add_shared_tabs`) are more pages of the same shape |
+| `SharedStashSoftCoreV2.d2i` | shared stash: pages of a 64-byte header (0xaa55aa55, u32 flags, u32 version 0x69, u32 gold, u32 page size, 44 bytes) followed by a `JM` item list; D2RLoader's extra shared tabs (`add_shared_tabs`) are more pages of the same shape. Used by classic / expansion games: 3 pages (+ `add_shared_tabs`) |
+| `ModernSharedStashSoftCoreV2.d2i` | the shared stash of Reign of the Warlock games (bug #535), same page shape; the u32 at header +0x14 is the page kind: 5 kind-0 shared pages, a kind-1 page (a `JM` list: the Gems / Materials / Runes stacks of the advanced stash), the `add_shared_tabs` pages (kind 0), then a kind-2 page (no `JM` list): kinds 0 0 0 0 0 1 0 0 2 with the key at 2. So the RotW pages are in the shared stash file, not in the `.d2s`; a second RotW character sees them (slot 2, 2026-11-04) |
 | `.key`, `.ctl`, `.ma*`, `.map` | key bindings, controller layout, automap: no character data |
 
 ## Character file (`.d2s`)

@@ -5,6 +5,10 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- The shared stash has 2 more pages: 5 in a classic or expansion game, as a Reign of the Warlock game has (D2R gives those 3).
+  Install, update and repair set `[d2rcore.stash] add_shared_tabs = 2` in the mod's `d2rloader.toml`; a higher number you set
+  yourself is kept, so no page with items on it goes away (#535). The Gems, Materials and Runes pages of a RotW game are shared
+  between your RotW characters, as in D2R.
 - The Fell Fiends' classic art has a new token (`FZ`, was `08`): a legacy game could ask for its files without the 0 and exit
   (#532). The crash was not seen here with the mod as shipped; the player's mod folder had another mod's D2RLoader files in it, so
   the mod's plugin did not load. Install D2R-XL 2012 into its own folder and do not copy another mod's `d2rloader` files over it.

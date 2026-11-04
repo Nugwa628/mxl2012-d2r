@@ -63,7 +63,7 @@ D2R has it), **plugin** (needs plugin work, another lane), **owner** (decision n
 | Terror token / uber materials stack item types (`terrt`, `uberm`) | itemtypes/misc | yes | remove | not in the migrated tables | auto |
 | Colossal Jewel (`cjwl`, Restricted) | itemtypes | yes | remove | no item of the type; type row kept for stable type ids | auto |
 | Advanced stash "Materials" stack tab (3.0) | misc `AdvancedStashStackable` (71 Median rows by code and type: runes, gems, rejuvs, Token; bug #510) | storage QoL; Median 2012 has 1 stash page | owner | `--advanced-stash off` | owner (question 2) |
-| Shared stash tabs (D2R 1.0) | D2R / D2RLoader `add_shared_tabs` | no (plugin-plan J) | keep | - | kept |
+| Shared stash tabs (D2R 1.0) | D2R / D2RLoader `add_shared_tabs` | no (plugin-plan J) | keep | - | kept; 2 more pages (`add_shared_tabs` at least 2, owner 2026-11-04, bug #535) |
 | Loot filter (3.x) | D2R UI | no (display only) | keep | - | kept |
 | Chronicle (3.x collection log, cosmetic rewards: portal / footsteps / backlight) | uniques/sets `disableChronicle`, itemtypes `UICategory` / `RunewordCategory1-2`, states chronicle* | no gameplay effect | keep, tracks Median's items (owner 2026-10-28) | `tools/chronicle.py`, see "Chronicle" below | done (data); game check below |
 | Auto gold pickup option | D2R option | small QoL; Median 2012 had none | keep | hiding the option = plugin | owner (question 4) |

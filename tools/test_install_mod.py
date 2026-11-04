@@ -71,7 +71,7 @@ class SaveFormatKeyTests(unittest.TestCase):
 
     def ensure_all(self, text):
         for section, key, value, forced, _ in install_mod.TOML_KEYS:
-            text = install_mod.ensure_toml_key(text, section, key, value, forced)
+            text = install_mod.apply_toml_key(text, section, key, value, forced)
         return text
 
     def test_another_mods_file_gets_extended_mode(self):
@@ -85,7 +85,7 @@ class SaveFormatKeyTests(unittest.TestCase):
 
     def test_installed_file_unchanged(self):
         text = ('[d2rcore.save_format]\nmode = "extended"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n'
-                '\n[d2rcore.items]\nitem_stat_ranges = false\n')
+                '\n[d2rcore.items]\nitem_stat_ranges = false\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n')
         self.assertEqual(self.ensure_all(text), text)
 
     def test_stat_ranges_off(self):
@@ -117,6 +117,29 @@ class SaveFormatKeyTests(unittest.TestCase):
         for text in (f"[d2rcore.player]\n{self.ROTW} = false # mine\n", f"d2rcore.player.{self.ROTW} = false\n[a]\nb = 1\n",
                      f"[d2rcore.player] # player\n  {self.ROTW}= false\n"):
             self.assertEqual(install_mod.ensure_toml_key(text, "d2rcore.player", self.ROTW, "true"), text)
+
+    def test_shared_tabs_at_least_rotw(self):
+        """docs/bugs.md #535 (owner 2026-11-04): 2 shared pages after D2R's 3 (5, as a RotW game has); never fewer than set."""
+        self.assertEqual(install_mod.EXTRA_SHARED_TABS, 2)
+        mode = {key: f for _, key, _, f, _ in install_mod.TOML_KEYS}
+        self.assertEqual(mode["add_shared_tabs"], "min")
+        out = self.ensure_all('[d2rcore.save_format]\nmode = "extended"\n')
+        self.assertIn("[d2rcore.stash]\nadd_shared_tabs = 2\n", out)
+        tmpl = "[d2rcore.stash]\n# Add more shared stash tabs after the vanilla tabs.\n# add_shared_tabs = 0\n\n# x\nset_materials_limit = 99\n"
+        self.assertEqual(install_mod.ensure_toml_min(tmpl, "d2rcore.stash", "add_shared_tabs", "2"),
+                         tmpl.replace("# add_shared_tabs = 0", "add_shared_tabs = 2"))
+        for low, want in (("add_shared_tabs = 0", "add_shared_tabs = 2"), ("add_shared_tabs = 1 # mine", "add_shared_tabs = 2 # mine"),
+                          ('add_shared_tabs = "x"', "add_shared_tabs = 2")):
+            self.assertEqual(install_mod.ensure_toml_min(f"[d2rcore.stash]\n{low}\n", "d2rcore.stash", "add_shared_tabs", "2"),
+                             f"[d2rcore.stash]\n{want}\n", low)
+        # A larger value stays: lowering it would hide the items on the pages past the new count (another mod's 100 tabs, bug #512)
+        for keep in ("[d2rcore.stash]\nadd_shared_tabs = 2\n", "[d2rcore.stash]\nadd_shared_tabs = 100  # big stash\n",
+                     "d2rcore.stash.add_shared_tabs = 7\n[a]\nb = 1\n", "﻿[d2rcore.stash]\r\nadd_shared_tabs = 3\r\n"):
+            self.assertEqual(install_mod.ensure_toml_min(keep, "d2rcore.stash", "add_shared_tabs", "2"), keep)
+        self.assertEqual(install_mod.ensure_toml_min("d2rcore.stash.add_shared_tabs = 1\n", "d2rcore.stash", "add_shared_tabs", "2"),
+                         "d2rcore.stash.add_shared_tabs = 2\n")
+        self.assertEqual(install_mod.ensure_toml_min("[d2rcore.other]\nadd_shared_tabs = 9\n", "d2rcore.stash", "add_shared_tabs", "2"),
+                         "[d2rcore.other]\nadd_shared_tabs = 9\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n")
 
     def test_forced_keys(self):
         """Owner decision 2026-11-04 (#498): the G toggle is forced like the save format and the stat ranges."""

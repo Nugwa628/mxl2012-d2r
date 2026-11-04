@@ -78,6 +78,7 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
 - [ ] All open bugs in docs/bugs.md triaged/fixed; Warlock in-game check (needs a RotW account)
 - [x] Release package, publish to files.werdegames.com/mxl2012/ (0.1.0 to 0.1.4)
 - [ ] Downloader signing
-- [ ] Ship PyreFly's plugins with the mod (controller-qol, pyre-lootfilter, item-roll-ranges, inventory-deposit),
+- [ ] Ship PyreFly's plugins with the mod (controller-qol, pyre-lootfilter, pyre-stashsearch, item-roll-ranges,
+  inventory-deposit),
   adapted to Median XL 2012 where needed: docs/bundled-plugins.md (after 0.1.11)
 - [x] GitHub mirror and issue templates live (2026-10-29: https://github.com/Nugwa628/mxl2012-d2r, public; fresh history, one snapshot commit per mirror run)

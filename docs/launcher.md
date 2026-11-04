@@ -141,6 +141,13 @@ gets `true` in place with its indent and comment, so a `false` set by hand or le
 the key goes under the header, or the table is appended. Fresh installs, updates and repairs all
 end with `true`; the game-wide file is never written.
 
+**Shared stash pages as in RotW** (bug #535, owner 2026-11-04). D2R 3.3 gives a classic / expansion game 3 shared
+stash pages and a Reign of the Warlock game 5. The release ships `[d2rcore.stash] add_shared_tabs = 2` (D2RLoader adds
+that many pages after D2R's own). The key is a minimum (`ModConfigKey::atLeast`; `install_mod.ensure_toml_min`, the
+`TOML_KEYS` mode `"min"`): a missing key or D2RLoader's commented template line becomes `2`, a smaller value or one that is
+not an integer becomes `2` in place (indent and comment kept), a value of 2 or more stays, since lowering it would hide the
+items on the pages past the new count.
+
 The downloader chooses the release **7z** when the objects needed are larger than the
 archive, otherwise individual **objects**. `--via auto|7z|objects` overrides this choice.
 Archive failures fall back to objects in auto mode; forced 7z mode reports the failure.

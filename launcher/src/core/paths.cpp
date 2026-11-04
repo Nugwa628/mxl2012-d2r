@@ -322,11 +322,12 @@ std::string ForceTomlKey(const std::string& text, const std::string& section, co
 	return out;
 }
 
-const ModConfigKey ModConfigKeys[3] = {
+const ModConfigKey ModConfigKeys[4] = {
 	{SaveFormatSection, "mode", "\"extended\"", false, "D2R-XL 2012 saves need it"},
 	{ItemsSection, StatRangesKey, "false", false, "D2RLoader's Ctrl stat ranges show repeated lines for D2R-XL 2012 items"},
 	{"d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", false,
 	 "G switches to legacy graphics in a RotW game; without it D2RLoader's game-wide false applies"},
+	{"d2rcore.stash", "add_shared_tabs", "2", false, "5 shared stash pages in every game, as a RotW game has", true},
 };
 
 std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, std::string* was) {
@@ -335,6 +336,12 @@ std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, st
 		*was = old;
 	if (k.keepHandSet)
 		return EnsureTomlKey(text, k.section, k.key, k.value);
+	if (k.atLeast) {
+		const std::string v = TomlUnquote(old);
+		if (!old.empty() && v == old && !v.empty() && v.size() < 10 && v.find_first_not_of("0123456789") == std::string::npos &&
+		    std::stoul(v) >= std::stoul(k.value))
+			return text;  // tools/install_mod.py ensure_toml_min
+	}
 	if (std::string(k.section) == SaveFormatSection && std::string(k.key) == "mode")
 		return SetExtendedSaveFormat(text);
 	if (std::string(k.section) == ItemsSection && std::string(k.key) == StatRangesKey)

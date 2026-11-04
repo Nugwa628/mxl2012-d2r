@@ -624,7 +624,7 @@ void TestModConfigKeys() {
 	// the mod's own file wins, so the mod's file must say true. The game-wide text is never handed to these functions.
 	const std::string global = "[d2rcore.player]\nenable_respec = false\nalways_enable_rotw_legacy_graphics_keybind = false\n";
 	std::string kept = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n# Keep the Toggle Renderer keybind available while "
-	                   "playing a RotW character.\n# " + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n";
+	                   "playing a RotW character.\n# " + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n";
 	std::string was = "x", fixed = mxl::ApplyModConfigKey(kept, *rotw, &was);
 	Check(was.empty() && fixed == Without(kept, "# " + R + " = true\n").insert(kept.find("# " + R), R + " = true\n"),
 	      "commented template line in the kept mod file becomes the key, nothing else changes");
@@ -637,7 +637,8 @@ void TestModConfigKeys() {
 		      ("commented line with other spacing replaced: " + line).c_str());
 	}
 	// A fresh install: the release's file (0.1.10 layout) has it; a file without it gets it under the header or a new table.
-	std::string shipped = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n" + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n";
+	std::string shipped = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n" + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n"
+	                      "\n[d2rcore.stash]\nadd_shared_tabs = 2\n";
 	Check(apply(shipped) == shipped, "the shipped file is left as it is");
 	Check(mxl::ApplyModConfigKey("[d2rcore.player]\nenable_respec = false\n", *rotw) == "[d2rcore.player]\n" + R + " = true\nenable_respec = false\n",
 	      "under the header");
@@ -672,6 +673,38 @@ void TestModConfigKeys() {
 	Check(mxl::ApplyModConfigKey(crlf, *rotw) == "\xEF\xBB\xBF[d2rcore.player]\r\n" + R + " = true\r\nenable_respec = false\r\n", "BOM and CRLF kept");
 	Check(mxl::ApplyModConfigKey("\xEF\xBB\xBF[d2rloader]\r\n", *rotw) == "\xEF\xBB\xBF[d2rloader]\r\n\r\n[d2rcore.player]\r\n" + R + " = true\r\n",
 	      "BOM and CRLF in a new table");
+}
+
+// docs/bugs.md #535: [d2rcore.stash] add_shared_tabs at least 2 (5 shared pages, as a RotW game has), the rules of
+// tools/install_mod.py ensure_toml_min: a larger value stays (items on the pages past it), a smaller one is raised.
+void TestSharedTabsMin() {
+	const std::string K = "add_shared_tabs";
+	const mxl::ModConfigKey* tabs = nullptr;
+	for (const auto& k : mxl::ModConfigKeys)
+		if (k.key == K)
+			tabs = &k;
+	Check(tabs && tabs->atLeast && !tabs->keepHandSet && std::string(tabs->section) == "d2rcore.stash" && std::string(tabs->value) == "2",
+	      "add_shared_tabs is a minimum of 2");
+	if (!tabs)
+		return;
+	std::string was = "x";
+	const std::string tmpl = "[d2rcore.stash]\n# Add more shared stash tabs after the vanilla tabs.\n# add_shared_tabs = 0\n\n# x\nset_materials_limit = 99\n";
+	const std::string fromTmpl = "[d2rcore.stash]\n# Add more shared stash tabs after the vanilla tabs.\nadd_shared_tabs = 2\n\n# x\nset_materials_limit = 99\n";
+	Check(mxl::ApplyModConfigKey(tmpl, *tabs, &was) == fromTmpl && was.empty(), "D2RLoader's commented template line becomes 2");
+	const std::pair<std::string, std::string> raised[] = {
+		{"[d2rcore.stash]\nadd_shared_tabs = 0\n", "[d2rcore.stash]\nadd_shared_tabs = 2\n"},
+		{"[d2rcore.stash]\nadd_shared_tabs = 1 # mine\n", "[d2rcore.stash]\nadd_shared_tabs = 2 # mine\n"},
+		{"[d2rcore.stash]\nadd_shared_tabs = \"x\"\n", "[d2rcore.stash]\nadd_shared_tabs = 2\n"},
+		{"d2rcore.stash.add_shared_tabs = 1\n", "d2rcore.stash.add_shared_tabs = 2\n"},
+		{"[d2rcore.other]\nadd_shared_tabs = 9\n", "[d2rcore.other]\nadd_shared_tabs = 9\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n"},
+		{"", "[d2rcore.stash]\nadd_shared_tabs = 2\n"},
+	};
+	for (const auto& [t, want] : raised)
+		Check(mxl::ApplyModConfigKey(t, *tabs) == want, ("raised to 2: " + t).c_str());
+	const std::string kept[] = {"[d2rcore.stash]\nadd_shared_tabs = 2\n", "[d2rcore.stash]\nadd_shared_tabs = 100  # big stash\n",
+	                            "d2rcore.stash.add_shared_tabs = 7\n[a]\nb = 1\n", "\xEF\xBB\xBF[d2rcore.stash]\r\nadd_shared_tabs = 3\r\n"};
+	for (const std::string& keep : kept)
+		Check(mxl::ApplyModConfigKey(keep, *tabs) == keep, ("a value of 2 or more stays: " + keep).c_str());
 }
 
 // docs/bugs.md #53: D2RLoader's default mod and stray copies of the plugin.
@@ -944,6 +977,7 @@ int main() {
 	TestSaveFormat();
 	TestStatRangesOff();
 	TestModConfigKeys();
+	TestSharedTabsMin();
 	TestEnvironment();
 	TestSvg();
 	TestZip();

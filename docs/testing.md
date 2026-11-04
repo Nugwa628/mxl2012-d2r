@@ -5284,3 +5284,34 @@ becomes `true`. `install_mod.TOML_KEYS` got a forced flag (save format, RotW key
 | `test_install_mod.py` | 16 tests OK (forced flags, hand-set and template `false` become `true`, CRLF, a quoted value with `#`; unforced keys still keep a hand-set value) |
 | the hand-set file above (`= false  # mine`), `repair` (log `rotw-repair3.log`) | diff: exactly one line, `always_enable_rotw_legacy_graphics_keybind = true # mine`; the panel line names the old `false` |
 | game-wide `fake-d2r3\d2rloader\config\d2rloader.toml` | sha256 `42dde64a...` unchanged |
+
+## Lane stashtabs: as many shared stash pages as RotW (bug #535, 2026-11-04, slot 2)
+
+Owner (2026-11-04): "make sure there are three stash tabs. We need to match whatever RotW has there for the amount."
+Evidence and scratch: `mxl2012-runs/stashtabs/` (outside git).
+
+**What D2R 3.3 has** (read from slot 2's save folder, `pre/` copies, `stashpages.py` lists the pages; earlier shots of the mod,
+which had D2R's counts): a classic / expansion game: Personal + Shared, 3 shared pages ("Page 1 / 3", `qol/stash_shared_hd.png`,
+`SharedStashSoftCoreV2.d2i` 3 pages); a RotW game: Personal + Shared, 5 shared pages ("Page 1 / 5", `cubeui/a515b_08_shared_hd.png`)
++ Gems / Materials / Runes (`ModernSharedStashSoftCoreV2.d2i`: page kinds 0 0 0 0 0 1 2; the kind-1 page holds the advanced stash
+stacks). The RotW pages are therefore in the shared stash file, shared by the characters of that game type (docs/save-format.md).
+D2RLoader's template (`d2rloader.toml.orig`): `add_shared_tabs` adds pages "after the vanilla tabs", max "995 additional tabs
+(1,000 total in RotW)".
+
+| Check | Result |
+|-|-|
+| `test_install_mod.py` | 17 tests OK (`test_shared_tabs_at_least_rotw`: template line, missing key, 0 / 1 / non-integer raised to 2, 2 / 3 / 7 / 100 kept, dotted key, BOM + CRLF) |
+| `test_package_release.py` | 17 tests OK (the package's toml has `add_shared_tabs = 2`) |
+| `launcher_tests.exe` (own build dir) | 334 checks, 0 failures (`TestSharedTabsMin`, the same cases; `TestModConfigKeys` files carry the new key) |
+| install on slot 2 | `d2rloader.toml: add_shared_tabs = 2 (5 shared stash pages as in RotW, bug #535)` |
+| harness | the first starts (runs `checks-20261104-180904-s2`, `-181159-s2`, `-183545-s2`) died about 5 s after launch at D2RLoader's "Preparing frontend launch task": the `-Release` plugin (`build/plugin-release`) had been installed, which has no test harness and so no `volserial` fix for the parallel slot. With the dev plugin (`tools/build_plugin.ps1`, install_mod's default) the game started |
+| key 0, classic / expansion (StashTab, run `checks-20261104-193949-s2`) | Personal + Shared, "Page 3 / 3" in HD (`a02_exp_shared_p3_hd.png`) and legacy (`a04_exp_shared_p3_legacy.png`), Next on page 3 stays there; a rune put in the personal tab and on shared pages 1-3; file: 3 pages, 1 item each |
+| key 2, classic / expansion (StashTab, run `checks-20261104-194841-s2`) | "Page 5 / 5" in HD (`b02_exp_shared_p5_hd.png`) and legacy (`b04_exp_shared_p5_legacy.png`, five reads like six in that font); page 3's rune still there (`b02_exp_shared_p3_hd.png`); runes put on pages 4 and 5; after a reload the personal rune and pages 4 / 5 hold (`e01_exp_personal_reload_hd.png`, `e02_exp_shared_p4_reload_hd.png`); file 3 -> 5 pages, pages 1-3 with the same item (only bit 13 of the item flags, "new", cleared on the reload) |
+| key 2, RotW (new Barbarian StashRotA) | Personal, Shared "Page 7 / 7", Gems, Materials, Runes in HD (`c02_rotw_shared_last_hd.png`) and legacy (`c07_rotw_shared_legacy.png`, five named tabs, gold max 17,600,000 against 7,600,000 / 12,600,000 for 3 / 5 pages); a rune put on shared page 7, a gem (Ctrl-click, Gems page), a small rejuvenation (Materials) and Tal (Runes); `ModernSharedStashSoftCoreV2.d2i`: its 8th page (shared page 7) 1 item, the advanced stash page 10 -> 13 items, the other shared pages byte-equal |
+| RotW pages shared? (new Barbarian StashRotB) | yes: the second character sees A's rune on shared page 7 (`d01_rotwB_shared_p7_hd.png`), the rejuvenation with count 1 on Materials and Tal on Runes (`d02_rotwB_materials_hd.png`, `d02_rotwB_runes_hd.png`). The classic file was not touched by the RotW games |
+| RotW file with the key (an earlier session on slot 2 that ran with this lane's key) | 7 -> 9 pages (kinds 0 0 0 0 0 1 0 0 2): shared pages 1-5 and the advanced stash page (10 stacks) byte-equal, then the 2 new empty pages, the kind-2 page byte-equal at the end |
+| logs | the exit-only pool asserts (see "Lane cube2"); once, when a Key (not a Materials item) was Ctrl-clicked with the Materials page open: `nIndex >= 0 && size_t(nIndex) < dataTable->itemTypes.size()`, `UnitGetClassEx(hItem, ...) != -1`, `ptItemStats` (19:58:18), no crash, the Key stayed in the backpack. Not reproduced: slot 2 was taken by another lane after the run. No crash file |
+
+Screenshots: `mxl2012-runs/stashtabs/shots/`. Answer to the owner's question: in plain D2R the Gems / Materials / Runes pages are
+stored in the RotW shared stash file and shared by all RotW characters (offline, softcore); the mod behaves the same in HD and legacy.
+The player gets 5 shared pages in a classic / expansion game and 7 in a RotW game (D2RLoader adds the 2 pages to both).
