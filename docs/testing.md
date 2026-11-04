@@ -5216,3 +5216,22 @@ Build of lane/cogs529, plugin of main's sources (the maps10 worktree's Release D
 `sheet_before_after.png`: statranges' final crops (0.1.10 data) against `run5`, per Id HD and legacy. Plain Fallens and
 Zealots keep their colour. Not checked in game: Hell (`elite_steely`'s Hell block has no free prop column for the HD cover;
 those Cogs stay red in HD, legacy right). Slot 2 unlocked, game closed after every run.
+
+## Lane crash532: the Fell Fiend's token 08 and the Act 2 trip (bug #532, 2026-11-04, slot 2, background mode)
+
+Check `crash532` (`tools/game_checks.py`, `MXL_CRASH532_MODES`, default `legacy,hd`): a new Barbarian (made by the run, god mode)
+has Andariel killed by the harness, travels with Warriv to Act 2 (cut scene skipped), then per mode spawns `fellfiend1` and
+`fellfiend2` next to the character in Act 2's desert, lets them fight, kills them and shoots the fight, the death and the corpse
+(`crash532_*` shots); `asserttrace` counts asserts per step. The art is judged by hand (PARTIAL). D2R image 0x6ab3782c, the
+player's. Report folders under `work/runs/` of the worktree, the player's logs in `mxl2012-runs/crash532/`.
+
+| Run | Install | Result |
+|-|-|-|
+| `checks-20261104-142934-s2` | dev, main's data | not usable: the Act 2 cut scene covered every shot (the check skips it since) |
+| `checks-20261104-143650-s2` | dev, main's data (token `08`) | Warriv to Act 2 ok; both Fell Fiends in legacy and HD: spawn, fight, death, corpse drawn, 0 asserts; no `\8\` COF request |
+| `checks-20261104-144651-s2` | dev, plugin game parts off (`MXL_CONTROL`) | only the known `nMissile` asserts (SkillsNec); no COF request, no `nRadius` assert |
+| `checks-20261104-145535-s2` | the 0.1.10 release package (`release_install.py`, no `-txt`) | 0 asserts, legacy corpse drawn; slot restored to the dev install after |
+| `checks-20261104-152709-s2` | this branch (token `FZ`) | Warriv to Act 2 ok; fellfiend1 / 2 in legacy (Median's winged orange art, DD corpse) and HD (`mxl_megademon1` look): 0 asserts, 0 crash files; only the usual object_pool asserts at exit |
+
+The `\8\` request did not reproduce; the player's session ran without the plugin and with another mod's D2RLoader patches (bugs.md
+#532). Slot 2 unlocked, game closed after every run.

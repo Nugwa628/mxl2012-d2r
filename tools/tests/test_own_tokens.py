@@ -229,12 +229,12 @@ class DataTests(unittest.TestCase):
         entries = ot.load()
         self.assertTrue(entries)
         for e in entries:
-            self.assertIn(e["mode"], ("split", "complete", "borrow"))
+            self.assertIn(e["mode"], ("split", "complete", "borrow", "rename"))
             self.assertTrue(e["why"])
             self.assertTrue(e["rows"])
         self.assertEqual({e["old"] for e in ot.splits(entries)}, {"e9"})
         self.assertEqual(ot.row_token("slayer", "e9", entries), "KS")
-        self.assertTrue(all(len(e["new"]) == 2 for e in ot.splits(entries) + ot.borrows(entries)))   # a monstats Code has two characters
+        self.assertTrue(all(len(e["new"]) == 2 for e in ot.splits(entries) + ot.borrows(entries) + ot.renames(entries)))   # a monstats Code has two characters
         self.assertEqual(ot.row_token("haunt_vasily", "AM", entries), "HN")
 
     def test_a_token_in_use_is_refused(self):

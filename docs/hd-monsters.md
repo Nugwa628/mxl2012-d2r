@@ -506,6 +506,7 @@ mapping follows the monstats Code the build writes (`hd_monsters.tok_of`, `row_t
 | `hornedgods` | `AN` (borrowed) | `8@` | none: pinned donor of the `8@` entry as before | the row now keeps its Code, the missing DT COF and rh layer are made (`complete`) |
 | `couatlfather1-3`, `couatlfather_elite` | `FA` (borrowed) | `!4` | none (the `!4` entry) | the missing SC COF is made |
 | `dead3`, `res_dead3` | `ZM` (borrowed) | `ji` | none (the `ji` entry) | the missing S1 COF and looks are made |
+| `fellfiend1`, `fellfiend2`, `baalset_fellfiend2` | `08` | `FZ` (`rename`, bug #532) | none: `tok_of` gives Median's token (`own_tokens.art_token`), so the `08` entry and its unit `mxl_megademon1_9b3c805` stay; HD is bound per Id in `monsters.json` | a token of digits with a leading 0 can reach D2R as a number (`monsters\8\COF\8DDhth.COF`); `tables` refuses such a token now |
 
 `hd_monsters.py splits` updates only the split entries of the committed mapping (a full `map` needs the reference reports); `classify`
 reads the virtual files of the plan (`own_tokens.virtual_index`) so `ks` counts as a token with MPQ art.

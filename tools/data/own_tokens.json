@@ -1,5 +1,5 @@
 {
- "_about": "Own monster tokens (tools/own_tokens.py, docs/legacy-graphics.md section 6). split: Median's rows leave a token D2R's art also uses for the token `new`, which neither D2R nor Median uses (make_plan refuses a token that has files). complete: a token of Median's own whose rows used to borrow a D2R monster's graphics for want of a COF; Median's art is kept and the missing modes / parts are filled.",
+ "_about": "Own monster tokens (tools/own_tokens.py, docs/legacy-graphics.md section 6). split: Median's rows leave a token D2R's art also uses for the token `new`, which neither D2R nor Median uses (make_plan refuses a token that has files). rename: as split, for an own token D2R cannot use as it is (digits with a leading 0). complete: a token of Median's own whose rows used to borrow a D2R monster's graphics for want of a COF; Median's art is kept and the missing modes / parts are filled.",
  "tokens": [
   {
    "mode": "split",
@@ -37,6 +37,13 @@
    "weapons": ["bow"],
    "rows": ["haunt_vasily", "haunt_esu", "haunt_fiaclagear", "haunt_amazon", "haunt_sorceress", "haunt_druid"],
    "why": "Median ships no art for the Haunts' tokens AM / DZ / SO (player class codes); they borrowed D2R's Corrupt Rogue (CR, 1hs melee in classic, the archer cr_archer1 in HD), whose COFs have no SC: their MonBow (Sk1mode SC / TH) put them in a mode without an animation (bug #74). HN = D2R's CR bow art with the archer's monstats2 row; A2, BL and SC are filled from A1 / NU."
+  },
+  {
+   "mode": "rename",
+   "old": "08",
+   "new": "FZ",
+   "rows": ["fellfiend1", "fellfiend2", "baalset_fellfiend2"],
+   "why": "Median's Fell Fiend token 08 is the only monster token of digits with a leading 0. A player's legacy game (bug #532) asked for monsters/8/COF/8DDhth.COF, the 0 lost on the way (that session ran without mxl2012-core and with another mod's memory patches), and exited. FZ cannot be read as a number. Median's 08 files and animdata records move to FZ; the HD look is bound per Id and keeps Median's art."
   }
  ]
 }

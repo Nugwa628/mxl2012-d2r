@@ -171,6 +171,12 @@ file has a new class `split` (`hd_monster_tokens.json` `ks`, `e9` trimmed to its
 | `couatlfather1-3`, `couatlfather_elite` | `!4` (was `FA`) | no SC COF: `!4schth.cof` copied from A1 with the A1 DCC under the SC name | Median ships no SC COF; the rows borrowed the Fallen's token |
 | `dead3`, `res_dead3` | `ji` (was `ZM`) | no S1 COF: `jis1hth.cof` copied from A1 (+ DCC); the heavy / medium looks have no DCC for several modes: copies of the lit look | Median ships no S1 / RN COF and only the lit look for the torso; the rows borrowed D2R's zombie |
 
+**Rename** (as split, for a token D2R cannot use as it is, bug #532):
+
+| Rows | Old token | New token | Why |
+|-|-|-|-|
+| `fellfiend1`, `fellfiend2`, `baalset_fellfiend2` (both banks) | `08` | `FZ` | a player's legacy game asked for `monsters\8\COF\8DDhth.COF` (the leading 0 lost) and exited. Median's `08` files move to `fz/cof/fz*.cof` and `fz/tr/fztrlit*.dcc`, animdata `FZ..` copied from `08..`. `own_tokens.py tables` fails the build on any monstats Code or objects Token that is all digits with a leading 0. |
+
 The copies are listed per file in `work/mod/legacy_art.md` (section "Own monster tokens") and their animdata records in
 `work/mod/animdata_report.md` (`8@DTHTH`, `!4SCHTH`, `JIS1HTH`, the `KS..` ones). Table side: the Code of the split rows is rewritten
 in both banks (`own_tokens.py tables`); the completed tokens need no table change, `gfx_placeholders.py` now counts the COFs of the plan

@@ -144,8 +144,9 @@ def file_index(root: Path) -> dict[str, Path]:
 
 
 def tok_of(mid: str, code: str) -> str:
-    """The token a monstats row draws in the build: its Code, but the own token of a split row (tools/own_tokens.py)."""
-    return own_tokens.row_token(mid, code).lower()
+    """The token a monstats row draws in the build: its Code, but the own token of a split row (tools/own_tokens.py; a
+    `rename` row keeps the old token: its art and HD mapping are keyed by Median's token)."""
+    return own_tokens.art_token(mid, code).lower()
 
 
 def md5(p: Path) -> str:

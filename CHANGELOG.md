@@ -5,6 +5,9 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- The Fell Fiends' classic art has a new token (`FZ`, was `08`): a legacy game could ask for its files without the 0 and exit
+  (#532). The crash was not seen here with the mod as shipped; the player's mod folder had another mod's D2RLoader files in it, so
+  the mod's plugin did not load. Install D2R-XL 2012 into its own folder and do not copy another mod's `d2rloader` files over it.
 - Cogs are yellow in HD as in classic, and so are the Cog shamans (#529). The other monsters with a classic colour of their own
   (Shadows, Lamias, Darklings, Daystars, the Thunder Bear, the Golden Calf and others, 60 in all) get that colour from a monster
   level now, so HD can draw it too. Cogs still cannot be healed. In Hell, Cogs and Cog shamans are still red in HD.

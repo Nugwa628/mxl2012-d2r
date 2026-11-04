@@ -21,6 +21,12 @@ mode. The data file `tools/data/own_tokens.json` lists what is done about it, on
             the monstats2 visual columns of D2R's `donor` row with the row's own modes added, and the modes D2R's art lacks
             filled as `complete` does. First case: the six Haunts (AM / DZ / SO, player class codes) as D2R's Corrupt Rogue
             archer (CR bow): their MonBow uses SC, a mode no CR COF has (bug #74).
+  rename    Median's rows `rows` move from their own token `old` to `new` with all of Median's `old` files and animdata records,
+            as `split` does, for a token D2R cannot use as it is. D2R has no `old` art; the HD look is bound per Id
+            (hd/character/monsters.json) and tools/hd_monsters.py keeps keying the art by `old` (art_token). First case: the
+            Fell Fiends' `08` (bug #532): the legacy client asked for `monsters/8/COF/8DDhth.COF` and the game exited.
+
+`tables` also refuses (exit 1) a build whose monstats `Code` or objects `Token` is digits with a leading 0 (numeric_tokens).
 
 Everything is derived from Median's files, D2R's files and the built tables; nothing is stored in git but the entry file.
 
@@ -70,9 +76,27 @@ def borrows(entries: list[dict] | None = None) -> list[dict]:
     return [e for e in (load() if entries is None else entries) if e["mode"] == "borrow"]
 
 
+def renames(entries: list[dict] | None = None) -> list[dict]:
+    return [e for e in (load() if entries is None else entries) if e["mode"] == "rename"]
+
+
+def moves(entries: list[dict] | None = None) -> list[dict]:
+    """The entries that rewrite the Code of Median's rows and rename Median's files: `split` and `rename`."""
+    return [e for e in (load() if entries is None else entries) if e["mode"] in ("split", "rename")]
+
+
+def art_token(mid: str, code: str, entries: list[dict] | None = None) -> str:
+    """The token whose art files a row shows, for tools that key art by token (tools/hd_monsters.py): row_token, but a
+    `rename` row keeps its old token (the same files under another name)."""
+    for e in renames(entries):
+        if mid.lower() in (r.lower() for r in e["rows"]) and code.lower() in (e["old"].lower(), e["new"].lower()):
+            return e["old"]
+    return row_token(mid, code, entries)
+
+
 def row_token(mid: str, code: str, entries: list[dict] | None = None) -> str:
     """The token a monstats row draws with after the split: `code` (what the raw table says) unless the row is listed."""
-    for e in splits(entries):
+    for e in moves(entries):
         if mid.lower() in (r.lower() for r in e["rows"]) and code.lower() == e["old"].lower():
             return e["new"]
     for e in borrows(entries):
@@ -82,9 +106,9 @@ def row_token(mid: str, code: str, entries: list[dict] | None = None) -> str:
 
 
 def apply_tables(excel: Path, entries: list[dict] | None = None) -> list[str]:
-    """Rewrite the monstats `Code` of the split rows in both banks of `excel`; returns report lines."""
+    """Rewrite the monstats `Code` of the split / rename rows in both banks of `excel`; returns report lines."""
     out = []
-    for e in splits(entries):
+    for e in moves(entries):
         want = {r.lower() for r in e["rows"]}
         for bank in BANKS:
             p = excel / bank / "monstats.txt"
@@ -97,13 +121,42 @@ def apply_tables(excel: Path, entries: list[dict] | None = None) -> list[str]:
                 r[ci] = e["new"]
             if hit:
                 write_tsv(p, h, rows)
-            out.append(f"| {bank or 'rotw'} | {e['old']} -> {e['new']} | {', '.join(r[0] for r in hit)} |")
+            out.append(f"| {bank or 'rotw'} | {'rename ' if e['mode'] == 'rename' else ''}{e['old']} -> {e['new']} | "
+                       f"{', '.join(r[0] for r in hit)} |")
             done = {r[0].lower() for r in rows if is_record(r) and r[ci].lower() == e["new"].lower()}   # a second run
             missing = want - {r[0].lower() for r in hit} - done
             if missing:
                 raise SystemExit(f"own_tokens: {sorted(missing)} not in {p} with Code {e['old']}")
     for e in borrows(entries):
         out += _borrow_tables(e, excel)
+    return out
+
+
+# (table, column) of the names the legacy client makes file paths of: data/global/<kind>/<token>/COF/<token><mode><wc>.COF
+TOKEN_COLUMNS = (("monstats.txt", "Code"), ("objects.txt", "Token"))
+
+
+def numeric_token(tok: str) -> bool:
+    """Digits only with a leading 0 (`08`): on D2R's way the token is read as a number and loses the 0 (bug #532: the legacy
+    client asked for monsters/8/COF/8DDhth.COF). Digits without a leading 0 (`45`, `40`) come back the same; D2R uses them."""
+    t = tok.strip()
+    return len(t) > 1 and t.isdigit() and t[0] == "0"
+
+
+def numeric_tokens(excel: Path) -> list[str]:
+    """`<bank>/<table> <row>: <column> <token>` for every token numeric_token refuses, both banks."""
+    out = []
+    for bank in BANKS:
+        for table, col in TOKEN_COLUMNS:
+            p = excel / bank / table
+            if not p.exists():
+                continue
+            h, rows = read_tsv(p)
+            if col not in h:
+                continue
+            ci = h.index(col)
+            out += [f"{bank or 'rotw'}/{table} {r[0]}: {col} {r[ci]}" for r in rows
+                    if is_record(r) and len(r) > ci and numeric_token(r[ci])]
     return out
 
 
@@ -393,7 +446,7 @@ def make_plan(entries: list[dict] | None = None, med_mon: Path | None = None, d2
     plan = Plan()
     med, d2r = index(med_mon), index(d2r_mon)
     for e in entries:
-        if e["mode"] == "split":
+        if e["mode"] in ("split", "rename"):
             _split_plan(e, plan, med, d2r)
         elif e["mode"] == "complete":
             _complete_plan(e, plan, med, d2r, excel)
@@ -419,9 +472,11 @@ def cof_stems(plan: Plan | None = None) -> set[str]:
 
 
 def virtual_index(plan: Plan | None = None) -> dict[str, Path]:
-    """rel -> source file for the plan's files that are copies (hd_monsters.py reads the art of a new token through this)."""
+    """rel -> source file for the plan's files that are copies (hd_monsters.py reads the art of a new token through this; it
+    reads a `rename` token's art under the old token, see art_token)."""
     plan = default_plan() if plan is None else plan
-    return {r: o.src for r, o in plan.ops.items() if o.src is not None}
+    renamed_to = {e["new"].lower() for e in renames()}
+    return {r: o.src for r, o in plan.ops.items() if o.src is not None and r.split("/")[0] not in renamed_to}
 
 
 def resolve(rel: str) -> Path | None:
@@ -500,6 +555,11 @@ def main(argv=None) -> int:
         excel = Path(a.excel) if a.excel else fxpaths.OUT / "global" / "excel"
         lines = apply_tables(excel)
         print("\n".join(lines) or "no split / borrow entries")
+        bad = numeric_tokens(excel)
+        if bad:
+            print("own_tokens: tokens of digits with a leading 0 reach D2R as a number (bug #532); give their rows a `rename` "
+                  "entry in tools/data/own_tokens.json:\n  " + "\n  ".join(bad))
+            return 1
         return 0
     if a.cmd == "plan":
         plan = make_plan()

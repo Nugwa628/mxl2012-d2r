@@ -14499,5 +14499,90 @@ def check_bscharm():
 
 CHECKS += [("bscharm", check_bscharm)]
 
+# lane crash532: bug #532, the legacy client's exit on "Could not add cof file: data\global\monsters\8\COF\8DDhth.COF" (Gfx.cpp:4056)
+# after the first Warriv trip to Act 2. The Fell Fiends (fellfiend1 / fellfiend2 / baalset_fellfiend2) drew with Median's token 08.
+CRASH532_MONSTERS = ("fellfiend1", "fellfiend2")
+
+
+def crash532_asserts(a0, rows, bad, what, log):
+    a1 = pot_asserts()
+    n = (a1 - a0) if a0 is not None and a1 is not None else None
+    msgs = pot_assert_lines(n or 0)
+    if n:
+        Hl("asserttrace show %d" % min(n, 32), log, 10)  # with the return addresses (who called the assert)
+    rows.append("%s: asserts %s%s" % (what, n if n is not None else "?", " %s" % msgs if msgs else ""))
+    if n is None or n > 0:
+        bad.append("%s: %s engine asserts" % (what, n))
+    return a1
+
+
+def check_crash532():
+    """Bug #532: the player's path in legacy graphics (a new Barbarian, Andariel killed by the harness as the set-up, Warriv's
+    travel line to Lut Gholein), then in each mode (MXL_CRASH532_MODES, default legacy,hd) every CRASH532_MONSTERS row spawned in
+    the Rocky Waste (41), shot while it fights the tanked character, killed and shot again after its death animation (mode DD,
+    the corpse). PASS: the travel arrived, every spawn and kill went through without an engine assert and the game stayed up;
+    the art is judged by hand on the crash532_* shots."""
+    mark = engine_mark()
+    log, rows, bad, shots = [], [], [], []
+    modes = [m.strip().lower() for m in (os.environ.get("MXL_CRASH532_MODES") or "legacy,hd").split(",") if m.strip()]
+    enable_debug()
+    goto(1)
+    Hl("asserttrace on", log)
+    a0 = pot_asserts()
+    with Tank():
+        if not set_graphics(modes[0]):
+            bad.append("graphics mode %s not reached" % modes[0])
+        a25_harness_kill(37, 156, log, rows)
+        goto(1)
+        a0 = crash532_asserts(a0, rows, bad, "set-up (Andariel)", log)
+        note = a25_npc_travel(1, 155, 40, log)
+        time.sleep(4)
+        shots.append(sh("crash532_act2_%s" % modes[0]))  # the Act 2 cut scene (first travel)
+        rows.append("cut scene skipped: %d Esc" % skip_cinematic())
+        time.sleep(3)
+        shots.append(sh("crash532_act2_town_%s" % modes[0]))
+        area = hstate()["player"].get("area")
+        rows.append("Warriv travel (%s): %s; now in %s" % (modes[0], note, area))
+        if area != 40:
+            bad.append("the Warriv travel did not arrive in Lut Gholein (area %s)" % area)
+        a0 = crash532_asserts(a0, rows, bad, "Warriv travel", log)
+        if not game_alive():
+            bad.append("the game died on the Act 2 travel")
+        for mode in modes if game_alive() else ():
+            goto(40)
+            if not set_graphics(mode):
+                bad.append("graphics mode %s not reached" % mode)
+            goto(41)
+            for mid in CRASH532_MONSTERS:
+                row = row_of("monstats", "Id", mid)
+                if row is None:
+                    bad.append("%s: not in the built monstats" % mid)
+                    continue
+                px, py = player_xy()
+                _, sp = Hl("spawn %s 1 %d %d" % (row["*hcIdx"], px + 5, py - 5), log)
+                uid = first(sp, r"id=(\d+)")
+                if uid is None:
+                    bad.append("%s: not spawned" % mid)
+                    continue
+                time.sleep(3.0)
+                shots.append(sh("crash532_%s_%s_fight" % (mid, mode)))
+                Hl("kill %s" % uid, log)
+                time.sleep(1.0)
+                shots.append(sh("crash532_%s_%s_dying" % (mid, mode)))
+                time.sleep(3.0)
+                shots.append(sh("crash532_%s_%s_corpse" % (mid, mode)))
+                a0 = crash532_asserts(a0, rows, bad, "%s %s (code %s)" % (mid, mode, row.get("Code")), log)
+                if not game_alive():
+                    bad.append("the game died after %s in %s" % (mid, mode))
+                    break
+    if game_alive():
+        goto(40)
+        set_graphics("hd")
+    finish("crash532", not bad and game_alive(), "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark,
+           shots, rows + log[-300:], partial="the Fell Fiend's art (fight, death, corpse) is judged by hand on the crash532_* shots")
+
+
+CHECKS += [("crash532", check_crash532)]
+
 if __name__ == "__main__":
     main()
