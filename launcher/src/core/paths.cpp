@@ -3,6 +3,7 @@
 #include "json.h"
 #include "manifest.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <cstring>
@@ -412,6 +413,48 @@ bool LoaderVersionMatches(const std::string& found, const std::string& required)
 	};
 	std::vector<long> f = nums(found), r = nums(required);
 	return !f.empty() && f == r;
+}
+
+bool IsSaveCopyFile(const std::string& name) {
+	if (name.find_first_of("/\\") != std::string::npos)
+		return false;
+	std::string n;
+	for (char c : name)
+		n += char(std::tolower(uint8_t(c)));
+	for (const char* ext : {".d2i", ".d2s", ".d2rl"}) {
+		size_t e = std::strlen(ext);
+		if (n.size() > e && n.compare(n.size() - e, e, ext) == 0)
+			return true;
+	}
+	return false;
+}
+
+std::string SaveCopyFolderName(const std::string& stamp, const std::string& from, const std::string& to) {
+	std::string name = stamp + " " + (from.empty() ? "none" : from) + " to " + to, out;
+	for (char c : name)
+		out += std::isalnum(uint8_t(c)) || c == '.' || c == '-' || c == '_' || c == ' ' ? c : '_';
+	return out;
+}
+
+static bool HasStamp(const std::string& name) {  // "YYYYMMDD-HHMMSS" then the end or a space
+	if (name.size() < 15 || (name.size() > 15 && name[15] != ' ') || name[8] != '-')
+		return false;
+	for (size_t i = 0; i < 15; ++i)
+		if (i != 8 && !std::isdigit(uint8_t(name[i])))
+			return false;
+	return true;
+}
+
+std::vector<std::string> SaveCopiesToRemove(const std::vector<std::string>& folders, size_t keep) {
+	std::vector<std::string> ours;
+	for (const auto& f : folders)
+		if (HasStamp(f))
+			ours.push_back(f);
+	std::sort(ours.begin(), ours.end());
+	if (ours.size() <= keep)
+		return {};
+	ours.resize(ours.size() - keep);
+	return ours;
 }
 
 bool OfficialMedianXLPath(const std::string& path, const std::string& localAppData, const std::string& roamingAppData) {

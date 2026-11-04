@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace mxl {
 
@@ -110,6 +111,20 @@ struct ModConfigKey {
 extern const ModConfigKey ModConfigKeys[4];
 // The text with that key applied (unchanged when nothing is to do); `was` (optional) gets the old value ("" missing).
 std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, std::string* was = nullptr);
+
+// ---- Copies of the player's saves before an install, update or repair (docs/bugs.md #536: a player's shared stash was
+// refused with "bad header" after updates). The save folder is only read; the copies go to <data dir>\save-copies\<folder>.
+constexpr const char* SaveCopiesFolder = "save-copies";
+constexpr size_t SaveCopiesKept = 10;
+// A file name of the save folder that is copied: shared stashes (.d2i), characters (.d2s) and D2RLoader's sidecars (.d2rl),
+// case-insensitive. Not the key bindings, automap or settings files.
+bool IsSaveCopyFile(const std::string& name);
+// "<stamp> <from> to <to>" with every character outside [A-Za-z0-9._-] made '_'; `stamp` is "YYYYMMDD-HHMMSS" and `from` is
+// "none" for a first install.
+std::string SaveCopyFolderName(const std::string& stamp, const std::string& from, const std::string& to);
+// The copy folders to remove so that `keep` stay: the oldest by their stamp. Names that do not start with a stamp are not
+// the downloader's and are never listed.
+std::vector<std::string> SaveCopiesToRemove(const std::vector<std::string>& folders, size_t keep = SaveCopiesKept);
 
 // True for a path the official Median XL owns or this downloader must never use: <localAppData>\mxl-launcher (its
 // launcher), <roamingAppData>\MedianXL (its saves), <localAppData>\MedianXL, and a classic Diablo II folder (any path

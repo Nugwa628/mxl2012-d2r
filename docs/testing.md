@@ -5381,3 +5381,41 @@ lane's run folder and was driven only by `WM_COMMAND` to the button ids (`IdPlay
   made: the plugin build was denied in this lane. In one of three kept-open runs the downloader window was gone a few
   minutes later without a crash event or log line. A repeat watched it for 60 s after the game ended, and it stayed open.
 - Evidence: `mxl2012-runs/playbtn/` (`playcheck.log`, `ev-close/`, `ev-keep/`, the snapshots).
+
+## Lane stashhdr: shared stash "bad header" after updates (bug #536, 2026-11-05, slot 2, background mode)
+
+Player report (via the user): "every update causes items in the shared stash to cause a bad header error". No logs or files yet.
+Evidence and scratch: `mxl2012-runs/stashhdr/` (outside git): `backup0/`, `backup1/` (saves and mod config before the runs),
+`filled/` (the filled stash), `t019/`, `t0110/` (the packages' tables and config), `tomlout/`, `dltest/` (downloader test, `test.log`).
+Slot 2 install: lane playbtn's dev build of main (2026-11-04); its mod `d2rloader.toml`, `metadata.json` and plugin were put back
+after each run (`cmp` equal). Character `StashTab` (expansion). Left behind: the test items on shared pages 1-2 of slot 2's
+`SharedStashSoftCoreV2.d2i`.
+
+| Check | Result |
+|-|-|
+| tables of the 0.1.9 and 0.1.10 packages | identical (all of `data/global/excel`); only `metadata.json` (modVersion) and the plugin differ |
+| 0.1.10 against main (slot 2 dev build) | itemstatcost, uniqueitems, setitems, magic / rare affixes, runes, misc, weapons, armor, itemtypes, gems, properties: byte-equal, both banks |
+| 0.1.1 -> 0.1.9 (git) | the only change to those tables: `AdvancedStashStackable` on 71 rune / gem rows (#510, 0.1.4) |
+| D2RLoader backups of slots 1-4 | 60 shared stashes (builds since 2026-10-28): `d2save.py roundtrip` with the 0.1.10 tables, all OK |
+| fewer pages configured (run `checks-20261105-000143-s2`) | 5-page stash, items on every page, the 0.1.10 toml (no `add_shared_tabs`, effective 0): loads, no ERROR line, Save and Exit writes all 5 pages unchanged |
+| other modVersion (`0.1.0-dev` -> `0.1.0-devB`) | loads, no ERROR line |
+| filled stash (`fill.py`) | shared page 1: rare ring, unique amulet (215), magic ring, r01, r33, gem; page 2: rare amulet, 476 arrows, tome, unique ring (222), rare jewel, r15 (charms: no room in the backpack). Save and Exit, `roundtrip` with the 0.1.10 tables OK (17 items) |
+| retail start (mode commented out) | `savemode` writes the key back and asks for a restart; the character list is **empty** in that start (`retail_after_play.png`), stash file unchanged |
+| plugin missing | not run: the harness needs the plugin to start |
+| downloader toml writer (`tomldrv/`, the downloader's own `ApplyModConfigKey` / `SetExtendedSaveFormat`, twice) | D2RLoader-written mod configs of slots 2-4, D2RLoader's template, the 0.1.10 toml: all valid TOML (`tomllib`), `mode = "extended"` |
+| D2RLoader versions | 1.3.1-beta on slots 1-4 and in the release manifest |
+
+**Fix (protection):** the downloader copies the save folder's `.d2i` / `.d2s` / `.d2rl` before every install, update and repair
+(docs/launcher.md "Copies of the saves"). `launcher_tests.exe` **370 checks, 0 failures** (new `TestSaveCopies`). Local test
+(`mxl2012-runs/stashhdr/dltest/test.ps1`, lane dlsave's local site 0.0.2-lt1 -> 0.0.3-lt2, fake D2R folder, own data dir, savepath
+pointed at slot 2's save folder, read only):
+
+| Step | Result |
+|-|-|
+| A fresh install, no save folder | PASS: no copy |
+| B update | PASS: one folder `<stamp> 0.0.2-lt1 to 0.0.3-lt2`, 200 of 200 files, byte-equal, both shared stashes, no `Settings.json`, reported |
+| C 11 repairs (12 runs) | PASS: 10 copy folders stay, the oldest went first, a foreign folder `my notes` stays |
+| save folder | PASS: names, bytes and times unchanged |
+
+Open: the cause. Needed from the player: `d2rloader.log` after the error, the `.d2i`, the mod's `d2rloader.toml`, how they update,
+and whether other mods' files are in the mod folder.

@@ -1330,6 +1330,7 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 		files.Set(path, rec);
 		return sha;
 	};
+	KeepSaveCopy();
 	InstallPlan plan = PlanInstall(feed_, ListFilesUnder(mod), current);
 	for (const auto& k : plan.preserved)
 		Report("Kept your " + k);
@@ -1394,6 +1395,49 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 	SaveState();
 	Report("D2R-XL 2012 " + feed_.version + " is in " + Utf8(mod) + ". " + HowToPlay);
 	return true;
+}
+
+// docs/bugs.md #536: a player's shared stash came back with "bad header" after updates. Before the mod's files change, the
+// save folder's stashes, characters and sidecars are copied to <data dir>\save-copies\<stamp> <from> to <to>; the save folder
+// is only read. The oldest copies past SaveCopiesKept are removed (only the downloader's own copy folders). Not fatal: a
+// failed copy is reported and the install goes on (D2RLoader keeps its own backups too).
+void Launcher::KeepSaveCopy() {
+	std::wstring saves = SavesDir();
+	if (!DirExists(saves))
+		return;
+	std::vector<std::string> names;
+	for (const auto& f : ListFilesUnder(saves))
+		if (IsSaveCopyFile(f))
+			names.push_back(f);
+	if (names.empty())
+		return;
+	SYSTEMTIME t;
+	GetLocalTime(&t);
+	char stamp[32];
+	std::snprintf(stamp, sizeof stamp, "%04u%02u%02u-%02u%02u%02u", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+	bool ours = state_["mod"].IsObject() && SamePath(Wide(state_["mod_dir"].Str()), ModDir());
+	std::wstring root = JoinPath(opt_.dataDir, Wide(SaveCopiesFolder));
+	std::string name = SaveCopyFolderName(stamp, ours ? state_["mod"]["version"].Str() : "", feed_.version);
+	std::wstring dir = JoinPath(root, Wide(name));
+	for (int n = 2; DirExists(dir); ++n)  // two runs in the same second
+		dir = JoinPath(root, Wide(name + " (" + std::to_string(n) + ")"));
+	size_t copied = 0;
+	if (MakeDirs(dir))
+		for (const auto& n : names)
+			copied += CopyFileW(LongPath(JoinPath(saves, Wide(n))).c_str(), LongPath(JoinPath(dir, Wide(n))).c_str(), TRUE) != 0;
+	if (copied < names.size()) {
+		Report("Could not copy " + std::to_string(names.size() - copied) + " of " + Count(names.size(), "save file") + " from " + Utf8(saves) +
+		       " to " + Utf8(dir) + " (" + Utf8(LastErrorText(GetLastError())) + "); your saves are not changed by the install.");
+		return;
+	}
+	std::set<std::string> folders;
+	for (const auto& f : ListFilesUnder(root))
+		if (size_t s = f.find('/'); s != std::string::npos)
+			folders.insert(f.substr(0, s));
+	std::string ignore;
+	for (const auto& old : SaveCopiesToRemove({folders.begin(), folders.end()}))
+		RemoveTree(JoinPath(root, Wide(old)), ignore);
+	Report("Copied " + Count(copied, "save file") + " (shared stashes and characters) to " + Utf8(dir) + " before the install");
 }
 
 // docs/bugs.md #512 (owner decision 2026-10-30): the mod's d2rloader.toml is the player's (`preserve`), but without

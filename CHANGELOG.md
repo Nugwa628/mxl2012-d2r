@@ -5,6 +5,11 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- The downloader keeps a copy of your shared stashes and characters before every install, update and repair, in
+  `save-copies` in its data folder (the 10 newest stay). Your save folder is only read. If a shared stash ever shows a "bad
+  header" error after an update, close the game and copy the files back from there (or from D2RLoader's own backups in
+  `Saved Games\Diablo II Resurrected\D2RLoader Backups`), and please send us `d2rloader\logs\d2rloader.log` and the stash file
+  (#536).
 - The downloader has a **Play** button: it starts `D2RLoader.exe -mod mxl2012` from your D2R folder, so D2R-XL 2012 starts
   whatever D2RLoader's Default Mod is. It is on when D2RLoader 1.3.1 is there and D2R-XL 2012 is installed and up to date; the
   line under the panel says why when it is off. The downloader closes when the game starts (a check box turns that off).

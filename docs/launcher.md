@@ -138,6 +138,14 @@ line goes right under an existing header; else the table is appended. Every othe
 and the CRLF/LF endings are unchanged. The panel/log line says what the old value was and where
 the backup is. If the backup or the write fails, the install stops with an error that names the key.
 
+**Copies of the saves** (bug #536). Before an install, update or repair changes the mod's files, `KeepSaveCopy` copies the
+`.d2i` (shared stashes), `.d2s` (characters) and `.d2rl` (D2RLoader's sidecars) files of the mod's save folder (the `savepath` of
+`mxl2012.mpq/modinfo.json`, under `Saved Games\Diablo II Resurrected\mods`) to `<data dir>\save-copies\<YYYYMMDD-HHMMSS> <old
+version> to <new version>` (`none` for a first install; ` (2)` when two runs share a second). The save folder is only read. The
+10 newest copy folders stay; older ones the downloader made are removed, a folder whose name does not start with a date stamp is
+never touched (`IsSaveCopyFile`, `SaveCopyFolderName`, `SaveCopiesToRemove`, paths.h). A failed copy is reported and the install
+goes on. To go back: close the game and copy the files from a copy folder into the save folder.
+
 **Ctrl stat ranges off in a kept config** (bug #528, owner decision 2026-11-03). D2RLoader's
 Ctrl "Possible base rolls" block repeats lines for Median's automagic rows (upstream:
 D2RLoader/PluginSDK issue 6), so the release ships `[d2rcore.items] item_stat_ranges = false`.

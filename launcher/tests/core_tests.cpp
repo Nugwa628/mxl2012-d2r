@@ -992,6 +992,29 @@ void TestLoaderPackage() {
 
 }  // namespace
 
+void TestSaveCopies() {
+	for (const char* n : {"SharedStashSoftCoreV2.d2i", "ModernSharedStashSoftCoreV2.d2i", "SharedStashHardCoreV2.D2I", "Hero.d2s", "Hero.d2rl"})
+		Check(mxl::IsSaveCopyFile(n), (std::string("copied: ") + n).c_str());
+	for (const char* n : {"Hero.key", "Hero.ma0", "Hero.map", "Hero.ctlo", "Settings.json", "lootfilter.json", ".d2i", "sub/Hero.d2s",
+	                      "sub\\Hero.d2i", "Hero.d2s.bak"})
+		Check(!mxl::IsSaveCopyFile(n), (std::string("not copied: ") + n).c_str());
+	Check(mxl::SaveCopyFolderName("20261105-010203", "0.1.10", "0.1.11") == "20261105-010203 0.1.10 to 0.1.11", "copy folder name");
+	Check(mxl::SaveCopyFolderName("20261105-010203", "", "0.1.11") == "20261105-010203 none to 0.1.11", "first install");
+	Check(mxl::SaveCopyFolderName("20261105-010203", "a/b\\c:d", "0.1.11") == "20261105-010203 a_b_c_d to 0.1.11", "unsafe characters");
+	std::vector<std::string> folders;
+	for (int i = 1; i <= 12; ++i) {
+		char b[64];
+		std::snprintf(b, sizeof b, "202611%02d-120000 0.1.%d to 0.1.%d", i, i, i + 1);
+		folders.push_back(b);
+	}
+	folders.push_back("my notes");
+	folders.push_back("2026-not-a-stamp");
+	auto gone = mxl::SaveCopiesToRemove(folders);
+	Check(gone.size() == 2 && gone[0].rfind("20261101-", 0) == 0 && gone[1].rfind("20261102-", 0) == 0, "the two oldest of 12 go, 10 stay");
+	Check(mxl::SaveCopiesToRemove(folders, 20).empty(), "nothing goes when fewer than keep");
+	Check(mxl::SaveCopiesToRemove({"my notes", "x"}, 0).empty(), "folders without a stamp are never removed");
+}
+
 int main() {
 	TestSha256();
 	TestJson();
@@ -1010,6 +1033,7 @@ int main() {
 	TestStatRangesOff();
 	TestModConfigKeys();
 	TestSharedTabsMin();
+	TestSaveCopies();
 	TestEnvironment();
 	TestPlay();
 	TestSvg();

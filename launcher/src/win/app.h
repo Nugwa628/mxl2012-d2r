@@ -146,6 +146,7 @@ private:
 	bool EnsureMod(bool verify, std::string& error);
 	bool EnsureExtendedSaves(const std::wstring& mod, std::string& error);  // docs/bugs.md #512
 	void EnsureModConfigKeys(const std::wstring& mod);                     // docs/bugs.md #528, #498 (ModConfigKeys)
+	void KeepSaveCopy();                                                   // docs/bugs.md #536: saves copied before an install
 	bool LoadState();
 	bool SaveState();
 	void Report(const std::string& text, double fraction = -1);
