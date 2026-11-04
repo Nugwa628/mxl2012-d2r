@@ -902,7 +902,7 @@ for them (the server frames are driven from it). `menu` runs on the UI thread. A
 | `wpobj` | every waypoint object of the game (class, position, distance, level, whether it is within 36 sub-tiles) and the player's level and waypoint number |
 | `travel` | (client side) the hotkey bindings (key and modifier as D2RLoader reports them), counters (waypoints activated, scans, reveals, key presses, transmutes, cube open / closed) and the distinct UI messages seen (`uimsgs`) |
 | `stashprobe <tab>` / `stashprobe result` | queues, on the game thread, a rune created by ItemService in shared stash tab `<tab>` and destroyed again; `result` answers `1 page=<n> create=0 ...` when the tab took the item, `0` when it refused |
-| `stashpage state\|open\|close\|toggle\|msgs\|uia <target> <command> [text]\|widget <panel> [child]\|vis <panel> <child> <0\|1>\|put <code> [x y]\|fill <1\|2>\|drop <code>\|list\|move <id> <1\|2> [x y]\|result` | (client side; put / fill / drop / list / move queue work on the game thread, `result` has the answer) the personal stash page 2: panel state (1 closed, 2 open), a native UI message through WidgetService (`uia PanelManager OpenPanel BankExpansionLayout`), a widget rect, items created / listed / moved between page 1 and page 2 in one ItemService transaction |
+| `stashpage state\|open\|close\|toggle\|msgs\|uia <target> <command> [text]\|widget <panel> [child]\|vis <panel> <child> <0\|1>\|put <code> [x y]\|fill <1\|2>\|drop <code>\|list\|move <id> <1\|2> [x y]\|result` | (client side; put / fill / drop / list / move queue work on the game thread, `result` has the answer) the personal stash page 2: `state` prints `state=<page 2 panel: 1 closed, 2 open> tab=<n> strip=<0\|1>`, `msgs` the last bank / stash UI messages newest first, a native UI message through WidgetService (`uia PanelManager OpenPanel BankExpansionLayout`), a widget rect, items created / listed / moved between page 1 and page 2 in one ItemService transaction |
 
 mxl2012 additions (lane skills, 2026-10-28) to the list above:
 
@@ -5434,3 +5434,32 @@ and runs 20 + 20 west from a live zombie. Distances are sub-tiles from the playe
 | Wolf Companion, Blood Elementals, Raise Skeleton | follow and attack as in lane summonai (within about 2-13, D2R's own warps); the part's counters did not move while they were out |
 | Harness on the shared frame hook | all verbs ran in both modes |
 | Crash | none (HD and legacy, 12 summons) |
+
+## Lane stashpage2: a second personal stash page (bug #537, 2026-11-05, slot 2, background mode)
+
+Owner (2026-11-04): the personal stash gets a second page through D2RLoader 1.3.1's one custom player page (`stash2`, item page 6,
+`<char>.d2rl`), drawn by the panel `StashPage2` (10 x 10). The 2012 port of lane stash-pages' part (see "Stash pages: personal
+page 2" above). Evidence and scratch: `mxl2012-runs/stashpage2/` (outside git): `runs/<run>/` (report, shots, logscan), `run*.log`,
+`off*.log`, `exp-*.log`. Characters `Mxl2Barb` and `StashPgTwo` (RotW Barbarians), `StashTab` (expansion, its files put back
+after the run).
+
+**Findings.** D2R 3.3 sends `BankPanelMessage:SelectTab` with an empty text, so no tab index reaches a plugin, and WidgetService has
+no visibility getter: the plugin cannot tell Personal from Shared. The strip with the arrows is therefore inserted before D2R's
+`SharedStashTabContainer`; on the Shared tab D2R's `StashNavigation` (HD 369,1211, classic 15,385) is drawn over it and turns the
+shared pages. `StashPage2` and `BankExpansionLayout` share the left panel slot (opening one closes the other), so page 2's arrows
+and X send `PanelManager:OpenPanel` / `ClosePanel` `BankExpansionLayout`. Calibration for the checks (1600 x 900 client): HD layout ->
+client scale 0.4163, origin (97.95, 86.8); stash grid (135,178), 40.8 px cells; arrows (276,608) / (401,608); tabs y 162, Personal
+x 163, Shared x 254; page 2 X (563,103); legacy arrows (368,692) / (596,692).
+
+| Check | Run | Result |
+|-|-|-|
+| `stashpage2`, HD and legacy, RotW game | `checks-20261105-032725-s2` | PARTIAL (only the pictures are judged by hand; all of them look right): the stock strip shows two arrows (`stashpage2_hd_p1.png`); right arrow opens page 2 ("2 / 2", `stashpage2_hd_p2.png`), left arrow back; Shared tab: D2R's arrow turns to "Page 2 / 7" and page 2 stays shut (`stashpage2_hd_shared_next.png`); an item moves 2 -> 1 -> 2; Ctrl-click backpack -> page 2 and back (`stashpage2_ctrl_in.png`); page 2's X closes the page and the inventory (`stashpage2_hd_x.png`); legacy: the arrows open page 2 and come back (`stashpage2_legacy_p2.png`, `stashpage2_legacy_back.png`); Save and Exit + reload keeps both items |
+| game restart (Mxl2Barb) | `checks-20261105-015918-s2` -> `-020615-s2` | PASS: the item put on page 2 (9,9) before the exit is there after a new start |
+| game restart (StashPgTwo) | `-033750-s2` (`stashpage2keep`) -> `-035232-s2` (`stashpage2after`) | PASS: `p2:r08@9,9` after the start, then dropped |
+| protected page | `-033925-s2` (`MXL_CONTROL=stashpage2`, StashPgTwo with r08 on page 2) | as designed: "enter game BLOCKED", D2RCore logs "Character contains a custom page-6 item, but no custom player inventory provider is configured." and "Character item-list load failed" (twice). The `.d2s` SHA256 is unchanged; the `.d2rl` (594 bytes) is rewritten at the refused load (header `D2RL` v2 kept, bytes after offset 12 changed), and r08 is there again with the part on (`-035232-s2`) |
+| part off | `-035327-s2` (`stashpage2off`) | PASS: the stash opens, no arrows (`strip=0`, `stashpage2off_stash.png`), `mxl2012` "stashpage2 off: left out by mxl2012-core-off.txt" |
+| `stashpage2`, expansion game (StashTab, `rotwstash` "game type 2") | `checks-20261105-041710-s2` | PARTIAL (pictures by hand, all right): the same steps as the RotW run pass; Shared tab: D2R's arrow turns to "Page 2 / 5" (`stashpage2_hd_shared_next.png`), legacy page 2 "2 / 2" (`stashpage2_legacy_p2.png`); 0 new crash files. StashTab's `.d2s` and `.d2rl` were put back from the copy made before the run (SHA256 equal) |
+| logs | all runs | no crash file from these runs; only the exit-only pool assert (`s_StatsPool.IsEmpty`). The first runs left one d2r-lastresort report (first-chance access violation at shutdown, 2026-11-04 17:01 UTC), not seen again |
+
+Unit tests: `tools/tests/test_stash_page2.py` (strips, messages, header), `plugin/tests/stash_pages_test.cpp` ("stash_pages: all
+checks passed"). Not tested: the gamepad stash (it has no arrows), TCP/IP with two clients.

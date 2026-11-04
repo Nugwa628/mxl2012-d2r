@@ -14584,5 +14584,281 @@ def check_crash532():
 
 CHECKS += [("crash532", check_crash532)]
 
+
+# ---------------------------------------------------------------- lane stashpage2: personal stash page 2 (D2RLoader player page)
+# docs/plugin-plan.md 8.2. Page 2 is D2RLoader's custom player page (item page 6, <char>.d2rl), drawn by the plugin panel
+# mxl2012-core/StashPage2 at the stock stash's place; the arrows in the stock stash (under D2R's shared ones) and the "2 / 2" strip on page 2 switch
+# between them with D2R's own PanelManager messages (tools/stash_page2.py).
+
+SP2_HD = (0.4163, 97.95, 86.8)  # HD stash layout -> 1600 x 900 client: scale and origin (the stock grid at 89,219 shows at 135,178)
+SP2_GRID = (135, 178, 40.8, 40.8)  # the HD stash grid (stock page and page 2), 1600 x 900 client
+
+
+def sp2_xy(x, y):
+    return (SP2_HD[1] + x * SP2_HD[0]) / 1600.0, (SP2_HD[2] + y * SP2_HD[0]) / 900.0
+
+
+def sp2_job(cmd, want, log):
+    """A queued stashpage job (put / fill / list / move / drop) and its answer: the `stashpage result` line once it is not pending."""
+    ok, lines = Hl("stashpage " + cmd, log)
+    if not ok:
+        return False, "refused: %s" % (lines[:2],)
+    out = ""
+    for _ in range(20):
+        time.sleep(0.4)
+        _ok, l2 = H("stashpage result")
+        out = next((ln for ln in l2 if ln.startswith("stashpage result")), "")
+        if " -1 pending" not in out and " -2 " not in out:
+            break
+    log.append(out)
+    return want in out, out
+
+
+def sp2_state(log):
+    """(state, tab, strip) of `stashpage state`: state = the page 2 panel's presentation state (1 closed, 2 open); tab = the
+    stock stash's tab as the plugin saw it (D2R 3.3's SelectTab has no index: stays 0); strip = the stock arrows shown."""
+    _ok, lines = Hl("stashpage state", log)
+    ln = next((x for x in lines if x.startswith("stashpage state=")), "")
+    m = re.match(r"stashpage state=(-?\d+) tab=(-?\d+) strip=(-?\d+)", ln)
+    return tuple(int(v) for v in m.groups()) if m else (-9, -9, -9)
+
+
+def sp2_wait_state(want, log, tries=8):
+    st = sp2_state(log)
+    for _ in range(tries):
+        if st[0] == want:
+            break
+        time.sleep(0.5)
+        st = sp2_state(log)
+    return st
+
+
+def sp2_open_stash(log):
+    """The stock stash as a player opens it: the Act 1 stash object clicked (the stash and the inventory panel open)."""
+    if right_panel_open():
+        return True
+    goto(1)
+    hdl_stash_open(log)
+    time.sleep(1.0)
+    return right_panel_open()
+
+
+def sp2_close(log):
+    """Page 2, the stock stash and the inventory closed (a panel left open keeps the character from walking)."""
+    if sp2_state(log)[0] == 2:
+        Hl("stashpage close", log)
+        sp2_wait_state(1, log)
+    Hl("stashpage uia PanelManager ClosePanel BankExpansionLayout", log)
+    time.sleep(1.0)
+    close_right_panel()
+    if sp2_state(log)[0] == 2:
+        g.press("esc")
+        time.sleep(0.8)
+
+
+SP2_LEGACY_ARROWS = {"left": (368 / 1600.0, 692 / 900.0), "right": (596 / 1600.0, 692 / 900.0)}  # legacy shot, 1600 x 900 client
+
+
+def sp2_arrow(which, legacy=False):
+    """A background click on an arrow of the open strip (the stock arrows or page 2's "2 / 2" strip, the same place). HD: the
+    strip at 369,1211 with 64 x 64 arrows at x 29 and 327; legacy: where the classic strip shows."""
+    if legacy:
+        return g.click(*SP2_LEGACY_ARROWS[which])
+    off = 29 + 32 if which == "left" else 327 + 32
+    g.click(*sp2_xy(369 + off, 1211 + 13 + 32))
+
+
+def sp2_ids(out):
+    return {m.group(2): (m.group(1), m.group(3)) for m in re.finditer(r"(p\d|inv):(\w+)@\d+,\d+#(\d+)", out)}
+
+
+def check_stashpage2():
+    name = "stashpage2"
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    mark = engine_mark()
+    bad, res, log, shots = [], [], [], []
+    txt = mxl_text()
+    line = next((ln for ln in txt.splitlines() if "stashpage2" in ln), "-")
+    log.append(line)
+    if "stashpage2 on:" not in txt:
+        return add(name, "FAIL", "`mxl` does not say `stashpage2 on`: %s" % line, [], log)
+    # two test items on page 2 (rune codes the test character does not carry)
+    for cmd in ("put r05 1 1", "put r06 5 5"):
+        ok, out = sp2_job(cmd, "container=9", log)  # 9 = the custom page
+        if not ok:
+            bad.append("%s: %s" % (cmd, out[:80]))
+    ok, out = sp2_job("list", "p2:r05@1,1", log)
+    ids = sp2_ids(out)
+    both = ok and "p2:r06@5,5" in out
+    res.append("2 items put on page 2: %s" % ("yes" if both else "NO"))
+    if not both:
+        bad.append("page 2 list: %s" % out[:120])
+    # the stock stash, its strip, the arrows (background clicks)
+    if not sp2_open_stash(log):
+        bad.append("the stash did not open")
+    _ok, wl = Hl("stashpage widget BankExpansionLayout MxlPersonalNavigation", log)
+    strip = next((ln for ln in wl if "rect result 0" in ln), "")
+    st = sp2_state(log)
+    res.append("stock stash: strip widget %s, strip shown=%d tab=%d" % ("present" if strip else "MISSING", st[2], st[1]))
+    if not strip or st[2] != 1:
+        bad.append("no page 2 arrows on the Personal tab (%s, %s)" % (wl[:1], st))
+    shots.append(sh("stashpage2_hd_p1"))
+    sp2_arrow("right")
+    st = sp2_wait_state(2, log)
+    res.append("right arrow -> page 2: %s" % ("yes" if st[0] == 2 else "NO (%s)" % (st,)))
+    if st[0] != 2:
+        bad.append("the right arrow did not open page 2")
+        Hl("stashpage open", log)
+        sp2_wait_state(2, log)
+    shots.append(sh("stashpage2_hd_p2"))
+    sp2_arrow("left")
+    st = sp2_wait_state(1, log)
+    res.append("left arrow on page 2 -> stock stash: %s" % ("yes" if st[0] == 1 else "NO (%s)" % (st,)))
+    if st[0] != 1:
+        bad.append("the page 2 arrow did not return")
+        Hl("stashpage close", log)
+        sp2_wait_state(1, log)
+    # the Shared tab: D2R's own arrows and "Page n / m" draw over ours; its right arrow turns the shared page, page 2 stays shut
+    g.click(*sp2_xy(82 + 195 * 1.5, 146 + 36))
+    time.sleep(1.2)
+    shots.append(sh("stashpage2_hd_shared"))
+    sp2_arrow("right")
+    time.sleep(1.5)
+    shared = sp2_state(log)
+    shots.append(sh("stashpage2_hd_shared_next"))
+    sp2_arrow("left")
+    time.sleep(1.0)
+    Hl("stashpage msgs", log)
+    g.click(*sp2_xy(82 + 195 * 0.5, 146 + 36))
+    time.sleep(1.2)
+    shots.append(sh("stashpage2_hd_personal_again"))
+    res.append("Shared tab: its right arrow left page 2 %s (shots stashpage2_hd_shared*)" % ("shut" if shared[0] == 1 else "OPEN"))
+    if shared[0] != 1:
+        bad.append("on the Shared tab the right arrow opened page 2")
+        Hl("stashpage open", log)  # back to the stock stash: page 2's arrow
+        sp2_wait_state(2, log)
+        sp2_arrow("left")
+        sp2_wait_state(1, log)
+    # moves between the pages (ItemService, atomic) and back
+    if "r05" in ids:
+        iid = ids["r05"][1]
+        ok1, o1 = sp2_job("move %s 1 2 2" % iid, "move rc=0 committed=1", log)
+        ok2, _l1 = sp2_job("list", "p1:r05@2,2", log)
+        ok3, o3 = sp2_job("move %s 2" % iid, "move rc=0 committed=1", log)
+        ok4, _l2 = sp2_job("list", "p2:r05@", log)
+        moved = ok1 and ok2 and ok3 and ok4
+        res.append("item moved page 2 -> 1 -> 2: %s" % ("yes" if moved else "NO"))
+        if not moved:
+            bad.append("move between the pages (%s / %s)" % (o1[:50], o3[:50]))
+    # Ctrl+click: backpack -> page 2 and back with page 2 open (D2RCore's own while the panel shows)
+    _ok, ln = Hl("item r07 inv", log)
+    it = next((kv(x) for x in ln if x.startswith("item id=")), None)
+    Hl("stashpage open", log)
+    if sp2_wait_state(2, log)[0] != 2 or it is None:
+        bad.append("Ctrl+click: no page 2 panel or no backpack item (%s)" % (ln[:1],))
+    else:
+        g.click(*rp_inv_xy(int(it["x"]), int(it["y"])), mods=("ctrl",))
+        time.sleep(1.5)
+        ok1, out1 = sp2_job("list", "p2:r07@", log)
+        shots.append(sh("stashpage2_ctrl_in"))
+        ok2 = False
+        m = re.search(r"p2:r07@(\d+),(\d+)", out1)
+        if m:
+            g.click(*rp_inv_xy(int(m.group(1)), int(m.group(2)), SP2_GRID), mods=("ctrl",))
+            time.sleep(1.5)
+            ok2, _o = sp2_job("list", "inv:r07@", log)
+        res.append("Ctrl+click backpack -> page 2: %s, page 2 -> backpack: %s" % ("yes" if ok1 else "NO", "yes" if ok2 else "NO"))
+        if not (ok1 and ok2):
+            bad.append("Ctrl+click (in %s, out %s)" % (ok1, ok2))
+    # page 2's X: the stash and the inventory close as with the stock X
+    if sp2_state(log)[0] == 2:
+        g.click(563 / 1600.0, 103 / 900.0)
+        time.sleep(1.5)
+        st, inv = sp2_state(log), right_panel_open()
+        shots.append(sh("stashpage2_hd_x"))
+        res.append("page 2's X: page 2 %s, inventory %s" % ("closed" if st[0] == 1 else "OPEN", "OPEN" if inv else "closed"))
+        if st[0] != 1 or inv:
+            bad.append("page 2's X left a panel open (state %s, inventory %s)" % (st, inv))
+    sp2_close(log)
+    # legacy graphics: the stash opened in HD (the walk's click projection is HD's), then G with it open
+    if not sp2_open_stash(log):
+        bad.append("legacy: the stash did not open in HD first")
+    elif not set_graphics("legacy"):
+        bad.append("legacy graphics not reached")
+    else:
+        Hl("stashpage widget BankExpansionLayout MxlPersonalNavigation", log)
+        shots.append(sh("stashpage2_legacy_p1"))
+        sp2_arrow("right", legacy=True)
+        st = sp2_wait_state(2, log)
+        Hl("stashpage widget mxl2012-core/StashPage2 MxlPageNavigation", log)
+        shots.append(sh("stashpage2_legacy_p2"))
+        sp2_arrow("left", legacy=True)
+        back = sp2_wait_state(1, log)
+        shots.append(sh("stashpage2_legacy_back"))
+        res.append("legacy: right arrow -> page 2: %s, left arrow back: %s" % ("yes" if st[0] == 2 else "NO", "yes" if back[0] == 1 else "NO"))
+        if st[0] != 2 or back[0] != 1:
+            bad.append("legacy arrows (states %s, %s)" % (st, back))
+    set_graphics("hd")
+    sp2_close(log)
+    # Save and Exit + reload: the page 2 items stay
+    if not leave_and_reenter():
+        bad.append("Save and Exit + reload failed")
+    else:
+        ok, out = sp2_job("list", "p2:r05@", log)
+        kept = ok and "p2:r06@5,5" in out
+        res.append("after Save and Exit + reload page 2 holds r05 and r06: %s" % ("yes" if kept else "NO"))
+        if not kept:
+            bad.append("page 2 after reload: %s" % out[:120])
+    for code in ("r05", "r06", "r07"):
+        sp2_job("drop " + code, "destroyed", log)
+    finish(name, not bad, "; ".join(res) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial="the page pictures (HD and legacy) are judged by hand on the stashpage2_* shots")
+
+
+def check_stashpage2keep():
+    """First run of the game restart pair: an item put on page 2 and saved; stashpage2after (next run, a new game process) finds it."""
+    name = "stashpage2keep"
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    log = []
+    sp2_job("drop r08", "destroyed", log)
+    ok, out = sp2_job("put r08 9 9", "container=9", log)
+    saved = ok and leave_and_reenter()
+    ok2, out2 = sp2_job("list", "p2:r08@9,9", log)
+    add(name, "PASS" if saved and ok2 else "FAIL", "r08 on page 2 at 9,9 and saved: put %s; after Save and Exit %s" % (out[:60], out2[:80]), [], log)
+
+
+def check_stashpage2after():
+    name = "stashpage2after"
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    log = []
+    ok, out = sp2_job("list", "p2:r08@9,9", log)
+    sp2_job("drop r08", "destroyed", log)
+    add(name, "PASS" if ok else "FAIL", "after a game restart page 2 holds r08 at 9,9: %s (%s)" % ("yes" if ok else "NO", out[:100]), [], log)
+
+
+def check_stashpage2off():
+    """A control run with the part off (MXL_CONTROL=stashpage2, mxl2012-core-off.txt): the stock stash opens without page 2's arrows."""
+    name = "stashpage2off"
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    log, shots = [], []
+    line = next((ln for ln in mxl_text().splitlines() if "stashpage2" in ln), "-")
+    log.append(line)
+    opened = sp2_open_stash(log)
+    st = sp2_state(log)
+    Hl("stashpage widget BankExpansionLayout MxlPersonalNavigation", log)
+    shots.append(sh("stashpage2off_stash"))
+    sp2_close(log)
+    ok = "stashpage2 off" in line and opened and st[2] == 0
+    add(name, "PASS" if ok else "FAIL", "part off (%s); the stash opens: %s; page 2 arrows hidden: %s (strip=%d)"
+        % (line[:60], "yes" if opened else "NO", "yes" if st[2] == 0 else "NO", st[2]), shots, log)
+
+
+CHECKS += [("stashpage2", check_stashpage2), ("stashpage2keep", check_stashpage2keep), ("stashpage2after", check_stashpage2after),
+           ("stashpage2off", check_stashpage2off)]
+
 if __name__ == "__main__":
     main()

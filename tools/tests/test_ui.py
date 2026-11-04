@@ -286,7 +286,8 @@ class LayoutTests(unittest.TestCase):
                 { "type": "InventoryGridWidget", "name": "grid", "fields": { "rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 },
                   "cellSize": "$ItemCellSize" } },
                 { "type": "ButtonWidget", "name": "StashLeftArrow", "fields": { "rect": { "x": 29, "y": 13 } } },
-                { "type": "ButtonWidget", "name": "StashRightArrow", "fields": { "rect": { "x": 290, "y": 13 } } } ] },
+                { "type": "ButtonWidget", "name": "StashRightArrow", "fields": { "rect": { "x": 290, "y": 13 } } },
+                { "type": "Widget", "name": "SharedStashTabContainer", "children": [ ] } ] },
             { "type": "Widget", "name": "advancedstash_gems", "children": [
                 { "type": "AdvancedStashSlotWidget", "name": "gcv", "fields": { "rect": { "x": 470, "y": 214, "width": 98, "height": 98 }, "itemCode": "gcv" } } ] },
             { "type": "Widget", "name": "advancedstash_horadriccube", "children": [
@@ -315,7 +316,8 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(cube[1]["fields"], {"rect": {"x": 520, "y": 1239}, "tooltipString": "Transmute"})
         self.assertIn('"name": "gcv", "fields": { "rect": { "x": 470, "y": 214, "width": 98, "height": 98 }', t)   # slots: D2R's
         self.assertIn('"rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 }', t)   # the stash grid untouched
-        arrows = lay["children"][1]["children"][1:]
+        arrows = lay["children"][1]["children"][1:3]
+        self.assertEqual([c["name"] for c in lay["children"][1]["children"][3:]], ["MxlPersonalNavigation", "SharedStashTabContainer"])   # page 2's strip
         for a in arrows:   # D2RLoader's bundled file's page arrow tooltip, as text
             self.assertEqual(a["fields"]["tooltipString"], ui_layouts.PAGE_ARROW_TOOLTIP)
             self.assertIs(a["fields"]["tooltipIsTopAligned"], True)

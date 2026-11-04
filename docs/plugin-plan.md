@@ -29,7 +29,7 @@ Effort: XS < 1 h, S < 1 day, M a few days, L a week or more (same scale as engin
 | G | Dev test harness (for the game checks) | - | dev builds only, a small verb set | `testharness.cpp`, part of `harness_cmds.cpp` | copy, cut down | S-M | yes (dev only) |
 | H | Pandemonium 2 waypoint index 17 (shared with Valley of the Kings) | D2R's panel lists actinfo levels; a number maps to one level | game check; same as 1.13c expected, nothing to build | fallback `waypoints.cpp` `InstallWaypointPanel` | none / fallback change | XS (M fallback) | check only |
 | I | Stat unassign (Laz's PlugY ini forces it) | no per-point unassign in D2R | **optional, owner**: new part | starting point `stat_rules.cpp` `StatClickHook` (`0x4b3c70`) | new | M | no |
-| J | Extra stash pages | 1 personal page + 3 shared tabs | **optional, owner**: shared tabs are data (`add_shared_tabs`); personal page 2 is plugin | `stash_pages.cpp`, `mxl_stash_page.h` | change (size 10x10) | XS data / M plugin | no |
+| J | Extra stash pages | 1 personal page + 3 shared tabs | **optional, owner**: shared tabs are data (`add_shared_tabs`); personal page 2 is plugin (owner 2026-11-04: one page, done by lane stashpage2) | `stash_pages.cpp`, `mxl_stash_page.h` | change (size 10x10) | XS data / M plugin | no (0.1.11) |
 | K | D2R additions that conflict with Median | see section 9 | data first (lane d2radds); a hook only if data cannot switch it off | data only (`tools/d2r_adds.py`) | - | XS-S | check only |
 
 **mxl2012-core v0.1 = E + F + A + D (+ G in dev builds).** Effort for v0.1 on top of the skeleton: about 1.5-2 days
@@ -301,6 +301,14 @@ panel `StashPage2` (`stash_pages.cpp`, generated `mxl_stash_page.h`, layout from
 exactly one such page; ten personal pages are not safely possible. Caveat: a character with items on page 2 refuses to load
 without the plugin ("protected page"). For 2012: shared tabs = XS (data); personal page 2 = copy `stash_pages.cpp` with the
 grid changed from 14 x 14 to Median 2012's 10 x 10, **M**. Game check `stashpage2`.
+
+**Done (owner 2026-11-04, lane stashpage2, bug #537, release 0.1.11):** part `stashpages` registers the page and the panel;
+the stock stash gets a strip with two arrows under its grid (`tools/stash_page2.py`, inserted before D2R's
+`SharedStashTabContainer`, so on the Shared tab D2R's own arrows are on top and turn the shared pages). An arrow opens
+`StashPage2`, which shares the left panel slot with `BankExpansionLayout`; page 2's arrows and X send
+`PanelManager:OpenPanel` / `ClosePanel` `BankExpansionLayout`. D2R 3.3 sends `BankPanelMessage:SelectTab` with an empty text
+and WidgetService has no visibility getter, so the plugin does not know the open tab (an SDK request). HD and legacy, RotW
+and expansion games: docs/testing.md "Lane stashpage2".
 
 ## 9. K: D2R additions that conflict with Median (data cannot switch off?)
 

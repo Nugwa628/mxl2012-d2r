@@ -136,7 +136,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual((plain["textStrings"][3], plain["activeFrames"]), ("Materials", [1] * 5))
         box = rs.find(lay, "basicstash_container")
         self.assertEqual([c["name"] for c in box["children"]],
-                         ["gold_max", "gold_amount", "gold_withdraw", "grid", "SharedStashTabContainer"])
+                         ["gold_max", "gold_amount", "gold_withdraw", "grid", "MxlPersonalNavigation", "SharedStashTabContainer"])
         gw = rs.find(lay, "gold_withdraw")["fields"]   # base fields carried, the expansion's rect wins, the key written out
         self.assertEqual((gw["rect"], gw["filename"], gw["tooltipString"]), ({"x": 15, "y": 357}, "PANEL\\goldcoinbtn", "Withdraw"))
         self.assertEqual(rs.find(lay, "CurrentSharedStashText")["fields"]["text"], "Page %u / %u")

@@ -19,6 +19,8 @@
 #include "d2r.h"
 #include "item_effect.h"
 #include "skill_remove.h"
+#include "stash_pages.h"
+#include "stash_pages_logic.h"
 #include "missile_stubs.h"
 #include "server_frame.h"
 #include "testharness.h"
@@ -323,6 +325,7 @@ auto CmdHelp(Ctx*, const hcmd::Tokens&) noexcept -> bool {
 	Out("verbs (lane act1start, read only): walkmap <x> <y> <half> <step> [mask] | find <class>");
 	Out("verbs (lane realpath): gold get|set <carried> <bank> | shop [npc class] | gamble | usecheck <item id> | tiles");
 	Out("verbs: states player|mon:<id> [state] | cstates player|mon:<id> [state] (client) | asserttrace on|count|show [n]|clear (client) | watch cltdo|srvhit <index> | watch [off] (client)");
+	Out("verbs (client): stashpage state|open|close|toggle|msgs|uia <target> <command> [text]|widget <panel> [child]|vis <panel> <child> <0|1>|put <code> [x y]|fill <1|2> [code]|drop <code>|list|move <id> <1|2> [x y]|result");
 	Out("verbs: merc [dead] | mercprice [level] | interact <npc class>|nearest | menu list|<line>|cancel (client) | hire [npc class] [n] [reopen] | cursor | shop [npc class] | gamble | pkt <hex bytes> | quest <id> <bit>|dump [set|clear|get]");
 	return true;
 }
@@ -2869,6 +2872,96 @@ auto CmdHire(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return Fail(c, "hire: no free entry %lld", which);
 }
 
+// `stashpage` (client side, lane stashpage2): personal stash page 2 (stash_pages.cpp). state | open | close | toggle | msgs |
+// uia <target> <command> [text] | widget <panel> [child] | vis <panel> <child> 0|1 | put <code> [x y] | fill <1|2> [code] | list |
+// drop <code> | move <runtime id> <1|2> [x y] | result. put / fill / list / drop / move queue work on the game thread (ItemService);
+// `stashpage result` has the answer.
+auto CmdStashPage(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const char* usage = "usage: stashpage state|open|close|toggle|msgs|uia <target> <command> [text]|widget <panel> [child]|vis <panel> <child> <0|1>|put <code> [x y]|fill <1|2> [code]|drop <code>|list|move <id> <1|2> [x y]|result";
+	char text[1000];
+	if (t.n < 2) {
+		return Fail(c, usage);
+	}
+	const char* verb = t.tok[1];
+	if (hcmd::LowerEq(verb, "state")) {
+		char status[300];
+		StashPagesStatus(status, sizeof(status));
+		int tab = 0, shown = 0;
+		StashPageTab(&tab, &shown);
+		Out("stashpage state=%d tab=%d strip=%d %s", StashPageState(), tab, shown, status);
+		return true;
+	}
+	if (hcmd::LowerEq(verb, "open") || hcmd::LowerEq(verb, "close") || hcmd::LowerEq(verb, "toggle")) {
+		const int mode = hcmd::LowerEq(verb, "close") ? 0 : hcmd::LowerEq(verb, "open") ? 1 : 2;
+		Out("stashpage %s %s", verb, StashPageOpen(mode) == 0 ? "queued" : "unavailable");
+		return true;
+	}
+	if (hcmd::LowerEq(verb, "msgs")) {
+		StashPageMessages(text, sizeof(text));
+		Out("stashpage msgs %s", text);
+		return true;
+	}
+	if (hcmd::LowerEq(verb, "uia")) {
+		if (t.n < 4) {
+			return Fail(c, usage);
+		}
+		Out("stashpage uia %s:%s(%s) = %d", t.tok[2], t.tok[3], t.n >= 5 ? t.tok[4] : "", StashPageUiAction(t.tok[2], t.tok[3], t.n >= 5 ? t.tok[4] : ""));
+		return true;
+	}
+	if (hcmd::LowerEq(verb, "widget")) {
+		if (t.n < 3) {
+			return Fail(c, usage);
+		}
+		StashPageWidget(t.tok[2], t.n >= 4 ? t.tok[3] : "", text, sizeof(text));
+		Out("stashpage widget %s", text);
+		return true;
+	}
+	if (hcmd::LowerEq(verb, "vis")) {
+		long long on = 0;
+		if (t.n < 5 || !hcmd::ParseInt(t.tok[4], &on)) {
+			return Fail(c, usage);
+		}
+		Out("stashpage vis %s/%s=%lld result %d", t.tok[2], t.tok[3], on, StashPageSetVisible(t.tok[2], t.tok[3], on != 0));
+		return true;
+	}
+	if (hcmd::LowerEq(verb, "result")) {
+		const int rc = StashPageResult(text, sizeof(text));
+		Out("stashpage result %d %s", rc, text);
+		return true;
+	}
+	long long a = 0, x = -1, y = -1;
+	int queued = 0;
+	if (hcmd::LowerEq(verb, "put")) {
+		if (t.n < 3 || (t.n >= 5 && (!hcmd::ParseInt(t.tok[3], &x) || !hcmd::ParseInt(t.tok[4], &y)))) {
+			return Fail(c, usage);
+		}
+		queued = StashPageJob("put", x, y, 0, t.tok[2], text, sizeof(text));
+	} else if (hcmd::LowerEq(verb, "fill")) {
+		if (t.n < 3 || !hcmd::ParseInt(t.tok[2], &a)) {
+			return Fail(c, usage);
+		}
+		queued = StashPageJob("fill", a, 0, 0, t.n >= 4 ? t.tok[3] : "r01", text, sizeof(text));
+	} else if (hcmd::LowerEq(verb, "list")) {
+		queued = StashPageJob("list", 0, 0, 0, "", text, sizeof(text));
+	} else if (hcmd::LowerEq(verb, "drop")) {
+		if (t.n < 3) {
+			return Fail(c, usage);
+		}
+		queued = StashPageJob("drop", 0, 0, 0, t.tok[2], text, sizeof(text));
+	} else if (hcmd::LowerEq(verb, "move")) {
+		long long page = 0;
+		if (t.n < 4 || !hcmd::ParseInt(t.tok[2], &a) || !hcmd::ParseInt(t.tok[3], &page) ||
+		    (t.n >= 6 && (!hcmd::ParseInt(t.tok[4], &x) || !hcmd::ParseInt(t.tok[5], &y)))) {
+			return Fail(c, usage);
+		}
+		queued = StashPageJob("move", a, page, stash_pages::PackCell(x, y), "", text, sizeof(text));
+	} else {
+		return Fail(c, usage);
+	}
+	Out("stashpage %s %s", verb, text);
+	return queued == 1 ? true : Fail(c, "%s", text);
+}
+
 using VerbFn = bool (*)(Ctx*, const hcmd::Tokens&) noexcept;
 struct Verb {
 	const char* name;
@@ -2896,6 +2989,7 @@ const Verb Verbs[] = {
     {"tiles", CmdTiles, false}, {"hashscan", CmdHashScan, false},
     {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
+    {"stashpage", CmdStashPage, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {

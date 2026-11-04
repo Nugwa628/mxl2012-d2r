@@ -65,6 +65,8 @@
 //      platform the build floors with D2R's Arcane walkways (void_floor.cpp, off word void65, docs/maps-hd.md item 12);
 //   +  a Barbarian spirit (Guardian, Defender, Protector) farther than 20 sub-tiles from its owner is warped to it by D2R's pet
 //      warp, unless it is fighting a target in reach within 40 (spirit_warp.cpp, off word spiritwarp, #534);
+//   +  a second personal stash page on D2RLoader's one custom player page (item page 6 + <char>.d2rl, 10 x 10), drawn by the
+//      plugin panel StashPage2 and reached by arrows in the stock stash (stash_pages.cpp, off word stashpage2);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
@@ -93,6 +95,7 @@
 #include "skill_remove.h"
 #include "skill_text.h"
 #include "spirit_warp.h"
+#include "stash_pages.h"
 #include "sound_guard.h"
 #include "state_lists.h"
 #include "testharness.h"
@@ -159,7 +162,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash void65), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash void65 stashpage2), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -442,6 +445,7 @@ char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
 char g_rotwStashReport[256] = "";
 char g_voidFloorReport[160] = "";
+char g_stashPageReport[192] = "";
 char g_harnessReport[192] = "";
 char g_saveModeReport[MAX_PATH + 160] = "";
 bool g_partsInstalled = false;
@@ -720,6 +724,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	              g_rotwStashReport, rs.inits, rs.classicWired, rs.classicLeft, rs.skipped, rs.gameType, rs.hd ? "HD" : "legacy");
 	SayPart(command, "rotwstash", line);
 	Say(command, Off("void65") ? "void65 off: left out by mxl2012-core-off.txt" : g_voidFloorReport);
+	{
+		char status[256];
+		StashPagesStatus(status, sizeof(status));
+		std::snprintf(line, sizeof(line), "%s | %s", g_stashPageReport, status);
+		SayPart(command, "stashpage2", line);
+	}
 	std::snprintf(line, sizeof(line), "client wall calls %ld", ClientWallCalls());
 	Say(command, line);
 	std::snprintf(line, sizeof(line), "testharness %s", g_harnessReport[0] != '\0' ? g_harnessReport : "off");
@@ -934,6 +944,13 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("void65")) {
 		InstallVoidFloor(context, g_voidFloorReport, sizeof(g_voidFloorReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voidFloorReport);
+		context->LogInfo(line);
+	}
+	if (Off("stashpage2")) {
+		StashPagesOff(context);  // the stock stash's page 2 arrows stay hidden
+	} else {
+		InstallStashPages(context, g_stashPageReport, sizeof(g_stashPageReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: stashpage2 %s", g_stashPageReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cltdostub")) {

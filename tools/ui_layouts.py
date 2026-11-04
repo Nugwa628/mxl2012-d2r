@@ -39,6 +39,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from icon_paths import EXCEL, read_tsv  # noqa: E402
 from ui_paths import BASE_UI, LAYOUT_OUT  # noqa: E402
+import stash_page2  # noqa: E402
 
 SX, SY = 1162 / 320, 1507 / 432
 ITEM_CELL = 98                      # D2R's HD item sprite size per cell
@@ -256,7 +257,8 @@ def stash_hd(name: str = "bankexpansionlayouthd.json") -> str:
     (bug #515, owner 2026-11-01). D2R draws a grid's items at their cube cell whatever cellCount says, so Median's 10 x 8
     cube ran out of the 3 x 4 frame; the grid keeps D2R's cell count and size but sits off the panel, and an image of D2R's
     cover sits in the frame (D2R hides its own `horadriccube_cover` when the cube is there). The pages' slots, the Transmute
-    button and everything else stay D2R's; the `@` keys are written as text and the page arrows get D2RLoader's tooltip.
+    button and everything else stay D2R's; the `@` keys are written as text and the page arrows get D2RLoader's tooltip. The
+    keyboard / mouse layout also gets personal stash page 2's strip (tools/stash_page2.py) in `basicstash_container`.
     `name`: also D2R's gamepad UI stash (controller/bankexpansionlayouthd.json, a whole layout of its own with the same
     window; its page arrows are button legends, no tooltip)."""
     t = baseline(name)
@@ -268,6 +270,10 @@ def stash_hd(name: str = "bankexpansionlayouthd.json") -> str:
             a, b = block_span(t, f'"name": "{arrow}"')
             f = t.index('"fields": {', a, b) + len('"fields": {')
             t = t[:f] + f' "tooltipString": {json.dumps(PAGE_ARROW_TOOLTIP)}, "tooltipIsTopAligned": true,' + t[f:]
+    if name == "bankexpansionlayouthd.json":  # personal stash page 2's arrows (keyboard / mouse layout; tools/stash_page2.py)
+        s, _e = block_span(t, '"name": "SharedStashTabContainer"')
+        indent = t[t.rindex("\n", 0, s) + 1:s]
+        t = t[:s] + json.dumps(stash_page2.stock_strip_hd()) + ",\n" + indent + t[s:]
     from rotw_stash_legacy import LITERALS as STASH_LITERALS
     for key, literal in {**STASH_LITERALS, **STASH_KEYS}.items():
         t = t.replace(json.dumps(key), json.dumps(literal))

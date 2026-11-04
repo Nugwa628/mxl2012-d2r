@@ -16,6 +16,12 @@ version being released (docs/release.md).
   Starting `D2RLoader.exe` yourself still works.
 - The Barbarian's Guardian, Defender and Protector Spirit come back to you: a spirit more than 20 sub-tiles away teleports next to
   you, unless it is fighting a monster near you. After a fight they used to stay behind, 30 to 90 sub-tiles away (#534). Other summons and mercenaries are unchanged.
+- The personal stash has a second page. Open the stash and click the arrows under the grid to switch (page 2 shows
+  "2 / 2"); Ctrl-click moves items between your backpack and the open page. Page 2 is D2RLoader's custom player page: its items are
+  saved in `<character>.d2rl` next to the `.d2s`. **Keep the mod's plugin with your characters:** a character with items on
+  page 2 does not load without it (D2RLoader stops the load, so nothing is lost). Move the items to page 1 first if you
+  want to play that character without the plugin. The gamepad stash has no page arrows. On the Shared
+  tab the arrows turn D2R's shared pages, as before.
 - The shared stash has 2 more pages: 5 in a classic or expansion game, as a Reign of the Warlock game has (D2R gives those 3).
   Install, update and repair set `[d2rcore.stash] add_shared_tabs = 2` in the mod's `d2rloader.toml`; a higher number you set
   yourself is kept, so no page with items on it goes away (#535). The Gems, Materials and Runes pages of a RotW game are shared

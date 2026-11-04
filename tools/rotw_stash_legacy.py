@@ -51,6 +51,7 @@ from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 
 import dc6  # noqa: E402
 import fxpaths  # noqa: E402
+import stash_page2  # noqa: E402
 import ui_art  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -189,7 +190,9 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: 
                 "onSwitchTabMessage": tabs["onSwitchTabMessage"],
                 "notificationIconTemplate": {"filename": f"PANEL\\{NOTIFY}"}}},
             {"type": "Widget", "name": "basicstash_container", "children": [
-                kids["gold_max"], kids["gold_amount"], kids["gold_withdraw"], kids["grid"], kids["SharedStashTabContainer"]]},
+                kids["gold_max"], kids["gold_amount"], kids["gold_withdraw"], kids["grid"],
+                stash_page2.stock_strip_sd(),  # personal stash page 2's arrows (under D2R's shared ones; tools/stash_page2.py)
+                kids["SharedStashTabContainer"]]},
             *({"type": "Widget", "name": f"advancedstash_{p}", "children": [
                 {"type": "AdvancedStashSlotWidget", "name": code,
                  "fields": {"rect": rect(*classic_box(r)), "itemCode": code}} for code, r in pages[p]]} for p in PAGES),
