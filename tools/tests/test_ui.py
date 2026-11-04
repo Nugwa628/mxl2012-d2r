@@ -221,8 +221,10 @@ class LayoutTests(unittest.TestCase):
     def test_controller_cube_takes_the_mods_picture_grid_and_button(self):   # lane cubeui: gamepad UI cube
         pc = """{ "type": "HoradricCubePanel", "children": [
             { "type": "ImageWidget", "name": "background", "fields": { "filename": "PANEL\\\\Horadric_Cube\\\\HoradricCube_BG" } },
+            { "type": "ImageWidget", "name": "LeftHinge", "fields": { "rect": "$LeftHingeRect", "filename": "$LeftHingeSprite" } },
             { "type": "TextBoxWidget", "name": "title", "fields": { "rect": "$InGamePanelTitleRect", "text": "@box" } },
             { "type": "ButtonWidget", "name": "convert", "fields": { "rect": { "x": 520, "y": 969 } } },
+            { "type": "ButtonWidget", "name": "close", "fields": { "rect": { "x": 1075, "y": 9 }, "filename": "PANEL\\\\closebtn_4x" } },
             { "type": "InventoryGridWidget", "name": "grid",
               "fields": { "rect": { "x": 431, "y": 534 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize" } },
             { "type": "AnimatedImageWidget", "name": "flourish", "fields": { "rect": { "x": 180, "y": 204, "scale":2 } } } ] }"""
@@ -255,6 +257,25 @@ class LayoutTests(unittest.TestCase):
             files["controller/horadriccubelayouthd.json"] = ctrl.replace("Controller/Panel/HoradricCube/V2", "Other")
             with self.assertRaises(ValueError):   # D2R changed its picture: fail loudly, not ship a 3 x 4 cube
                 ui_layouts.cube_controller_hd(row)
+            # bug #531: D2R's close button (top right) and side hinge (x -236, y 630) lay on the grid's frame and corner cells
+            w = {c["name"]: c["fields"] for c in json.loads(hd)["children"]}
+            g = w["grid"]["rect"]
+            grid = (g["x"], g["y"], g["x"] + 10 * 98 * g["scale"], g["y"] + 8 * 94 * g["scale"])
+            close = w["close"]["rect"]
+            cw, ch = ui_layouts.CLOSE_BUTTON_SIZE
+            self.assertEqual((close["x"], close["y"]), (1015, 1350))   # in the picture's bottom right square, as classic
+            x0, y0, x1, y1 = (v * s for v, s in zip(ui_layouts.CUBE_CLOSE, (ui_layouts.SX, ui_layouts.SY) * 2))
+            self.assertTrue(x0 <= close["x"] and close["x"] + cw <= x1 and y0 <= close["y"] and close["y"] + ch <= y1)
+            self.assertGreater(close["y"], grid[3])
+            hinge = w["LeftHinge"]["rect"]
+            self.assertEqual(hinge["x"], -236)                         # the pin stays on D2R's side bar
+            plate = (hinge["y"] + ui_layouts.HINGE_PLATE[0], hinge["y"] + ui_layouts.HINGE_PLATE[1])
+            stone = [v * ui_layouts.SY for v in ui_layouts.CUBE_STONE]
+            self.assertGreater(plate[0], grid[3])                      # below the grid and its frame
+            self.assertLess(abs((plate[0] + plate[1]) / 2 - (stone[0] + stone[1]) / 2), 1)
+            files["horadriccubelayouthd.json"] = pc.replace('"rect": "$LeftHingeRect", ', "")
+            with self.assertRaises(ValueError):   # D2R dropped the hinge's rect: fail loudly
+                ui_layouts.cube_hd(row)
         finally:
             ui_layouts.baseline = orig
 

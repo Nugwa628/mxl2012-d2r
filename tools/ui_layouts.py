@@ -7,7 +7,8 @@ HD (`...hd.json`; art = tools/ui_panels.py, the classic 320 x 432 picture scaled
   playerinventoryoriginallayouthd / playerinventoryexpansionlayouthd: background PANEL\\mxl\\inventory, the grid 10 x 6 at the
       table's place, the ten equipment slots at the table's boxes (D2R's widget size scaled to fit the box), the weapon swap
       tabs on the picture's I / II boxes, the gold button and amount on the picture's coin and bar.
-  horadriccubelayouthd: background PANEL\\mxl\\cube, the grid 10 x 8, the transmute button on the picture's square.
+  horadriccubelayouthd: background PANEL\\mxl\\cube, the grid 10 x 8, the transmute button on the picture's square, the
+      close button on its bottom right square as in classic Median and D2R's side hinge on its stone block (bug #531).
   Items draw at D2R's HD size (98 pixels per cell) whatever cellSize says, so a grid keeps cellSize 98 x 94 and the widget
   gets `scale` 1.0745 (cell 105.3 across, 101.2 down = 29 classic pixels scaled; a first test showed that a bare
   smaller cellSize leaves items overlapping).
@@ -57,6 +58,15 @@ GOLD_BAR = (105, 391, 198, 411)
 GOLD_BUTTON_SIZE = 48               # D2R goldbutton.sprite frame
 CUBE_BUTTON = (144, 259, 178, 293)  # the picture's transmute square (D2R's classic convert button sits at 144, 260)
 CUBE_BUTTON_SIZE = 117              # D2R transmutebutton.sprite frame
+# D2R puts the close button on its picture's top right corner (1075, 9) and the side panel hinge at x -236, y 630; on the mod's
+# picture those lie on the grid's frame and over its corner cells (bug #531). Classic Median's close button is the picture's bottom
+# right square (D2R's classic layout: buysellbtn at 275, 383); the hinge goes down to the plain stone block left of the picture's
+# lower half (classic 2..55 across, 260..327 down), where it covers no frame or cell.
+CUBE_CLOSE = (275, 383, 307, 415)   # the picture's close square (classic pixels; its frame 274..310 x 382..417)
+CLOSE_BUTTON_SIZE = (83, 84)        # D2R closebtn_4x.sprite frame
+HINGE_X = -236                      # D2R's $LeftHingeRect x: the pin on the screen's side bar
+HINGE_PLATE = (20, 255)             # rows of SidePanel_Hinge_L.sprite (331 x 297) that the solid plate covers
+CUBE_STONE = (260, 327)             # the stone block's rows (classic pixels)
 # The cube title: D2R's $InGamePanelTitleRect (x 91, y 64, 972 x 71) lands on the first grid row of the mod's picture, which has no
 # title band (its grid starts under the 45-px top border); the title sits above the panel frame instead (player report 2026-10-29).
 CUBE_TITLE = (91, -80, 972, 71)
@@ -117,6 +127,15 @@ def set_title_rect(text: str, value: str) -> str:
 def set_rect(text: str, name: str, value: str) -> str:
     s, e = block_span(text, f'"name": "{name}"')
     return text[:s] + RECT.sub(lambda _m: f'"rect": {value}', text[s:e], count=1) + text[e:]
+
+
+def set_profile_rect(text: str, name: str, value: str) -> str:
+    """The widget's rect, an object or a profile name ("$LeftHingeRect"), replaced by `value`; an error when it has none."""
+    s, e = block_span(text, f'"name": "{name}"')
+    block, n = re.subn(r'"rect":\s*(?:"[^"]*"|\{[^}]*\})', lambda _m: f'"rect": {value}', text[s:e], count=1)
+    if n != 1:
+        raise ValueError(f"no rect field in the {name} widget")
+    return text[:s] + block + text[e:]
 
 
 def set_grid(text: str, x: float, y: float, cols: int, rows: int, scale: float | None, marker: str = '"name": "grid"') -> str:
@@ -207,6 +226,9 @@ def cube_hd(row: dict[str, int]) -> str:
     t = set_grid(t, (row["gridLeft"] - row["invLeft"]) * SX, row["gridTop"] * SY, row["gridX"], row["gridY"], GRID_SCALE)
     x0, y0, x1, y1 = box_hd(CUBE_BUTTON)
     t = set_rect(t, "convert", rect((x0 + x1) / 2 - CUBE_BUTTON_SIZE / 2, (y0 + y1) / 2 - CUBE_BUTTON_SIZE / 2))
+    x0, y0, x1, y1 = box_hd(CUBE_CLOSE)
+    t = set_profile_rect(t, "close", rect((x0 + x1) / 2 - CLOSE_BUTTON_SIZE[0] / 2, (y0 + y1) / 2 - CLOSE_BUTTON_SIZE[1] / 2))
+    t = set_profile_rect(t, "LeftHinge", rect(HINGE_X, sum(CUBE_STONE) / 2 * SY - sum(HINGE_PLATE) / 2))
     return t
 
 

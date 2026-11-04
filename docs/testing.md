@@ -5180,3 +5180,20 @@ Later runs (2026-11-03/04, `lab2.py`; fresh characters RangeLaneB..L because the
 | `run14` | as run13 with the tables also in rows 1072 + 129 / 130 | legacy Cog still not visible |
 
 Result: #528 PASS (HD and legacy). #529 open: HD uses a custom entry only from 129 up, legacy reads the classic table only up to 128 (docs/hd-monsters.md section 19). The slot code was not committed. Slot 2 was left with the `final` build (slots 115-121) installed.
+
+## Lane cubegrid: the HD cube's grid and frame (bug #531, 2026-11-04, slot 2, background mode)
+
+Slot 2 had 0.1.10 (its cube layouts byte-equal to main's generated ones); the after run had this branch's
+`horadriccubelayouthd.json` copied in for the run and the slot's file restored after. Character `CubeRotw` (Barbarian, RotW).
+Script `mxl2012-runs/cubegrid/run531.py` (outside git): the cube emptied (`remove id`), a jewel dropped into each corner cell by
+picking it up (`pickup`) and a left click on the drawn cell (`game_checks.CUBE_GRID`), two El runes in (0,0) / (9,7) and the
+Transmute button, the close button clicked, classic (G), the RotW stash's Gems page. Evidence: `mxl2012-runs/cubegrid/`.
+
+| Run | Build | Result |
+|-|-|-|
+| `before_*` (10:31) | 0.1.10 | 10 x 8, all four corner clicks land in their cell; Transmute r01 + r01 -> r02; **the hinge covers the grid's left frame and the left edge of (0,7), the close X sits on the frame corner over (9,0)** (hovering the cell shows "Close"); the picture's close square empty |
+| `after_*` (10:43) | 0.1.10 + this branch's HD cube layout | corners land in their cells, nothing over them; Transmute r01 + r01 -> r02; close X in the bottom right square ("Close" tooltip), a click closes the panel; hinge on the stone block below the grid; classic cube and the stash's cube window as before; 0 ERROR / ASSERT lines, 0 crash files |
+
+`sheet531.png`: before / after side by side. Note: the plugin has no `cubeclear` verb (`unknown verb`); `remove id <n>` per item
+empties the cube. Test: `test_ui.py` `test_controller_cube_takes_the_mods_picture_grid_and_button` (close and hinge places).
+Slot 2 unlocked, game closed.

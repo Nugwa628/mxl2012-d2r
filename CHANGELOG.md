@@ -5,6 +5,7 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- The Horadric Cube window in HD matches classic Median XL's frame: its close button sits in the bottom right square as in classic (it was on the grid's top right corner, over a cell), and the side hinge no longer covers the grid's left frame and bottom left cells (#531).
 - Hole Level 2 shows its cave walls in HD, and Median XL's edits of ten more original maps (Duriel's Lair, the
   Chaos Sanctuary heart, the Cathedral, the Harem, the Act 3 temples and dungeons, ...) are used: the game had loaded its own
   versions of those maps instead (#525). All ten were checked in HD against classic, and Duriel greets the player in his
