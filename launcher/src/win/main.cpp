@@ -16,7 +16,7 @@ using namespace mxl;
 namespace {
 
 const wchar_t* Usage =
-	L"D2R-XL-2012-Downloader.exe [--cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins] [options]\n"
+	L"D2R-XL-2012-Downloader.exe [--cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader] [options]\n"
 	L"  --data-dir DIR   state, download and log (default %LOCALAPPDATA%\\mxl2012)\n"
 	L"  --site URL|DIR   download site root (default https://files.werdegames.com/mxl2012/; backup https://dl.werdegames.com/mxl2012/; http://, file:// or a folder for tests)\n"
 	L"  --channel NAME   release channel: stable (default) or test\n"
@@ -116,6 +116,8 @@ int RunCli(Cli& c) {
 			Log("WARNING: " + w);
 		if (v.defaultModChecked && !v.defaultMod.ok)
 			Log("  --cli fix-default-mod sets default_mod = \"mxl2012\" in D2RLoader's config (only that key)");
+		if (v.d2rFound && !v.loaderOk && l.LoaderInstallable())
+			Log("  --cli install-loader downloads D2RLoader " + l.LoaderPackage().version + " from " + l.LoaderPackage().url + " into the D2R folder");
 		if (!v.strayPlugins.empty())
 			Log("  --cli remove-stray-plugins moves them to " + Utf8(l.options().dataDir) + R"(\removed\<date>\ (nothing is deleted; protected mod folders are left in place))");
 		if (!err.empty())
@@ -127,6 +129,12 @@ int RunCli(Cli& c) {
 	else if (c.command == L"uninstall") ok = l.Uninstall(err);
 	else if (c.command == L"fix-default-mod") ok = l.FixDefaultMod(err);
 	else if (c.command == L"remove-stray-plugins") ok = l.RemoveStrayPlugins(err);
+	else if (c.command == L"install-loader") {
+		std::string feedErr;
+		if (!l.CheckFeed(feedErr))
+			Log("feed: " + feedErr);
+		ok = l.InstallLoader(err);
+	}
 	else if (c.command == L"self-update") {
 		std::string feedErr;
 		if (!l.CheckFeed(feedErr) && !l.LauncherUpdateAvailable())

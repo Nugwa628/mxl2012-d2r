@@ -135,7 +135,7 @@ std::string SetTomlKey(const std::string& text, const std::string& section, cons
 	for (int i = start + 1; i < end; ++i) {
 		std::string t = Strip(lines[size_t(i)]);
 		if (t.size() > 1 && t[0] == '#') {
-			std::string bare = Strip(t.substr(1));
+			std::string bare = Strip(t.substr(t.find_first_not_of('#') == std::string::npos ? t.size() : t.find_first_not_of('#')));  // "##  key = x" too
 			if (KeyLine(bare, key, nullptr, nullptr)) {
 				lines[size_t(i)] = key + " = " + value + eol;
 				return join(lines);
@@ -272,6 +272,74 @@ std::string SetItemStatRangesOff(const std::string& text) {
 			out.pop_back();  // keep a missing final newline missing
 	}
 	return bom ? "\xEF\xBB\xBF" + out : out;
+}
+
+std::string TableKeyValue(const std::string& text, const std::string& section, const std::string& key) {
+	std::string t = text.rfind("\xEF\xBB\xBF", 0) == 0 ? text.substr(3) : text;
+	int keyLine = 0, headerLine = 0;
+	std::string value;
+	FindTableKey(Lines(t), section, key, keyLine, headerLine, &value);
+	return keyLine < 0 ? "" : value;
+}
+
+std::string EnsureTomlKey(const std::string& text, const std::string& section, const std::string& key, const std::string& value) {
+	bool bom = text.rfind("\xEF\xBB\xBF", 0) == 0;
+	std::string t = bom ? text.substr(3) : text;
+	int keyLine = 0, headerLine = 0;
+	FindTableKey(Lines(t), section, key, keyLine, headerLine, nullptr);
+	if (keyLine >= 0)
+		return text;  // set by hand: leave it
+	std::string out;
+	if (headerLine < 0) {  // a new table after one blank line, as install_mod.ensure_toml_key writes it
+		std::string nl = t.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+		out = t;
+		while (!out.empty() && (out.back() == '\n' || out.back() == '\r'))
+			out.pop_back();
+		out = (out.empty() ? "" : out + nl + nl) + "[" + section + "]" + nl + key + " = " + value + nl;
+	} else {
+		out = SetTomlKey(t, section, key, value);  // the commented template line, else right under the header
+	}
+	return bom ? "\xEF\xBB\xBF" + out : out;
+}
+
+std::string ForceTomlKey(const std::string& text, const std::string& section, const std::string& key, const std::string& value) {
+	bool bom = text.rfind("\xEF\xBB\xBF", 0) == 0;
+	std::string t = bom ? text.substr(3) : text;
+	auto lines = Lines(t);
+	int keyLine = 0, headerLine = 0;
+	std::string old;
+	FindTableKey(lines, section, key, keyLine, headerLine, &old);
+	if (keyLine < 0)
+		return EnsureTomlKey(text, section, key, value);  // a commented template line, else under the header, else a new table
+	if (TomlUnquote(old) == TomlUnquote(value))
+		return text;
+	lines[size_t(keyLine)] = ReplaceKeyValue(lines[size_t(keyLine)], section, key, value);
+	std::string out = bom ? "\xEF\xBB\xBF" : "";
+	for (const auto& l : lines)
+		out += l + "\n";
+	if (!t.empty() && t.back() != '\n')
+		out.pop_back();  // keep a missing final newline missing
+	return out;
+}
+
+const ModConfigKey ModConfigKeys[3] = {
+	{SaveFormatSection, "mode", "\"extended\"", false, "D2R-XL 2012 saves need it"},
+	{ItemsSection, StatRangesKey, "false", false, "D2RLoader's Ctrl stat ranges show repeated lines for D2R-XL 2012 items"},
+	{"d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", false,
+	 "G switches to legacy graphics in a RotW game; without it D2RLoader's game-wide false applies"},
+};
+
+std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, std::string* was) {
+	std::string old = TableKeyValue(text, k.section, k.key);
+	if (was)
+		*was = old;
+	if (k.keepHandSet)
+		return EnsureTomlKey(text, k.section, k.key, k.value);
+	if (std::string(k.section) == SaveFormatSection && std::string(k.key) == "mode")
+		return SetExtendedSaveFormat(text);
+	if (std::string(k.section) == ItemsSection && std::string(k.key) == StatRangesKey)
+		return SetItemStatRangesOff(text);
+	return ForceTomlKey(text, k.section, k.key, k.value);
 }
 
 bool PathIsOrUnder(const std::string& path, const std::string& dir) {

@@ -1,5 +1,6 @@
 #include "app.h"
 
+#include "../core/loaderpkg.h"
 #include "../core/paths.h"
 #include "../core/sevenzip.h"
 #include "../core/sha256.h"
@@ -400,6 +401,228 @@ bool Launcher::RemoveStrayPlugins(std::string& error) {
 		}
 		Report("Moved the old D2R-XL 2012 plugin " + Utf8(sp.path) + " to " + Utf8(to));
 	}
+	return true;
+}
+
+// ---------------------------------------------------------------- Install D2RLoader (docs/launcher.md)
+
+bool Launcher::LoaderInstallable(std::string* why) const {
+	std::string e;
+	bool ok = feedChecked_ && LoaderPackageUsable(feed_.d2rloader, e);
+	if (why)
+		*why = feedChecked_ ? e : "the release manifest has not been read (no connection to the download site?)";
+	return ok;
+}
+
+// <data>\download\<zip name>: resumed with Range requests, size and sha256 against the manifest.
+bool Launcher::DownloadLoader(std::wstring& file, std::string& error) {
+	const auto& l = feed_.d2rloader;
+	std::wstring dir = JoinPath(opt_.dataDir, L"download");
+	file = JoinPath(dir, Wide(LoaderZipName(l.url)));
+	std::wstring part = file + L".part";
+	if (!MakeDirs(dir)) {
+		error = NotWritable(dir, GetLastError());
+		return false;
+	}
+	uint64_t size = 0;
+	if (FileSize(file, size) && size == l.size && FileSha256(file) == l.sha256) {
+		Report("D2RLoader " + l.version + " is already downloaded (" + Utf8(file) + ")");
+		return true;
+	}
+	DeleteFileW(LongPath(file).c_str());
+	for (int attempt = 0; attempt < ObjectAttempts; ++attempt) {
+		Pause(attempt, cancel);
+		if (cancel.load()) {
+			error = "cancelled";
+			return false;
+		}
+		uint64_t have = 0;
+		if (!FileSize(part, have) || have > l.size) {
+			DeleteFileW(LongPath(part).c_str());
+			have = 0;
+		}
+		if (have < l.size) {
+			Report(have ? "Resuming D2RLoader " + l.version + " at " + Mb(have) + " of " + Mb(l.size)
+			            : "Downloading D2RLoader " + l.version + " (" + Mb(l.size) + ") from " + l.url);
+			HANDLE h = CreateFileW(LongPath(part).c_str(), FILE_APPEND_DATA, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+			if (h == INVALID_HANDLE_VALUE) {
+				error = NotWritable(dir, GetLastError());
+				return false;
+			}
+			bool writeOk = true, tooBig = false;
+			uint64_t got = have;
+			ULONGLONG lastShow = 0;
+			FetchResult r = Fetch(l.url, have, l.size - have, [&](const uint8_t* p, size_t n) {
+				DWORD w = 0;
+				if (got + n > l.size) {  // more bytes than the manifest says: not the pinned file
+					tooBig = true;
+					return false;
+				}
+				if (!WriteFile(h, p, DWORD(n), &w, nullptr) || w != n) {
+					writeOk = false;
+					return false;
+				}
+				got += n;
+				ULONGLONG now = GetTickCount64();
+				if (onProgress && now - lastShow >= 300) {
+					lastShow = now;
+					onProgress({"Downloading D2RLoader " + l.version + ": " + Mb(got) + " of " + Mb(l.size), double(got) / double(l.size)});
+				}
+				return !cancel.load();
+			});
+			CloseHandle(h);
+			if (!writeOk) {
+				error = "Cannot write " + Utf8(part) + " (disk full?)";
+				return false;
+			}
+			if (tooBig) {
+				DeleteFileW(LongPath(part).c_str());
+				error = "the download is larger than the release manifest says (" + Mb(l.size) + "); nothing was installed";
+				return false;
+			}
+			if (!r.ok) {
+				error = cancel.load() ? "cancelled" : r.error;
+				Log("D2RLoader download: " + r.error + (r.status ? " (HTTP " + std::to_string(r.status) + ")" : ""));
+				if (r.status == 404 || r.status == 403 || r.status == 410 || cancel.load())
+					return false;
+				continue;
+			}
+		}
+		Report("Checking D2RLoader (sha256) ...");
+		std::string sha = FileSha256(part);
+		if (sha != l.sha256) {
+			DeleteFileW(LongPath(part).c_str());
+			error = "The downloaded D2RLoader does not match the release manifest (sha256 " + sha + ", expected " + l.sha256 +
+			        "). It was deleted; nothing was installed.";
+			return false;  // the official file changed or the download was tampered with: never retried into the game folder
+		}
+		if (!MoveFileExW(LongPath(part).c_str(), LongPath(file).c_str(), MOVEFILE_REPLACE_EXISTING)) {
+			error = "Cannot rename " + Utf8(part) + ": " + Utf8(LastErrorText(GetLastError()));
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+bool Launcher::InstallLoader(std::string& error) {
+	const std::string fallback = std::string(" Get D2RLoader opens its download page (") + LoaderSite + ").";
+	std::string why;
+	if (!LoaderInstallable(&why)) {
+		error = "Cannot install D2RLoader: " + why + "." + fallback;
+		return false;
+	}
+	if (!FindD2R(error))
+		return false;
+	auto running = [&] {
+		std::vector<std::string> exes;
+		for (const auto& p : ProcessesUnder(d2rDir_))
+			exes.push_back(Utf8(p.exe));
+		return LoaderRunningRefusal(exes, Utf8(d2rDir_));
+	};
+	if (error = running(); !error.empty())
+		return false;
+	const auto& l = feed_.d2rloader;
+	std::wstring zipFile;
+	if (!DownloadLoader(zipFile, error)) {
+		if (error != "cancelled")
+			error = "D2RLoader download failed: " + error + fallback;
+		return false;
+	}
+	std::string zip;
+	std::vector<ZipEntry> entries;
+	std::vector<LoaderTarget> plan;
+	if (!ReadWholeFile(zipFile, zip) || !ReadZipDirectory(zip, entries, error) || !PlanLoaderInstall(entries, plan, error)) {
+		error = "Cannot install D2RLoader " + l.version + ": " + (error.empty() ? "cannot read " + Utf8(zipFile) : error) + "." + fallback;
+		return false;
+	}
+	std::wstring stageRoot = JoinPath(opt_.dataDir, L"loader-staging"), stage = JoinPath(stageRoot, L"new"),
+	             backup = JoinPath(stageRoot, L"old");
+	std::string e;
+	if (DirExists(stageRoot) && !RemoveTree(stageRoot, e)) {
+		error = "Cannot clear " + Utf8(stageRoot) + ": " + e;
+		return false;
+	}
+	struct Move {
+		std::wstring staged, target;
+		std::string rel;
+	};
+	std::vector<Move> moves;
+	std::vector<std::wstring> dirs;
+	for (const LoaderTarget& t : plan) {
+		std::wstring target = JoinPath(d2rDir_, Wide(t.path));
+		if (!PathUnder(target, d2rDir_) || SamePath(target, d2rDir_)) {
+			error = "Internal error: " + Utf8(target) + " is not inside " + Utf8(d2rDir_) + ".";
+			return false;
+		}
+		if (t.dir) {
+			dirs.push_back(target);
+			continue;
+		}
+		if (t.keepExisting && FileExists(target)) {
+			Report("Keeping your " + t.path + " (D2RLoader settings)");
+			continue;
+		}
+		Report("Unpacking " + t.path + " ...");
+		std::string data;
+		if (!ExtractZipEntry(zip, entries[t.entry], data, error)) {
+			error = "Cannot unpack D2RLoader " + l.version + ": " + error + "." + fallback;
+			return false;
+		}
+		std::wstring staged = JoinPath(stage, Wide(t.path));
+		if (!MakeDirs(ParentDir(staged)) || !WriteFileAtomic(staged, data)) {
+			error = NotWritable(ParentDir(staged), GetLastError());
+			return false;
+		}
+		moves.push_back({staged, target, t.path});
+	}
+	zip.clear();
+	zip.shrink_to_fit();
+	std::wstring stagedExe = JoinPath(stage, L"D2RLoader.exe");
+	std::string thumb;
+	bool intact = false;
+	if (SignerThumbprint(stagedExe, thumb, intact))
+		Log("D2RLoader " + l.version + ": signed by " + thumb + (intact ? "" : " (signature not intact)") +
+		    (l.signerThumbprint.empty() || Lower(thumb) == Lower(l.signerThumbprint) ? "" : ", the manifest names " + l.signerThumbprint));
+	else
+		Log("D2RLoader " + l.version + ": not signed");
+	if (error = running(); !error.empty())  // started while it downloaded
+		return false;
+	// Old files go to <staging>\old first, so a failed move puts everything back as it was.
+	std::vector<Move> done, saved;
+	auto rollback = [&] {
+		for (const Move& m : done)
+			DeleteFileW(LongPath(m.target).c_str());
+		for (const Move& m : saved)
+			MoveFileExW(LongPath(m.staged).c_str(), LongPath(m.target).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+	};
+	for (const Move& m : moves) {
+		if (FileExists(m.target)) {
+			Move b{JoinPath(backup, Wide(m.rel)), m.target, m.rel};
+			MakeDirs(ParentDir(b.staged));
+			if (!MoveFileExW(LongPath(m.target).c_str(), LongPath(b.staged).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+				error = NotWritable(ParentDir(m.target), GetLastError());
+				rollback();
+				return false;
+			}
+			saved.push_back(b);
+		}
+		if (!MakeDirs(ParentDir(m.target)) ||
+		    !MoveFileExW(LongPath(m.staged).c_str(), LongPath(m.target).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH)) {
+			error = NotWritable(ParentDir(m.target), GetLastError());
+			rollback();
+			return false;
+		}
+		done.push_back(m);
+	}
+	for (const std::wstring& d : dirs)
+		MakeDirs(d);
+	if (!RemoveTree(stageRoot, e))
+		Log("Could not remove " + Utf8(stageRoot) + ": " + e);
+	DeleteFileW(LongPath(zipFile).c_str());
+	std::string found = ExeFileVersion(JoinPath(d2rDir_, L"D2RLoader.exe"));
+	Report("D2RLoader " + l.version + " installed into " + Utf8(d2rDir_) + " (" + Count(done.size(), "file") + ", sha256 checked" +
+	       (found.empty() ? "" : ", D2RLoader.exe reads " + found) + ")");
 	return true;
 }
 
@@ -1148,7 +1371,7 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 	SaveState();
 	if (!EnsureExtendedSaves(mod, error))
 		return false;
-	EnsureStatRangesOff(mod);
+	EnsureModConfigKeys(mod);
 	Report("D2R-XL 2012 " + feed_.version + " is in " + Utf8(mod) + ". " + HowToPlay);
 	return true;
 }
@@ -1185,25 +1408,32 @@ bool Launcher::EnsureExtendedSaves(const std::wstring& mod, std::string& error) 
 	return true;
 }
 
-// docs/bugs.md #528 (owner decision 2026-11-03): D2RLoader's Ctrl stat ranges print repeated lines for Median's items, so
-// the release turns them off; a kept d2rloader.toml of an older release gets [d2rcore.items] item_stat_ranges = false too.
-// Only that key changes. Not fatal: the game runs either way.
-void Launcher::EnsureStatRangesOff(const std::wstring& mod) {
+// The other keys of the mod's d2rloader.toml (ModConfigKeys, paths.h; the save format above has its own backup and is fatal):
+// a kept file of an older release gets them too, with the rules of tools/install_mod.py ensure_toml_key. docs/bugs.md #528
+// (owner decision 2026-11-03): item_stat_ranges is always false. #498: always_enable_rotw_legacy_graphics_keybind = true
+// unless the player set it; a commented template line does not count. Only those keys change; D2RLoader's game-wide
+// config is never written. Not fatal: the game runs either way.
+void Launcher::EnsureModConfigKeys(const std::wstring& mod) {
 	std::wstring path = JoinPath(mod, Wide(ModLoaderConfigRel));
 	std::string text;
 	if (!ReadWholeFile(path, text))
 		return;
-	std::string was = ItemStatRanges(text);
-	if (was == "false")
-		return;
-	if (!WriteFileAtomic(path, SetItemStatRangesOff(text))) {
-		Report("Could not turn off D2RLoader's Ctrl stat ranges in " + Utf8(path) + " (" + Utf8(LastErrorText(GetLastError())) +
-		       "): set item_stat_ranges = false under [d2rcore.items] there yourself; with them on, Ctrl shows repeated lines.");
-		return;
+	for (const ModConfigKey& k : ModConfigKeys) {
+		if (std::string(k.section) == "d2rcore.save_format")
+			continue;  // EnsureExtendedSaves
+		std::string was, next = ApplyModConfigKey(text, k, &was);
+		if (next == text)
+			continue;
+		std::string line = "[" + std::string(k.section) + "] " + k.key + " = " + k.value;
+		if (!WriteFileAtomic(path, next)) {
+			Report("Could not set " + line + " in " + Utf8(path) + " (" + Utf8(LastErrorText(GetLastError())) + "): add it there yourself (" +
+			       k.why + ").");
+			return;
+		}
+		Report("Your " + std::string(ModLoaderConfigRel) + " had " + (was.empty() ? "no " + std::string(k.key) : std::string(k.key) + " = " + was) +
+		       ": set " + line + " (" + k.why + "); nothing else in it changed.");
+		text = next;
 	}
-	Report("Your " + std::string(ModLoaderConfigRel) + " had " + (was.empty() ? std::string("no item_stat_ranges") : "item_stat_ranges = " + was) +
-	       ": set [d2rcore.items] item_stat_ranges = false (D2RLoader's Ctrl stat ranges show repeated lines for D2R-XL 2012 items); "
-	       "nothing else in it changed.");
 }
 
 // ---------------------------------------------------------------- actions

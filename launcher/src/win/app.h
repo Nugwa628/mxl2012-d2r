@@ -26,7 +26,8 @@ constexpr const char* DefaultSite = "https://files.werdegames.com/mxl2012/";  //
 constexpr const char* DefaultChannel = "stable";
 constexpr int ObjectAttempts = 5;  // tries per object or 7z (resumed each time) before an install stops with "try again"
 constexpr const char* IssuesUrl = "https://github.com/Nugwa628/mxl2012-d2r/issues";
-// D2RLoader is not shipped or downloaded: the player gets it from its official site.
+// D2RLoader is never shipped: Install D2RLoader downloads the release manifest's d2rloader.url from its official site when
+// the player asks (docs/launcher.md "Install D2RLoader"); Get D2RLoader opens this page (also the fallback).
 constexpr const char* LoaderSite = "https://d2rloader.net/download.html";
 constexpr const char* LoaderVersionDefault = "1.3.1-beta";  // when the manifest names none
 // The player's part (docs/launcher.md "How the player starts D2R-XL 2012"). Shown in the window, README, release notes.
@@ -105,6 +106,13 @@ public:
 	// mods\mxl2012 into <data>\removed\<date>\ (never deleted); a protected mod's folder is always left alone.
 	bool FixDefaultMod(std::string& error);
 	bool RemoveStrayPlugins(std::string& error);
+	// docs/launcher.md "Install D2RLoader", after the player said yes: download the manifest's d2rloader package (https,
+	// size and sha256 checked), unpack it into <data>\loader-staging and move its files into the D2R folder. Refused while
+	// D2R or D2RLoader runs there; the player's d2rloader\config files are kept; a failed move puts the old files back.
+	bool InstallLoader(std::string& error);
+	// The manifest's package can be installed (LoaderPackageUsable); `why` says why not.
+	bool LoaderInstallable(std::string* why = nullptr) const;
+	const Manifest::Loader& LoaderPackage() const { return feed_.d2rloader; }
 	bool ForeignModFolder() const { return foreign_; }  // set by an install that stopped to ask
 	void SetReplace(bool replace) { opt_.replace = replace; }  // the player said yes
 
@@ -129,7 +137,7 @@ private:
 	bool PrepareTarget(std::string& error);  // marker, writable, not running
 	bool EnsureMod(bool verify, std::string& error);
 	bool EnsureExtendedSaves(const std::wstring& mod, std::string& error);  // docs/bugs.md #512
-	void EnsureStatRangesOff(const std::wstring& mod);                     // docs/bugs.md #528
+	void EnsureModConfigKeys(const std::wstring& mod);                     // docs/bugs.md #528, #498 (ModConfigKeys)
 	bool LoadState();
 	bool SaveState();
 	void Report(const std::string& text, double fraction = -1);
@@ -137,6 +145,7 @@ private:
 	bool InstallObjects(const std::wstring& mod, std::vector<ManifestFile>& fetch, Json& files, std::string& error);
 	bool InstallFrom7z(const std::wstring& mod, std::vector<ManifestFile>& fetch, Json& files, std::string& error);
 	bool Download7z(std::wstring& file, std::string& error);
+	bool DownloadLoader(std::wstring& file, std::string& error);
 	bool UseSevenZip(const std::vector<ManifestFile>& fetch, uint64_t localBytes) const;
 	std::string NewLauncherUrl() const;
 

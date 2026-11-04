@@ -7,7 +7,7 @@ project(mxl_launcher LANGUAGES C CXX RC)
 
 include(third_party/lzma/lzma.cmake)
 
-set(core src/core/sha256.cpp src/core/json.cpp src/core/manifest.cpp src/core/detect.cpp src/core/paths.cpp
+set(core src/core/sha256.cpp src/core/json.cpp src/core/manifest.cpp src/core/detect.cpp src/core/paths.cpp src/core/zip.cpp src/core/loaderpkg.cpp
          src/core/sevenzip.cpp src/core/svgpath.cpp)
 add_executable(mxl_launcher WIN32 src/win/main.cpp src/win/window.cpp src/win/app.cpp src/win/game.cpp src/win/http.cpp src/win/util.cpp ${core} ${MXL_LZMA_SOURCES}
                res/launcher.rc)

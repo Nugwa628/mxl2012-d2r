@@ -37,6 +37,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -50,7 +51,8 @@ REPO_URL = "https://github.com/Nugwa628/mxl2012-d2r"
 EXTRACT = fxpaths.D2R  # D2R 93847's extraction (MXL_D2R_EXTRACT > extract/d2r/93847 > the machine's extract_dir, read-only)
 RELEASE_BUILD = ROOT / "build" / "plugin-release"
 D2R = {"build": install_mod.D2R_BUILD, "version": "3.3.0", "imageTimestamp": "0x6ab3782c"}  # plugin/src/build_guard_logic.h
-# The pinned D2RLoader (docs/setup.md step 10)
+# The pinned D2RLoader (docs/setup.md step 10). The downloader's Install D2RLoader fetches `url` (https on d2rloader.net
+# only) when the player asks and installs it only when `size` and `sha256` match (docs/launcher.md "Install D2RLoader").
 D2RLOADER = {"version": "1.3.1-beta", "url": "https://d2rloader.net/download/D2RLoader-1.3.1-beta.zip", "size": 47652455,
              "sha256": "9286c6b5bff7f1043658411dbea305faa9698b6a455e6441668fc6d02c22aad7",
              "signerThumbprint": "8001082E968FADAA58BF2F73EFA1810A11D0C28F"}
@@ -205,8 +207,37 @@ def write_7z(mod: Path, out: Path, sevenzip=None) -> None:
         raise RuntimeError(f"7-Zip failed ({r.returncode}): {(r.stdout + r.stderr).strip()[-600:]}")
 
 
+LOADER_HOST = "d2rloader.net"
+
+
+def loader_problems(block: dict) -> list:
+    """What keeps the downloader from installing the manifest's d2rloader block (the same rules as
+    launcher/src/core/loaderpkg.cpp LoaderPackageUsable): a version, an https url on d2rloader.net ending in a .zip name,
+    a size, a 64-digit sha256."""
+    out = []
+    if not block.get("version"):
+        out.append("d2rloader.version is missing")
+    url = urllib.parse.urlsplit(block.get("url") or "")
+    host = (url.hostname or "").lower()
+    if url.scheme != "https":
+        out.append("d2rloader.url is not https://")
+    elif host != LOADER_HOST and not host.endswith("." + LOADER_HOST):
+        out.append(f"d2rloader.url is not on {LOADER_HOST}")
+    elif not url.path.lower().endswith(".zip") or url.path.endswith("/.zip"):
+        out.append("d2rloader.url does not name a .zip")
+    size = block.get("size")
+    if not isinstance(size, int) or isinstance(size, bool) or not 0 < size <= 512 << 20:
+        out.append("d2rloader.size is missing or out of range")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", block.get("sha256") or ""):
+        out.append("d2rloader.sha256 is not 64 hex digits")
+    return out
+
+
 def manifest(version: str, files: list, archive_path: Path, complete: bool, dirs=()) -> dict:
     """archive_path: the .7z. The launcher installs from the objects (docs/release.md), never from the archive."""
+    problems = loader_problems(D2RLOADER)
+    if problems:
+        raise ValueError("D2RLOADER: " + "; ".join(problems))
     return {
         "schemaVersion": SCHEMA,
         "name": NAME,

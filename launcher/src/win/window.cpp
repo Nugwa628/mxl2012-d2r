@@ -54,7 +54,7 @@ const gp::Color Gold(255, 232, 196, 128), GoldBright(255, 255, 228, 168), Body(2
 	ErrorText(255, 240, 128, 104);
 
 enum : int { IdInstall = 101, IdRepair, IdUninstall, IdMods, IdIssues, IdChoose, IdCancel, IdLoader, IdSelfUpdate, IdDefaultMod,
-               IdMovePlugins };
+               IdMovePlugins, IdInstallLoader };
 enum Kind { Big, Small, Icon };
 struct Button {
 	int id;
@@ -67,10 +67,12 @@ struct Button {
 Button buttons[] = {
 	{IdInstall, L"Install", Big, gp::RectF(360, 444, 240, 60)},
 	{IdCancel, L"Stop", Big, gp::RectF(360, 444, 240, 60)},
-	// one row, centred (RefreshStatus): Repair, Uninstall or Get D2RLoader in its place, D2R folder, Mods folder
+	// one row, centred (RefreshStatus): Repair, Uninstall or Install / Get D2RLoader in its place, D2R folder, Mods folder
 	{IdRepair, L"Repair", Small, gp::RectF(175, 516, 140, 34)},
 	{IdUninstall, L"Uninstall", Small, gp::RectF(325, 516, 140, 34)},
 	{IdLoader, L"Get D2RLoader", Small, gp::RectF(325, 516, 170, 34)},  // shown when D2RLoader is missing or another version
+	// the same, when the release manifest names an installable package and no install of it failed yet (else Get D2RLoader)
+	{IdInstallLoader, L"Install D2RLoader", Small, gp::RectF(325, 516, 200, 34)},
 	{IdChoose, L"D2R folder", Small, gp::RectF(475, 516, 150, 34)},
 	{IdMods, L"Mods folder", Small, gp::RectF(635, 516, 150, 34)},
 	// either side of the big button
@@ -112,6 +114,7 @@ struct Ui {
 	Options opt;
 	std::wstring snapshot;
 	bool busy = false;
+	bool loaderFailed = false;  // Install D2RLoader failed: Get D2RLoader (its page) takes its place
 	std::thread worker;
 };
 Ui g;
@@ -405,7 +408,7 @@ void MoveButtonX(int id, float x) {
 	SetWindowPos(b->h, nullptr, Px(b->r.X), Px(b->r.Y), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-// The window's state from Launcher::Inspect: the status lines, the big button's label, Get D2RLoader.
+// The window's state from Launcher::Inspect: the status lines, the big button's label, Install / Get D2RLoader.
 void RefreshStatus() {
 	g.view = g.launcher->Inspect();
 	const Launcher::View& v = g.view;
@@ -420,8 +423,10 @@ void RefreshStatus() {
 	bool defaultMod = v.d2rFound && v.defaultModChecked && !v.defaultMod.ok, plugins = v.d2rFound && !v.strayPlugins.empty();
 	ShowWindow(FindButton(IdDefaultMod)->h, defaultMod ? SW_SHOWNA : SW_HIDE);
 	ShowWindow(FindButton(IdMovePlugins)->h, plugins ? SW_SHOWNA : SW_HIDE);
-	// Get D2RLoader takes Uninstall's place (never both); the row stays centred
-	std::pair<int, bool> row[] = {{IdRepair, true}, {IdUninstall, !loader}, {IdLoader, loader}, {IdChoose, true}, {IdMods, true}};
+	// Install D2RLoader (or Get D2RLoader, its page) takes Uninstall's place (never both); the row stays centred
+	bool installLoader = loader && !g.loaderFailed && g.launcher->LoaderInstallable();
+	std::pair<int, bool> row[] = {{IdRepair, true}, {IdUninstall, !loader}, {IdInstallLoader, installLoader}, {IdLoader, loader && !installLoader},
+	                              {IdChoose, true}, {IdMods, true}};
 	float width = -10;
 	for (const auto& [id, shown] : row)
 		width += shown ? FindButton(id)->r.Width + 10 : 0;
@@ -460,6 +465,16 @@ void RunAction(int id) {
 		if (MessageBoxW(g.wnd, q.c_str(), L"Make D2R-XL 2012 the default mod", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
 			return;
 	}
+	if (id == IdInstallLoader) {
+		const Manifest::Loader& p = g.launcher->LoaderPackage();
+		std::wstring q = L"Download D2RLoader " + Wide(p.version) + L" from its official site and install it?\n\nSource: " + Wide(p.url) +
+		                 L"\nInto: " + g.launcher->D2RDir() + L"\n\nThe download (" + std::to_wstring((p.size + (1 << 19)) >> 20) +
+		                 L" MB) is checked against the sha256 in the D2R-XL 2012 release before anything is installed. D2RLoader.exe, "
+		                 L"D2RCore.dll, d2rloader.mpq and the d2rloader folder are written; your D2RLoader settings "
+		                 L"(d2rloader\\config) are kept. D2RLoader is made by its own authors, not by D2R-XL 2012.";
+		if (MessageBoxW(g.wnd, q.c_str(), L"Install D2RLoader", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+			return;
+	}
 	if (id == IdMovePlugins) {
 		std::wstring list;
 		for (const auto& sp : g.view.strayPlugins)
@@ -484,6 +499,7 @@ void RunAction(int id) {
 		case IdSelfUpdate: ok = l.SelfUpdate(err); break;
 		case IdDefaultMod: ok = l.FixDefaultMod(err); break;
 		case IdMovePlugins: ok = l.RemoveStrayPlugins(err); break;
+		case IdInstallLoader: ok = l.InstallLoader(err); break;
 		}
 		std::string done = id == IdInstall || id == IdRepair ? "Done. " + std::string(HowToPlay) : "Done.";
 		auto* msg = new ProgressMsg{ok ? done : err, ok ? 1.0 : -2.0, id};
@@ -624,7 +640,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 	switch (m) {
 	case WM_COMMAND:
 		switch (LOWORD(w)) {
-		case IdInstall: case IdRepair: case IdUninstall: case IdDefaultMod: case IdMovePlugins: RunAction(LOWORD(w)); return 0;
+		case IdInstall: case IdRepair: case IdUninstall: case IdDefaultMod: case IdMovePlugins: case IdInstallLoader: RunAction(LOWORD(w)); return 0;
 		case IdMods: {  // opened, never created: the downloader writes only mods\mxl2012
 			std::wstring d = g.launcher->ModDir();
 			if (!d.empty() && !DirExists(d))
@@ -673,6 +689,15 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 					return 0;
 				}
 				MessageBoxW(h, L"The downloader was updated. Start it again.", L"D2R-XL 2012 Downloader", MB_ICONINFORMATION);
+			}
+			if (w == 0 && msg->action == IdInstallLoader && !g.launcher->cancel.load()) {  // fallback: the official page
+				g.loaderFailed = true;
+				RefreshStatus();
+				std::wstring q = Wide(msg->text) + L"\n\nOpen the D2RLoader download page instead?";
+				if (MessageBoxW(h, q.c_str(), L"Install D2RLoader", MB_YESNO | MB_ICONWARNING) == IDYES)
+					ShellExecuteW(h, L"open", Wide(LoaderSite).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+				InvalidatePanel();
+				return 0;
 			}
 			if (w == 0 && msg->action == IdInstall && g.launcher->ForeignModFolder()) {
 				AskReplace(msg->text);
@@ -781,7 +806,7 @@ int RunWindow(HINSTANCE inst, const Options& opt, const std::wstring& snapshot) 
 	LoadArt();
 	MakeLayers();
 	for (auto& b : buttons) {
-		DWORD bs = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW | (b.id == IdCancel || b.id == IdLoader || b.id == IdDefaultMod || b.id == IdMovePlugins ? 0 : WS_VISIBLE);
+		DWORD bs = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW | (b.id == IdCancel || b.id == IdLoader || b.id == IdInstallLoader || b.id == IdDefaultMod || b.id == IdMovePlugins ? 0 : WS_VISIBLE);
 		b.h = CreateWindowExW(0, L"BUTTON", b.label.c_str(), bs, Px(b.r.X), Px(b.r.Y), Px(b.r.Width), Px(b.r.Height), g.wnd,
 		                      HMENU(INT_PTR(b.id)), inst, nullptr);
 		SetWindowSubclass(b.h, ButtonProc, 0, reinterpret_cast<DWORD_PTR>(&b));
@@ -796,6 +821,9 @@ int RunWindow(HINSTANCE inst, const Options& opt, const std::wstring& snapshot) 
 	SendMessageW(g.tip, TTM_ADDTOOLW, 0, LPARAM(&ti));
 	ti.uId = UINT_PTR(FindButton(IdDefaultMod)->h);
 	ti.lpszText = const_cast<wchar_t*>(L"Make D2R-XL 2012 the default mod (D2RLoader's default_mod; asks first)");
+	SendMessageW(g.tip, TTM_ADDTOOLW, 0, LPARAM(&ti));
+	ti.uId = UINT_PTR(FindButton(IdInstallLoader)->h);
+	ti.lpszText = const_cast<wchar_t*>(L"Download D2RLoader from d2rloader.net and install it into the D2R folder (asks first; sha256 checked)");
 	SendMessageW(g.tip, TTM_ADDTOOLW, 0, LPARAM(&ti));
 	ti.uId = UINT_PTR(FindButton(IdMovePlugins)->h);
 	ti.lpszText = const_cast<wchar_t*>(L"Move the old copy of the D2R-XL 2012 plugin away (asks first; nothing is deleted)");

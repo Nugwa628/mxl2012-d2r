@@ -8,6 +8,14 @@ version being released (docs/release.md).
 - The Fell Fiends' classic art has a new token (`FZ`, was `08`): a legacy game could ask for its files without the 0 and exit
   (#532). The crash was not seen here with the mod as shipped; the player's mod folder had another mod's D2RLoader files in it, so
   the mod's plugin did not load. Install D2R-XL 2012 into its own folder and do not copy another mod's `d2rloader` files over it.
+- The downloader can install D2RLoader for you: when D2RLoader is missing or the wrong version, **Install D2RLoader**
+  asks first, downloads it from its official site (d2rloader.net), checks it against the version pinned in the release,
+  and puts it into your D2R folder. Your D2RLoader settings are kept. If that fails, **Get D2RLoader** opens the download
+  page as before.
+- Legacy graphics (G) in Reign of the Warlock games: you no longer have to add `always_enable_rotw_legacy_graphics_keybind = true`
+  to the mod's `d2rloader.toml` by hand. The downloader sets it on every install, update and repair, also in a file kept from
+  an older install. A `false` there (set by hand or left by D2RLoader's template) becomes `true`, as the stat ranges
+  setting is kept off. D2RLoader's own game-wide settings are not touched (#498).
 - Cogs are yellow in HD as in classic, and so are the Cog shamans (#529). The other monsters with a classic colour of their own
   (Shadows, Lamias, Darklings, Daystars, the Thunder Bear, the Golden Calf and others, 60 in all) get that colour from a monster
   level now, so HD can draw it too. Cogs still cannot be healed. In Hell, Cogs and Cog shamans are still red in HD.

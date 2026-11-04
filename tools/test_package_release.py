@@ -78,6 +78,27 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertTrue(set(m["preserve"]) <= set(paths))
         self.assertEqual(m["emptyDirs"], ["d2rloader/patches"])
 
+    def test_d2rloader_block_is_installable(self):
+        self.assertEqual(pr.loader_problems(pr.D2RLOADER), [])
+        self.assertEqual(pr.D2RLOADER["url"], "https://d2rloader.net/download/D2RLoader-1.3.1-beta.zip")
+        good = dict(pr.D2RLOADER)
+        for field, value, words in (("version", "", "version"), ("url", "", "https"), ("sha256", "", "sha256"),
+                                    ("sha256", "g" * 64, "sha256"), ("size", 0, "size"), ("size", "47652455", "size"),
+                                    ("url", "http://d2rloader.net/download/D2RLoader-1.3.1-beta.zip", "https"),
+                                    ("url", "https://example.com/D2RLoader-1.3.1-beta.zip", "d2rloader.net"),
+                                    ("url", "https://evild2rloader.net/D2RLoader.zip", "d2rloader.net"),
+                                    ("url", "https://d2rloader.net/download.html", ".zip")):
+            problems = pr.loader_problems(dict(good, **{field: value}))
+            self.assertTrue(problems and any(words in p for p in problems), (field, value, problems))
+        missing = {k: v for k, v in good.items() if k != "sha256"}
+        self.assertIn("d2rloader.sha256 is not 64 hex digits", pr.loader_problems(missing))
+
+    def test_manifest_refuses_a_broken_d2rloader_block(self):
+        mod = self.staged()
+        with mock.patch.object(pr, "D2RLOADER", dict(pr.D2RLOADER, sha256="")):
+            with self.assertRaisesRegex(ValueError, "d2rloader.sha256"):
+                pr.manifest("1.2.3", pr.file_list(mod), self.fake_7z(mod), True)
+
     def test_manifest_archive_entry(self):
         mod = self.staged()
         seven = self.fake_7z(mod)

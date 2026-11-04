@@ -4,11 +4,13 @@
 // Built and run by CI on Linux (g++) and locally with MSVC: cmake -S launcher/tests -B build/launcher-tests.
 #include "../src/core/detect.h"
 #include "../src/core/json.h"
+#include "../src/core/loaderpkg.h"
 #include "../src/core/manifest.h"
 #include "../src/core/paths.h"
 #include "../src/core/sevenzip.h"
 #include "../src/core/sha256.h"
 #include "../src/core/svgpath.h"
+#include "../src/core/zip.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -600,6 +602,78 @@ void TestStatRangesOff() {
 	Check(mxl::ItemStatRanges(mxl::SetItemStatRangesOff("")) == "false", "an empty file gets the table");
 }
 
+// docs/bugs.md #498: the mod's d2rloader.toml keys (ModConfigKeys) with tools/install_mod.py ensure_toml_key's rules.
+void TestModConfigKeys() {
+	const std::string R = "always_enable_rotw_legacy_graphics_keybind";
+	const mxl::ModConfigKey* rotw = nullptr;
+	for (const auto& k : mxl::ModConfigKeys)
+		if (k.key == R)
+			rotw = &k;
+	Check(rotw && !rotw->keepHandSet && std::string(rotw->section) == "d2rcore.player" && std::string(rotw->value) == "true",
+	      "the RotW legacy toggle is a forced mod config key (owner decision 2026-11-04)");
+	for (const auto& k : mxl::ModConfigKeys)
+		Check(!k.keepHandSet, ("every mod config key is forced: " + std::string(k.key)).c_str());
+	if (!rotw)
+		return;
+	auto apply = [](std::string text) {  // what EnsureExtendedSaves + EnsureModConfigKeys leave in the mod's file
+		for (const auto& k : mxl::ModConfigKeys)
+			text = mxl::ApplyModConfigKey(text, k);
+		return text;
+	};
+	// The owner's kept mod file (2026-10-30, template layout): only the commented line. D2RLoader's game-wide file says false;
+	// the mod's own file wins, so the mod's file must say true. The game-wide text is never handed to these functions.
+	const std::string global = "[d2rcore.player]\nenable_respec = false\nalways_enable_rotw_legacy_graphics_keybind = false\n";
+	std::string kept = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n# Keep the Toggle Renderer keybind available while "
+	                   "playing a RotW character.\n# " + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n";
+	std::string was = "x", fixed = mxl::ApplyModConfigKey(kept, *rotw, &was);
+	Check(was.empty() && fixed == Without(kept, "# " + R + " = true\n").insert(kept.find("# " + R), R + " = true\n"),
+	      "commented template line in the kept mod file becomes the key, nothing else changes");
+	Check(mxl::TableKeyValue(fixed, "d2rcore.player", R) == "true" && mxl::TableKeyValue(global, "d2rcore.player", R) == "false",
+	      "mod file true, game-wide false stays the player's");
+	Check(apply(kept) == fixed, "all keys: only the RotW key changed");
+	for (const std::string& line : {"#" + R + "=true", "  ##   " + R + " = false   # D2RLoader default", "#\t" + R + " = true"}) {
+		std::string t = "[d2rcore.player]\nenable_respec = false\n" + line + "\n[d2rcore.stash]\n";
+		Check(mxl::ApplyModConfigKey(t, *rotw) == "[d2rcore.player]\nenable_respec = false\n" + R + " = true\n[d2rcore.stash]\n",
+		      ("commented line with other spacing replaced: " + line).c_str());
+	}
+	// A fresh install: the release's file (0.1.10 layout) has it; a file without it gets it under the header or a new table.
+	std::string shipped = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n" + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n";
+	Check(apply(shipped) == shipped, "the shipped file is left as it is");
+	Check(mxl::ApplyModConfigKey("[d2rcore.player]\nenable_respec = false\n", *rotw) == "[d2rcore.player]\n" + R + " = true\nenable_respec = false\n",
+	      "under the header");
+	Check(mxl::ApplyModConfigKey("[d2rloader]\ndefault_mod = \"x\"\n", *rotw) == "[d2rloader]\ndefault_mod = \"x\"\n\n[d2rcore.player]\n" + R + " = true\n",
+	      "the table appended after one blank line");
+	Check(mxl::ApplyModConfigKey("", *rotw) == "[d2rcore.player]\n" + R + " = true\n", "an empty file");
+	Check(mxl::TableKeyValue(apply(""), "d2rcore.player", R) == "true" && mxl::SaveFormatMode(apply("")) == "extended" &&
+	          mxl::ItemStatRanges(apply("")) == "false",
+	      "every key in an empty file");
+	// Set by hand or left by D2RLoader 1.3.1's template (uncommented false): forced to true in place, also the dotted key and a
+	// header with a comment (owner decision 2026-11-04); the comment and indent stay. The game-wide text stays false.
+	const std::pair<std::string, std::string> handSet[] = {
+		{"[d2rcore.player]\n" + R + " = false # mine\n", "[d2rcore.player]\n" + R + " = true # mine\n"},
+		{"d2rcore.player." + R + " = false\n[a]\nb = 1\n", "d2rcore.player." + R + " = true\n[a]\nb = 1\n"},
+		{"[d2rcore.player] # player\n  " + R + "= false\n", "[d2rcore.player] # player\n  " + R + " = true\n"},
+		{"[d2rcore.player]\n" + R + " = false", "[d2rcore.player]\n" + R + " = true"},
+		{"[d2rcore.player]\n" + R + " = \"true\"\n", "[d2rcore.player]\n" + R + " = \"true\"\n"},
+	};
+	for (const auto& [t, want] : handSet)
+		Check(mxl::ApplyModConfigKey(t, *rotw, &was) == want && was == mxl::TableKeyValue(t, "d2rcore.player", R),
+		      ("hand-set value forced to true: " + t).c_str());
+	std::string tmpl = "[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n" + R + " = false\nenable_respec = false\n";
+	std::string fromTmpl = apply(tmpl);
+	Check(fromTmpl.rfind("[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n" + R + " = true\nenable_respec = false\n", 0) == 0 &&
+	          fromTmpl.find(R + " = false") == std::string::npos,
+	      "D2RLoader's template false becomes true in place");
+	Check(mxl::ApplyModConfigKey(fixed, *rotw) == fixed, "a forced file comes back unchanged");
+	// The forced keys stay forced (owner decisions #512, #528).
+	Check(mxl::ItemStatRanges(apply("[d2rcore.items]\nitem_stat_ranges = true\n")) == "false", "stat ranges forced off");
+	Check(mxl::SaveFormatMode(apply("[d2rcore.save_format]\nmode = \"retail\"\n")) == "extended", "save format forced extended");
+	std::string crlf = "\xEF\xBB\xBF[d2rcore.player]\r\n# " + R + " = true\r\nenable_respec = false\r\n";
+	Check(mxl::ApplyModConfigKey(crlf, *rotw) == "\xEF\xBB\xBF[d2rcore.player]\r\n" + R + " = true\r\nenable_respec = false\r\n", "BOM and CRLF kept");
+	Check(mxl::ApplyModConfigKey("\xEF\xBB\xBF[d2rloader]\r\n", *rotw) == "\xEF\xBB\xBF[d2rloader]\r\n\r\n[d2rcore.player]\r\n" + R + " = true\r\n",
+	      "BOM and CRLF in a new table");
+}
+
 // docs/bugs.md #53: D2RLoader's default mod and stray copies of the plugin.
 void TestEnvironment() {
 	const std::string bs(1, char(92));
@@ -704,6 +778,153 @@ void TestSvg() {
 	}
 }
 
+// docs/launcher.md "Install D2RLoader": the ZIP reader on a ZIP laid out like D2RLoader's (data/make_sample_zip.py).
+void TestZip() {
+	Check(mxl::Crc32("123456789", 9) == 0xCBF43926u, "crc32 check value");
+	Check(mxl::Crc32("", 0) == 0, "crc32 of nothing");
+	const std::string dir = MXL_TEST_DATA;
+	std::string zip = ReadAll(dir + "/sample-loader.zip"), listing = ReadAll(dir + "/sample-loader.json"), err;
+	mxl::Json want;
+	Check(!zip.empty() && mxl::Json::Parse(listing, want, err) && want["files"].size() == 5, "sample-loader.zip and .json present");
+	std::vector<mxl::ZipEntry> entries;
+	Check(mxl::ReadZipDirectory(zip, entries, err), ("sample-loader.zip directory: " + err).c_str());
+	Check(entries.size() == 8, "eight entries");
+	size_t same = 0, dirs = 0;
+	for (const auto& e : entries) {
+		if (e.IsDir()) {
+			++dirs;
+			continue;
+		}
+		std::string data;
+		bool ok = mxl::ExtractZipEntry(zip, e, data, err);
+		for (const auto& f : want["files"].items())
+			same += ok && f["path"].Str() == e.name && f["sha256"].Str() == mxl::Sha256Hex(data.data(), data.size());
+	}
+	Check(same == 5 && dirs == 3, "every file unpacks to its sha256 (stored, fixed and dynamic blocks)");
+
+	auto find = [&](const std::string& name) {
+		for (const auto& e : entries)
+			if (e.name == name)
+				return e;
+		return mxl::ZipEntry{};
+	};
+	{  // a damaged byte inside D2RCore.dll's deflate data: CRC or deflate error, never wrong bytes
+		mxl::ZipEntry core = find("D2RCore.dll");
+		std::string bad = zip, data;
+		bad[size_t(core.localOffset) + 30 + core.name.size() + 2000] ^= 0x10;
+		Check(!mxl::ExtractZipEntry(bad, core, data, err), "a damaged entry is refused");
+	}
+	{
+		mxl::ZipEntry core = find("D2RCore.dll"), wrong = core;
+		std::string data;
+		wrong.crc ^= 1;
+		Check(!mxl::ExtractZipEntry(zip, wrong, data, err) && err.find("CRC") != std::string::npos, "a CRC mismatch is refused");
+		wrong = core;
+		wrong.size -= 1;
+		Check(!mxl::ExtractZipEntry(zip, wrong, data, err), "more data than the entry's size is refused");
+		wrong = core;
+		wrong.method = 14;
+		Check(!mxl::ExtractZipEntry(zip, wrong, data, err) && err.find("method") != std::string::npos, "another method is refused");
+		wrong = core;
+		wrong.flags = 1;
+		Check(!mxl::ExtractZipEntry(zip, wrong, data, err) && err.find("encrypted") != std::string::npos, "encryption is refused");
+	}
+	std::vector<mxl::ZipEntry> none;
+	Check(!mxl::ReadZipDirectory("not a zip file, just some text that is long enough", none, err), "junk is refused");
+	Check(!mxl::ReadZipDirectory(zip.substr(0, zip.size() / 2), none, err), "a truncated ZIP is refused");
+	std::string out;
+	const uint8_t stored[] = {0x01, 0x03, 0x00, 0xfc, 0xff, 'a', 'b', 'c'};
+	Check(mxl::Inflate(stored, sizeof(stored), out, 3, err) && out == "abc", "a stored deflate block");
+	Check(!mxl::Inflate(stored, sizeof(stored), out, 2, err), "output over the limit is refused");
+	const uint8_t badlen[] = {0x01, 0x03, 0x00, 0xfc, 0xfe, 'a', 'b', 'c'};
+	Check(!mxl::Inflate(badlen, sizeof(badlen), out, 3, err), "a stored block with a bad NLEN is refused");
+}
+
+// docs/launcher.md "Install D2RLoader": which manifests are usable, where the ZIP's entries go, when it is refused.
+void TestLoaderPackage() {
+	mxl::Manifest m;
+	std::string err;
+	Check(mxl::ParseManifest(ManifestText(F("a.txt", H1)), m, err), "manifest with a d2rloader block");
+	Check(mxl::LoaderPackageUsable(m.d2rloader, err), ("the pinned package is usable: " + err).c_str());
+	Check(mxl::LoaderZipName(m.d2rloader.url) == "D2RLoader-1.3.1-beta.zip", "zip name from the url");
+	Check(m.d2rloader.sha256 == "9286c6b5bff7f1043658411dbea305faa9698b6a455e6441668fc6d02c22aad7", "sha256 lower-cased");
+	auto refused = [&](void (*edit)(mxl::Manifest::Loader&), const char* field, const char* what) {
+		mxl::Manifest::Loader l = m.d2rloader;
+		edit(l);
+		std::string e;
+		Check(!mxl::LoaderPackageUsable(l, e) && e.find(field) != std::string::npos, what);
+	};
+	refused([](mxl::Manifest::Loader& l) { l.version.clear(); }, "d2rloader.version", "no version");
+	refused([](mxl::Manifest::Loader& l) { l.url.clear(); }, "d2rloader.url", "no url");
+	refused([](mxl::Manifest::Loader& l) { l.sha256.clear(); }, "d2rloader.sha256", "no sha256");
+	refused([](mxl::Manifest::Loader& l) { l.sha256 = std::string(63, 'a') + "g"; }, "d2rloader.sha256", "a sha256 that is not hex");
+	refused([](mxl::Manifest::Loader& l) { l.size = 0; }, "d2rloader.size", "no size");
+	refused([](mxl::Manifest::Loader& l) { l.size = mxl::LoaderMaxSize + 1; }, "d2rloader.size", "a size too large");
+	refused([](mxl::Manifest::Loader& l) { l.url = "http://d2rloader.net/download/D2RLoader-1.3.1-beta.zip"; }, "https", "plain http");
+	refused([](mxl::Manifest::Loader& l) { l.url = "https://example.com/download/D2RLoader-1.3.1-beta.zip"; }, "d2rloader.net", "another host");
+	refused([](mxl::Manifest::Loader& l) { l.url = "https://d2rloader.net.example.com/D2RLoader.zip"; }, "d2rloader.net", "a look-alike host");
+	refused([](mxl::Manifest::Loader& l) { l.url = "https://evild2rloader.net/D2RLoader.zip"; }, "d2rloader.net", "a host ending in the name");
+	refused([](mxl::Manifest::Loader& l) { l.url = "https://d2rloader.net/download.html"; }, ".zip", "a page, not a zip");
+	refused([](mxl::Manifest::Loader& l) { l.url = "https://d2rloader.net/download/"; }, ".zip", "no file name");
+	{
+		mxl::Manifest::Loader l = m.d2rloader;
+		l.url = "https://dl.d2rloader.net/x/D2RLoader-1.3.2.zip?v=2";
+		Check(mxl::LoaderPackageUsable(l, err) && mxl::LoaderZipName(l.url) == "D2RLoader-1.3.2.zip", "a subdomain and a query");
+	}
+	{  // a manifest without the block (an old release) parses; the package is not usable
+		mxl::Manifest old;
+		std::string text = ManifestText(F("a.txt", H1));
+		size_t a = text.find("\"d2rloader\""), b = text.find("},", a);
+		Check(a != std::string::npos && mxl::ParseManifest(text.erase(a, b + 2 - a), old, err), "manifest without d2rloader parses");
+		Check(!mxl::LoaderPackageUsable(old.d2rloader, err) && err.find("d2rloader.version") != std::string::npos, "missing block: not usable");
+	}
+
+	auto entry = [](const std::string& name) {
+		mxl::ZipEntry e;
+		e.name = name;
+		return e;
+	};
+	std::vector<mxl::ZipEntry> real = {entry("mods/"), entry("d2rloader/"), entry("d2rloader/config/"), entry("d2rloader/plugins/"),
+	                                   entry("D2RLoader.exe"), entry("D2RCore.dll"), entry("d2rloader.mpq"), entry("d2rloader/config/d2rloader.toml")};
+	std::vector<mxl::LoaderTarget> plan;
+	Check(mxl::PlanLoaderInstall(real, plan, err) && plan.size() == real.size(), ("the official layout is accepted: " + err).c_str());
+	size_t kept = 0, dirs = 0;
+	for (const auto& t : plan) {
+		kept += t.keepExisting;
+		dirs += t.dir;
+	}
+	Check(kept == 1 && plan.back().keepExisting && plan.back().path == "d2rloader/config/d2rloader.toml", "the player's config is kept");
+	Check(dirs == 4 && plan[0].path == "mods" && plan[0].dir, "folders without their '/'");
+	auto planRefused = [&](const std::string& name, const char* what) {
+		std::vector<mxl::ZipEntry> z = real;
+		z.push_back(entry(name));
+		std::vector<mxl::LoaderTarget> p;
+		std::string e;
+		Check(!mxl::PlanLoaderInstall(z, p, e) && !e.empty() && p.empty(), what);
+	};
+	planRefused("D2R.exe", "D2R's own exe is never replaced");
+	planRefused("Data/global/excel/armor.txt", "D2R's Data folder is never written");
+	planRefused("mods/mxl2012/modinfo.json", "a file inside mods is never written");
+	planRefused("../D2RLoader.exe", "a path leaving the D2R folder");
+	planRefused("d2rloader/../../x.dll", "a .. inside the path");
+	planRefused("C:/Windows/D2RLoader.exe", "a drive");
+	planRefused("/D2RLoader.dll", "an absolute path");
+	planRefused("d2rloader\\plugins\\x.dll", "a backslash");
+	planRefused("d2rloader/AUX", "a device name");
+	planRefused("D2RLOADER.EXE", "a duplicate (case-insensitive)");
+	planRefused("readme.txt", "an unknown top-level file");
+	{
+		std::vector<mxl::ZipEntry> z = {entry("d2rloader/"), entry("D2RCore.dll")};
+		Check(!mxl::PlanLoaderInstall(z, plan, err) && err.find("D2RLoader.exe") != std::string::npos, "a ZIP without D2RLoader.exe");
+	}
+
+	Check(mxl::LoaderRunningRefusal({}, R"(C:\Games\D2R)").empty(), "nothing running: no refusal");
+	std::string r = mxl::LoaderRunningRefusal({R"(C:\Games\D2R\D2RLoader.exe)", R"(C:\Games\D2R\D2R.exe)"}, R"(C:\Games\D2R)");
+	Check(r.rfind("D2RLoader.exe is running from C:\\Games\\D2R.", 0) == 0 && r.find("Close D2RLoader and the game") != std::string::npos,
+	      "D2RLoader running: refused with its name and folder");
+	Check(mxl::LoaderRunningRefusal({"D2R.exe"}, "D:/D2R").rfind("D2R.exe is running from D:/D2R.", 0) == 0, "D2R running: refused");
+}
+
 }  // namespace
 
 int main() {
@@ -722,8 +943,11 @@ int main() {
 	TestToml();
 	TestSaveFormat();
 	TestStatRangesOff();
+	TestModConfigKeys();
 	TestEnvironment();
 	TestSvg();
+	TestZip();
+	TestLoaderPackage();
 	std::printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;
 }

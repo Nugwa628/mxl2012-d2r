@@ -1,0 +1,34 @@
+{
+ "files": [
+  {
+   "path": "D2RLoader.exe",
+   "size": 70002,
+   "sha256": "84935ed3436116000e5dffb8c67ba40fd44442b0291f44c379c2105417f67561"
+  },
+  {
+   "path": "D2RCore.dll",
+   "size": 677124,
+   "sha256": "b430f8b4c805ca222d21b6c9c2a6a0180f1126c163b05ea9cd113442100a329e"
+  },
+  {
+   "path": "d2rloader.mpq",
+   "size": 24,
+   "sha256": "4aadc7a2ca7c9ecf4d5e2b7c367a572dc745307838ca6d3c5978070467e64ec2"
+  },
+  {
+   "path": "d2rloader/config/d2rloader.toml",
+   "size": 29,
+   "sha256": "12d617eba3d45cfbcf77a7f13cd6b2ff68e68117bd54905d3777c52af7449c67"
+  },
+  {
+   "path": "d2rloader/empty.txt",
+   "size": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+ ],
+ "dirs": [
+  "mods",
+  "d2rloader",
+  "d2rloader/plugins"
+ ]
+}

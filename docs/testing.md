@@ -5235,3 +5235,52 @@ player's. Report folders under `work/runs/` of the worktree, the player's logs i
 
 The `\8\` request did not reproduce; the player's session ran without the plugin and with another mod's D2RLoader patches (bugs.md
 #532). Slot 2 unlocked, game closed after every run.
+## Lane getloader: Install D2RLoader in the downloader (2026-11-04, no game slot)
+
+Downloader of lane/getloader (VS 18 2026, x64 Release, build dir `mxl2012-runs/launcher-getloader`), CLI and `--snapshot`
+only, every run with its own `--data-dir` and a fake `--game-dir` in `mxl2012-runs/getloader/` (`fake-d2r`, `fake-d2r2`: a
+`D2R.exe` that is a copy of `ping.exe`, an empty `Data`, a `.build.info` at 3.3.93847). No real D2R folder, no game start.
+Source: the official ZIP `https://d2rloader.net/download/D2RLoader-1.3.1-beta.zip` (45 MB); its sha256 matched the one
+on the download page and in the live 0.1.10 manifest. The site sets no licence or terms against automated download.
+
+| Run | Result |
+|-|-|
+| `launcher_tests.exe` | 295 checks, 0 failures (`TestZip`, `TestLoaderPackage`: hash and size fields, missing manifest fields, host and https rules, ZIP paths, running-process refusal) |
+| `status`, `--snapshot window-install-loader.png` (`--channel test`) | "D2RLoader missing", **Install D2RLoader** in Uninstall's place, the CLI hint `--cli install-loader` |
+| `install-loader` into `fake-d2r` (with a player `d2rloader/config/d2rloader.toml`) | real download, sha256 checked, signer `8001082E...C28F` logged; `D2RLoader.exe`, `D2RCore.dll`, `d2rloader.mpq` byte-equal to the ZIP, `d2rloader/{config,data,plugins,logs,crashes}` and `mods` made; the player's toml unchanged (same sha256); download and staging removed; `status` then "D2RLoader: 1.3.1-beta (OK)" |
+| `install-loader` again over it | the same, old files moved to staging and replaced |
+| local site with a wrong `d2rloader.sha256` (`site-bad`) | "does not match the release manifest", file deleted, nothing in `fake-d2r2` |
+| our own fake `D2R.exe` running from `fake-d2r2` | refused before any download: "D2R.exe is running from ... Close D2RLoader and the game first" |
+
+Not run: the window's question and its fallback message box (they need a click); the install path they call is the CLI's.
+
+### Lane getloader, second part: the RotW legacy toggle key in the mod's config (bug #498, 2026-11-04, no game slot)
+
+Owner report 2026-11-04: in a RotW game G said "Only Available in Classic and Expansion games". Their kept
+`mods\mxl2012\d2rloader\config\d2rloader.toml` (2026-10-30, D2RLoader's template layout) had only
+`# always_enable_rotw_legacy_graphics_keybind = true`, and the game-wide file says `false`. After the key was set
+in the mod's file, **the owner confirmed on their own install that G now switches to legacy graphics in a RotW game**:
+a Warlock in classic mode gets at least as far as the toggle (in game, not only the static check of lane wlklegacy).
+
+Downloader of lane/getloader, fake folder `mxl2012-runs/getloader/fake-d2r3`, game-wide toml with
+`always_enable_rotw_legacy_graphics_keybind = false`, live test channel (0.1.10, read-only GETs). Logs: `rotw-*.log`.
+
+| Run | Result |
+|-|-|
+| `launcher_tests.exe` | 314 checks, 0 failures (`TestModConfigKeys`: the commented line with any spacing, under the header, new table, empty file, hand-set and dotted keys kept, forced keys stay forced, BOM / CRLF) |
+| `test_install_mod.py` | 13 tests OK (`ensure_toml_key`: the same cases) |
+| `install` (fresh) | mod toml has `always_enable_rotw_legacy_graphics_keybind = true` (shipped) |
+| kept file `kept-template.toml` (D2RLoader 1.3.1 template sections, `item_stat_ranges = true`, only the commented RotW line), `repair` | diff: exactly two lines, `item_stat_ranges = false` and the commented line became `always_enable_rotw_legacy_graphics_keybind = true`; panel lines name both keys |
+| hand-set `always_enable_rotw_legacy_graphics_keybind = false  # mine`, `repair` | file byte-equal afterwards (kept) |
+| game-wide `fake-d2r3\d2rloader\config\d2rloader.toml` | sha256 unchanged after all runs |
+
+Owner decision 2026-11-04: the key is forced like `item_stat_ranges`; any existing value, `false` or commented out,
+becomes `true`. `install_mod.TOML_KEYS` got a forced flag (save format, RotW key, `item_stat_ranges` forced;
+`add_shared_tabs` not), `ensure_toml_key(..., force)` sets a key line in place; the downloader uses `ForceTomlKey`.
+
+| Run | Result |
+|-|-|
+| `launcher_tests.exe` | 321 checks, 0 failures (`TestModConfigKeys`: every key forced; hand-set, dotted, header-comment and no-final-newline `false` become `true` with indent and comment kept; D2RLoader's template `false` becomes `true` in place; a forced file comes back unchanged) |
+| `test_install_mod.py` | 16 tests OK (forced flags, hand-set and template `false` become `true`, CRLF, a quoted value with `#`; unforced keys still keep a hand-set value) |
+| the hand-set file above (`= false  # mine`), `repair` (log `rotw-repair3.log`) | diff: exactly one line, `always_enable_rotw_legacy_graphics_keybind = true # mine`; the panel line names the old `false` |
+| game-wide `fake-d2r3\d2rloader\config\d2rloader.toml` | sha256 `42dde64a...` unchanged |

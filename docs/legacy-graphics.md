@@ -299,8 +299,9 @@ for a Warlock. Expect the Necromancer look, a Flame Wave without its wave and sh
 
 ### 8.4 Test on a RotW account (owner / user; the slots cannot)
 
-1. Install a build of this branch into `mods\mxl2012`. Set `always_enable_rotw_legacy_graphics_keybind = true` in that install's
-   `d2rloader\config\d2rloader.toml` by hand (the tools never edit the loader toml).
+1. Install a build of this branch into `mods\mxl2012`. That install's `d2rloader\config\d2rloader.toml` has
+   `always_enable_rotw_legacy_graphics_keybind = true` (`tools/install_mod.py` and the downloader set it, also in a kept file;
+   the game-wide `<D2R>\d2rloader\config\d2rloader.toml` is never edited).
 2. Make a new Warlock in a RotW game. In HD first: walk, open I / C / T, cast nothing. Then press **G**: expect a
    Necromancer-looking Warlock.
 3. Classic UI: I (10 x 6 grid), C, and T: the tabs Demon / Eldritch / Chaos, and the close button on all three tabs (the #498

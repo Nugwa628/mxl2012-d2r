@@ -22,7 +22,7 @@ The title and subtitle fill the top, down to about y 255: nothing is drawn there
 | status panel, progress line, bar | panel (230,262) 500 x 170; status from (270,284), 19 px a line; bar (272,389) 416 x 9 | covered by the opaque panel |
 | Install / Stop | (360,444) 240 x 60 | dark ground (mean luminance ~44 of 255) |
 | Default mod, Move plugin (only when needed) | (195,457) and (615,457), 150 x 34 | either side of Install, over the spires' feet; the buttons have their own dark fill |
-| small buttons | one row at y 516, h 34: Repair (175, w 140), Uninstall or Get D2RLoader (325, w 140 / 170), D2R folder (475, w 150), Mods folder (635, w 150); the row is centred | lava-lit ground (mean ~68, bright spots); the buttons have their own dark fill |
+| small buttons | one row at y 516, h 34: Repair (175, w 140), Uninstall, Install D2RLoader or Get D2RLoader (325, w 140 / 200 / 170), D2R folder (475, w 150), Mods folder (635, w 150); the row is centred | lava-lit ground (mean ~68, bright spots); the buttons have their own dark fill |
 | how to play | centred from y 570, two lines, wrap width 740 | dark (mean ~25) |
 | footer, link icon | text centred on y 616; icon (918,602) 28 x 28 | darkest (mean ~18) |
 

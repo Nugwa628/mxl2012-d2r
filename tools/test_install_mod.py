@@ -70,8 +70,8 @@ class SaveFormatKeyTests(unittest.TestCase):
     """docs/bugs.md #512: a d2rloader.toml without the save format gets D2RLoader's extended mode back."""
 
     def ensure_all(self, text):
-        for section, key, value, _ in install_mod.TOML_KEYS:
-            text = install_mod.ensure_toml_key(text, section, key, value)
+        for section, key, value, forced, _ in install_mod.TOML_KEYS:
+            text = install_mod.ensure_toml_key(text, section, key, value, forced)
         return text
 
     def test_another_mods_file_gets_extended_mode(self):
@@ -94,6 +94,60 @@ class SaveFormatKeyTests(unittest.TestCase):
         self.assertIn("[d2rcore.items]\nitem_stat_ranges = false\n", out)
         out = self.ensure_all("[d2rcore.items]\n# item_stat_ranges = true\nmaximum_sockets = true\n")
         self.assertIn("[d2rcore.items]\nitem_stat_ranges = false\nmaximum_sockets = true\n", out)
+
+    ROTW = "always_enable_rotw_legacy_graphics_keybind"
+
+    def test_rotw_legacy_toggle_from_the_commented_template(self):
+        """docs/bugs.md #498: the owner's kept mod file had only the commented template line; the global file's false won."""
+        for line in (f"# {self.ROTW} = true", f"#{self.ROTW}=true", f"  ##  {self.ROTW} = false  # template"):
+            text = f"[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n{line}\n\n[d2rcore.stash]\nadd_shared_tabs = 0\n"
+            out = install_mod.ensure_toml_key(text, "d2rcore.player", self.ROTW, "true")
+            self.assertEqual(out, text.replace(line, f"{self.ROTW} = true"), line)
+
+    def test_rotw_legacy_toggle_added_under_header_or_as_table(self):
+        out = install_mod.ensure_toml_key("[d2rcore.player]\nenable_respec = false\n", "d2rcore.player", self.ROTW, "true")
+        self.assertEqual(out, f"[d2rcore.player]\n{self.ROTW} = true\nenable_respec = false\n")
+        out = install_mod.ensure_toml_key('[d2rloader]\ndefault_mod = "x"\n', "d2rcore.player", self.ROTW, "true")
+        self.assertEqual(out, f'[d2rloader]\ndefault_mod = "x"\n\n[d2rcore.player]\n{self.ROTW} = true\n')
+        self.assertEqual(install_mod.ensure_toml_key("", "d2rcore.player", self.ROTW, "true"),
+                         f"[d2rcore.player]\n{self.ROTW} = true\n")
+        self.assertIn(f"[d2rcore.player]\n{self.ROTW} = true\n", self.ensure_all('[d2rcore.save_format]\nmode = "extended"\n'))
+
+    def test_unforced_key_set_by_hand_is_kept(self):
+        for text in (f"[d2rcore.player]\n{self.ROTW} = false # mine\n", f"d2rcore.player.{self.ROTW} = false\n[a]\nb = 1\n",
+                     f"[d2rcore.player] # player\n  {self.ROTW}= false\n"):
+            self.assertEqual(install_mod.ensure_toml_key(text, "d2rcore.player", self.ROTW, "true"), text)
+
+    def test_forced_keys(self):
+        """Owner decision 2026-11-04 (#498): the G toggle is forced like the save format and the stat ranges."""
+        forced = {key: f for _, key, _, f, _ in install_mod.TOML_KEYS}
+        self.assertTrue(forced["mode"] and forced["item_stat_ranges"] and forced[self.ROTW])
+
+    def test_rotw_legacy_toggle_set_by_hand_becomes_true(self):
+        """Owner decision 2026-11-04 (#498): a hand-set or template false ends as true; indent and comment stay."""
+        for text, want in ((f"[d2rcore.player]\n{self.ROTW} = false # mine\n", f"[d2rcore.player]\n{self.ROTW} = true # mine\n"),
+                           (f"d2rcore.player.{self.ROTW} = false\n[a]\nb = 1\n", f"d2rcore.player.{self.ROTW} = true\n[a]\nb = 1\n"),
+                           (f"[d2rcore.player] # player\n  {self.ROTW}= false\n", f"[d2rcore.player] # player\n  {self.ROTW} = true\n"),
+                           (f"[d2rcore.player]\n{self.ROTW} = true # mine\n", f"[d2rcore.player]\n{self.ROTW} = true # mine\n")):
+            self.assertEqual(install_mod.ensure_toml_key(text, "d2rcore.player", self.ROTW, "true", True), want, text)
+        # D2RLoader 1.3.1's template line is uncommented: `always_enable_rotw_legacy_graphics_keybind = false`
+        template = f"[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n{self.ROTW} = false\nenable_respec = false\n"
+        self.assertIn(f"{self.ROTW} = true\nenable_respec = false\n", self.ensure_all(template))
+        self.assertNotIn(f"{self.ROTW} = false", self.ensure_all(template))
+
+    def test_forced_value_with_crlf_and_quotes(self):
+        out = install_mod.ensure_toml_key(f"[d2rcore.player]\r\n{self.ROTW} = false\r\n", "d2rcore.player", self.ROTW, "true", True)
+        self.assertEqual(out, f"[d2rcore.player]\r\n{self.ROTW} = true\r\n")
+        out = install_mod.ensure_toml_key('[d2rcore.save_format]\nmode = "retail # x" # was\n', "d2rcore.save_format", "mode",
+                                          '"extended"', True)
+        self.assertEqual(out, '[d2rcore.save_format]\nmode = "extended" # was\n')
+
+    def test_bom_and_crlf_stay(self):
+        text = f"﻿[d2rcore.player]\r\n# {self.ROTW} = true\r\nenable_respec = false\r\n"
+        out = install_mod.ensure_toml_key(text, "d2rcore.player", self.ROTW, "true")
+        self.assertEqual(out, f"﻿[d2rcore.player]\r\n{self.ROTW} = true\r\nenable_respec = false\r\n")
+        out = install_mod.ensure_toml_key("﻿[d2rloader]\r\n", "d2rcore.player", self.ROTW, "true")
+        self.assertEqual(out, f"﻿[d2rloader]\r\n\r\n[d2rcore.player]\r\n{self.ROTW} = true\r\n")
 
 
 if __name__ == "__main__":

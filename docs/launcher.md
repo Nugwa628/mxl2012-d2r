@@ -4,8 +4,9 @@
 into the player's D2R folder at `<D2R>\mods\mxl2012`. The plugin is `mxl2012-core.dll`.
 The downloader version starts at **0.1.0**, independently of the plugin and release versions.
 
-It never starts the game or installs D2RLoader. Install **D2RLoader 1.3.1** from
-<https://d2rloader.net/>, run the downloader and press **Install**. To play, start
+It never starts the game. It needs **D2RLoader 1.3.1** in the D2R folder: when it is missing,
+**Install D2RLoader** downloads it from <https://d2rloader.net/> after asking (below); it can also be
+installed by hand. Then press **Install**. To play, start
 `D2RLoader.exe`; use its gear menu to select D2R-XL 2012 as Default Mod, Apply, and restart
 D2RLoader. The downloader also offers a confirmed **Default mod** action (below).
 The release `.7z` is the manual-install fallback.
@@ -24,8 +25,10 @@ The release `.7z` is the manual-install fallback.
   and the GUI asks before installing anyway. The plugin has its own build guard.
 - `<D2R>\D2RLoader.exe`'s version resource must match **1.3.1** (or the release manifest's
   required version). Numeric equivalents `1.3.1`, `1.3.1.0`, and `1.3.1-beta` match.
-  A missing or different version shows a warning and **Get D2RLoader** opens its official
-  download page (https://d2rloader.net/download.html). Installation remains available; the downloader never downloads the loader.
+  A missing or different version shows a warning and **Install D2RLoader** in Uninstall's place
+  (below). **Get D2RLoader**, which opens the official download page
+  (https://d2rloader.net/download.html), takes that place when the release manifest has no usable
+  `d2rloader` package or an install of it failed. Installing D2R-XL 2012 stays available either way.
 
 ## Where it writes
 
@@ -42,16 +45,46 @@ The release `.7z` is the manual-install fallback.
   archives. `--data-dir` overrides this for tests. The official Median XL's data and save
   folders are protected and separate.
 - Next to the downloader: `<exe>.download` and `<exe>.old` during self-update.
+- Install D2RLoader only, after the player confirms: D2RLoader's files in the D2R folder (below). The ZIP
+  downloads to `<data>\download`, is unpacked into `<data>\loader-staging`, and both are removed afterwards.
 
 The executable uses `asInvoker`; a write failure explains how to grant access or run as
 administrator. Install, repair, uninstall and environment fixes refuse while D2R or
 D2RLoader is running from the selected game folder. Characters and game settings are
 never written. The only optional writes outside the target mod folder are the explicit
-Default mod and Move plugin actions below.
+Install D2RLoader, Default mod and Move plugin actions below.
 
-There is no private game copy, Play action, loader download, legacy state migration,
+There is no private game copy, Play action, bundled D2RLoader, legacy state migration,
 old-copy deletion prompt, `remove-old-copy` command, or `--source` alias. This new product
 does not migrate or delete other launchers' old copies.
+
+## Install D2RLoader
+
+D2RLoader is never shipped in the release or downloader. The release manifest's `d2rloader` block
+(`tools/package_release.py` `D2RLOADER`: version, url, size, sha256, signerThumbprint) names the official ZIP,
+`https://d2rloader.net/download/D2RLoader-1.3.1-beta.zip`, sha256 `9286c6b5...2aad7` as published on its
+download page. D2RLoader's site sets no licence or terms against downloading it; the downloader fetches
+it only from that site, only when the player asks.
+
+- Offered (in Uninstall's place) when D2RLoader is missing or another version, and the manifest's block
+  is usable (`LoaderPackageUsable`, loaderpkg.h): a version, an `https://` url on d2rloader.net (or a
+  subdomain) naming a `.zip`, a size up to 512 MB, a 64-digit sha256. `package_release.loader_problems`
+  checks the same before a manifest is written.
+- A question names the version, the source URL and the target D2R folder. `--cli install-loader` does the same
+  without asking.
+- Refused while D2R or D2RLoader runs from that folder (checked before the download and again before
+  anything is moved). No elevation: a write failure explains how to grant access.
+- The download resumes with Range requests and retries like the 7z (403/404/410 stop). More bytes than
+  `size`, or another sha256, deletes the file; nothing is installed. Then the window offers the download page.
+- The ZIP is read by the downloader's own ZIP reader (`zip.cpp`: Stored and Deflate, CRC-32 checked; no ZIP64,
+  no encryption). `PlanLoaderInstall` accepts only top-level `D2RLoader*` / `D2RCore*` files, anything under
+  `d2rloader/`, and empty folders (`mods/`). Any other entry (D2R's own files, `Data/`, a file in `mods/`, an
+  unsafe path, a duplicate) refuses the whole package.
+- Files are unpacked into staging first. Files under `d2rloader/config/` that already exist are kept: they
+  hold the player's D2RLoader settings and the game-wide `default_mod`. Existing loader files move to
+  `<staging>\old` before the new ones go in. A failed move puts them back.
+- The Authenticode signer of the new `D2RLoader.exe` is logged and compared with `signerThumbprint`.
+  It is information only: the sha256 is the check.
 
 ## Install, Update, Repair and Uninstall
 
@@ -86,12 +119,27 @@ the backup is. If the backup or the write fails, the install stops with an error
 **Ctrl stat ranges off in a kept config** (bug #528, owner decision 2026-11-03). D2RLoader's
 Ctrl "Possible base rolls" block repeats lines for Median's automagic rows (upstream:
 D2RLoader/PluginSDK issue 6), so the release ships `[d2rcore.items] item_stat_ranges = false`.
-After `EnsureExtendedSaves`, `EnsureStatRangesOff` reads the same kept file; if the key is not
-`false` (missing, `true`, a commented template), only that key is set (`SetItemStatRangesOff`,
-paths.h): an existing line in place with its indent and comment, a commented template line, else
-under the header, else the table is appended; BOM and line endings stay. No backup (one key), and
-a failed write is only reported: the game runs either way. A player who sets it back to `true`
-gets `false` again at the next update or repair while this owner decision stands.
+After `EnsureExtendedSaves`, `EnsureModConfigKeys` reads the same kept file and applies the other
+`ModConfigKeys` (paths.h). If `item_stat_ranges` is not `false` (missing, `true`, a commented
+template), only that key is set (`SetItemStatRangesOff`): an existing line in place with its indent
+and comment, a commented template line, else under the header, else the table is appended; BOM and
+line endings stay. No backup (one key), and a failed write is only reported: the game runs either way.
+A player who sets it back to `true` gets `false` again at the next update or repair while this owner
+decision stands.
+
+**Legacy graphics (G) in a RotW game** (bug #498). D2RLoader blocks G in a Reign of the Warlock game
+unless `[d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true`. Its game-wide
+`d2rloader\config\d2rloader.toml` ships `false`, and the mod's own file overrides it, so the release ships
+`true` (`tools/install_mod.py` `TOML_KEYS`). A kept file from an older install may hold only D2RLoader's
+commented template line (`# always_enable_rotw_legacy_graphics_keybind = true`). Then the game-wide
+false applied. The key is forced like `item_stat_ranges` (owner decision 2026-11-04):
+`EnsureModConfigKeys` uses `ForceTomlKey`, the rules of `install_mod.ensure_toml_key` with
+`force` (each `TOML_KEYS` entry has a forced flag; the save format, this key and `item_stat_ranges`
+are forced). An uncommented value in `[d2rcore.player]`, or the dotted key before the first table,
+gets `true` in place with its indent and comment, so a `false` set by hand or left by D2RLoader's
+1.3.1 template becomes `true`. Else a commented line (any `#` and spaces) becomes `... = true`. Else
+the key goes under the header, or the table is appended. Fresh installs, updates and repairs all
+end with `true`; the game-wide file is never written.
 
 The downloader chooses the release **7z** when the objects needed are larger than the
 archive, otherwise individual **objects**. `--via auto|7z|objects` overrides this choice.
@@ -155,7 +203,7 @@ docs/hosting.md) and refuses any other file name. The host needs this multi-prod
 ## Command line and build
 
 ```text
-D2R-XL-2012-Downloader.exe --cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins
+D2R-XL-2012-Downloader.exe --cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader
   --game-dir DIR --data-dir DIR --site URL|DIR --channel stable|test
   --replace --via auto|7z|objects
 ```
@@ -176,7 +224,7 @@ Tests can also be configured separately with `cmake -S launcher/tests -B build/l
 CI cross-builds with the existing xwin toolchain and runs portable tests on Linux.
 
 Tests cover detection, manifest/installation plans, hashes, marker/path protection,
-7z decoding and corruption, coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesOff`), plugin identification,
+7z decoding and corruption, the ZIP reader and the D2RLoader package (`TestZip`, `TestLoaderPackage`), coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesOff`), the RotW G key (`TestModConfigKeys`), plugin identification,
 other-mod warnings, and protection of other mods from automatic cleanup. No downloader or
 in-game integration run is required for this cleanup; unit tests do not access a real
 D2R installation. Previous copied documentation's release/game test results are not

@@ -48,34 +48,94 @@ EXTRA_SHARED_TABS = 0  # 2012 has one personal stash page; extra PlugY pages are
 # The save format first: a d2rloader.toml that was already there (another mod's copy, an old install) can lack it, and then
 # D2RLoader writes retail saves, which cannot hold Median's stats 511-537 (docs/bugs.md #512; the plugin part savemode does the same
 # repair for players). D2RCore's Ctrl stat ranges are off (owner decision 2026-11-03, bug #528: repeated lines for Median's
-# automagic rows, D2RLoader/PluginSDK issue 6); the downloader sets the key in a kept file too (launcher EnsureStatRangesOff).
-TOML_KEYS = [("d2rcore.save_format", "mode", '"extended"', "D2RLoader's extended saves, bug #512"),
-             ("d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", "G toggle in RotW games"),
-             ("d2rcore.items", "item_stat_ranges", "false", "Ctrl stat ranges off, bug #528")]
+# automagic rows, D2RLoader/PluginSDK issue 6). The G toggle in a RotW game is on (owner decision 2026-11-04, bug #498: the
+# game-wide file says false and the mod's file must win). Forced keys get their value whatever the file says; the others keep a
+# value set by hand. The downloader sets the same keys in a kept file with the same rules (launcher ModConfigKeys /
+# EnsureModConfigKeys). (section, key, value, forced, why)
+TOML_KEYS = [("d2rcore.save_format", "mode", '"extended"', True, "D2RLoader's extended saves, bug #512"),
+             ("d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", True, "G toggle in RotW games, bug #498"),
+             ("d2rcore.items", "item_stat_ranges", "false", True, "Ctrl stat ranges off, bug #528")]
 if EXTRA_SHARED_TABS > 0:
-    TOML_KEYS.append(("d2rcore.stash", "add_shared_tabs", str(EXTRA_SHARED_TABS), "extra shared tabs"))
+    TOML_KEYS.append(("d2rcore.stash", "add_shared_tabs", str(EXTRA_SHARED_TABS), False, "extra shared tabs"))
 
 
-def ensure_toml_key(text: str, section: str, key: str, value: str) -> str:
-    """Return `text` with `key = value` in [section]. An uncommented key already there is the user's and is kept; a
-    commented template line (D2RLoader writes `# key = default`) is replaced; a missing section is appended."""
-    lines = text.splitlines()
-    head = f"[{section}]"
-    start = next((i for i, l in enumerate(lines) if l.strip() == head), None)
+def _toml_header(line: str):
+    """The table name of a `[name]` line (a comment after it allowed), else None."""
+    t = line.strip()
+    return t[1:t.index("]")].strip() if t.startswith("[") and "]" in t else None
+
+
+def _is_key_line(bare: str, key: str) -> bool:
+    return bare.startswith(key) and bare[len(key):].lstrip().startswith("=")
+
+
+def _set_value(line: str, key: str, value: str) -> str:
+    """A `key = old  # comment` line with the value replaced; indent, comment and line ending kept."""
+    body = line.rstrip("\r\n")
+    ending = line[len(body):]
+    indent = body[:len(body) - len(body.lstrip())]
+    rest = body.strip()[len(key):].lstrip()[1:]
+    quote, cut = None, len(rest)
+    for i, c in enumerate(rest):
+        if quote:
+            quote = None if c == quote else quote
+        elif c in "\"'":
+            quote = c
+        elif c == "#":
+            cut = i
+            break
+    old, comment = rest[:cut].strip(), rest[cut:].strip()
+    if old == value:
+        return line
+    return f"{indent}{key} = {value}" + (f" {comment}" if comment else "") + ending
+
+
+def ensure_toml_key(text: str, section: str, key: str, value: str, force: bool = False) -> str:
+    """Return `text` with `key = value` in [section]. An uncommented key already there (in [section], or the dotted
+    `section.key` before the first table) is the user's and is kept, or with `force` gets `value` in place (indent and
+    comment kept); a commented template line (D2RLoader writes
+    `# key = default`; any number of `#` and spaces) is replaced; else the key goes right under the header; else the
+    table is appended. A UTF-8 BOM and the line endings stay. The downloader does the same (launcher/src/core/paths.h
+    EnsureTomlKey)."""
+    bom = "﻿" if text.startswith("﻿") else ""
+    body = text[len(bom):]
+    eol = "\r\n" if "\r\n" in body else "\n"
+    lines = body.splitlines(keepends=True)
+    start, end = None, len(lines)
+    for i, line in enumerate(lines):
+        name = _toml_header(line)
+        if name is None:
+            if start is None and not any(_toml_header(l) is not None for l in lines[:i]) and \
+                    _is_key_line(line.strip(), f"{section}.{key}"):
+                if not force:
+                    return text  # the dotted key before the first table: set by hand
+                lines[i] = _set_value(line, f"{section}.{key}", value)
+                return bom + "".join(lines)
+            continue
+        if start is not None:
+            end = i
+            break
+        if name == section:
+            start = i
     if start is None:
-        return text.rstrip("\n") + f"\n\n{head}\n{key} = {value}\n"
-    end = next((i for i in range(start + 1, len(lines)) if lines[i].lstrip().startswith("[")), len(lines))
+        kept = body.rstrip("\r\n")
+        return bom + (kept + eol + eol if kept else "") + f"[{section}]{eol}{key} = {value}{eol}"
+    for i in range(start + 1, end):
+        if _is_key_line(lines[i].strip(), key):
+            if not force:
+                return text  # set by hand: leave it
+            lines[i] = _set_value(lines[i], key, value)
+            return bom + "".join(lines)
     for i in range(start + 1, end):
         bare = lines[i].strip()
-        if bare.startswith(key) and bare[len(key):].lstrip().startswith("="):
-            return text  # set by hand: leave it
-    for i in range(start + 1, end):
-        bare = lines[i].strip().lstrip("#").strip()
-        if lines[i].strip().startswith("#") and bare.startswith(key) and bare[len(key):].lstrip().startswith("="):
-            lines[i] = f"{key} = {value}"
-            return "\n".join(lines) + "\n"
-    lines.insert(start + 1, f"{key} = {value}")
-    return "\n".join(lines) + "\n"
+        if bare.startswith("#") and _is_key_line(bare.lstrip("#").strip(), key):
+            ending = lines[i][len(lines[i].rstrip("\r\n")):] or eol
+            lines[i] = f"{key} = {value}{ending}"
+            return bom + "".join(lines)
+    if not lines[start].endswith("\n"):
+        lines[start] += eol
+    lines.insert(start + 1, f"{key} = {value}{eol}")
+    return bom + "".join(lines)
 
 
 # D2RLoader stores every registered action's key in <game>/d2rloader/config/input-bindings.toml the first time the plugin registers it,
@@ -247,9 +307,9 @@ def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, 
     toml = d2rl / "config" / "d2rloader.toml"
     if not toml.exists():  # never overwrite a config someone edited
         toml.write_text('[d2rcore.save_format]\nmode = "extended"\n', encoding="utf-8")
-    for section, key, value, why in TOML_KEYS:
+    for section, key, value, forced, why in TOML_KEYS:
         text = toml.read_text(encoding="utf-8")
-        added = ensure_toml_key(text, section, key, value)
+        added = ensure_toml_key(text, section, key, value, forced)
         if added != text:
             toml.write_text(added, encoding="utf-8")
             print(f"d2rloader.toml: {key} = {value} ({why})")

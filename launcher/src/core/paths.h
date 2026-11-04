@@ -77,6 +77,37 @@ std::string ItemStatRanges(const std::string& text);
 // header, else the table is appended. A BOM and the line endings stay; a file already at false comes back unchanged.
 std::string SetItemStatRangesOff(const std::string& text);
 
+// `key = value` in [section] unless the player set the key (tools/install_mod.py ensure_toml_key, the same rules): an
+// uncommented key in [section], or the dotted `section.key` before the first table, is kept as it is; else a commented
+// template line (`# key = ...`, any number of '#' and spaces) becomes the key; else the key goes under the header; else
+// the table is appended. A BOM and the line endings stay.
+std::string EnsureTomlKey(const std::string& text, const std::string& section, const std::string& key, const std::string& value);
+// `key = value` in [section] whatever the file says (tools/install_mod.py ensure_toml_key with force): an existing key line
+// (or the dotted key before the first table) gets the value in place (indent and comment kept), else as EnsureTomlKey. A
+// file already at that value (quotes ignored) comes back unchanged.
+std::string ForceTomlKey(const std::string& text, const std::string& section, const std::string& key, const std::string& value);
+// The value of `key` in [section] (or the dotted key before the first table), as written; "" when missing.
+std::string TableKeyValue(const std::string& text, const std::string& section, const std::string& key);
+
+// ---- The keys every install leaves in the mod's own d2rloader.toml (docs/launcher.md "Keys in the mod's config"). The
+// mod's file overrides D2RLoader's game-wide one, which the downloader never writes. A fresh install ships them
+// (tools/install_mod.py TOML_KEYS); a kept (`preserve`) file of an older install gets them after each install, update and
+// repair (ApplyModConfigKey).
+struct ModConfigKey {
+	const char* section;
+	const char* key;
+	const char* value;  // TOML text
+	bool keepHandSet;   // true: a value the player set stays (EnsureTomlKey); false: always this value (ForceTomlKey)
+	const char* why;    // for the panel / log line
+};
+// [d2rcore.save_format] mode = "extended" (#512, forced, with a backup: Launcher::EnsureExtendedSaves),
+// [d2rcore.items] item_stat_ranges = false (#528, forced),
+// [d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true (#498, the G toggle in a RotW game; forced, owner
+// decision 2026-11-04: a false set by hand or left by D2RLoader's template becomes true).
+extern const ModConfigKey ModConfigKeys[3];
+// The text with that key applied (unchanged when nothing is to do); `was` (optional) gets the old value ("" missing).
+std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, std::string* was = nullptr);
+
 // True for a path the official Median XL owns or this downloader must never use: <localAppData>\mxl-launcher (its
 // launcher), <roamingAppData>\MedianXL (its saves), <localAppData>\MedianXL, and a classic Diablo II folder (any path
 // segment named "Diablo II"). Case-insensitive, '\' or '/'.
