@@ -271,32 +271,22 @@ class StateColours(unittest.TestCase):
         self.assertEqual(out[0]["label"], "none")     # the identity table: no change
         self.assertEqual(out[0]["ids"], ["cog"])
 
-    def test_build_adds_a_custom_entry_on_top_of_level0(self):
-        colours = [{"token": "rt", "colorshift": 101, "ids": ["cog"], "adj": [0.04, 0.4, 0.25, 1.0],
-                    "tint": [0.0] * 4, "label": "hue +0.04"},
-                   {"token": "rt", "colorshift": 20, "ids": ["cog"], "label": "none"}]
-        rows = t.add_state_entries(colours, self.mj, self.data, self.d2r)
-        self.assertEqual([(r["colorshift"], r["state"]) for r in rows], [(20, "no shift"), (101, "added")])
-        out = self.data / "hd" / "character" / "enemy" / "rat1" / "rat1_variant.json"
-        v = json.loads(out.read_text("utf-8"))
-        c = v["customColorShiftEntries"]
-        self.assertEqual([(x["type"], x["colorShiftIndex"]) for x in c], [("CustomVariantColorShiftMap", 101)])
-        a = c[0]["entry"]["transforms"][0]["colorAdjustment"]
-        self.assertEqual((a["x"], a["y"], a["z"]), (0.14, 0.6, 0.25))   # level0 (0.1, 0.2, 0) + the shift
-        self.assertEqual(len(v["entries"]), 8)
-        t.add_state_entries(colours, self.mj, self.data, self.d2r)      # a second run replaces, never duplicates
-        self.assertEqual(len(json.loads(out.read_text("utf-8"))["customColorShiftEntries"]), 1)
+    def test_a_level_copy_counts_as_its_original(self):
+        # tools/state_translvl.py: the monprop names `<state>_lvl` (no colorshift); the measure still sees the colour
+        tsv(self.excel / "states.txt", ["state", "*ID", "colorshift"],
+            [["preventheal", "52", "101"], ["freeze", "11", "108"], ["calm", "60", "0"], ["dark", "90", "20"],
+             ["dark_lvl", "4", "0"]])
+        tsv(self.excel / "monprop.txt", ["Id", "prop1", "par1"], [["twoprop", "state", "4"]])
+        self.assertEqual(t.state_shifts(self.excel), {"twoprop": [20]})
 
-    def test_shared_table_keeps_the_record_with_more_ids(self):
-        self.mj.update(a="rat1", b="rat1")
-        colours = [{"token": "aa", "colorshift": 20, "ids": ["a"], "adj": [0.5, 0.0, 0.0, 1.0], "tint": [0.0] * 4,
-                    "label": "x"},
-                   {"token": "bb", "colorshift": 20, "ids": ["b", "cog"], "adj": [0.2, 0.0, 0.0, 1.0],
-                    "tint": [0.0] * 4, "label": "y"}]
-        rows = t.add_state_entries(colours, self.mj, self.data, self.d2r)
-        self.assertEqual(sorted(r["state"] for r in rows), ["added", "shared table: `bb` kept"])
-        v = json.loads((self.data / "hd" / "character" / "enemy" / "rat1" / "rat1_variant.json").read_text("utf-8"))
-        self.assertAlmostEqual(v["customColorShiftEntries"][0]["entry"]["transforms"][0]["colorAdjustment"]["x"], 0.3)
+    def test_old_custom_entries_are_dropped(self):
+        p = self.data / "hd" / "character" / "enemy" / "mxl" / "v_1.json"
+        p.parent.mkdir(parents=True)
+        v = table()
+        v["customColorShiftEntries"] = [{"name": "S101", "colorShiftIndex": 101}, {"name": "bound", "colorShiftIndex": 130}]
+        p.write_text(json.dumps(v), "utf-8")
+        self.assertEqual(t.drop_custom_state_entries(self.data), 1)
+        self.assertEqual([c["name"] for c in json.loads(p.read_text("utf-8"))["customColorShiftEntries"]], ["bound"])
 
     def test_committed_colours_cover_cog(self):
         d = json.loads(t.STATE_COLOURS.read_text("utf-8"))["colours"]

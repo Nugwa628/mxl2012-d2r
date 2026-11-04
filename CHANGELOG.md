@@ -5,6 +5,9 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Cogs are yellow in HD as in classic, and so are the Cog shamans (#529). The other monsters with a classic colour of their own
+  (Shadows, Lamias, Darklings, Daystars, the Thunder Bear, the Golden Calf and others, 60 in all) get that colour from a monster
+  level now, so HD can draw it too. Cogs still cannot be healed. In Hell, Cogs and Cog shamans are still red in HD.
 - The Horadric Cube window in HD matches classic Median XL's frame: its close button sits in the bottom right square as in classic (it was on the grid's top right corner, over a cell), and the side hinge no longer covers the grid's left frame and bottom left cells (#531).
 - Hole Level 2 shows its cave walls in HD, and Median XL's edits of ten more original maps (Duriel's Lair, the
   Chaos Sanctuary heart, the Cathedral, the Harem, the Act 3 temples and dungeons, ...) are used: the game had loaded its own

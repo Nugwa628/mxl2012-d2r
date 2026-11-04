@@ -5197,3 +5197,22 @@ Transmute button, the close button clicked, classic (G), the RotW stash's Gems p
 `sheet531.png`: before / after side by side. Note: the plugin has no `cubeclear` verb (`unknown verb`); `remove id <n>` per item
 empties the cube. Test: `test_ui.py` `test_controller_cube_takes_the_mods_picture_grid_and_button` (close and hinge places).
 Slot 2 unlocked, game closed.
+
+## Lane cogs529: monprop state colours through a free level (bug #529, 2026-11-04, slot 2, background mode)
+
+Build of lane/cogs529, plugin of main's sources (the maps10 worktree's Release DLL, built after the last plugin commit, by
+`MXL_PLUGIN`). Character `CogLane` (Assassin, made by the run, god mode), Blood Moor. Script `mxl2012-runs/cogs529/lab.py`
+(outside git, from `statranges/lab2.py`): per mode each Id spawned 5 sub-tiles away, server and client states (`states` /
+`cstates mon:<id>`), a shot and a crop; life (stat 6) read for 12 s in the first mode. Evidence: `mxl2012-runs/cogs529/`.
+
+| Run | Build | Result |
+|-|-|-|
+| `run1` | `_lvl` copies, colourless preventheal cover (pri 116) only | states right (Cog 52 + 302, the others their copy 303-310, no stray id); legacy Cog orange as classic, Darklings magenta both modes; **HD Cog still red** with the yellow entry 7 in `fallen1_variant.json`: HD skips the colourless cover |
+| `run2` | the same | `setstate` / `hit` are not verbs of this plugin (`unknown verb`); life set to half (`stat mon:<id> 6 set`) stays flat for Cog and a plain Fallen alike, so regeneration cannot be told apart this way |
+| `run3` | + `preventheal_hd` (colorshift 131, pri 116, custom entry `S131`), `_lvl` cover pri 117 | **Cog and Cog shaman yellow / orange in HD and in legacy**; server and client have 52, 302 (`_lvl`), 303 (`_hd`); Lamias green in legacy, green-white in HD; Darklings magenta both modes |
+| `run5` | the same | clean pass (monsters cleared between spawns): the same; `th_bear` legacy teal (was pink-violet): teal is classic's colour (its art through Pal.pl2 row 1328 + 34: hue 0.49; level 0 hue 0.08) |
+| `run6` | the same | Lamias, Shadows, Daystars: summons (life 1) that walk 17-25 sub-tiles off before the shot; nothing to read |
+
+`sheet_before_after.png`: statranges' final crops (0.1.10 data) against `run5`, per Id HD and legacy. Plain Fallens and
+Zealots keep their colour. Not checked in game: Hell (`elite_steely`'s Hell block has no free prop column for the HD cover;
+those Cogs stay red in HD, legacy right). Slot 2 unlocked, game closed after every run.

@@ -1151,4 +1151,46 @@ measure below the threshold and get no entry. The result is 31 entries in 28 tab
 
 Legacy reads the classic table through Pal.pl2 row 1328 + N up to 128 (rows for 115-128 are flat and unused, so a table copied there draws exactly the classic colour: run10, run12). From 129 up legacy does not read that row: 129 and 130 draw Cog dark (not visible on the shot), 131 green, also with the table copied into row 1328 + N or 1072 + N (run11, run13b, run14). **No index works in both modes**, so a slot remap (tried as `state_slots.py`, kept outside git in `mxl2012-runs/statranges/slots529.patch`) cannot fix it.
 
-Route left, for the owner to decide: the coloured units get a copy of their monprop state without colorshift, and their colour moves to a free TransLvl. Classic draws it from the token's `palshift.dat` table for that level (the state's Pal.pl2 table applied to the unit's current level table: the same pixels as before). HD draws the variant entry of that level, which it does use when no state colour is on. Costs: new states.txt rows, classic `palshift.dat` edits per token, a free level per token (not every token has one), and the skill-given states (Mon Rust Storm's `preventheal`) keep their colorshift as now.
+The owner chose (2026-11-04) the level route: the coloured units get a copy of their monprop state without colorshift, and
+their colour moves to a free TransLvl. It replaces the custom entries above (the build drops the old `S<N>` entries).
+
+### The level route (lane cogs529, 2026-11-04, bug #529)
+
+`tools/state_translvl.py`, run by `hd_translvl.py build` (tests: `tools/tests/test_state_translvl.py`):
+
+- **Plan.** Per monprop row the state 1.14d draws the colour of: the highest `colorpri`, a tie to the lower id
+  (`STATES_UpdateColorShiftAndLight` 0x4d97f0 does not look at the colorshift). Rows whose winner has a colorshift HD has no
+  colour for are grouped per (classic token, colorshift): 39 groups, 60 Ids, 9 states (`preventheal`, `necroshadowspirit`,
+  `zomgrefuge`, `thunderbeared`, `revive`, `reddish`, `passive_lockout`, `devilish`, `shieldaura`).
+- **Level.** Each group gets the highest TransLvl (5..1) that no enabled monster of the same token or of the same HD variant
+  table uses. Two groups share a level on one table only with the same colorshift. **Every group found one** (most get 5;
+  `(m` 2, `7#` / `9$` / `$g` 4, `c#` 3, `~b` 1, `im` 1 and 4, `ww` 5 and 4), so no unit is left out.
+- **States.** A copy `<state>_lvl` per state: every cell of the original, colorshift 0, the same colorpri, so the copy wins
+  and loses against the same states. The original row stays: skills (Mon Rust Storm, totems, Lioness, Ravage, Thorn Field,
+  Shield Aura, Revive's pet type) and items give it by name or id. The new rows are 302..311, appended to both banks.
+- **`preventheal` keeps its id.** D2R tests state 52 by id (0x448c61, 0x4a35d2; 1.14d `RegenAndPsnDecreaser` 0x5a6952
+  blocks life regeneration with it). A copy would lose that, so the monprops keep 52 and get two cover states with nothing but
+  a colour:
+  - `preventheal_lvl` (302): no colorshift, colorpri 117. Legacy takes the highest colorpri whatever its colorshift, so it
+    draws this one: the level.
+  - `preventheal_hd` (303): colorshift 131, colorpri 116. **HD skips states without colorshift** (seen in game: with only
+    the colourless cover a Cog stayed red in HD, `run1`). So it draws this one: the variant table's
+    `customColorShiftEntries` entry of index 131 (`S131`), written with the same colour as the level entry. HD draws custom
+    entries from 129 up (statranges run7); D2R's own tables have 130 (bound demons).
+- **Classic.** `palshift.dat` of the token (D2R's, else identity tables) gets the state's Pal.pl2 colour table as the table of
+  that level. 1.14d draws a state colour through the act palette's row 1328 + colorshift INSTEAD of the level table
+  (`GFX_DrawUnitComponents` 0x470ec0), so the level table is that row itself. The five act palettes differ in indices
+  225-254 only, but their colour tables differ in 26-45 indices per colorshift; `pl2_table` picks per index the colour with
+  the least error over the five acts.
+- **HD.** The level's variant entry is the level-0 entry with the measured colour on top (`hd_state_colours.json`; Cog's
+  hand colour `STATE_HAND`). HD draws it for a monster of that level with no coloured state on.
+
+**Seen in game** (slot 2, `mxl2012-runs/cogs529/run3`, `run5`, docs/testing.md "Lane cogs529"): Cog and the Cog shaman
+yellow / orange in HD and in legacy, with 52, 302 and 303 on server and client; Darklings magenta and Lamias green in both
+modes; the Thunder Bear teal in legacy (its classic colour: the art through row 1328 + 34; 0.1.10's legacy drew it pink-violet).
+
+**Left as it was.** `elite_steely` (Cog, Cog shaman and their `sumelite` rows) has no free prop column in its Hell block
+(mon-buff, hit-skill, death-skill, red-dmg%, 52, `_lvl`). There it gets only `preventheal_lvl`: right in legacy, and red in
+HD as before. Putting `_hd` there instead would draw them green in legacy. Monsters and players that get `preventheal` from a
+skill or an item (Mon Rust Storm, "prevent monster heal") keep state 52 alone: classic colour in legacy, none in HD, as
+before.
