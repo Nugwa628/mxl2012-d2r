@@ -51,7 +51,10 @@ What never goes in (package_release refuses or leaves it out):
 - the test harness: the release DLL is built with `-DMXL_RELEASE=ON` (plugin/CMakeLists.txt): `testharness.cpp` and
   `harness_cmds.cpp` are not compiled, `testharness_release.cpp` has no-op entry points, so `mxl2012-testharness.txt` does
   nothing. package_release refuses a DLL that contains the string `mxl2012-testharness` or lacks the PluginVersion. The `mxl`
-  console command's first line says `mxl2012-core <version> (release)` or `(dev)`.
+  console command's first line says `mxl2012-core <version> (release)` or `(dev)`. Without the harness there is no `volserial`
+  word either, so on the test slots 2 to 5 (game folders on `D:`) a release DLL start always dies at D2RLoader's "Preparing
+  frontend launch task" (Battle.net cookie, `Botan::Decoding_Error`, APPCRASH 0xe06d7363). That is the slot, not the release:
+  test a release folder in game with the dev DLL of the same version (docs/testing.md "Test what players get", "Lane relcheck").
 - `mxl2012-testharness*`, `mxl2012-core-off.txt`, `input-bindings.toml`, `imgui.ini`, `debugsettings.json`, saves and their
   sidecars (`.d2s .d2i .d2x .d2rl .ctc .ctl .key .map .ma0-9`), `.log .dmp .pdb .orig`: the run stops if one is in the staged folder.
 - byte copies of Blizzard's files: every staged data file that is identical (same path, same bytes) to

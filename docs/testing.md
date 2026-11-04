@@ -789,7 +789,16 @@ empty folder like a player's first install. Then it changes only what background
 has no test harness; it is kept in that folder, `--release-dll` keeps it in for a log-only launch), the slot's own
 savepath, and the run's launch arguments (the manifest's `launch_arguments` plus `-w`; the shared toml is not edited:
 each run sets them for itself inside the snapshot, "Sharing slots with another mod"). Build the dev DLL of the same
-version first (`tools/build_plugin.ps1`); `install` says when its PluginVersion differs from the release's. The checks
+version first (`tools/build_plugin.ps1`); `install` says when its PluginVersion differs from the release's.
+**The release DLL cannot start a game on slots 2 to 5, by design of the slots, not by a fault of the release build** (lane
+relcheck, 2026-11-05, proven by A/B runs): D2RLoader dies about 8-15 s after the launch, at "Preparing frontend launch task",
+with `APPCRASH` 0xe06d7363 (an uncaught C++ exception, `KERNELBASE.dll+0xc41ca` = RaiseException; the renamed
+`D2RLoader-sN.exe` leaves no Application event, the plain `D2RLoader.exe` that Play starts does). The exception is
+`Botan::Decoding_Error` from the Battle.net cookie decryption (the cookie item under "Parallel slots" above): the slot's
+loader runs from `D:`, the cookie was made on `C:`, and only the dev DLL's harness word `volserial` fixes that. The release DLL has
+no harness, so it never can. A player's loader runs from the drive the game wrote its own cookie on, so players never hit it.
+For a release-DLL start use `--release-dll` only for its `mxl2012-core.log` (it is written before the crash), and test the
+release folder in game with the dev DLL of the same version. Evidence: "Lane relcheck" below. The checks
 read the expected data from work/mod and assets/median as usual. `MXL_GRAPHICS=legacy` runs a whole game_checks run in
 legacy graphics (G in town first; `inv_cell` / `shop_cell` give the legacy grid positions, the shop ones are not yet
 right: the hover misses on Gheed's shelf).
@@ -5376,9 +5385,8 @@ lane's run folder and was driven only by `WM_COMMAND` to the button ids (`IdPlay
   click, and Play was back on within 5 s after the game ended (the 3-second process timer). With the channel unreachable
   (a DNS failure in one run), Play was still on for the installed release.
 - The game itself exited about 10 s into every start: a D2RLoader APPCRASH (0xe06d7363), the same command line each time,
-  log ending at "Preparing frontend launch task". This is the known effect of the release DLL on slots 2 to 5 (no harness,
-  no `volserial`; see "the first starts ... died about 5 s after launch" above), not of Play. A run with the dev DLL was not
-  made: the plugin build was denied in this lane. In one of three kept-open runs the downloader window was gone a few
+  log ending at "Preparing frontend launch task". This is the effect of the release DLL on slots 2 to 5 (no harness,
+  no `volserial`), not of Play: lane relcheck proved it with the dev DLL of the same version (below, "Lane relcheck"). In one of three kept-open runs the downloader window was gone a few
   minutes later without a crash event or log line. A repeat watched it for 60 s after the game ended, and it stayed open.
 - Evidence: `mxl2012-runs/playbtn/` (`playcheck.log`, `ev-close/`, `ev-keep/`, the snapshots).
 
@@ -5482,3 +5490,40 @@ log line). Evidence and scratch: `mxl2012-runs/dlvanish/` (outside git).
 Build: CMake / Visual Studio 18 2026, x64 Release, `mxl2012-runs/dlvanish/build`. Cause: the test script's process tree, not the
 downloader. Change: every way the downloader ends by itself is logged, and the start line names the parent (docs/launcher.md
 "Play"). Start a downloader for a long watch from a terminal that stays open, not as a child of a script a tool may end.
+
+## Lane relcheck: release DLL start crash on test slots, merged main in game (2026-11-05, slot 2, background mode)
+
+Before release 0.1.11. Builds of main 2af6efa in this lane: dev and `-Release` plugin (`build_plugin.ps1 -Release -Tests`, both
+PluginVersion 0.1.10), the mod (`tools/build.py`, validate 0 errors) and the downloader. Evidence and scratch:
+`mxl2012-runs/relcheck/` (outside git). Slot 2 locked per run, restored to the dev install of main afterwards.
+
+**1. The release DLL start crash on slots 2 to 5 is the slot's drive, not a release-build bug.** Same slot, same mod, one
+thing changed per run:
+
+| Run | Plugin | Harness words | Result |
+|-|-|-|-|
+| `runA-release` | `-Release` of main | (none: no harness) | dies about 8 s in, d2rloader.log ends at "Preparing frontend launch task"; `mxl2012-core.log` normal up to then |
+| `runB-dev-novolserial` | dev of main | `tag=s2 diag` | the same death at the same step. The `diag` log: `CryptoBox.input` (the cookie record of `cookie.bin`), then `CxxException .?AVDecoding_Error@Botan@@`, raised at `KERNELBASE.dll+0xc41ca` |
+| `runC-dev-volserial` | dev of main | `volserial tag=s2 diag` | the same CryptoBox input, 0 `Decoding_Error`, the game reaches the menu and stays up |
+| `runD-play-dev` (`checks-20261105-082425-s2`) | published 0.1.10 package, dev DLL of main swapped in (`release_install.py install --downloader <built>`) | `volserial tag=s2` | Play of the downloader built from main: `"D:\D2R-93847\D2RLoader.exe" -mod mxl2012`, the game started; game_checks attached (MXL_ATTACH=1), entered a game, `mxl2012` PASS, clean stop |
+| `runE-play-release` | the same install with the **published 0.1.10 release DLL** put back | (no harness) | Play: Application event 1000 `D2RLoader.exe` (1.3.1), `KERNELBASE.dll`, exception 0xe06d7363, offset 0xc41ca, about 15 s in, log ends at "Preparing frontend launch task": byte for byte what lane playbtn saw (its four events 2026-11-04 23:02 / 23:13 have the same bucket and offset) |
+
+So the release DLL itself is fine: with the harness out, nothing hides that the slot's loader runs from `D:` while the
+Battle.net cookie was written for `C:`, and D2RLoader's own uncaught `Botan::Decoding_Error` ends the process ("Parallel slots").
+Players run D2RLoader from the folder the game itself wrote the cookie from, the reason 0.1.10 plays for them; a player who
+copies the game to another drive without signing in again would see the same death with or without this mod. No fix needed.
+Tool gap seen on the way: `game_ctl` finds only the slot's renamed loader (`D2RLoader-s2.exe`), so a game started by Play (plain
+`D2RLoader.exe`) on slots 2 to 5 needs `LOADER_NAME` pointed at it to attach (`mxl2012-runs/relcheck/attach_plain.py`).
+
+**2. Merged main (spiritwarp + stashpage2) in game**, dev DLL of main:
+
+| Check | Run | Result |
+|-|-|-|
+| start, `mxl2012` | `checks-20261105-075753-s2` | PASS (39 lines, `mxl2012-core 0.1.10 (dev)`); `spiritwarp` and `stashpage2 on:` lines present; 0 crash files |
+| `stashpage2`, HD and legacy, StashPgTwo | `checks-20261105-075753-s2` | PARTIAL (pictures by hand, all right): arrows, page 2 open / back, Shared tab arrow leaves page 2 shut, an item 2 -> 1 -> 2, Ctrl-click in and out, X closes; legacy arrows; **after Save and Exit + reload page 2 holds r05 and r06**. Only the exit-only pool asserts |
+| spirits, HD (SpwLane, lane spiritwarp's lab, `spirit1/`) | `spirit1/lab.json` | Guardian, Defender, Protector came back on the walks: 35 -> 22 -> 19, 21 -> 8, 32 -> 7, 22 -> 7 |
+| spirits, legacy | `spirit1/lab.json` | Guardian 28 -> 14; three walk legs ended 25-31 away without a warp, each with verdict "left fighting" and the spirit's think-with-target count rising: a monster near in the Blood Moor (the lab clears only its zombies), which the part leaves fighting up to 40 by design. 52 warps, 0 failed over the run |
+| Play start (downloader of main) | `runD-play-dev` | see table above: in game, PASS |
+
+Tests: `tools/tests` 1034 OK, `tools` `test_*.py` 520 OK (5 skipped), `check_docs_links` 0, `check_public` 0 hits,
+`build_plugin.ps1 -Release -Tests` all passed, `launcher_tests` 370 checks, 0 failures.
