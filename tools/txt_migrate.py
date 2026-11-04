@@ -1066,6 +1066,45 @@ class Migrator:
             done.append(f"{bank or 'rotw'} {n}")
         self.report.append("\nhireling HiringMaxLevelDifference by Version from D2R's rows: " + (", ".join(done) or "none"))
 
+    # monstats aip columns D2R's Hireable AI (61) reads in place of 1.13c's per-class code (bug #534)
+    HIRELING_AIP = tuple(f"aip{n}{d}" for n in range(1, 5) for d in ("", "(N)", "(H)"))
+
+    def hireling_ai_params(self) -> None:
+        """Bug #534: D2R's Hireable AI reads monstats aip1-4 for rules 1.13c / 1.14d keep in code. aip1 is the range type
+        (1 ranged, 2 melee, 3 hybrid; 1.14d HirelingCombatThink 0x5e5050 reads aip1 only as a melee flag, Median's 0 / 1),
+        and when no hireling skill is rolled the basic attack is monstats Skill[aip2], else monster mode aip3 (D2R 0x5bf070,
+        the fallback at 0x5bf4ec; aip4 applies the hireling damage bonus to missiles). Median's rows keep 1.13c's values
+        (aip2 / aip3 empty), so the basic attack became mode 0 (death) and the mercenaries stood still. Each Hireable row
+        takes D2R's aip1-4 of the row with the same Id; Median's own skills, aidel and the other columns stay.
+        MXL2012_HIRELING_AIP=0 in the environment keeps Median's values (the in-game before / after comparison)."""
+        if os.environ.get("MXL2012_HIRELING_AIP") == "0":
+            self.report.append("\nmonstats Hireable aip1-4: kept Median's (MXL2012_HIRELING_AIP=0)")
+            return
+        done = []
+        for bank in ("base", ""):
+            ours, theirs = OUT / "data" / "global" / "excel" / bank / "monstats.txt", D2R / bank / "monstats.txt"
+            if not (ours.exists() and theirs.exists()):
+                continue
+            dh, drows = read_tsv(theirs)
+            h, rows = read_tsv(ours)
+            if not all(c in h and c in dh for c in ("Id", "AI") + self.HIRELING_AIP):
+                continue
+            theirs_by_id = {r[dh.index("Id")]: r for r in drows if is_record(r) and r[dh.index("AI")] == "Hireable"}
+            ii, ai = h.index("Id"), h.index("AI")
+            changed = []
+            for r in rows:
+                if not is_record(r) or r[ai] != "Hireable" or r[ii] not in theirs_by_id:
+                    continue
+                d = theirs_by_id[r[ii]]
+                before = [r[h.index(c)] for c in self.HIRELING_AIP]
+                for c in self.HIRELING_AIP:
+                    r[h.index(c)] = d[dh.index(c)]
+                if [r[h.index(c)] for c in self.HIRELING_AIP] != before:
+                    changed.append(r[ii])
+            write_tsv(ours, h, rows)
+            done.append(f"{bank or 'rotw'} {', '.join(changed) or 'none'}")
+        self.report.append("\nmonstats Hireable aip1-4 from D2R's rows (bug #534): " + ("; ".join(done) or "none"))
+
     # difficultylevels columns for rules 1.13c keeps in code (DF11, lane rulescheck2): the Fire Enchanted death explosion is 3/4
     # of the damage on Normal, 2/3 on Nightmare and 1/8 on Hell in 1.14d (0x5a2725-0x5a2766, the same rule as 1.13c); D2R's own
     # rows have 75 / 50 / 13 %, so Nightmare takes 67 (the nearest whole percent of 2/3)
@@ -2058,6 +2097,7 @@ def main() -> int:
     m.carry_numbers()
     m.monprop_event_skills()
     m.hireling_level_difference()
+    m.hireling_ai_params()
     m.difficulty_code_rules()
     m.skill_rules()
     m.stat_send_bits()

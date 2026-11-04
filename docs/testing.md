@@ -5315,3 +5315,40 @@ D2RLoader's template (`d2rloader.toml.orig`): `add_shared_tabs` adds pages "afte
 Screenshots: `mxl2012-runs/stashtabs/shots/`. Answer to the owner's question: in plain D2R the Gems / Materials / Runes pages are
 stored in the RotW shared stash file and shared by all RotW characters (offline, softcore); the mod behaves the same in HD and legacy.
 The player gets 5 shared pages in a classic / expansion game and 7 in a RotW game (D2RLoader adds the 2 pages to both).
+
+## Lane summonai: summon and mercenary AI (bug #534, 2026-11-04, static, then slot 2, background mode)
+
+Static part (before the owner's go, no game run): the work compared Median 2012's tables with the 0.1.10 build and D2R 93847's excel. It also compared D2R's pet AI code (the dump through `tools/d2r_find.py`) with 1.14d (redivivus). Report and table: `mxl2012-runs/summonai/REPORT.md`, `summons.txt`.
+
+| Check | Result |
+|-|-|
+| AI ids and params of every player summon | the same in Median, the build and D2R. NecroPet (67) has 18 summons, including Blood Elementals and Ice Elemental; Vampire (28) and PinHead (39) cover the Barbarian spirits; Raven (107), DruidBear (112) and the rest are listed in the report. pettype flags match by name |
+| NecroPet code | D2R `0x5c1080` / `0x5c1b20` = 1.14d `0x5e4830` / `0x5e4ac0`: the same constants (follow > 50, fight < 0x1d, attack 80%) and no aip reads |
+| Hireable code | **differs.** D2R `0x5beac0` / `0x5bf6e0` / `0x5bf070` read monstats aip1 as the range type (1.14d uses class ids). If no hireling.txt skill is rolled, they cast Skill[aip2], else they set mode aip3. Median's rows have aip2 / aip3 empty, so the basic attack is mode 0. Median's act2 / act5 aip1 = 1 makes melee mercenaries ranged |
+| petspread hooks | `0x500a40`, `0x501df0` (6 args) and `0x596d40` (3 args, also the mercenary warp `0x5c1460`) pass calls through and move only pettype totemic: no regression |
+| leash / medianai | not in this repo's plugin (no source, no `leash` verb). The `leash` row of the verb table above is inherited documentation. The vanilla distances apply (mercenary warp beyond 100) |
+
+**Fix:** `txt_migrate.py` `hireling_ai_params` gives the five Hireable rows D2R's aip1-4 by Id, in both banks. On a copy of the 0.1.10 tables the result is roguehire 1,1,_,1; act2hire 2,_,4; act3hire 3,_,4; act5hire1 2,_,4; act5hire2 2,_,5. Test: `tools/tests/test_txt_migrate_hireling_ai.py`.
+
+### In game (2026-11-04, slot 2, background mode, owner's go)
+
+Builds of lane/summonai after the merge of main 19cd683: **off** = `MXL2012_HIRELING_AIP=0` (Median's aip, as 0.1.10), **on** = the fix. Plugin of main's sources (lane crash532's Release DLL, by `MXL_PLUGIN`; the branch does not change the plugin). Character `SumLane` (Barbarian, made by the run, level 120 and god mode as fixtures; mercenaries hired with `hire`, life raised). Script `mxl2012-runs/summonai/lab.py` (outside git). In it a zombie with 20,000 life is spawned 10-12 / 20-22 / 30-32 sub-tiles from the unit, the unit's mode and distance and the zombie's life are polled for 14 s, then the player runs. Evidence: `mxl2012-runs/summonai/run1_off` ... `run5_on` (`lab.json`, logs).
+
+| Unit | off (`run1_off`, HD) | on (`run2_on` / `run3_on` / `run4_on` / `run5_on`, HD and legacy) |
+|-|-|-|
+| Rogue (271) | attacks (A1) at 13, 20 and 33, the zombie loses life; keeps 11-21 from the running player | attacks at 10-25 (A1, life lost), not at 32-35; keeps 5-20 |
+| Desert Mercenary (338) | attacks (A1) at 15 and 24, closes to 1.4; after the second fight it is not found within 40 of the player for the rest of the test | runs in (RN) and attacks at 12 and 22 (life lost), not at 32-35; keeps 3-22 and comes back |
+| Iron Wolf (359) | casts (SC) at 9-30, the zombie dies | the same (SC at 9-29, life lost) |
+| Barbarian (561) | Bloody Foothills: A2 seen, the zombie gone at once (no clean reading) | Foothills: no attack (the zombie stood still too: blocked ground); Blood Moor (`run3_on`): A2 at 12 with life lost, HD and legacy; no engage at 22 |
+| Raise Skeleton, Blood Elementals, Ice Elemental | not run (the fix does not touch them) | attack (A1) at 10, 20 and 30 sub-tiles, life lost; follow the player within about 13 (`run4_on`) |
+| Wolf Companion | not run | attacks at 10-30 (legacy) and 10-20 (HD), follows within 2-9 (`run4_on`, `run5_on`) |
+| Spirit of Vengeance | not run | attacks (SQ) at 10-30, follows within 2-13 |
+| Guardian / Defender / Protector Spirit | not run | attack (A1) at 10, 20 and up to 30. **Do not follow:** after a fight they stand 32-51 sub-tiles from the player and stay there while the player runs 12 / 24 / 12 (HD). In legacy the Protector walked off to 69-91 and warped back to 11, while Guardian and Defender stayed within 5-16 |
+
+Results:
+- Every unit attacks and damages the zombie, with the fix and without it. The report "don't work at all" is not reproduced on D2R 93847.
+- The fix changes how the Desert Mercenary moves: it runs in to melee and stays with the player, where without the fix it was lost after its fights. The fix is kept.
+- The spirits' missing follow matches their AIs: Vampire and PinHead are hostile AIs with no owner follow in 1.14d either, so the pet warp only brings them back from far away. Changing that would be a design change for the owner.
+- Not measured: the warp distances. `place` found no free spot 45 / 110 sub-tiles away, and a 60-tile `move` was refused.
+- A harness note: the first `cast` of a summon after an earlier summon's test came back accepted but did not start (player mode 1). With life refilled, monsters cleared and the cast aimed 5 sub-tiles west, as the skill sweep does, every summon appeared (`run4_on`).
+- Slot 2 was locked only for each run and unlocked after it, and the game was closed after every run.
