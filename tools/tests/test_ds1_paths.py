@@ -127,6 +127,57 @@ class RoomCheckTests(unittest.TestCase):
         self.assertEqual(self.gc.ds1_source({(a + 7, b + 3) for a, b in median}, [("mod", median), ("d2r", d2r)]), "mod")
         self.assertIsNone(self.gc.ds1_source({(500, 500)}, [("mod", median), ("d2r", d2r)]))
 
+    def test_edit_hits_tell_maps_that_share_most_spots(self):
+        # cathy3: every D2R spot is also Median's, so the overlap share alone ties; the Median-only spots decide
+        d2r = {(10, 10), (20, 30), (40, 12), (55, 70)}
+        median = d2r | {(65, 60), (68, 20)}
+        live = {(a + 4500, b + 3100) for a, b in median}
+        self.assertEqual(self.gc.edit_hits(live, median, d2r), (2, 0, (4500, 3100)))
+        # Duriel's Lair: D2R's 6 braziers (only D2R's) found, Median's firetowers not
+        median = {(135, 218), (78, 88), (59, 114), (93, 114)}
+        d2r = {(135, 218), (78, 88), (73, 153), (87, 153)}
+        live = {(a + 10, b + 20) for a, b in d2r}
+        self.assertEqual(self.gc.edit_hits(live, median, d2r), (0, 2, (10, 20)))
+        self.assertEqual(self.gc.edit_hits(set(), median, d2r), (0, 0, None))
+
+    def test_edit_source_from_missing_spots(self):
+        # Duriel's Lair in run checks-20261104-085859-s2: Duriel, Duriel's door and flies show, none of either map's own spots;
+        # D2R's braziers next to Duriel would be listed with them, so the map is Median's
+        shared = {(135, 218), (110, 207), (120, 193), (139, 184), (141, 205)}
+        median = shared | {(59, 114), (93, 114), (79, 181)}
+        d2r = shared | {(112, 216), (116, 195), (148, 177), (73, 153)}
+        live = {(a + 22500, b + 15500) for a, b in shared}
+        self.assertEqual(self.gc.edit_source(live, median, d2r), ("mod", 0, 0, (22500, 15500)))
+        live_d2r = live | {(112 + 22500, 216 + 15500)}
+        self.assertEqual(self.gc.edit_source(live_d2r, median, d2r)[0], "d2r")
+        self.assertEqual(self.gc.edit_source({(1, 1)}, {(500, 500)}, {(600, 600)})[0], "unknown")
+
+    def test_maps10_verdict(self):
+        # run checks-20261104-092801-s2 (slot 2), shortened
+        trace = [(0.0, 22638, 15693, (22635, 15717, 24)), (0.5, 22638, 15693, (22636, 15710, 17)),
+                 (1.4, 22638, 15693, (22638, 15697, 4))]
+        res = {16: {"hd": "reached", "src_hd": "mod", "walk_hd": "stopped 29 away"},
+               64: {"hd": "reached", "src_hd": "unknown", "walk_hd": "no spots"},
+               73: {"hd": "reached", "src_hd": "mod", "walk_hd": "reached", "trace_hd": trace}}
+        bad, notes = self.gc.maps10_verdict(res)
+        self.assertEqual(bad, [])
+        self.assertIn("16 hd walk stopped 29 away", notes)
+        self.assertIn("73 hd: Duriel first seen at (22635, 15717), 24 from the player, within 5 after 1.4 s", notes)
+        res[90] = {"hd": "reached", "src_hd": "d2r", "walk_hd": "reached"}
+        res[96] = {"hd": "not reached"}
+        self.assertEqual(self.gc.maps10_verdict(res)[0], ["90 hd: d2r map", "96 hd not reached"])
+        self.assertEqual(self.gc.duriel_first([(0.0, 1, 2, None)]), (None, None, None))
+
+    def test_maps10_names_each_moved_map_once(self):
+        rels = [r for rels, _spot, _n in self.gc.MAPS10.values() for r in rels]
+        self.assertEqual(len(rels), len(set(rels)))
+        # the 11 maps tools/ds1_paths.py moves: these plus caveroom4 (check hole2_room) and bivouac (no level of its own)
+        self.assertEqual(set(rels) | {"act1/caves/caveroom4.ds1", "act1/outdoors/bivouac.ds1"},
+                         {"act1/caves/caveroom4.ds1", "act1/caves/caveroom5.ds1", "act1/cathedrl/cathy3.ds1",
+                          "act1/outdoors/bivouac.ds1", "act2/maggot/magqueen.ds1", "act2/palace/harem2.ds1",
+                          "act2/tomb/duriel.ds1", "act3/jungle/dungrm6a.ds1", "act3/temple/temple5.ds1",
+                          "act3/temple/temple6.ds1", "act4/diab/heart.ds1"})
+
 
 if __name__ == "__main__":
     unittest.main()

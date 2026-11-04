@@ -5082,6 +5082,24 @@ hole2_room wall_maps`. Seen in passing: Duriel stands at the arrival of his lair
 edits now used), a release (no -txt) package. Open: why lane walls3 (2026-10-30) arrived on Median's caveroom4; D2R,
 D2RLoader and the CASC files are unchanged since 2026-10-20. Tests: `tools/tests/test_ds1_paths.py`.
 
+## Lane maps10: Median's edits of D2R maps in HD (bug #525, 2026-11-04, slot 2, background mode, build of lane/maps10)
+
+Scripts and evidence (outside git): `mxl2012-runs/maps10/` (run logs `run1.log`-`run4.log`, static comparisons in `scratch/`:
+`cmp.py` tile layers, `sp.py` / `dur.py` preset spots, `lp.py` lvlprest). Check `maps10` (tools/game_checks.py), tests
+`tools/tests/test_ds1_paths.py`. Results per map: docs/maps-hd.md "Result per map in HD".
+
+| Run | What | Result |
+|-|-|-|
+| `checks-20261104-085859-s2` | first pass | Duriel's place not read (`mon` lines give `mx/my`), maps that share most spots not told apart; both fixed in the check |
+| `checks-20261104-091259-s2` | second pass | walks stop on long paths in both modes (hops and `place` added); 64 not told (`presets` is empty in the maze) |
+| `checks-20261104-092801-s2` | all levels, HD then classic | 16, 33, 50, 73, 90, 96, 108 built from the mod's .ds1 in both modes; 64 not told; HD shots match classic; 0 new crash files (only the known MissMode assert, #54 / #73) |
+| `checks-20261104-095305-s2` | MXL_MAPS10_LEVELS=73, the verdict `maps10_verdict` | PARTIAL (the scenes are judged by hand): 73 from the mod's map; Duriel first seen at (22635,15718) 25 away in HD and at (22636,15713) 20 away in classic, at the player after 1.3 s in classic (in HD he stood still at 20 for the 6 s: the AI's random pick); 0 new crash files |
+
+Run: `MXL_RUN=maps10 MXL_SLOT=2 py -3 tools/game_checks.py all mxl2012 maps10` (MXL_MAPS10_LEVELS=73,... to visit fewer
+levels). Duriel trace in run 3: first frame at (22632,15715), 23 from the arrival (22638,15693), at dist 3 after 1.4 s in
+both modes. Not checked in game: bivouac (a random outdoor piece, no level of its own), magqueen's room (judged from the files:
+same tiles as D2R's). No native Median 1.13c install is on the PC; classic is compared through the map files and 1.14d's AI.
+
 ## Lane batstrike: Batstrike and Bloodbath, Open Wounds (bugs #526, #527, #530, 2026-11-03, slot 2, background mode, build of lane/batstrike)
 
 Scripts and evidence (outside git): `mxl2012-runs/batstrike/` (run logs `run3.log`, `run4.log`, builds `build4.log` /

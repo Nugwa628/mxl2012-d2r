@@ -9267,6 +9267,274 @@ def hole2_room():
 
 CHECKS += [("hole2_room", hole2_room)]
 
+# ---- lane maps10: Median's 10 other edits of D2R maps in HD (bug #525 follow-up, docs/maps-hd.md "Edited D2R maps") ------
+# level -> (tile paths of the map (one of them is built), the edit's own spot to look at (ds1 sub-tile, None = the map's
+# Median-only unit nearest its middle), label). Bivouac (lvlprest 50) is a random outdoor piece of Act 1 and has no level.
+MAPS10 = {16: (("act1/caves/caveroom5.ds1",), (73, 104), "caveroom5 Winged Death"),
+          33: (("act1/cathedrl/cathy3.ds1",), (65, 60), "cathy3 chest"),
+          64: (("act2/maggot/magqueen.ds1",), (21, 29), "magqueen den"),
+          50: (("act2/palace/harem2.ds1",), (35, 44), "harem2 Sharp Tooth Sayer"),
+          73: (("act2/tomb/duriel.ds1",), (135, 218), "duriel"),
+          90: (("act3/jungle/dungrm6a.ds1",), (72, 62), "dungrm6a Riftwraith"),
+          96: (("act3/temple/temple5.ds1", "act3/temple/temple6.ds1"), (57, 51), "temple Riftwraith"),
+          108: (("act4/diab/heart.ds1",), (62, 62), "heart centre")}
+DURIEL_CLASS = 211
+DURIEL_ENTRY = (135, 190)  # duriel.ds1 (Median's and D2R's): special tile orientation 10, style 30 seq 11 at tile (27, 38)
+MAPS10_NEAR = 30  # sub-tiles round a shown preset spot whose room is surely loaded (edit_missing)
+STAFF_CHEST_CLASS, STAFF_CHEST_SPOT = 356, (10, 30)  # StaffOfKingsChest (objects.txt) in magqueen.ds1, both maps
+
+
+def edit_hits(spots, mod, d2r):
+    """(spots only Median's map has, spots only D2R's has, (dx, dy)) found in the level's preset spots, at the shift that
+    lines up the most spots both maps share (all spots when they share none). spots: absolute; mod / d2r: ds1 sub-tiles."""
+    base = (mod & d2r) or (mod | d2r)
+    shifts = collections.Counter((x - a, y - b) for x, y in spots for a, b in base)
+    if not shifts or shifts.most_common(1)[0][1] < 2:  # one spot fits any map at some shift
+        return 0, 0, None
+    dx, dy = shifts.most_common(1)[0][0]
+    moved = lambda s: {(a + dx, b + dy) for a, b in s}
+    return len(moved(mod - d2r) & spots), len(moved(d2r - mod) & spots), (dx, dy)
+
+
+def edit_missing(spots, only, shared, shift, radius=MAPS10_NEAR):
+    """How many spots of `only` (one map's own) lie within `radius` of a shared spot the level shows, yet are not there: the
+    rooms round them are loaded, so that map would have listed them."""
+    dx, dy = shift
+    seen = {(a + dx, b + dy) for a, b in shared} & spots
+    return sum(1 for a, b in only if (a + dx, b + dy) not in spots
+               and any(max(abs(a + dx - x), abs(b + dy - y)) <= radius for x, y in seen))
+
+
+def edit_source(spots, mod, d2r):
+    """('mod' | 'd2r' | 'unknown', Median-only hits, D2R-only hits, shift) for the level's preset spots: the map whose own
+    spots show; when neither's do, the map whose own spots near the shown shared ones are all there while the other's are
+    missing."""
+    hm, hd, shift = edit_hits(spots, mod, d2r)
+    if shift is None:
+        return "unknown", hm, hd, None
+    if hm != hd:
+        return ("mod" if hm > hd else "d2r"), hm, hd, shift
+    mm = edit_missing(spots, mod - d2r, mod & d2r, shift)
+    md = edit_missing(spots, d2r - mod, mod & d2r, shift)
+    if md and not mm:
+        return "mod", hm, hd, shift
+    if mm and not md:
+        return "d2r", hm, hd, shift
+    return "unknown", hm, hd, shift
+
+
+def maps10_judge(lv, rels, log):
+    """(source, tile path, shift) of the level's map from `presets`: the best of the candidate maps (temple5 / temple6)."""
+    import fxpaths
+    mod_tiles = os.path.join(os.path.dirname(os.path.dirname(EXCEL)), "global", "tiles", "mxl2012")
+    d2r_tiles = os.path.join(str(fxpaths.D2R), "data", "global", "tiles")
+    _ok, lines = Hl("presets", log)
+    spots = {(q["x"], q["y"]) for q in parse_presets(lines)}
+    best = ("unknown", None, None, -1)
+    for rel in rels:
+        mod = ds1_object_spots(os.path.join(mod_tiles, *rel.split("/")))
+        d2r = ds1_object_spots(os.path.join(d2r_tiles, *rel.split("/")))
+        if mod is None or d2r is None:
+            continue
+        src, hm, hd, shift = edit_source(spots, mod, d2r)
+        log.append("%d %s: %s, Median-only spots %d, D2R-only %d, shift %s" % (lv, rel, src, hm, hd, shift))
+        score = (src != "unknown") * 1000 + hm + hd
+        if shift is not None and score > best[3]:
+            best = (src, rel, shift, score)
+    return best[:3]
+
+
+def walk_to(tx, ty, log, limit=60, hop=20):
+    """Run to (tx, ty) with `move` in hops of at most `hop` sub-tiles (the server's path search gives up on long ones), a hop
+    that does not get closer tried again to either side; stops within 8 sub-tiles, after 4 hops without progress or `limit` s.
+    -> 'reached', 'stopped N away' or 'no path'."""
+    t0, still, moved = time.time(), 0, False
+    p = hstate()["player"]
+    far = max(abs((p.get("x") or 0) - tx), abs((p.get("y") or 0) - ty))
+    while far > 8 and still < 4 and time.time() - t0 < limit:
+        px, py = p.get("x") or 0, p.get("y") or 0
+        dx, dy = tx - px, ty - py
+        n = max(abs(dx), abs(dy))
+        if n > hop:
+            sx, sy = px + dx * hop // n, py + dy * hop // n
+            side = [(0, 0), (-dy * 10 // n, dx * 10 // n), (dy * 10 // n, -dx * 10 // n)]
+        else:
+            sx, sy = tx, ty
+            side = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3), (5, 5), (-5, -5)]
+        best = far
+        for ox, oy in side:
+            ok, _l = Hl("move %d %d" % (sx + ox, sy + oy), log)
+            if not ok:
+                continue
+            moved = True
+            time.sleep(2.5)
+            p = hstate()["player"]
+            best = max(abs((p.get("x") or 0) - tx), abs((p.get("y") or 0) - ty))
+            if best < far - 2:
+                break
+        still = 0 if best < far - 2 else still + 1
+        far = min(far, best)
+    if far <= 8:
+        return "reached"
+    return "stopped %d away" % far if moved else "no path"
+
+
+def magqueen_seek(lv, log, hops=16, limit=360):
+    """Maggot Lair 3 is a maze: its rooms' preset lists are empty for `presets` (DrlgType 1), so the map is told by the live
+    objects instead. Walk room by room (`presets rooms`, nearest first) until `objects` shows the Staff of Kings chest (both
+    maps: magqueen.ds1 (10, 30)); then count Median's own fires (objects 160-162 at its spots, D2R's map has none).
+    -> (source, None, shift)."""
+    import fxpaths
+    rel = MAPS10[lv][0][0]
+    mod = ds1_object_spots(os.path.join(os.path.dirname(os.path.dirname(EXCEL)), "global", "tiles", "mxl2012", *rel.split("/")))
+    d2r = ds1_object_spots(os.path.join(str(fxpaths.D2R), "data", "global", "tiles", *rel.split("/")))
+    seen, t0 = set(), time.time()
+    while time.time() - t0 < limit:
+        objs = parse_objects(Hl("objects", log)[1])
+        chest = [o for o in objs if o["class"] == STAFF_CHEST_CLASS]
+        if chest:
+            dx, dy = chest[0]["x"] - STAFF_CHEST_SPOT[0], chest[0]["y"] - STAFF_CHEST_SPOT[1]
+            live = {(o["x"], o["y"]) for o in objs}
+            hm = len({(a + dx, b + dy) for a, b in mod - d2r} & live)
+            log.append("%d: Staff of Kings chest at %d,%d (mode %d); Median-only object spots %d of %d" % (
+                lv, chest[0]["x"], chest[0]["y"], chest[0]["mode"], hm, len(mod - d2r)))
+            return ("mod" if hm else "d2r"), rel, (dx, dy)
+        if len(seen) >= hops:
+            break
+        p = hstate()["player"]
+        rooms = [tuple(map(int, m.groups())) for m in (re.match(r"room x=(-?\d+) y=(-?\d+)", ln)
+                                                       for ln in Hl("presets rooms", log)[1]) if m]
+        todo = sorted((r for r in rooms if r not in seen), key=lambda r: abs(r[0] - p.get("x", 0)) + abs(r[1] - p.get("y", 0)))
+        if not todo:
+            break
+        seen.add(todo[0])
+        log.append("%d seek: room %d,%d -> %s" % (lv, todo[0][0], todo[0][1], walk_to(todo[0][0] + 12, todo[0][1] + 12, log, 40)))
+    return "unknown", rel, None
+
+
+def duriel_trace(log, secs=6.0):
+    """`level 73` and `state` every 0.3 s from the first frame in the lair: the player's and Duriel's places (Duriel walks to a
+    player he sees, 1.14d AITHINK_Fn1_Duriel 0x5f67b0, so where he stands at the first frame is where the map put him)."""
+    H("level 73")
+    t0, trace, t_in = time.time(), [], None
+    while time.time() - t0 < 60:
+        st = hstate()
+        if st["player"].get("area") == 73:
+            t_in = t_in or time.time()
+            d = [m for m in st["mons"] if m.get("class") == DURIEL_CLASS]
+            trace.append((round(time.time() - t_in, 1), st["player"].get("x"), st["player"].get("y"),
+                          (d[0].get("mx"), d[0].get("my"), d[0].get("dist")) if d else None))
+            if time.time() - t_in > secs:
+                break
+        time.sleep(0.3)
+    log.append("73 trace (s, player x, y, Duriel x, y, dist): %s" % trace)
+    return trace
+
+
+def maps10_visit(mode, log, shots, res):
+    """One pass over MAPS10 in the current graphics mode: travel, which map the level was built from (maps10_judge; the maze of
+    Maggot Lair 3 by its live objects, magqueen_seek), a shot at the arrival and one at the edit's spot after a walk there (put
+    there with `place` when the walk stops). Duriel's Lair: the trace of the arrival first (duriel_trace)."""
+    only = {int(v) for v in os.environ.get("MXL_MAPS10_LEVELS", "").split(",") if v.strip().isdigit()}
+    for lv, (rels, spot, name) in MAPS10.items():
+        if only and lv not in only:
+            continue
+        r = res.setdefault(lv, {"name": name})
+        if lv == 73:
+            goto(74, timeout=60)  # the Arcane Sanctuary, same act: `level 73` from there is one warp
+            r["trace_" + mode] = duriel_trace(log)
+            st = hstate()
+        else:
+            st = goto(lv, timeout=60)
+        if st["player"].get("area") != lv:
+            r[mode] = "not reached"
+            continue
+        time.sleep(3)
+        shots.append(sh("m10_%d_%s_arrival" % (lv, mode)))
+        src, _rel, shift = magqueen_seek(lv, log) if lv == 64 else maps10_judge(lv, rels, log)
+        r["src_" + mode] = src
+        r[mode] = "reached"
+        if shift is None:
+            r["walk_" + mode] = "no spots"
+            continue
+        dx, dy = shift
+        if lv == 73:
+            r["duriel_" + mode] = {"entry": (DURIEL_ENTRY[0] + dx, DURIEL_ENTRY[1] + dy), "preset": (spot[0] + dx, spot[1] + dy)}
+            log.append("73 %s: entry tile %s, Duriel's preset %s" % (mode, r["duriel_" + mode]["entry"],
+                                                                     r["duriel_" + mode]["preset"]))
+        r["walk_" + mode] = walk_to(spot[0] + dx, spot[1] + dy, log)
+        if r["walk_" + mode] != "reached":  # the shot still shows the spot: put the character there (loaded rooms only)
+            Hl("place %d %d" % (spot[0] + dx, spot[1] + dy), log)
+            time.sleep(3)
+        shots.append(sh("m10_%d_%s_spot" % (lv, mode)))
+
+
+def duriel_first(trace):
+    """(Duriel's place at the first frame he is seen in the lair, his distance there, seconds until he is within 5 of the
+    player or None) from duriel_trace's rows."""
+    seen = [row for row in trace if row[3]]
+    if not seen:
+        return None, None, None
+    near = [row[0] for row in seen if row[3][2] is not None and row[3][2] <= 5]
+    return seen[0][3][:2], seen[0][3][2], (near[0] if near else None)
+
+
+def maps10_verdict(res):
+    """(problems, notes) of the per-level results. A problem: a level not reached or built from D2R's map (or an unknown one
+    where `presets` shows spots). Walks are notes: collision is the server's, the same in both graphics modes, and the
+    harness walk (`move`) gives up on long or winding paths (tools/game_checks.py walk_to); Maggot Lair 3's maze room (64)
+    is only found by walking."""
+    bad, notes = [], []
+    for lv, r in sorted(res.items()):
+        for mode in ("hd", "classic"):
+            if mode not in r:
+                continue
+            if r[mode] != "reached":
+                bad.append("%d %s %s" % (lv, mode, r[mode]))
+            elif r.get("src_" + mode) == "mod":
+                if r.get("walk_" + mode) != "reached":
+                    notes.append("%d %s walk %s" % (lv, mode, r.get("walk_" + mode)))
+            elif lv == 64 and r.get("src_" + mode) == "unknown":
+                notes.append("64 %s: the Maggot Queen's room not found by the walk" % mode)
+            else:
+                bad.append("%d %s: %s map" % (lv, mode, r.get("src_" + mode)))
+        for mode in ("hd", "classic"):
+            if r.get("trace_" + mode):
+                spot, dist, secs = duriel_first(r["trace_" + mode])
+                notes.append("73 %s: Duriel first seen at %s, %s from the player, within 5 after %s s" % (mode, spot, dist, secs))
+    return bad, notes
+
+
+def maps10():
+    """Lane maps10: the 10 maps tools/ds1_paths.py moves besides Hole Level 2's (docs/maps-hd.md "Edited D2R maps"). Per level and
+    graphics mode: built from the mod's .ds1 (maps10_judge), a walk from the arrival to the edit's spot, screenshots there (HD
+    scene against the classic look, judged by hand). Duriel's Lair: where Duriel stands from the first frame (duriel_trace).
+    PASS (by hand for the scenes): every level reached and built from the mod's map (maps10_verdict)."""
+    mark = engine_mark()
+    log, shots, res = [], [], {}
+    cheat("god 1")
+    goto(1, timeout=60)
+    hd_ok = set_graphics("hd")
+    if hd_ok:
+        maps10_visit("hd", log, shots, res)
+    goto(1, timeout=60)
+    legacy_ok = set_graphics("legacy")
+    if legacy_ok:
+        maps10_visit("classic", log, shots, res)
+    goto(1, timeout=60)
+    set_graphics("hd")
+    cheat("god 0")
+    bad, notes = maps10_verdict(res)
+    if not (hd_ok and legacy_ok):
+        bad.insert(0, "graphics mode not set")
+    log.append("result %r" % res)
+    rc_finish("maps10", not bad, "; ".join(bad + notes) or "every level from the mod's map", mark, shots, log,
+              ["travel by `h level`", "god mode (cheat god 1)", "`place` where the walk stopped"],
+              judged_by_hand="the HD scene in m10_<level>_hd_*.png against m10_<level>_classic_*.png")
+
+
+CHECKS += [("maps10", maps10)]
+
 # ---- lane tints: per-TransLvl colours (tools/hd_translvl.py) and gradient-tinted effects (tools/hd_recolour.py) -----------
 def tint_class(mid):
     """The monster class (row of the built monstats.txt) of a monstats Id, or None."""

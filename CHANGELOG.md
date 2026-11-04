@@ -7,7 +7,8 @@ version being released (docs/release.md).
 
 - Hole Level 2 shows its cave walls in HD, and Median XL's edits of ten more original maps (Duriel's Lair, the
   Chaos Sanctuary heart, the Cathedral, the Harem, the Act 3 temples and dungeons, ...) are used: the game had loaded its own
-  versions of those maps instead (#525).
+  versions of those maps instead (#525). All ten were checked in HD against classic, and Duriel greets the player in his
+  lair as in classic: he starts at the far end and rushes in.
 - Batstrike and Bloodbath play their strike animations in HD, and Batstrike's nova spreads over its full radius in HD
   (it uses a stand-in look: green, not classic's orange-red, until custom art is made). Batstrike now spends its charges
   on the first Attack that lands, as all finishing moves do in classic, and its charm part converts monsters again (#526,

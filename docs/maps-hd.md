@@ -372,6 +372,36 @@ So Median's object and unit edits of these maps (Duriel's lair, the Chaos heart,
 effect now; before they were D2R's in both modes. Check `hole2_room` (tools/game_checks.py) reads the preset unit spots of
 levels 15, 90 and 96 (`presets`) and names the .ds1 they belong to (mod or D2R), with HD screenshots also of 73, 33 and 50.
 
+### Result per map in HD (lane maps10, 2026-11-04, slot 2, check `maps10`)
+
+Check `maps10` (tools/game_checks.py) visits each level in HD and then classic. It tells which .ds1 the level was built from
+by the preset spots that only Median's map or only D2R's has (`edit_source`), walks to the spot of Median's edit and takes
+shots at the arrival and at that spot (`m10_<level>_<mode>_*.png`). Collision comes from the tiles on the server, so it is the
+same in both modes. The HD look is D2R's copied scene or the walls_hd one. "Tiles" compares the tile layers of the two .ds1
+files:
+
+| Map | Level | Tiles against D2R's | Median's edit | Built from | HD scene | Result |
+|-|-|-|-|-|-|-|
+| caveroom5 | 16 (Cave Treasure 5) | same | Winged Death (act1 47) and fires; D2R's fallen shamans and unique pack gone | mod (2 Median-only spots) | cave as classic | OK |
+| cathy3 | 33 | same | 8 gargoyle traps, LargeChestL (65,60), ConsolationChest | mod (6) | cathedral altar as classic | OK |
+| bivouac | none (random Act 1 outdoor piece) | same | D2R's "The Cow King" preset (1,45) gone | judged from the files | D2R's copied: same tiles | OK (not seen in game) |
+| magqueen | 64 (Maggot Lair 3) | same | 26 objects: fires 49-51, corpses, HellLight1, ConsolationChest; Staff of Kings chest kept | not told: `presets` lists nothing in a maze level and the walk (`magqueen_seek`) did not reach the room | D2R's copied: same tiles | OK (judged from the files) |
+| harem2 | 50 | same | Sharp Tooth Sayer (act2 59) at (35,44) | mod (1) | arch and stairs as classic | OK |
+| duriel | 73 | same walls, 1 floor cell | 4 firetowers, Flamespike the Crawler; D2R's 6 Brazier3 gone | mod (no D2R braziers) | lair as classic | OK |
+| dungrm6a | 90 | differ | Riftwraith / Death Projector, raw monstats 970 | mod (3) | the mod's (walls_hd) | OK |
+| temple5 / temple6 | 96 | differ | many object changes | mod (temple6, 35) | the mod's (walls_hd); grass floor as known (biome) | OK |
+| heart | 108 | same walls, 84 floor cells | 2 champions, Anodized Elite (act4 28), SkeletonSpawnHell | mod (5) | D2R's copied: D2R's pentagram on Median's floor cells | OK |
+
+No holes, missing walls or invisible walls were seen in the HD shots, so nothing needed a fix. In 16, 33, 50, 90 and 96 the
+harness walk (`move`) stopped 23-100 sub-tiles short of the spot. It stopped by about as much in classic, so this is the
+harness's path search on long paths and not a map defect. The check notes these walks rather than failing on them.
+
+Duriel (73): his preset spot (135,218) and the arrival tile (orientation 10 at sub-tile (135,190)) are the same bytes in
+Median's and D2R's duriel.ds1. At the first frame in the lair he stands at his preset, 20-25 sub-tiles from the player, in
+both modes. He then walks or charges to the player (1.14d `AITHINK_Fn1_Duriel` 0x5f67b0: when not engaged, a charge with
+chance aip5, otherwise a walk to the target), usually within 1.3-1.5 s. Classic Median 1.13c uses the same map and AI, so it
+does the same and nothing was changed. Lane hole2's "Duriel stands at the arrival" was this rush, seen after it had ended.
+
 ## Median's look on the 8 retextured maps (lane maptint, 2026-10-30)
 
 `tools/map_tint.py` (build step inside `walls_hd.py build`, tests `tools/tests/test_map_tint.py`; pixel reader
