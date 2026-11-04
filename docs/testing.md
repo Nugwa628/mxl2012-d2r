@@ -5352,3 +5352,32 @@ Results:
 - Not measured: the warp distances. `place` found no free spot 45 / 110 sub-tiles away, and a 60-tile `move` was refused.
 - A harness note: the first `cast` of a summon after an earlier summon's test came back accepted but did not start (player mode 1). With life refilled, monsters cleared and the cast aimed 5 sub-tiles west, as the skill sweep does, every summon appeared (`run4_on`).
 - Slot 2 was locked only for each run and unlocked after it, and the game was closed after every run.
+
+## Lane playbtn: Play in the downloader (2026-11-04, slot 2)
+
+**Play** starts `<D2R>\D2RLoader.exe -mod mxl2012` (docs/launcher.md "Play"). D2RLoader 1.3.1 rejects `-mod` only inside
+`launch_arguments` of its config (its template says so), not on its command line. `tools/slot_share.py` already starts every
+slot run that way. So Play never reads or writes `default_mod` and asks nothing before starting.
+
+Tests: `launcher_tests.exe` 349 checks, 0 failures (`TestPlay`: the enable rules, the quoted command line).
+
+Slot 2 (locked only for the run, shared config snapshotted by `slot_share.begin`, restored and verified at unlock). The
+built downloader made a player install with `release_install.py install --slot 2 --channel stable --downloader <built exe>
+--release-dll` (0.1.10, marker written), restored with `restore`. The slot's `launch_arguments` was `-w` for the run only (no
+`-txt`, as a release run); the shared `default_mod` stayed on another mod. The window ran with `--data-dir` in the
+lane's run folder and was driven only by `WM_COMMAND` to the button ids (`IdPlay` 113, `IdCloseAfterPlay` 114):
+- Play on: the line says "Ready to play.", although the status warns that the default mod is another mod (`snap-s2-ready.png`).
+  Fake D2R folder without D2RLoader: Play off (`snap-noloader.png`).
+- Close-after-start on (the default): the downloader logged `Play: "D:\D2R-93847\D2RLoader.exe" -mod mxl2012 in D:\D2R-93847`
+  and the PID, then exited 3.5 s after the click. d2rloader.log: `D2RLoader command line: "D:\D2R-93847\D2RLoader.exe" -mod
+  mxl2012`, `Active mod: name mxl2012`, `D2R command line: ... -w -mod mxl2012`, `[PLUGIN] D2R-XL 2012 core 0.1.10 [mod]`,
+  `CASC paths: mod="mxl2012"`. mxl2012-core.log: `mxl2012-core 0.1.10 loaded (mod mxl2012, D2R 3.3.0)`.
+- Close-after-start off: the check box wrote `close_after_play: false`. The window stayed open, Play was off 10 s after the
+  click, and Play was back on within 5 s after the game ended (the 3-second process timer). With the channel unreachable
+  (a DNS failure in one run), Play was still on for the installed release.
+- The game itself exited about 10 s into every start: a D2RLoader APPCRASH (0xe06d7363), the same command line each time,
+  log ending at "Preparing frontend launch task". This is the known effect of the release DLL on slots 2 to 5 (no harness,
+  no `volserial`; see "the first starts ... died about 5 s after launch" above), not of Play. A run with the dev DLL was not
+  made: the plugin build was denied in this lane. In one of three kept-open runs the downloader window was gone a few
+  minutes later without a crash event or log line. A repeat watched it for 60 s after the game ended, and it stayed open.
+- Evidence: `mxl2012-runs/playbtn/` (`playcheck.log`, `ev-close/`, `ev-keep/`, the snapshots).

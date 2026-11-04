@@ -20,16 +20,17 @@ W, H = 960, 640  # CanvasW, CanvasH
 PANEL = (230, 262)
 STATUS = (270, 284)  # StatusRect, 19 px a line
 BAR = (272, 389, 416, 9)
-INSTALL = (360, 444, 240, 60)
+INSTALL = (230, 444, 240, 60)
+PLAY = (490, 444, 240, 60)
 ROW = [((175, 516, 140, 34), "Repair"), ((325, 516, 140, 34), "Uninstall"), ((475, 516, 150, 34), "D2R folder"),
        ((635, 516, 150, 34), "Mods folder")]
-HOW_Y, HOW_WRAP = 570, W - 220  # HowToPlayRect: first line's centre, wrap width
+HOW_Y, HOW_WRAP = 565, W - 220  # HowToPlayRect: the line's centre, wrap width
+CHECK = (325, 578, 310, 22)  # the close-after-Play check box
 FOOT_Y = 616  # FooterRect's centre
 ICON = (918, 602, 28, 28)
 
 GOLD, BODY, DIM = (232, 196, 128), (222, 212, 192), (150, 136, 112)
-HOW = ("How to play: start D2RLoader.exe in your D2R folder. The first time, click the gear on the character screen, set "
-       "Default Mod to D2R-XL 2012, Apply, and start D2RLoader again.")
+HOW = "How to play: press Play. Without the downloader: start D2RLoader.exe and pick D2R-XL 2012 as Default Mod (gear)."
 LINES = [r"D2R: C:\Program Files (x86)\Diablo II Resurrected (build 93847)", "D2RLoader: 1.3.1-beta (OK)",
          "D2R-XL 2012: 0.9.0 installed (latest)", r"Mod folder: ...\Diablo II Resurrected\mods\mxl2012"]
 FOOT = ("Downloader 0.1.0  ·  D2R-XL 2012, a port of Median XL 2012 by Brother Laz. Diablo II by Blizzard Entertainment. "
@@ -71,6 +72,7 @@ def build(res: str, fonts) -> Image.Image:
             text((x + w / 2, y + h / 2), label, title(15), GOLD, "mm")
 
     button(INSTALL, "Install", "big")
+    button(PLAY, "Play", "big")
     for r, label in ROW:
         button(r, label)
     words, lines, cur = HOW.split(), [], ""
@@ -85,6 +87,9 @@ def build(res: str, fonts) -> Image.Image:
     lines.append(cur)
     for i, l in enumerate(lines):
         text((W / 2, HOW_Y + i * 18), l, f, GOLD, "mm")
+    cx, cy, cw, ch = CHECK
+    d.rectangle([(cx + 2) * S, (cy + 4) * S, (cx + 16) * S, (cy + 18) * S], fill=(0, 0, 0, 160), outline=GOLD + (255,), width=S)
+    text((cx + 24, cy + ch / 2), "Close the downloader when the game starts", f, GOLD, "lm")
     text((14, FOOT_Y), FOOT, body(12), DIM, "lm")
     ix, iy, iw, ih = ICON  # issues icon stand-in
     d.ellipse([(ix + 4) * S, (iy + 5) * S, (ix + iw - 4) * S, (iy + ih - 5) * S], fill=GOLD + (255,))

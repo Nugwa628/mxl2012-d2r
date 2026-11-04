@@ -1,6 +1,6 @@
 // What the D2R-XL 2012 Downloader does (docs/launcher.md): find D2R, put the D2R-XL 2012 release into <D2R>\mods\mxl2012 (from the
 // release's 7z or from single-file objects), check D2RLoader, Repair and Uninstall, update itself. Used by the window
-// (window.cpp) and the CLI (main.cpp). It never starts the game: the player starts D2RLoader.exe.
+// (window.cpp) and the CLI (main.cpp). Play starts D2RLoader.exe -mod mxl2012 in the D2R folder.
 #pragma once
 
 #include "../core/json.h"
@@ -30,10 +30,9 @@ constexpr const char* IssuesUrl = "https://github.com/Nugwa628/mxl2012-d2r/issue
 // the player asks (docs/launcher.md "Install D2RLoader"); Get D2RLoader opens this page (also the fallback).
 constexpr const char* LoaderSite = "https://d2rloader.net/download.html";
 constexpr const char* LoaderVersionDefault = "1.3.1-beta";  // when the manifest names none
-// The player's part (docs/launcher.md "How the player starts D2R-XL 2012"). Shown in the window, README, release notes.
+// The player's part (docs/launcher.md "Play"). Shown in the window and after an install; the release notes say the same.
 constexpr const char* HowToPlay =
-	"How to play: start D2RLoader.exe in your D2R folder. The first time, click the gear on the character screen, set "
-	"Default Mod to D2R-XL 2012, Apply, and start D2RLoader again.";
+	"How to play: press Play. Without the downloader: start D2RLoader.exe and pick D2R-XL 2012 as Default Mod (gear).";
 
 enum class Via { Auto, SevenZip, Objects };  // how files are fetched (docs/launcher.md "7z or objects")
 
@@ -75,6 +74,9 @@ public:
 		std::string latest;        // the channel's release
 		bool latestComplete = true;  // false: a test package without game data (InstallableFromChannel)
 		bool updateAvailable = false;
+		bool pending = false;      // an install, update or repair stopped before it finished (the state's mod_pending)
+		bool gameRunning = false;  // D2R or D2RLoader runs from the D2R folder
+		std::string playBlocked;   // why Play is off (PlayBlocked), "" when it may start the game
 		// docs/bugs.md #53: what D2RLoader really starts. Its game-wide default_mod (checked when D2RLoader or its
 		// config is there), and copies of our plugin in the game-wide or another mod's plugins folder.
 		bool defaultModChecked = false;
@@ -110,6 +112,12 @@ public:
 	// size and sha256 checked), unpack it into <data>\loader-staging and move its files into the D2R folder. Refused while
 	// D2R or D2RLoader runs there; the player's d2rloader\config files are kept; a failed move puts the old files back.
 	bool InstallLoader(std::string& error);
+	// docs/launcher.md "Play": start <D2R>\D2RLoader.exe -mod mxl2012 (working folder: the D2R folder; not elevated, not
+	// waited for) when Inspect allows it. Fails when the exe is missing, it cannot be started, or it ends within 3 s.
+	bool Play(std::string& error);
+	// The window closes after Play started the game (the state's close_after_play, default on).
+	bool CloseAfterPlay() const { return state_["close_after_play"].Bool(true); }
+	void SetCloseAfterPlay(bool close);
 	// The manifest's package can be installed (LoaderPackageUsable); `why` says why not.
 	bool LoaderInstallable(std::string* why = nullptr) const;
 	const Manifest::Loader& LoaderPackage() const { return feed_.d2rloader; }

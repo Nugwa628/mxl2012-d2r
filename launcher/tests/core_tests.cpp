@@ -713,7 +713,7 @@ void TestEnvironment() {
 	std::string toml = "[d2rloader]\n# Launch this mod automatically.\ndefault_mod = \"MedianXL\"  # set by the gear\nlaunch_arguments = \"-w\"\n\n[d2rcore.stash]\nadd_shared_tabs = 3\n";
 	mxl::DefaultModCheck c = mxl::CheckDefaultMod(toml, true, "mxl2012");
 	Check(!c.ok && c.mod == "MedianXL" && !c.configMissing, "default_mod MedianXL is not ours");
-	Check(mxl::DefaultModWarning(c, "mxl2012") == "D2RLoader starts the mod MedianXL, not mxl2012", "warning names the mod D2RLoader starts");
+	Check(mxl::DefaultModWarning(c, "mxl2012") == "Started by hand, D2RLoader starts the mod MedianXL, not mxl2012 (Play starts mxl2012)", "warning names the mod D2RLoader starts");
 	std::string fixed = mxl::SetDefaultMod(toml, "mxl2012");
 	Check(mxl::CheckDefaultMod(fixed, true, "mxl2012").ok, "fixed config names D2R-XL 2012");
 	Check(fixed == "[d2rloader]\n# Launch this mod automatically.\ndefault_mod = \"mxl2012\" # set by the gear\nlaunch_arguments = \"-w\"\n\n[d2rcore.stash]\nadd_shared_tabs = 3\n",
@@ -740,7 +740,7 @@ void TestEnvironment() {
 	      "other plugins, text files and exes are not ours");
 
 	mxl::DefaultModCheck prior = mxl::CheckDefaultMod("[d2rloader]\ndefault_mod = \"PriorMod\"\n", true, "mxl2012");
-	Check(!prior.ok && mxl::DefaultModWarning(prior, "mxl2012") == "D2RLoader starts the mod PriorMod, not mxl2012",
+	Check(!prior.ok && mxl::DefaultModWarning(prior, "mxl2012") == "Started by hand, D2RLoader starts the mod PriorMod, not mxl2012 (Play starts mxl2012)",
 	      "another mod warns by name");
 	Check(mxl::IsOurPluginFile("renamed.dll", "mxl2012", ""), "current plugin ProductName");
 	Check(!mxl::IsOurPluginFile("other-core.dll", "PriorMod", "PriorMod core plugin (other-core)"), "another mod's plugin is not ours");
@@ -774,6 +774,38 @@ void TestEnvironment() {
 	Check(mxl::RemovedPluginPath("C:" + bs + "L" + bs + "mxl2012", "2026-10-27", "d2rloader/plugins/mxl2012-core.dll") ==
 	          "C:" + bs + "L" + bs + "mxl2012" + bs + "removed" + bs + "2026-10-27" + bs + "d2rloader" + bs + "plugins" + bs + "mxl2012-core.dll",
 	      "moved under removed, date, relative path");
+}
+
+void TestPlay() {
+	mxl::PlayInputs ready;
+	ready.d2rFound = ready.loaderOk = ready.loaderFound = ready.installed = true;
+	Check(mxl::PlayBlocked(ready).empty(), "play: D2R, D2RLoader 1.3.1 and an up-to-date install");
+	auto blocked = [&](void (*change)(mxl::PlayInputs&), const char* part) {
+		mxl::PlayInputs in = ready;
+		change(in);
+		return mxl::PlayBlocked(in).find(part) != std::string::npos;
+	};
+	Check(blocked([](mxl::PlayInputs& in) { in.d2rFound = false; }, "D2R folder"), "play: no D2R folder");
+	Check(blocked([](mxl::PlayInputs& in) { in.buildMismatch = true; }, "version"), "play: another D2R version");
+	Check(blocked([](mxl::PlayInputs& in) { in.loaderFound = in.loaderOk = false; }, "install D2RLoader"), "play: no D2RLoader");
+	Check(blocked([](mxl::PlayInputs& in) { in.loaderOk = false; }, "D2RLoader is not the version"), "play: another D2RLoader version");
+	Check(blocked([](mxl::PlayInputs& in) { in.installed = false; }, "Install"), "play: not installed");
+	Check(blocked([](mxl::PlayInputs& in) { in.installed = false, in.foreignMod = true; }, "not installed by this downloader"),
+	      "play: a mod folder the downloader did not make");
+	Check(blocked([](mxl::PlayInputs& in) { in.updateAvailable = true; }, "Update"), "play: an update is waiting");
+	Check(blocked([](mxl::PlayInputs& in) { in.pending = true; }, "Repair"), "play: a stopped install or repair");
+	Check(blocked([](mxl::PlayInputs& in) { in.gameRunning = true; }, "running"), "play: the game runs already");
+	mxl::PlayInputs none;
+	Check(mxl::PlayBlocked(none).find("D2R folder") != std::string::npos, "play: nothing known, the D2R folder comes first");
+
+	// the mod is chosen on the command line (it wins over D2RLoader's default_mod), so Play neither reads nor writes default_mod
+	Check(mxl::PlayArguments("mxl2012") == "-mod mxl2012", "play arguments name our mod");
+	const std::string bs(1, char(92));
+	std::string exe = "C:" + bs + "Program Files (x86)" + bs + "Diablo II Resurrected" + bs + "D2RLoader.exe";
+	Check(mxl::PlayCommandLine(exe, "mxl2012") == "\"" + exe + "\" -mod mxl2012", "play command line: quoted exe, then -mod mxl2012");
+	Check(mxl::PlayCommandLine("", "mxl2012").empty() && mxl::PlayCommandLine("C:" + bs + "a\"b" + bs + "D2RLoader.exe", "mxl2012").empty(),
+	      "play command line: no exe, or one that cannot be quoted");
+	Check(mxl::PlayCommandLine(exe, mxl::ProductFolder).find(" -mod mxl2012") != std::string::npos, "play starts the product's mod folder");
 }
 
 bool Near(float a, float b) { return a - b < 0.001f && b - a < 0.001f; }
@@ -979,6 +1011,7 @@ int main() {
 	TestModConfigKeys();
 	TestSharedTabsMin();
 	TestEnvironment();
+	TestPlay();
 	TestSvg();
 	TestZip();
 	TestLoaderPackage();

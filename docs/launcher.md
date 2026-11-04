@@ -4,11 +4,11 @@
 into the player's D2R folder at `<D2R>\mods\mxl2012`. The plugin is `mxl2012-core.dll`.
 The downloader version starts at **0.1.0**, independently of the plugin and release versions.
 
-It never starts the game. It needs **D2RLoader 1.3.1** in the D2R folder: when it is missing,
+It needs **D2RLoader 1.3.1** in the D2R folder: when it is missing,
 **Install D2RLoader** downloads it from <https://d2rloader.net/> after asking (below); it can also be
-installed by hand. Then press **Install**. To play, start
-`D2RLoader.exe`; use its gear menu to select D2R-XL 2012 as Default Mod, Apply, and restart
-D2RLoader. The downloader also offers a confirmed **Default mod** action (below).
+installed by hand. Then press **Install**, then **Play** (below), which starts `D2RLoader.exe -mod mxl2012`.
+Without the downloader, start `D2RLoader.exe` by hand; use its gear menu to select D2R-XL 2012 as Default Mod,
+Apply, and restart D2RLoader. The downloader also offers a confirmed **Default mod** action (below).
 The release `.7z` is the manual-install fallback.
 
 ## Finding D2R and checking prerequisites
@@ -54,9 +54,31 @@ D2RLoader is running from the selected game folder. Characters and game settings
 never written. The only optional writes outside the target mod folder are the explicit
 Install D2RLoader, Default mod and Move plugin actions below.
 
-There is no private game copy, Play action, bundled D2RLoader, legacy state migration,
+There is no private game copy, bundled D2RLoader, legacy state migration,
 old-copy deletion prompt, `remove-old-copy` command, or `--source` alias. This new product
 does not migrate or delete other launchers' old copies.
+
+## Play
+
+**Play** (owner decision 2026-11-04) sits next to Install / Update. It starts `<D2R>\D2RLoader.exe -mod mxl2012` with the D2R
+folder as working folder, with the downloader's own rights (it runs `asInvoker`, so never elevated), and does not wait for
+the game. **How the mod is chosen:** D2RLoader passes its own command line on to D2R after the game-wide `launch_arguments`,
+and a `-mod` there wins over the game-wide `default_mod` (checked on slot 2, where `default_mod` names another mod:
+`tools/slot_share.py`, and with Play itself: docs/testing.md "Lane playbtn"). So Play starts D2R-XL 2012 whatever `default_mod` says and never
+writes D2RLoader's config; the Default mod warning and action stay for players who start D2RLoader by hand. (D2RLoader 1.3.1
+refuses `-mod` only inside `launch_arguments` of its config, not on its command line.)
+
+Play is on only when all of these hold (`PlayBlocked`, paths.h; the line under the panel says `Play: <reason>.` otherwise):
+the D2R folder is known, its version is not a known other one (a D2R version that cannot be read does not block), D2RLoader
+is there at the required version, `mods\mxl2012` is our install (marker), no update is waiting on the channel, the last install,
+update or repair finished (the state's `mod_pending`, set when the folder starts to change and cleared when it ends well),
+and no D2R / D2RLoader runs from the D2R folder. A 3-second timer notices when the game ends and turns Play on again. When the
+channel cannot be read (offline), an installed release still plays.
+
+A missing `D2RLoader.exe`, a start Windows refuses (with "it asks for administrator rights" for `ERROR_ELEVATION_REQUIRED`)
+or a loader that ends within 3 s is shown in red in that line (no message box) and logged with the command line and PID.
+**Close the downloader when the game starts** (a check box under the how-to-play line; `close_after_play` in `launcher.json`,
+default on) closes the window after a good start. `--cli play` does the same as the button (after reading the channel).
 
 ## Install D2RLoader
 
@@ -210,7 +232,7 @@ docs/hosting.md) and refuses any other file name. The host needs this multi-prod
 ## Command line and build
 
 ```text
-D2R-XL-2012-Downloader.exe --cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader
+D2R-XL-2012-Downloader.exe --cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader|play
   --game-dir DIR --data-dir DIR --site URL|DIR --channel stable|test
   --replace --via auto|7z|objects
 ```
@@ -231,7 +253,7 @@ Tests can also be configured separately with `cmake -S launcher/tests -B build/l
 CI cross-builds with the existing xwin toolchain and runs portable tests on Linux.
 
 Tests cover detection, manifest/installation plans, hashes, marker/path protection,
-7z decoding and corruption, the ZIP reader and the D2RLoader package (`TestZip`, `TestLoaderPackage`), coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesOff`), the RotW G key (`TestModConfigKeys`), plugin identification,
+7z decoding and corruption, the ZIP reader and the D2RLoader package (`TestZip`, `TestLoaderPackage`), coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesOff`), the RotW G key (`TestModConfigKeys`), Play's enable rules and command line (`TestPlay`), plugin identification,
 other-mod warnings, and protection of other mods from automatic cleanup. No downloader or
 in-game integration run is required for this cleanup; unit tests do not access a real
 D2R installation. Previous copied documentation's release/game test results are not

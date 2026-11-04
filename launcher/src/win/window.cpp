@@ -1,6 +1,6 @@
 // The downloader's window: the owner's background art with the title in it (launcher/res/ART.md), a stone panel for
-// status and progress, a big Install / Update button and the smaller actions in Exocet, body text in Roboto Condensed,
-// the "How to play" line, a link icon. There is no Play button: the player starts D2RLoader.exe.
+// status and progress, the big Install / Update and Play buttons and the smaller actions in Exocet, body text in Roboto
+// Condensed, the "How to play" line, the "close after Play" check box, a link icon. Play starts D2RLoader.exe -mod mxl2012.
 //
 // Plain Win32 + GDI+ (part of Windows): GDI+ decodes the PNGs, loads the two fonts from the exe's
 // resources (PrivateFontCollection) and draws anti-aliased text and paths. The buttons are real BUTTON windows
@@ -47,15 +47,15 @@ const gp::RectF PanelRect(230, 262, 500, 170);
 const gp::RectF StatusRect(270, 284, 420, 76);  // four lines
 const gp::RectF LineRect(270, 363, 420, 20);
 const gp::RectF BarRect(272, 389, 416, 9);
-const gp::RectF HowToPlayRect(110, 559, 740, 40);  // two lines
+const gp::RectF HowToPlayRect(110, 554, 740, 22);  // one line
 const gp::RectF FooterRect(14, 604, 890, 24);
 
 const gp::Color Gold(255, 232, 196, 128), GoldBright(255, 255, 228, 168), Body(255, 222, 212, 192), Dim(255, 150, 136, 112),
 	ErrorText(255, 240, 128, 104);
 
 enum : int { IdInstall = 101, IdRepair, IdUninstall, IdMods, IdIssues, IdChoose, IdCancel, IdLoader, IdSelfUpdate, IdDefaultMod,
-               IdMovePlugins, IdInstallLoader };
-enum Kind { Big, Small, Icon };
+               IdMovePlugins, IdInstallLoader, IdPlay, IdCloseAfterPlay };
+enum Kind { Big, Small, Icon, CheckBox };
 struct Button {
 	int id;
 	std::wstring label;  // also the window text (screen readers, tooltips)
@@ -65,8 +65,9 @@ struct Button {
 	bool hot = false;
 };
 Button buttons[] = {
-	{IdInstall, L"Install", Big, gp::RectF(360, 444, 240, 60)},
-	{IdCancel, L"Stop", Big, gp::RectF(360, 444, 240, 60)},
+	{IdInstall, L"Install", Big, gp::RectF(230, 444, 240, 60)},
+	{IdCancel, L"Stop", Big, gp::RectF(230, 444, 240, 60)},
+	{IdPlay, L"Play", Big, gp::RectF(490, 444, 240, 60)},  // off with a reason in the line under the panel (PlayBlocked)
 	// one row, centred (RefreshStatus): Repair, Uninstall or Install / Get D2RLoader in its place, D2R folder, Mods folder
 	{IdRepair, L"Repair", Small, gp::RectF(175, 516, 140, 34)},
 	{IdUninstall, L"Uninstall", Small, gp::RectF(325, 516, 140, 34)},
@@ -76,13 +77,15 @@ Button buttons[] = {
 	{IdChoose, L"D2R folder", Small, gp::RectF(475, 516, 150, 34)},
 	{IdMods, L"Mods folder", Small, gp::RectF(635, 516, 150, 34)},
 	// either side of the big button
-	{IdDefaultMod, L"Default mod", Small, gp::RectF(195, 457, 150, 34)},   // shown when D2RLoader's default_mod is not D2R-XL 2012 (#53)
-	{IdMovePlugins, L"Move plugin", Small, gp::RectF(615, 457, 150, 34)},  // shown when an old copy of the plugin is elsewhere (#53)
+	{IdDefaultMod, L"Default mod", Small, gp::RectF(70, 457, 150, 34)},   // shown when D2RLoader's default_mod is not D2R-XL 2012 (#53)
+	{IdMovePlugins, L"Move plugin", Small, gp::RectF(740, 457, 150, 34)},  // shown when an old copy of the plugin is elsewhere (#53)
+	// under the how-to-play line; the setting is the state's close_after_play (default on)
+	{IdCloseAfterPlay, L"Close the downloader when the game starts", CheckBox, gp::RectF(325, 578, 310, 22)},
 	{IdIssues, L"Report a problem", Icon, gp::RectF(918, 602, 28, 28)},
 };
 
 constexpr UINT WmProgress = WM_APP + 1, WmDone = WM_APP + 2;
-constexpr UINT_PTR AnimTimer = 1;
+constexpr UINT_PTR AnimTimer = 1, GameTimer = 2;  // GameTimer: is the game still running (Play turns on again when it ends)
 
 struct ProgressMsg {
 	std::string text;
@@ -115,6 +118,7 @@ struct Ui {
 	std::wstring snapshot;
 	bool busy = false;
 	bool loaderFailed = false;  // Install D2RLoader failed: Get D2RLoader (its page) takes its place
+	bool closeAfterPlay = true;
 	std::thread worker;
 };
 Ui g;
@@ -237,7 +241,7 @@ void DrawScene(gp::Graphics& gr) {
 	if (g.art->panel)
 		gr.DrawImage(g.art->panel.get(), Px(PanelRect.X), Px(PanelRect.Y));
 	gr.ScaleTransform(g.s, g.s);
-	Text(gr, Wide(HowToPlay), *g.art->body, 14, Gold, HowToPlayRect, gp::StringAlignmentCenter, Wrap);
+	Text(gr, Wide(HowToPlay), *g.art->body, 14, Gold, HowToPlayRect, gp::StringAlignmentCenter);
 	std::wstring footer = L"Downloader " + Wide(LauncherVersion) +
 	                      L"  ·  D2R-XL 2012, a port of Median XL 2012 by Brother Laz. Diablo II by Blizzard Entertainment. Not affiliated with Blizzard.";
 	Text(gr, footer, *g.art->body, 12, Dim, FooterRect);
@@ -334,6 +338,19 @@ void DrawButton(gp::Graphics& gr, const Button& b, bool pressed, bool disabled, 
 	bool hot = b.hot && !disabled;
 	if (b.kind == Icon) {
 		DrawIcon(gr, g.art->issues, gp::RectF(r.X + 3, r.Y + 3, r.Width - 6, r.Height - 6), hot ? GoldBright : Gold);
+	} else if (b.kind == CheckBox) {
+		const gp::Color& c = disabled ? Dim : hot ? GoldBright : Gold;
+		gp::RectF box(r.X + 2, r.Y + (r.Height - 14) / 2, 14, 14);
+		gp::SolidBrush fill(gp::Color(160, 0, 0, 0));
+		gr.FillRectangle(&fill, box);
+		gp::Pen edge(c, 1);
+		gr.DrawRectangle(&edge, box);
+		if (g.closeAfterPlay) {
+			gp::Pen tick(c, 2);
+			gp::PointF pts[] = {{box.X + 3, box.Y + 7}, {box.X + 6, box.Y + 10.5f}, {box.X + 11.5f, box.Y + 3.5f}};
+			gr.DrawLines(&tick, pts, 3);
+		}
+		Text(gr, b.label, *g.art->body, 14, c, gp::RectF(box.X + 22, r.Y, r.Width - 24, r.Height));
 	} else {
 		gp::RectF box(r.X + 1, r.Y + 1, r.Width - 2, r.Height - 2);
 		gp::GraphicsPath p;
@@ -417,6 +434,14 @@ void RefreshStatus() {
 	b->label = v.foreignMod || v.installed.empty() ? L"Install" : v.updateAvailable || !v.feedOk ? L"Update" : L"Up to date";
 	SetWindowTextW(b->h, b->label.c_str());
 	EnableWindow(b->h, !g.busy && v.d2rFound && b->label != L"Up to date");
+	EnableWindow(FindButton(IdPlay)->h, !g.busy && v.playBlocked.empty());
+	InvalidateRect(FindButton(IdPlay)->h, nullptr, FALSE);
+	if (!g.busy && !g.lineError) {  // why Play is off, in the line under the panel (an error there stays until the next action)
+		if (!v.playBlocked.empty())
+			g.line = "Play: " + v.playBlocked + ".";
+		else if (g.line == "Ready." || g.line.rfind("Play: ", 0) == 0)
+			g.line = "Ready to play.";
+	}
 	EnableWindow(FindButton(IdUninstall)->h, !g.busy && !v.installed.empty());
 	EnableWindow(FindButton(IdRepair)->h, !g.busy && !v.installed.empty());
 	bool loader = v.d2rFound && !v.loaderOk;
@@ -500,8 +525,9 @@ void RunAction(int id) {
 		case IdDefaultMod: ok = l.FixDefaultMod(err); break;
 		case IdMovePlugins: ok = l.RemoveStrayPlugins(err); break;
 		case IdInstallLoader: ok = l.InstallLoader(err); break;
+		case IdPlay: ok = l.Play(err); break;
 		}
-		std::string done = id == IdInstall || id == IdRepair ? "Done. " + std::string(HowToPlay) : "Done.";
+		std::string done = id == IdInstall || id == IdRepair ? "Done. " + std::string(HowToPlay) : id == IdPlay ? "D2R-XL 2012 is starting." : "Done.";
 		auto* msg = new ProgressMsg{ok ? done : err, ok ? 1.0 : -2.0, id};
 		PostMessageW(g.wnd, WmDone, WPARAM(ok ? 1 : 0), reinterpret_cast<LPARAM>(msg));
 	});
@@ -640,7 +666,12 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 	switch (m) {
 	case WM_COMMAND:
 		switch (LOWORD(w)) {
-		case IdInstall: case IdRepair: case IdUninstall: case IdDefaultMod: case IdMovePlugins: case IdInstallLoader: RunAction(LOWORD(w)); return 0;
+		case IdInstall: case IdRepair: case IdUninstall: case IdDefaultMod: case IdMovePlugins: case IdInstallLoader: case IdPlay: RunAction(LOWORD(w)); return 0;
+		case IdCloseAfterPlay:
+			g.closeAfterPlay = !g.closeAfterPlay;
+			g.launcher->SetCloseAfterPlay(g.closeAfterPlay);
+			InvalidateRect(FindButton(IdCloseAfterPlay)->h, nullptr, FALSE);
+			return 0;
 		case IdMods: {  // opened, never created: the downloader writes only mods\mxl2012
 			std::wstring d = g.launcher->ModDir();
 			if (!d.empty() && !DirExists(d))
@@ -668,6 +699,8 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 	case WM_TIMER:
 		if (w == AnimTimer)
 			Tick();
+		if (w == GameTimer && !g.busy && g.view.d2rFound && ProcessesUnder(g.view.d2rDir).empty() == g.view.gameRunning)
+			RefreshStatus();  // the game started or ended outside the downloader: Play's state changes
 		return 0;
 	case WmProgress: case WmDone: {
 		std::unique_ptr<ProgressMsg> msg(reinterpret_cast<ProgressMsg*>(lp));
@@ -699,6 +732,14 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 				InvalidatePanel();
 				return 0;
 			}
+			if (msg->action == IdPlay) {  // errors stay in the line under the panel (and the log), no message box
+				if (w == 1 && g.closeAfterPlay) {
+					DestroyWindow(h);
+					return 0;
+				}
+				InvalidatePanel();
+				return 0;
+			}
 			if (w == 0 && msg->action == IdInstall && g.launcher->ForeignModFolder()) {
 				AskReplace(msg->text);
 				return 0;
@@ -725,6 +766,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 		return 0;
 	case WM_DESTROY:
 		KillTimer(h, AnimTimer);
+		KillTimer(h, GameTimer);
 		PostQuitMessage(0);
 		return 0;
 	}
@@ -825,11 +867,15 @@ int RunWindow(HINSTANCE inst, const Options& opt, const std::wstring& snapshot) 
 	ti.uId = UINT_PTR(FindButton(IdInstallLoader)->h);
 	ti.lpszText = const_cast<wchar_t*>(L"Download D2RLoader from d2rloader.net and install it into the D2R folder (asks first; sha256 checked)");
 	SendMessageW(g.tip, TTM_ADDTOOLW, 0, LPARAM(&ti));
+	ti.uId = UINT_PTR(FindButton(IdPlay)->h);
+	ti.lpszText = const_cast<wchar_t*>(L"Start D2R-XL 2012: D2RLoader.exe -mod mxl2012 in your D2R folder");
+	SendMessageW(g.tip, TTM_ADDTOOLW, 0, LPARAM(&ti));
 	ti.uId = UINT_PTR(FindButton(IdMovePlugins)->h);
 	ti.lpszText = const_cast<wchar_t*>(L"Move the old copy of the D2R-XL 2012 plugin away (asks first; nothing is deleted)");
 	SendMessageW(g.tip, TTM_ADDTOOLW, 0, LPARAM(&ti));
 
 	g.launcher = std::make_unique<Launcher>(g.opt);
+	g.closeAfterPlay = g.launcher->CloseAfterPlay();
 	g.launcher->onProgress = [](const Progress& p) {
 		PostMessageW(g.wnd, WmProgress, 0, reinterpret_cast<LPARAM>(new ProgressMsg{p.text, p.fraction}));
 	};
@@ -837,6 +883,7 @@ int RunWindow(HINSTANCE inst, const Options& opt, const std::wstring& snapshot) 
 	SetBusy(true);
 	g.fraction = -1;
 	SetTimer(g.wnd, AnimTimer, 20, nullptr);
+	SetTimer(g.wnd, GameTimer, 3000, nullptr);
 	if (g.snapshot.empty())
 		ShowWindow(g.wnd, SW_SHOWNORMAL);
 	g.worker = std::thread([] {  // the release check at start, so the status shows "update available"

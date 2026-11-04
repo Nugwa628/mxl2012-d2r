@@ -141,6 +141,29 @@ std::string DefaultModWarning(const DefaultModCheck& c, const std::string& ourMo
 // The config with default_mod set to `ourMod`; every other line stays as it is.
 std::string SetDefaultMod(const std::string& text, const std::string& ourMod);
 
+// ---- Play (docs/launcher.md "Play"): the downloader starts `<D2R>\D2RLoader.exe -mod mxl2012` in the D2R folder.
+// D2RLoader passes its own command line on to D2R after the game-wide launch_arguments, and a -mod there wins over the
+// game-wide default_mod, so Play starts D2R-XL 2012 whatever default_mod says and never writes it.
+
+struct PlayInputs {
+	bool d2rFound = false;
+	bool buildMismatch = false;    // the D2R version is known and is not the one the release needs
+	bool loaderOk = false;         // D2RLoader.exe at the required version
+	bool loaderFound = false;      // a D2RLoader.exe, of any version
+	bool installed = false;        // our install (the marker) of some release
+	bool foreignMod = false;       // mods\mxl2012 was not made by the downloader
+	bool updateAvailable = false;  // the channel has another release than the installed one
+	bool pending = false;          // an install, update or repair stopped before it finished
+	bool gameRunning = false;      // D2R or D2RLoader runs from the D2R folder
+};
+// "" when Play may start the game, else why not: one short line for the window ("Play: <why>").
+std::string PlayBlocked(const PlayInputs& in);
+// The words after D2RLoader.exe: `-mod <modFolder>`.
+std::string PlayArguments(const std::string& modFolder);
+// The whole command line for CreateProcess: the exe in quotes, then PlayArguments. `""` when the exe path cannot be quoted
+// (a '"' in it).
+std::string PlayCommandLine(const std::string& loaderExe, const std::string& modFolder);
+
 // True for a DLL that is (a copy of) our plugin: the file name mxl2012-core*.dll, or its version resource says D2R-XL 2012
 // (ProductName "mxl2012", or a FileDescription naming mxl2012-core or "D2R-XL 2012 core"). Empty strings: no version resource.
 bool IsOurPluginFile(const std::string& fileName, const std::string& productName, const std::string& fileDescription);

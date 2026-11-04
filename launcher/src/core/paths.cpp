@@ -460,10 +460,10 @@ std::string DefaultModWarning(const DefaultModCheck& c, const std::string& ourMo
 	if (c.ok)
 		return "";
 	if (c.configMissing)
-		return "D2RLoader has no settings file yet, so it does not start " + ourMod;
+		return "D2RLoader has no settings file yet, so starting it by hand does not start " + ourMod + " (Play does)";
 	if (c.mod.empty())
-		return "D2RLoader has no default mod, so it does not start " + ourMod;
-	return "D2RLoader starts the mod " + c.mod + ", not " + ourMod;
+		return "D2RLoader has no default mod, so starting it by hand does not start " + ourMod + " (Play does)";
+	return "Started by hand, D2RLoader starts the mod " + c.mod + ", not " + ourMod + " (Play starts " + ourMod + ")";
 }
 
 std::string SetDefaultMod(const std::string& text, const std::string& ourMod) {
@@ -553,6 +553,38 @@ std::string RemovedPluginPath(const std::string& dataDir, const std::string& dat
 	while (!r.empty() && r[0] == char(92))
 		r.erase(0, 1);
 	return Join(Join(Join(dataDir, "removed"), date), r);
+}
+
+std::string PlayBlocked(const PlayInputs& in) {
+	if (!in.d2rFound)
+		return "choose the D2R folder first";
+	if (in.buildMismatch)
+		return "D2R is not the version D2R-XL 2012 needs";
+	if (!in.loaderFound)
+		return "install D2RLoader first";
+	if (!in.loaderOk)
+		return "D2RLoader is not the version D2R-XL 2012 needs";
+	if (in.foreignMod)
+		return "mods\\mxl2012 was not installed by this downloader; press Install";
+	if (!in.installed)
+		return "press Install first";
+	if (in.pending)
+		return "the last install did not finish; press Update or Repair";
+	if (in.updateAvailable)
+		return "press Update first";
+	if (in.gameRunning)
+		return "the game is already running";
+	return "";
+}
+
+std::string PlayArguments(const std::string& modFolder) {
+	return "-mod " + modFolder;
+}
+
+std::string PlayCommandLine(const std::string& loaderExe, const std::string& modFolder) {
+	if (loaderExe.empty() || loaderExe.find('"') != std::string::npos)
+		return "";
+	return "\"" + loaderExe + "\" " + PlayArguments(modFolder);
 }
 
 }  // namespace mxl

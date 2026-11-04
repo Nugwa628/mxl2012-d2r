@@ -259,6 +259,7 @@ Launcher::View Launcher::Inspect() {
 	v.loaderNeeded = !feed_.d2rloader.version.empty() ? feed_.d2rloader.version : LoaderVersionDefault;
 	if (!FindD2R(e)) {
 		v.d2rError = e;
+		v.playBlocked = PlayBlocked(PlayInputs{});
 		return v;
 	}
 	v.d2rFound = true;
@@ -294,6 +295,19 @@ Launcher::View Launcher::Inspect() {
 	}
 	v.foreignMod = !ours && DirExists(mod) && !DirEmpty(mod);
 	v.updateAvailable = v.feedOk && v.latest != v.installed;
+	v.pending = state_["mod_pending"].Bool() && SamePath(Wide(state_["mod_dir"].Str()), mod);
+	v.gameRunning = !ProcessesUnder(d2rDir_).empty();
+	PlayInputs in;
+	in.d2rFound = true;
+	in.buildMismatch = v.build.verdict == BuildVerdict::Older || v.build.verdict == BuildVerdict::Newer;
+	in.loaderOk = v.loaderOk;
+	in.loaderFound = !v.loaderFound.empty();
+	in.installed = !v.installed.empty() && !v.foreignMod;
+	in.foreignMod = v.foreignMod;
+	in.updateAvailable = v.updateAvailable;
+	in.pending = v.pending;
+	in.gameRunning = v.gameRunning;
+	v.playBlocked = PlayBlocked(in);
 	return v;
 }
 
@@ -1323,6 +1337,10 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 		DeleteFileW(LongPath(JoinPath(mod, Wide(r))).c_str());
 		files.Set(r, Json());
 	}
+	if (!plan.remove.empty() || !plan.fetch.empty()) {  // the folder is changed from here on: no Play until this ends well
+		state_.Set("mod_pending", true);
+		SaveState();
+	}
 	if (!plan.remove.empty())
 		Report("Removed " + Count(plan.remove.size(), "file") + " that " + (plan.remove.size() == 1 ? "is" : "are") +
 		       " not part of D2R-XL 2012 " + feed_.version);
@@ -1372,6 +1390,8 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 	if (!EnsureExtendedSaves(mod, error))
 		return false;
 	EnsureModConfigKeys(mod);
+	state_.Set("mod_pending", Json());
+	SaveState();
 	Report("D2R-XL 2012 " + feed_.version + " is in " + Utf8(mod) + ". " + HowToPlay);
 	return true;
 }
@@ -1482,7 +1502,7 @@ bool Launcher::Uninstall(std::string& error) {
 		return false;
 	std::string ignore;
 	RemoveTree(JoinPath(opt_.dataDir, L"download"), ignore);
-	for (const char* k : {"mod", "mod_files", "install_id", "mod_dir"})
+	for (const char* k : {"mod", "mod_files", "install_id", "mod_dir", "mod_pending"})
 		state_.Set(k, Json());
 	Json clean = Json::Object();
 	for (const auto& [k, v] : state_.members())
@@ -1492,6 +1512,63 @@ bool Launcher::Uninstall(std::string& error) {
 	SaveState();
 	Report("D2R-XL 2012 is uninstalled (only " + Utf8(mod) + " was removed). Your characters stay in " + Utf8(saves) + ".");
 	return true;
+}
+
+// ---------------------------------------------------------------- Play (docs/launcher.md "Play")
+
+bool Launcher::Play(std::string& error) {
+	View v = Inspect();
+	if (!v.playBlocked.empty()) {
+		error = "Play: " + v.playBlocked + ".";
+		Log(error);
+		return false;
+	}
+	std::wstring exe = JoinPath(d2rDir_, L"D2RLoader.exe");
+	if (!FileExists(exe)) {
+		error = "Play: " + Utf8(exe) + " is missing. Install D2RLoader first.";
+		Log(error);
+		return false;
+	}
+	std::wstring cmd = Wide(PlayCommandLine(Utf8(exe), ModFolder()));
+	if (cmd.empty()) {
+		error = "Play: the D2R folder's path cannot be passed to D2RLoader (" + Utf8(d2rDir_) + ").";
+		Log(error);
+		return false;
+	}
+	// The downloader runs asInvoker, so D2RLoader gets the player's normal rights; nothing is inherited and nothing waits
+	// for it beyond the first seconds.
+	STARTUPINFOW si{sizeof(si)};
+	PROCESS_INFORMATION pi{};
+	Log("Play: " + Utf8(cmd) + " in " + Utf8(d2rDir_));
+	if (!CreateProcessW(exe.c_str(), cmd.data(), nullptr, nullptr, FALSE, CREATE_DEFAULT_ERROR_MODE, nullptr, d2rDir_.c_str(), &si, &pi)) {
+		DWORD code = GetLastError();
+		error = "Play: D2RLoader.exe could not be started (" + (code == ERROR_ELEVATION_REQUIRED ? std::string("it asks for administrator rights")
+		                                                                                             : "Windows error " + std::to_string(code)) +
+		        "). Start it from " + Utf8(d2rDir_) + " yourself.";
+		Log(error);
+		return false;
+	}
+	CloseHandle(pi.hThread);
+	DWORD wait = WaitForSingleObject(pi.hProcess, 3000);
+	DWORD exitCode = STILL_ACTIVE;
+	if (wait == WAIT_OBJECT_0)
+		GetExitCodeProcess(pi.hProcess, &exitCode);
+	CloseHandle(pi.hProcess);
+	if (wait == WAIT_OBJECT_0) {
+		char hex[16];
+		std::snprintf(hex, sizeof(hex), "0x%lX", exitCode);
+		error = "Play: D2RLoader.exe ended right after the start (exit code " + std::string(hex) + "). See " +
+		        Utf8(JoinPath(d2rDir_, LR"(d2rloader\logs\d2rloader.log)")) + ".";
+		Log(error);
+		return false;
+	}
+	Report("D2R-XL 2012 is starting (D2RLoader.exe " + PlayArguments(ModFolder()) + ", process " + std::to_string(pi.dwProcessId) + ").");
+	return true;
+}
+
+void Launcher::SetCloseAfterPlay(bool close) {
+	state_.Set("close_after_play", close);
+	SaveState();
 }
 
 }  // namespace mxl

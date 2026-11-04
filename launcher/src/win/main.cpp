@@ -16,7 +16,7 @@ using namespace mxl;
 namespace {
 
 const wchar_t* Usage =
-	L"D2R-XL-2012-Downloader.exe [--cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader] [options]\n"
+	L"D2R-XL-2012-Downloader.exe [--cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader|play] [options]\n"
 	L"  --data-dir DIR   state, download and log (default %LOCALAPPDATA%\\mxl2012)\n"
 	L"  --site URL|DIR   download site root (default https://files.werdegames.com/mxl2012/; backup https://dl.werdegames.com/mxl2012/; http://, file:// or a folder for tests)\n"
 	L"  --channel NAME   release channel: stable (default) or test\n"
@@ -134,6 +134,12 @@ int RunCli(Cli& c) {
 		if (!l.CheckFeed(feedErr))
 			Log("feed: " + feedErr);
 		ok = l.InstallLoader(err);
+	}
+	else if (c.command == L"play") {  // as the window's Play: only when the install is up to date with the channel
+		std::string feedErr;
+		if (!l.CheckFeed(feedErr))
+			Log("feed: " + feedErr);
+		ok = l.Play(err);
 	}
 	else if (c.command == L"self-update") {
 		std::string feedErr;

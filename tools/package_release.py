@@ -278,13 +278,14 @@ D2R-XL 2012 is Median XL 2012 (v005, by Brother Laz) ported to Diablo II: Resurr
 1. Install D2RLoader {loader} from https://d2rloader.net/ into your D2R folder (build {build}).
 2. Run `D2R-XL-2012-Downloader.exe` (downloads from https://files.werdegames.com/mxl2012/) and press **Install** (or **Update**). It puts the mod
    in `<D2R folder>\\mods\\mxl2012` and changes nothing else.
-3. How to play: start `D2RLoader.exe` in your D2R folder. The first time, click the gear on the character screen, set
-   Default Mod to D2R-XL 2012, Apply, and start D2RLoader again.
+3. How to play: press **Play** in the downloader (it starts `D2RLoader.exe -mod mxl2012` in your D2R folder). Or start
+   `D2RLoader.exe` yourself: the first time, click the gear on the character screen, set Default Mod to D2R-XL 2012, Apply,
+   and start D2RLoader again.
 
 By hand (offline), into a D2R folder at build {build} that has D2RLoader {loader}:
 
 1. {unpack}
-2. Set the default mod as in step 3 above (or `default_mod = "mxl2012"` in
+2. Set the default mod as in step 3 above, the D2RLoader.exe way (or `default_mod = "mxl2012"` in
    `<D2R folder>\\d2rloader\\config\\d2rloader.toml`).
 3. Start `D2RLoader.exe`. Characters are saved in `Saved Games\\Diablo II Resurrected\\mods\\mxl2012\\`.
    To update, delete `mods\\mxl2012\\mxl2012.mpq\\data` and unpack the new release; keep your
