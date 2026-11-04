@@ -470,7 +470,7 @@ PluginVersion 0.1.0. Build: `cmake -S plugin -B build/plugin -A x64 -DMXL2012_PL
 | + unit reassign guard | `reassign_guard.cpp`, `reassign_guard_logic.h` (`Parse`, `Decide`, `BranchBytes`, `StubBytes`) | `reassign` | Bugs #511 / #292. D2R's client handler of server command 0x15 (unit reassign, `0x12ab40`) moves the unit (`0x9bf00`) and, when it then has no client room (`0x34b440`), asserts "Could not get act!" (SCmd.cpp:1254, block `0x12aec0`) and ends the process (fatal stub `0x12557f0`, image +0x1255802); 1.14d does the same (Game.exe `0x45d160`). An inline hook at the handler's entry (15 bytes) keeps the command's fields; the branch `je 0x12aec0` at `0x12addb` goes to the 12 int3 bytes at `0x12aee4` (`movabs rax` / `jmp rax`) and a stub that asks the plugin: a unit other than the local player is left without a room and the handler returns (`0x12ae7e`), the local player goes on to D2R's block. Both are logged (first 16, with unit type / class / id / x, y). `mxl2012` prints commands seen, units left, player ends. (Line 1237, the same text, is command 0x04's own check at `0x129ab1`: not changed) |
 | + save format and cancelled saves | `save_mode.cpp`, `save_mode_logic.h` (`ParseMode`, `Repair`, `CountFailures`, notices) | `savemode` | Bug #512, section 28. No game address: the mod's `d2rloader.toml` must ask for D2RLoader's extended save format (put back when it does not, restart notice); a thread reads `d2rloader.log` and puts a red line on screen for every cancelled save |
 | + RotW stash pages in classic | `rotw_stash.cpp`, `rotw_stash_logic.h` (`WirePages`, `ParseMode`, `SkipPicture`, `AbsJumpBytes`) | `rotwstash` | Bug #516, section 29. The stash init `0x23b1b0` wires its five pages only after the HD check `0x846210`; its call at `0x23b204` goes through the int3 pad `0x2388a2` (`movabs rax` / `jmp rax`) to the plugin, which answers yes in classic too, so D2R's own RotW rule picks the tabs as in HD. Inline hook at `0x154ac0` (16 bytes): a classic item picture without its `+0x78` record is skipped. `mxl2012` prints stash inits, classic wired / left, pictures skipped, the game type |
-| G harness (dev) | `harness_cmds.cpp`, `harness_cmds_logic.h` (`ParseSlotTable`, `WatchableTable`), `testharness.cpp` | - | verbs of 10.1 (lane triage: `watch`, a counting wrapper on one cltdo / srvhit entry, written and restored with `PatchWriteU64` and its expected old value); the harness itself hooks the server frame `0x406550` |
+| G harness (dev) | `harness_cmds.cpp`, `harness_cmds_logic.h` (`ParseSlotTable`, `WatchableTable`), `testharness.cpp` | - | verbs of 10.1 (lane triage: `watch`, a counting wrapper on one cltdo / srvhit entry, written and restored with `PatchWriteU64` and its expected old value); the harness runs on the server frame `0x406550` through the shared hook of `server_frame.cpp` (section 30) |
 | `d2r.h` | trimmed to the v0.1 calls and the five function tables | - | summon / pet / melee / seed helpers of the skeleton removed |
 
 Off words now take letters **and digits** (`cltdo22`); the skeleton's reader kept letters only. Unit tests: `buildguard_tests`
@@ -959,3 +959,59 @@ RotW rule shows the Gems / Materials / Runes tabs only in a RotW game. With D2R'
 as D2R N), item pictures skipped N; game type N, HD|legacy".
 
 Checked in game: docs/testing.md "Lane rotwgate" (slot 1, no RotW). On a RotW account: the steps there.
+
+## 30. Barbarian spirits warp to their owner (lane spiritwarp, 2026-11-04; bug #534)
+
+Owner ruling (2026-11-04, release 0.1.11): Guardian, Defender and Protector Spirit teleport to their owner when they are more
+than about 20 away. Median gives them hostile AIs, Vampire (28: Guardian) and PinHead (39: Defender, Protector), with no owner
+follow. D2R warps a pet only from an inactive room, so lane summonai saw them stand 32-51 sub-tiles off after a fight (once 91).
+Other summons keep their AIs.
+
+**No data-only way.** pettype.txt `warp` (1 for all three) only brings a pet along when the owner itself is moved (`0x500a40`,
+section 26). monstats has no follow column: the follow distances are constants of each AI's think (NecroPet: follow beyond 50,
+mercenary: warp beyond 100, `0x5c1460`). Giving the spirits an owner-following AI (NecroPet, DruidBear) would change how they
+fight (the Vampire / PinHead params, aip1-5, are their attack rules). So it is a plugin part.
+
+| What | Address | Notes |
+|---|---|---|
+| AI table | `0x2397210` + 0x20 n | entry 28 `{1, 0, 0x5b7590, 0}`, entry 39 `{1, 0, 0x5b2b10, 0}` (lane summonai `aientries.txt`) |
+| Vampire think | `0x5b7590(game, unit, tick)` | entry `48 89 5c 24 08 55 56 57 41 54 41 55 41 56 41 57` |
+| PinHead think | `0x5b2b10(game, unit, tick)` | entry `48 89 5c 24 08 48 89 6c 24 10 48 89 74 24 18 48 89 7c 24 20` |
+| AI tick | `+0x00` AI control, `+0x10` target unit, `+0x20` target distance, `+0x24` target in reach, `+0x28` monstats row, `+0x38` difficulty | both thinks read `+0x10` / `+0x24` first (1.10's AiTickParam, 64-bit) |
+| minion owner | `0x4a53c0(monster)` -> unit or null | D2Game's owner lookup: monster data `+0x30` -> game `+0x60`, owner id `+0x68`, type `+0x6c` -> `0x48fe80(game, type, id)`. NecroPet `0x5c1b20` uses it |
+| pet warp | `0x596d40(game, owner, pet)` | section 26 (D2Game AiUtil.cpp) |
+| server frame | `0x406550(game)`, 25 Hz | entry `48 89 74 24 20 55 57 41 57 48 8d 6c 24 b9`; frame counter game `+0x170`; clients game `+0x138`, next `+0x628`, state `+0x04` (4 = in game), player `0x484c90(client, 0)` |
+| unit by id | `0x48fe80(game, type, id)` | the pet list nodes hold unit ids (`+0x04`, next `+0x18`) |
+
+**The think does not run for an idle spirit.** The first build checked the spirits inside the two thinks. In game the think
+count stayed flat while the player walked away from spirits with no target (run `run6_diag`), so an idle spirit 21-56 away was
+never seen. The check therefore runs on the server frame and the thinks only say whether a spirit is fighting.
+
+**Shared frame hook.** D2RLoader takes one inline hook per address (#522), and the test harness already hooked `0x406550`. That
+hook now lives in `server_frame.cpp`: it calls the original frame and then up to four callbacks (the harness's verbs while the
+harness is on, and `spiritwarp`).
+
+**Part `spiritwarp`** (`spirit_warp.cpp`, `spirit_warp_logic.h`, test `spiritwarp_tests`, off word `spiritwarp`):
+- Every 25th server frame (once a second) it walks the in-game players and their pet lists of pettype 30, 31 and 32
+  (`guardianspet`, `defenderspet`, `protectorspet` of the build's pettype.txt; `0x5013f0` as in section 26). Other pets are
+  never looked at. Distances are Euclidean, in sub-tiles (the unit x / y; the harness's `state` and lane summonai's readings use
+  the same unit).
+- A live spirit farther than 20 from its owner is warped with `0x596d40`, unless it is fighting and within 40. Beyond 40 it is
+  warped even in a fight.
+- Fighting comes from the thinks, which are wrapped (the note is taken before the think, which then runs as before). For a
+  monster whose owner (`0x4a53c0`) is a player with it in one of those pet lists, the think notes "fighting" when it has a live
+  target (`+0x10`, unit mode not DT 0 / DD 12) that is in reach (`+0x24`) or within 40 of the owner, so a spirit walking out to
+  a monster near its owner is not pulled back. The frame check takes a note under 1.5 s old as fighting (the thinks run every
+  0.6 s while a spirit has a target, and stop when it has none, so the note goes stale). 16 slots by unit id. A killed target
+  stays in the tick as a corpse: the first build, which did not check the mode, held spirits 21-39 away next to dead zombies.
+  Hostile Vampires / PinHeads and the other Vampire pets (Daystar, Sinner) pay only the owner lookup.
+- The warp is the game's own, so it lands where D2R's pet warp puts a pet (a random spot in the owner's room first). It goes
+  through `petspread`'s hook when that part is on; spirits are no totems, so `petspread` leaves them where D2R put them.
+- `mxl2012` prints "checks N, beyond 20 N, left fighting N, warps N, failed N (last: class N, D -> D sub-tiles); thinks N,
+  fighting N; last check D sub-tiles verdict V" (V: 0 stay, 1 left fighting, 2 warp).
+
+**In game** (slot 2, HD and legacy, run `run7_on`, 2026-11-05): all three spirits came back after the player walked off with no
+target, warps 55 -> 4, 47 -> 19, 34 -> 9, 30 -> 1, 27 -> 1, 22 -> 8 sub-tiles (55 warps, 0 failed); before the part they stood
+32-91 away (lane summonai). In fights they still attacked at 10-30 and were left fighting (verdict 1) up to 39 away. Wolf
+Companion, Blood Elementals and Raise Skeleton followed and attacked as in lane summonai, and the part's counters did not move
+while they were out. No crash; the harness verbs (on the same frame hook) ran throughout.

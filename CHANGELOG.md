@@ -14,6 +14,8 @@ version being released (docs/release.md).
   whatever D2RLoader's Default Mod is. It is on when D2RLoader 1.3.1 is there and D2R-XL 2012 is installed and up to date; the
   line under the panel says why when it is off. The downloader closes when the game starts (a check box turns that off).
   Starting `D2RLoader.exe` yourself still works.
+- The Barbarian's Guardian, Defender and Protector Spirit come back to you: a spirit more than 20 sub-tiles away teleports next to
+  you, unless it is fighting a monster near you. After a fight they used to stay behind, 30 to 90 sub-tiles away (#534). Other summons and mercenaries are unchanged.
 - The shared stash has 2 more pages: 5 in a classic or expansion game, as a Reign of the Warlock game has (D2R gives those 3).
   Install, update and repair set `[d2rcore.stash] add_shared_tabs = 2` in the mod's `d2rloader.toml`; a higher number you set
   yourself is kept, so no page with items on it goes away (#535). The Gems, Materials and Runes pages of a RotW game are shared

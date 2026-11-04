@@ -12,7 +12,7 @@ void StopTestHarness() noexcept;
 void HarnessEcho(const char* line) noexcept;  // appends a console line to mxl2012-testharness-console.txt while the harness is on
 
 // Gameplay commands (harness_cmds.cpp): "h <verb> ..." lines of the console mailbox. Server-side verbs run on the game
-// thread inside HarnessGameFrame, which goblins.cpp calls after the server frame 0x406550.
+// thread inside HarnessGameFrame, which harness_cmds.cpp adds to the shared server frame hook (server_frame.cpp, 0x406550).
 void HarnessCmdsInit(uint64_t exeBase) noexcept;
 void HarnessCmdsContext(const D2RL::PluginContext* context) noexcept;  // text verb: data table and localization services
 auto HarnessCommand(const char* line) noexcept -> int;  // UI thread; 1 ok, 0 failed, -2 crashed, -3 timed out

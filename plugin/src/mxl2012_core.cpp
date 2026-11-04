@@ -63,6 +63,8 @@
 //      so instead of D2R's "Could not get act!" end of the game (reassign_guard.cpp, off word reassign, #511 / #292);
 //   +  HD draws no ground plane on Median's Ancient Tunnels (level 65) either, as D2R does on 74, so its void shows round the
 //      platform the build floors with D2R's Arcane walkways (void_floor.cpp, off word void65, docs/maps-hd.md item 12);
+//   +  a Barbarian spirit (Guardian, Defender, Protector) farther than 20 sub-tiles from its owner is warped to it by D2R's pet
+//      warp, unless it is fighting a target in reach within 40 (spirit_warp.cpp, off word spiritwarp, #534);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
@@ -90,6 +92,7 @@
 #include "save_mode.h"
 #include "skill_remove.h"
 #include "skill_text.h"
+#include "spirit_warp.h"
 #include "sound_guard.h"
 #include "state_lists.h"
 #include "testharness.h"
@@ -156,7 +159,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread appleuse vochat reassign savemode rotwstash void65), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash void65), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -433,6 +436,7 @@ char g_spiritSoundReport[160] = "";
 char g_transGuardReport[192] = "";
 char g_lvlUpUiReport[192] = "";
 char g_petSpreadReport[192] = "";
+char g_spiritWarpReport[192] = "";
 char g_appleUseReport[192] = "";
 char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
@@ -477,7 +481,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
-	             {"petspread", g_petSpreadReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport},
+	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport},
 	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"void65", g_voidFloorReport},
 	             {"cltdostub", g_stubReport}};
 	for (const auto& p : parts) {
@@ -687,6 +691,17 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	std::snprintf(line + petLen, sizeof(line) - petLen, "; shifted %ld, pass 2 %ld, missed %ld (ring tries taken %ld, blocked %ld, not moved %ld, moved off %ld)",
 	              petShifted, petSecond, petMissed, triesTaken, triesBlocked, triesStill, triesOff);
 	SayPart(command, "petspread", line);
+	long swChecks = 0, swFar = 0, swHeld = 0, swWarps = 0, swFailed = 0, swFrom = -1, swTo = -1, swClass = -1;
+	SpiritWarpCounts(&swChecks, &swFar, &swHeld, &swWarps, &swFailed, &swFrom, &swTo, &swClass);
+	char swLine[640];
+	std::snprintf(swLine, sizeof(swLine), "%s; checks %ld, beyond 20 %ld, left fighting %ld, warps %ld, failed %ld (last: class %ld, %ld -> %ld sub-tiles)",
+	              g_spiritWarpReport, swChecks, swFar, swHeld, swWarps, swFailed, swClass, swFrom, swTo);
+	long swThinks = 0, swNotes = 0, swDist = -1, swVerdict = -1;
+	SpiritWarpLast(&swThinks, &swNotes, &swDist, &swVerdict);
+	const size_t swLen = std::strlen(swLine);
+	std::snprintf(swLine + swLen, sizeof(swLine) - swLen, "; thinks %ld, fighting %ld; last check %ld sub-tiles verdict %ld", swThinks, swNotes,
+	              swDist, swVerdict);
+	SayPart(command, "spiritwarp", swLine);
 	long appleCasts = 0, appleRefused = 0, appleBooks = 0;
 	AppleUseCounts(&appleCasts, &appleRefused, &appleBooks);
 	std::snprintf(line, sizeof(line), "%s; casts %ld, refused %ld, Books of Skill left to D2R %ld", g_appleUseReport, appleCasts, appleRefused, appleBooks);
@@ -889,6 +904,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("petspread")) {
 		InstallPetSpread(context, g_petSpreadReport, sizeof(g_petSpreadReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_petSpreadReport);
+		context->LogInfo(line);
+	}
+	if (!Off("spiritwarp")) {
+		InstallSpiritWarp(context, g_spiritWarpReport, sizeof(g_spiritWarpReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_spiritWarpReport);
 		context->LogInfo(line);
 	}
 	if (!Off("appleuse")) {

@@ -9,7 +9,7 @@
 // table, SEH wrapper, one-slot mailbox run on the game thread) and the verbs below. Of its ~150 other
 // verbs only `item` (MakeItem, with its generator hook for set / unique rows) came over, plus `identify` / `items` of our own
 // (lane monitems); cube, quests, NPCs, ... did not. Server-side verbs run on the game thread after the server frame
-// 0x406550, which this file hooks while the harness is on (elsewhere a goblins part owns that hook). Parsing lives in
+// 0x406550 (the shared hook of server_frame.cpp; this file adds its callback while the harness is on). Parsing lives in
 // harness_cmds_logic.h (unit-tested).
 //
 // A verb ends with a line "h: <verb> OK" or "h: <verb> FAIL <reason>" in the harness console file.
@@ -20,6 +20,7 @@
 #include "item_effect.h"
 #include "skill_remove.h"
 #include "missile_stubs.h"
+#include "server_frame.h"
 #include "testharness.h"
 
 #include <D2RLPlugin/api.h>
@@ -53,9 +54,6 @@ auto Fn(uint64_t rva) noexcept -> F {
 }
 
 // --- addresses (image 0x6ab3782c) ------------------------------------------------------------------------------------
-constexpr uint64_t RvaFrame = 0x406550;         // (Game*) the per-game server frame
-// 0x406550: mov [rsp+0x20],rsi / push rbp / push rdi / push r15 / lea rbp,[rsp-0x47]   (14 bytes)
-constexpr uint8_t FrameEntry[] = {0x48, 0x89, 0x74, 0x24, 0x20, 0x55, 0x57, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0xb9};
 constexpr uint64_t RvaGetStat = 0x2f5020;       // (unit, stat, layer)
 constexpr uint64_t RvaSetStat = 0x2f7d10;       // (unit, stat, value, layer)
 constexpr uint64_t RvaPlayerData = 0x34b240;    // (player) -> player data; +0x58 + difficulty * 8 = waypoint record
@@ -120,10 +118,7 @@ using UnitClientFn = void* (*)(Unit*);
 using MonsterUseSkillFn = int64_t (*)(Game*, Unit*, uint32_t, int32_t, Unit*, int32_t, int32_t, uint8_t);
 using UnitHasStateFn = uint64_t (*)(Unit*, int32_t);
 using ClientFindFn = Unit* (*)(uint32_t, int32_t);
-using FrameFn = void (*)(Game*);
-
-FrameFn g_frameOriginal = nullptr;
-bool g_frameHooked = false;
+bool g_frameHooked = false;  // the shared server frame hook (server_frame.cpp, 0x406550) runs FrameHook
 
 // --- output -----------------------------------------------------------------------------------------------------
 void Out(const char* fmt, ...) noexcept {
@@ -2949,11 +2944,8 @@ void RunTracking(Game* game) noexcept {
 	}
 }
 
-void FrameHook(Game* game) {
-	g_frameOriginal(game);
-	if (game != nullptr) {
-		HarnessGameFrame(game);
-	}
+void FrameHook(Game* game) noexcept {
+	HarnessGameFrame(game);
 }
 
 }  // namespace
@@ -2964,8 +2956,7 @@ void HarnessCmdsContext(const D2RL::PluginContext* context) noexcept {
 	if (g_frameHooked || context == nullptr) {
 		return;
 	}
-	g_frameHooked = context->InstallInlineHook(RvaFrame, FrameEntry, sizeof(FrameEntry), reinterpret_cast<void*>(&FrameHook),
-	                                           reinterpret_cast<void**>(&g_frameOriginal));
+	g_frameHooked = InstallServerFrame(context) && AddServerFrameCallback(&FrameHook);
 	context->LogInfo(g_frameHooked ? "mxl2012-core: test harness server frame hook on (0x406550)"
 	                               : "mxl2012-core: test harness server frame hook FAILED (entry bytes differ): server verbs cannot run");
 	// `item <code> set|unique <row>`: the generator takes the row asked for (no effect while no verb asks)

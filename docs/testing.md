@@ -5419,3 +5419,18 @@ pointed at slot 2's save folder, read only):
 
 Open: the cause. Needed from the player: `d2rloader.log` after the error, the `.d2i`, the mod's `d2rloader.toml`, how they update,
 and whether other mods' files are in the mod folder.
+## Lane spiritwarp: Barbarian spirits warp to their owner (bug #534, 2026-11-05, slot 2, background mode)
+
+Plugin part `spiritwarp` (docs/plugin-plan.md section 30). Lane summonai's lab (`mxl2012-runs/spiritwarp/lab.py`): each summon
+is cast, fights a zombie 10 / 20 / 30 away, then the player walks 15, 15 and 10 sub-tiles with no monster near, fights again,
+and runs 20 + 20 west from a live zombie. Distances are sub-tiles from the player.
+
+| Check | Result |
+|-|-|
+| `spiritwarp_tests` | passed (warp beyond 20, held to 40 while fighting, fight notes fresh 1.5 s, every 25th frame) |
+| Think-only build (`run2_on` ... `run6_diag`) | warped only while a spirit was thinking (41 -> 21, 46 -> 4). An idle spirit's think does not run, so spirits with no target stayed 21-56 away. Replaced by the frame check |
+| Spirits, frame build (`run7_on`, HD and legacy) | Guardian, Defender and Protector came back after every walk: 55 -> 4, 47 -> 19, 34 -> 9, 30 -> 1, 27 -> 1, 22 -> 8; 55 warps, 0 failed. Before: 32-91 away (lane summonai) |
+| Spirits in a fight | attack at 10-30 as before; left fighting (not warped) up to 39 away while their target was alive and near the player; the flee leg warped them once the fight ended |
+| Wolf Companion, Blood Elementals, Raise Skeleton | follow and attack as in lane summonai (within about 2-13, D2R's own warps); the part's counters did not move while they were out |
+| Harness on the shared frame hook | all verbs ran in both modes |
+| Crash | none (HD and legacy, 12 summons) |
