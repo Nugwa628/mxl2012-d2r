@@ -47,3 +47,8 @@ if(MSVC)
 endif()
 
 add_subdirectory(tests)
+# A stand-in D2RLoader.exe for Play tests without D2R (tools/launcher_play_stress.py)
+add_executable(fake_loader WIN32 tests/fake_loader/fake_loader.cpp tests/fake_loader/fake_loader.rc)
+if(MSVC)
+	set_property(TARGET fake_loader PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+endif()

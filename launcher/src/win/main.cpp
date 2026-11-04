@@ -10,6 +10,9 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <cstdlib>
+#include <exception>
+
 
 using namespace mxl;
 
@@ -81,11 +84,33 @@ void SetupLog(const Options& o, bool console) {
 	LogInit(JoinPath(data, L"launcher.log"), console);
 }
 
+// A crash or an uncaught C++ exception writes one line before the process ends (Windows Error Reporting still sees the
+// crash). With WindowCloseLine and the exit line, every way the downloader ends by itself is in the log.
+LONG WINAPI OnCrash(EXCEPTION_POINTERS* e) {
+	static LONG once = 0;
+	if (InterlockedExchange(&once, 1) == 0)
+		LogCrash(CrashLine(e->ExceptionRecord->ExceptionCode, reinterpret_cast<uint64_t>(e->ExceptionRecord->ExceptionAddress)));
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void OnTerminate() {
+	LogCrash("crash: an uncaught C++ exception; the downloader ends");
+	std::abort();
+}
+
+void InstallCrashLog() {
+	SetUnhandledExceptionFilter(OnCrash);
+	std::set_terminate(OnTerminate);
+	// WM_TIMER would swallow an exception silently and run on in an unknown state: let it reach OnCrash instead
+	BOOL suppress = FALSE;
+	SetUserObjectInformationW(GetCurrentProcess(), UOI_TIMERPROC_EXCEPTION_SUPPRESSION, &suppress, sizeof(suppress));
+}
+
 int RunCli(Cli& c) {
 	if (!AttachConsole(ATTACH_PARENT_PROCESS))
 		AllocConsole();
 	SetupLog(c.opt, true);
-	Log(std::string("D2R-XL 2012 Downloader ") + LauncherVersion + " --cli " + Utf8(c.command));
+	Log(std::string("D2R-XL 2012 Downloader ") + LauncherVersion + " --cli " + Utf8(c.command) + " (" + ProcessOrigin() + ")");
 	if (c.command == L"detect") {
 		auto found = FindD2RInstalls();
 		if (found.empty())
@@ -165,9 +190,12 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
 		MessageBoxW(nullptr, Usage, L"D2R-XL 2012 Downloader", MB_ICONINFORMATION);
 		return 2;
 	}
+	InstallCrashLog();
 	if (!c.command.empty())
 		return RunCli(c);
 	SetupLog(c.opt, false);
-	Log(std::string("D2R-XL 2012 Downloader ") + LauncherVersion + " (window)");
-	return RunWindow(inst, c.opt, c.snapshot);
+	Log(std::string("D2R-XL 2012 Downloader ") + LauncherVersion + " (window, " + ProcessOrigin() + ")");
+	int code = RunWindow(inst, c.opt, c.snapshot);
+	Log("D2R-XL 2012 Downloader ends (exit code " + std::to_string(code) + ")");
+	return code;
 }

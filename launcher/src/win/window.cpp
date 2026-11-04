@@ -566,6 +566,13 @@ void ChooseSource() {
 	dlg->Release();
 }
 
+// Every close goes through here: one log line per way (WindowCloseLine), so a vanished window without one was ended from
+// outside.
+void CloseWindow(HWND h, WindowClose why) {
+	Log(WindowCloseLine(why));
+	DestroyWindow(h);
+}
+
 // The new downloader after a self-update: the same exe path and arguments.
 bool Restart() {
 	std::wstring exe = Launcher::ExePath(), cmd = GetCommandLineW();
@@ -699,7 +706,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 	case WM_TIMER:
 		if (w == AnimTimer)
 			Tick();
-		if (w == GameTimer && !g.busy && g.view.d2rFound && ProcessesUnder(g.view.d2rDir).empty() == g.view.gameRunning)
+		if (w == GameTimer && GameStateChanged(g.busy, g.view.d2rFound, !ProcessesUnder(g.view.d2rDir).empty(), g.view.gameRunning))
 			RefreshStatus();  // the game started or ended outside the downloader: Play's state changes
 		return 0;
 	case WmProgress: case WmDone: {
@@ -713,12 +720,12 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 			RefreshStatus();
 			if (!g.snapshot.empty()) {  // after the start-up check: draw, save, close
 				Snapshot(g.snapshot);
-				DestroyWindow(h);
+				CloseWindow(h, WindowClose::Snapshot);
 				return 0;
 			}
 			if (msg->action == IdSelfUpdate && w == 1) {
 				if (Restart()) {
-					DestroyWindow(h);
+					CloseWindow(h, WindowClose::SelfUpdate);
 					return 0;
 				}
 				MessageBoxW(h, L"The downloader was updated. Start it again.", L"D2R-XL 2012 Downloader", MB_ICONINFORMATION);
@@ -733,8 +740,8 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 				return 0;
 			}
 			if (msg->action == IdPlay) {  // errors stay in the line under the panel (and the log), no message box
-				if (w == 1 && g.closeAfterPlay) {
-					DestroyWindow(h);
+				if (CloseAfterAction(true, w == 1, g.closeAfterPlay)) {
+					CloseWindow(h, WindowClose::AfterPlay);
 					return 0;
 				}
 				InvalidatePanel();
@@ -757,12 +764,18 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM lp) {
 	}
 	case WM_CLOSE:
 		if (g.busy && MessageBoxW(h, L"An installation is running. Stop it and quit? It continues where it stopped next time.", L"D2R-XL 2012 Downloader",
-		                          MB_YESNO | MB_ICONQUESTION) != IDYES)
+		                          MB_YESNO | MB_ICONQUESTION) != IDYES) {
+			Log("window: close asked during an action, the player kept it open");
 			return 0;
+		}
 		g.launcher->cancel = true;
 		if (g.worker.joinable())
 			g.worker.join();
-		DestroyWindow(h);
+		CloseWindow(h, WindowClose::Closed);
+		return 0;
+	case WM_ENDSESSION:  // Windows ends the process after this returns: no WM_CLOSE, no WM_DESTROY
+		if (w)
+			Log(WindowCloseLine(WindowClose::SessionEnd));
 		return 0;
 	case WM_DESTROY:
 		KillTimer(h, AnimTimer);
@@ -892,7 +905,7 @@ int RunWindow(HINSTANCE inst, const Options& opt, const std::wstring& snapshot) 
 		PostMessageW(g.wnd, WmDone, ok ? 1 : 2, reinterpret_cast<LPARAM>(new ProgressMsg{ok ? "Ready." : err, -2}));
 	});
 	MSG msg;
-	while (GetMessageW(&msg, nullptr, 0, 0)) {
+	while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
 		if (!IsDialogMessageW(g.wnd, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);

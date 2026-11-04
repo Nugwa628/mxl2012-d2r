@@ -5463,3 +5463,22 @@ x 163, Shared x 254; page 2 X (563,103); legacy arrows (368,692) / (596,692).
 
 Unit tests: `tools/tests/test_stash_page2.py` (strips, messages, header), `plugin/tests/stash_pages_test.cpp` ("stash_pages: all
 checks passed"). Not tested: the gamepad stash (it has no arrows), TCP/IP with two clients.
+
+## Lane dlvanish: the downloader window gone after Play (bug #539, 2026-11-05, no game slot)
+
+Lane playbtn saw the window gone a few minutes after Play in one of three runs with "close after start" off (no crash event, no
+log line). Evidence and scratch: `mxl2012-runs/dlvanish/` (outside git).
+
+| Check | Result |
+|-|-|
+| playbtn's own log (`mxl2012-runs/playbtn/playcheck.log`) | runs 1-3 never wrote the script's last step (the d2rloader.log lines), which it writes even when it times out: each of those scripts was ended early; run 4 ran to the end and its window stayed open |
+| Windows Application log, 2026-11-04 22:40 to 2026-11-05 00:30 | no event for the downloader |
+| child of a script whose tool call is stopped (`treekill/`) | the child's heartbeat stops at the stop, the process is gone |
+| the built downloader started by a script, the tool call stopped (`stress/data/launcher.log`, 07:48:29) | gone at the stop; its log ends at `(window, process 42848, started by python.exe (34964))` with no close or exit line |
+| code: close after Play, the 3-second game timer, start-up release check, self-update, single instance, slot tools | none closes the window without the player or the setting (bugs.md #539) |
+| `launcher_tests.exe` | **384 checks, 0 failures** (new `TestWindowClose`) |
+| `tools/launcher_play_stress.py`, 20 cycles, game 5 s (`stress.log`) | **16 of 16**: WM_CLOSE (exit 0, both lines), 20 of 20 Play -> game ends -> Play on with the window shown, one start line per cycle, no close line while open, check box -> close after Play (exit 0, both lines), no crash line |
+
+Build: CMake / Visual Studio 18 2026, x64 Release, `mxl2012-runs/dlvanish/build`. Cause: the test script's process tree, not the
+downloader. Change: every way the downloader ends by itself is logged, and the start line names the parent (docs/launcher.md
+"Play"). Start a downloader for a long watch from a terminal that stays open, not as a child of a script a tool may end.

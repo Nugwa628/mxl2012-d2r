@@ -179,6 +179,23 @@ std::string PlayArguments(const std::string& modFolder);
 // (a '"' in it).
 std::string PlayCommandLine(const std::string& loaderExe, const std::string& modFolder);
 
+// Every way the window closes writes one log line (docs/launcher.md "Log"), so a window that is gone without one was ended
+// from outside: another program ended the process (Task Manager, a script's process tree, Windows signing out).
+enum class WindowClose {
+	Closed,      // WM_CLOSE: the title bar's X, Alt+F4 or another program's WM_CLOSE
+	AfterPlay,   // Play started the game and "close the downloader when the game starts" is on
+	SelfUpdate,  // the updated downloader was started
+	Snapshot,    // --snapshot wrote its PNG
+	SessionEnd   // Windows signs out or shuts down
+};
+std::string WindowCloseLine(WindowClose why);
+// After an action ended: close the window only when Play started the game and close_after_play is on.
+bool CloseAfterAction(bool play, bool ok, bool closeAfterPlay);
+// The 3-second game timer: look again when the game started or ended outside the downloader (never while an action runs).
+bool GameStateChanged(bool busy, bool d2rFound, bool runningNow, bool runningShown);
+// The log line of an unhandled exception (code and address in hex).
+std::string CrashLine(uint32_t code, uint64_t address);
+
 // True for a DLL that is (a copy of) our plugin: the file name mxl2012-core*.dll, or its version resource says D2R-XL 2012
 // (ProductName "mxl2012", or a FileDescription naming mxl2012-core or "D2R-XL 2012 core"). Empty strings: no version resource.
 bool IsOurPluginFile(const std::string& fileName, const std::string& productName, const std::string& fileDescription);

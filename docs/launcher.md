@@ -80,6 +80,14 @@ or a loader that ends within 3 s is shown in red in that line (no message box) a
 **Close the downloader when the game starts** (a check box under the how-to-play line; `close_after_play` in `launcher.json`,
 default on) closes the window after a good start. `--cli play` does the same as the button (after reading the channel).
 
+**How it ended (bug #539):** the start line names the process and the program that started it (`D2R-XL 2012 Downloader 0.1.1
+(window, process 123, started by explorer.exe (456))`). Every way the downloader ends by itself writes one line: `window:
+closed ...` with the way (`WindowCloseLine`, paths.h: title bar / Alt+F4 / WM_CLOSE, after Play, for the updated downloader,
+after the snapshot, Windows signs out), `crash: ...` for an unhandled exception or an uncaught C++ exception (Windows Error
+Reporting still gets it; WM_TIMER no longer swallows exceptions), then `D2R-XL 2012 Downloader ends (exit code N)`. A log
+that stops after a start line without these was ended from outside (Task Manager, or the process tree of the script or
+tool that started it).
+
 ## Install D2RLoader
 
 D2RLoader is never shipped in the release or downloader. The release manifest's `d2rloader` block
@@ -293,6 +301,11 @@ before and `compare` after (with `--exclude mods/mxl2012`) shows that nothing el
   `tools/serve_dir.py`. Install, edit the preserved `d2rloader/config/d2rloader.toml`, add a
   `d2rloader/logs` file, `promote` the second, `update`: added/changed files arrive as objects,
   removed ones go, the player's toml and the log stay, unchanged files are not rewritten.
+- **Play without D2R:** `tools/launcher_play_stress.py --exe <downloader> --fake-loader <build>\Release\fake_loader.exe
+  --work DIR` (the build's `fake_loader` target: a stand-in `D2RLoader.exe` with FileVersion 1.3.1-beta that runs a few seconds
+  and starts nothing) makes a fake D2R folder with a marked `mods\mxl2012`, an empty site, and checks WM_CLOSE, many Play /
+  game-end cycles with close-after-start off and the close after Play, with their log lines. Start it from a terminal that
+  stays open: a tool that ends the script's process tree ends the downloader too.
 - **Window:** `--snapshot FILE` renders the start-up state. Install / Stop can be driven with
   `WM_COMMAND` messages to the button ids (`window.cpp`), no input injection; after Stop the
   panel says "Stopped. Install again to continue ..." without a message box.

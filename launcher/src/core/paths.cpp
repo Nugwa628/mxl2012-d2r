@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -628,6 +629,32 @@ std::string PlayCommandLine(const std::string& loaderExe, const std::string& mod
 	if (loaderExe.empty() || loaderExe.find('"') != std::string::npos)
 		return "";
 	return "\"" + loaderExe + "\" " + PlayArguments(modFolder);
+}
+
+std::string WindowCloseLine(WindowClose why) {
+	switch (why) {
+	case WindowClose::Closed: return "window: closed (title bar, Alt+F4 or WM_CLOSE)";
+	case WindowClose::AfterPlay: return "window: closed after Play (close the downloader when the game starts is on)";
+	case WindowClose::SelfUpdate: return "window: closed for the updated downloader";
+	case WindowClose::Snapshot: return "window: closed after the snapshot";
+	case WindowClose::SessionEnd: return "window: closed, Windows signs out or shuts down";
+	}
+	return "window: closed";
+}
+
+bool CloseAfterAction(bool play, bool ok, bool closeAfterPlay) {
+	return play && ok && closeAfterPlay;
+}
+
+bool GameStateChanged(bool busy, bool d2rFound, bool runningNow, bool runningShown) {
+	return !busy && d2rFound && runningNow != runningShown;
+}
+
+std::string CrashLine(uint32_t code, uint64_t address) {
+	char text[96];
+	std::snprintf(text, sizeof(text), "crash: exception 0x%08X at 0x%llX; the downloader ends", unsigned(code),
+	              static_cast<unsigned long long>(address));
+	return text;
 }
 
 }  // namespace mxl

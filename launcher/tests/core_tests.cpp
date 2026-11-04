@@ -808,6 +808,41 @@ void TestPlay() {
 	Check(mxl::PlayCommandLine(exe, mxl::ProductFolder).find(" -mod mxl2012") != std::string::npos, "play starts the product's mod folder");
 }
 
+// Bug #539: every way the window closes logs its own line; Play closes it only after a good start with the setting on.
+void TestWindowClose() {
+	using mxl::WindowClose;
+	const WindowClose all[] = {WindowClose::Closed, WindowClose::AfterPlay, WindowClose::SelfUpdate, WindowClose::Snapshot,
+	                           WindowClose::SessionEnd};
+	std::vector<std::string> lines;
+	for (WindowClose w : all)
+		lines.push_back(mxl::WindowCloseLine(w));
+	bool distinct = true, prefixed = true;
+	for (size_t i = 0; i < lines.size(); ++i) {
+		prefixed = prefixed && lines[i].rfind("window: closed", 0) == 0;
+		for (size_t j = i + 1; j < lines.size(); ++j)
+			distinct = distinct && lines[i] != lines[j];
+	}
+	Check(prefixed, "window close: every line starts with \"window: closed\" (one search finds them all)");
+	Check(distinct, "window close: each way has its own line");
+	Check(mxl::WindowCloseLine(WindowClose::AfterPlay).find("after Play") != std::string::npos, "window close: after Play says so");
+
+	Check(mxl::CloseAfterAction(true, true, true), "close after Play: started, setting on");
+	Check(!mxl::CloseAfterAction(true, true, false), "close after Play: setting off keeps the window");
+	Check(!mxl::CloseAfterAction(true, false, true), "close after Play: a failed start keeps the window (the error stays shown)");
+	Check(!mxl::CloseAfterAction(false, true, true), "close after Play: other actions never close it");
+
+	Check(mxl::GameStateChanged(false, true, false, true), "game timer: the game ended -> refresh (Play on again)");
+	Check(mxl::GameStateChanged(false, true, true, false), "game timer: the game started outside -> refresh (Play off)");
+	Check(!mxl::GameStateChanged(false, true, true, true) && !mxl::GameStateChanged(false, true, false, false),
+	      "game timer: no change, no refresh");
+	Check(!mxl::GameStateChanged(true, true, false, true), "game timer: not while an action runs");
+	Check(!mxl::GameStateChanged(false, false, false, true), "game timer: no D2R folder, nothing to watch");
+
+	Check(mxl::CrashLine(0xC0000005u, 0x7FF612345678ull) == "crash: exception 0xC0000005 at 0x7FF612345678; the downloader ends",
+	      "crash line: code and address in hex");
+	Check(mxl::CrashLine(0xE06D7363u, 0).find("0xE06D7363") != std::string::npos, "crash line: a C++ exception's code");
+}
+
 bool Near(float a, float b) { return a - b < 0.001f && b - a < 0.001f; }
 
 void TestSvg() {
@@ -1036,6 +1071,7 @@ int main() {
 	TestSaveCopies();
 	TestEnvironment();
 	TestPlay();
+	TestWindowClose();
 	TestSvg();
 	TestZip();
 	TestLoaderPackage();

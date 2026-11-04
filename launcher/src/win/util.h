@@ -34,5 +34,9 @@ std::wstring LastErrorText(unsigned long code);
 // Log to %data%\launcher.log and to the console when there is one (CLI mode).
 void LogInit(const std::wstring& file, bool console);
 void Log(const std::string& line);
+// From a crash handler: as Log, but never waits for the log's lock (the crash may have happened while it was held).
+void LogCrash(const std::string& line);
+// "process 123, started by explorer.exe (456)": which program started this one, for the log's first line.
+std::string ProcessOrigin();
 
 }  // namespace mxl

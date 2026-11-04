@@ -5,6 +5,7 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- The downloader's log (`launcher.log`) now says how the downloader ended: closed by you, after Play, for its own update, by Windows signing out, or a crash, then its exit code. Its first line names the program that started it. If the window ever disappears, that log shows why (#539).
 - The downloader keeps a copy of your shared stashes and characters before every install, update and repair, in
   `save-copies` in its data folder (the 10 newest stay). Your save folder is only read. If a shared stash ever shows a "bad
   header" error after an update, close the game and copy the files back from there (or from D2RLoader's own backups in

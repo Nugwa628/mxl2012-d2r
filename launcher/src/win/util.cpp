@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <knownfolders.h>
 #include <shlobj.h>
+#include <tlhelp32.h>
 
 #include <cstdio>
 #include <ctime>
@@ -213,8 +214,8 @@ void LogInit(const std::wstring& file, bool console) {
 		MoveFileExW(file.c_str(), (file + L".old").c_str(), MOVEFILE_REPLACE_EXISTING);
 }
 
-void Log(const std::string& line) {
-	std::lock_guard<std::mutex> lock(g_logMutex);
+namespace {
+void WriteLogLine(const std::string& line) {
 	SYSTEMTIME t;
 	GetLocalTime(&t);
 	char stamp[32];
@@ -237,6 +238,42 @@ void Log(const std::string& line) {
 			::WriteFile(out, l.data(), DWORD(l.size()), &w, nullptr);
 		}
 	}
+}
+}  // namespace
+
+void Log(const std::string& line) {
+	std::lock_guard<std::mutex> lock(g_logMutex);
+	WriteLogLine(line);
+}
+
+void LogCrash(const std::string& line) {
+	bool locked = g_logMutex.try_lock();
+	WriteLogLine(line);
+	if (locked)
+		g_logMutex.unlock();
+}
+
+std::string ProcessOrigin() {
+	const DWORD self = GetCurrentProcessId();
+	std::string text = "process " + std::to_string(self);
+	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snap == INVALID_HANDLE_VALUE)
+		return text;
+	PROCESSENTRY32W pe{};
+	pe.dwSize = sizeof(pe);
+	DWORD parent = 0;
+	for (BOOL ok = Process32FirstW(snap, &pe); ok && !parent; ok = Process32NextW(snap, &pe))
+		if (pe.th32ProcessID == self)
+			parent = pe.th32ParentProcessID;
+	std::string name = "a program that has ended";
+	pe.dwSize = sizeof(pe);
+	for (BOOL ok = parent ? Process32FirstW(snap, &pe) : FALSE; ok; ok = Process32NextW(snap, &pe))
+		if (pe.th32ProcessID == parent) {
+			name = Utf8(pe.szExeFile);
+			break;
+		}
+	CloseHandle(snap);
+	return parent ? text + ", started by " + name + " (" + std::to_string(parent) + ")" : text;
 }
 
 }  // namespace mxl
