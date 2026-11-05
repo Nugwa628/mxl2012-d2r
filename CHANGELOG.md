@@ -5,38 +5,24 @@ version being released (docs/release.md).
 
 ## Unreleased
 
-- The downloader's log (`launcher.log`) now says how the downloader ended: closed by you, after Play, for its own update, by Windows signing out, or a crash, then its exit code. Its first line names the program that started it. If the window ever disappears, that log shows why (#539).
-- The downloader keeps a copy of your shared stashes and characters before every install, update and repair, in
-  `save-copies` in its data folder (the 10 newest stay). Your save folder is only read. If a shared stash ever shows a "bad
-  header" error after an update, close the game and copy the files back from there (or from D2RLoader's own backups in
-  `Saved Games\Diablo II Resurrected\D2RLoader Backups`), and please send us `d2rloader\logs\d2rloader.log` and the stash file
-  (#536).
-- The downloader has a **Play** button: it starts `D2RLoader.exe -mod mxl2012` from your D2R folder, so D2R-XL 2012 starts
-  whatever D2RLoader's Default Mod is. It is on when D2RLoader 1.3.1 is there and D2R-XL 2012 is installed and up to date; the
-  line under the panel says why when it is off. The downloader closes when the game starts (a check box turns that off).
-  Starting `D2RLoader.exe` yourself still works.
+## D2R-XL 2012
+
+### 0.1.11 (2026-11-05)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.11:**
+
 - The Barbarian's Guardian, Defender and Protector Spirit come back to you: a spirit more than 20 sub-tiles away teleports next to
   you, unless it is fighting a monster near you. After a fight they used to stay behind, 30 to 90 sub-tiles away (#534). Other summons and mercenaries are unchanged.
-- The personal stash has a second page. Open the stash and click the arrows under the grid to switch (page 2 shows
-  "2 / 2"); Ctrl-click moves items between your backpack and the open page. Page 2 is D2RLoader's custom player page: its items are
-  saved in `<character>.d2rl` next to the `.d2s`. **Keep the mod's plugin with your characters:** a character with items on
-  page 2 does not load without it (D2RLoader stops the load, so nothing is lost). Move the items to page 1 first if you
-  want to play that character without the plugin. The gamepad stash has no page arrows. On the Shared
-  tab the arrows turn D2R's shared pages, as before.
-- The shared stash has 2 more pages: 5 in a classic or expansion game, as a Reign of the Warlock game has (D2R gives those 3).
-  Install, update and repair set `[d2rcore.stash] add_shared_tabs = 2` in the mod's `d2rloader.toml`; a higher number you set
-  yourself is kept, so no page with items on it goes away (#535). The Gems, Materials and Runes pages of a RotW game are shared
-  between your RotW characters, as in D2R.
 - Mercenaries use D2R's own AI settings: the Act 2 mercenary runs in to fight in melee and stays with you after a fight
   (it could lose you before). All mercenaries and summons were checked in game, in HD and legacy: they attack and follow
   (#534).
 - The Fell Fiends' classic art has a new token (`FZ`, was `08`): a legacy game could ask for its files without the 0 and exit
   (#532). The crash was not seen here with the mod as shipped; the player's mod folder had another mod's D2RLoader files in it, so
   the mod's plugin did not load. Install D2R-XL 2012 into its own folder and do not copy another mod's `d2rloader` files over it.
-- The downloader can install D2RLoader for you: when D2RLoader is missing or the wrong version, **Install D2RLoader**
-  asks first, downloads it from its official site (d2rloader.net), checks it against the version pinned in the release,
-  and puts it into your D2R folder. Your D2RLoader settings are kept. If that fails, **Get D2RLoader** opens the download
-  page as before.
 - Legacy graphics (G) in Reign of the Warlock games: you no longer have to add `always_enable_rotw_legacy_graphics_keybind = true`
   to the mod's `d2rloader.toml` by hand. The downloader sets it on every install, update and repair, also in a file kept from
   an older install. A `false` there (set by hand or left by D2RLoader's template) becomes `true`, as the stat ranges
@@ -64,7 +50,37 @@ version being released (docs/release.md).
   them off in a `d2rloader.toml` kept from an older release (`[d2rcore.items] item_stat_ranges = false`; nothing else in the
   file changes).
 
-## D2R-XL 2012
+**New:**
+
+- The downloader's log (`launcher.log`) now says how the downloader ended: closed by you, after Play, for its own update, by Windows signing out, or a crash, then its exit code. Its first line names the program that started it. If the window ever disappears, that log shows why (#539).
+- The downloader keeps a copy of your shared stashes and characters before every install, update and repair, in
+  `save-copies` in its data folder (the 10 newest stay). Your save folder is only read. If a shared stash ever shows a "bad
+  header" error after an update, close the game and copy the files back from there (or from D2RLoader's own backups in
+  `Saved Games\Diablo II Resurrected\D2RLoader Backups`), and please send us `d2rloader\logs\d2rloader.log` and the stash file
+  (#536).
+- The downloader has a **Play** button: it starts `D2RLoader.exe -mod mxl2012` from your D2R folder, so D2R-XL 2012 starts
+  whatever D2RLoader's Default Mod is. It is on when D2RLoader 1.3.1 is there and D2R-XL 2012 is installed and up to date; the
+  line under the panel says why when it is off. The downloader closes when the game starts (a check box turns that off).
+  Starting `D2RLoader.exe` yourself still works.
+- The personal stash has a second page. Open the stash and click the arrows under the grid to switch (page 2 shows
+  "2 / 2"); Ctrl-click moves items between your backpack and the open page. Page 2 is D2RLoader's custom player page: its items are
+  saved in `<character>.d2rl` next to the `.d2s`. **Keep the mod's plugin with your characters:** a character with items on
+  page 2 does not load without it (D2RLoader stops the load, so nothing is lost). Move the items to page 1 first if you
+  want to play that character without the plugin. The gamepad stash has no page arrows. On the Shared
+  tab the arrows turn D2R's shared pages, as before.
+- The shared stash has 2 more pages: 5 in a classic or expansion game, as a Reign of the Warlock game has (D2R gives those 3).
+  Install, update and repair set `[d2rcore.stash] add_shared_tabs = 2` in the mod's `d2rloader.toml`; a higher number you set
+  yourself is kept, so no page with items on it goes away (#535). The Gems, Materials and Runes pages of a RotW game are shared
+  between your RotW characters, as in D2R.
+- The downloader can install D2RLoader for you: when D2RLoader is missing or the wrong version, **Install D2RLoader**
+  asks first, downloads it from its official site (d2rloader.net), checks it against the version pinned in the release,
+  and puts it into your D2R folder. Your D2RLoader settings are kept. If that fails, **Get D2RLoader** opens the download
+  page as before.
+
+**Known:** the gamepad stash has no page arrows, and a character with items on personal page 2 needs the mod's plugin to
+load. What caused one player's "bad header" shared stash error after an update is not known yet: if you see it, please
+send us `d2rloader\logs\d2rloader.log` and the stash file (#536). In HD, Median's runes still show their classic pictures
+scaled up and the HD pet row shows at most 9 icons (D2R's own limit).
 
 ### 0.1.10 (2026-11-01)
 
