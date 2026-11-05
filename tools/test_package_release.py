@@ -85,7 +85,7 @@ class PackageReleaseTests(unittest.TestCase):
         (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\nreset_screen = true\n", encoding="utf-8")
         (src / "PINNED_COMMIT").write_text((commit or pr.legacy169_commit()) + "\n", encoding="ascii")
         dll = self.tmp / "legacy169.dll"
-        dll.write_bytes(b"MZ...legacy169\0...0.1.0\0...")
+        dll.write_bytes(b"MZ...legacy169\0...0.1.1\0...")
         return src, dll
 
     def test_legacy169_is_pinned(self):
@@ -173,7 +173,7 @@ class PackageReleaseTests(unittest.TestCase):
     def test_legacy169_test_builds_are_refused(self):
         _src, dll = self.legacy169_src()
         self.assertEqual(pr.check_legacy169(dll), [])
-        for body, words in ((b"MZ legacy169\0 0.1.0-test\0", "test build"), (b"MZ legacy169-testharness.txt 0.1.0\0", "test build"),
+        for body, words in ((b"MZ legacy169\0 0.1.1-test\0", "test build"), (b"MZ legacy169-testharness.txt 0.1.1\0", "test build"),
                             (b"MZ legacy169\0 0.0.9\0", "version")):
             dll.write_bytes(body)
             problems = pr.check_legacy169(dll)

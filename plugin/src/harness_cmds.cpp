@@ -24,6 +24,7 @@
 #include "missile_stubs.h"
 #include "server_frame.h"
 #include "testharness.h"
+#include "send_stash.h"
 
 #include <D2RLPlugin/api.h>
 
@@ -324,8 +325,8 @@ auto CmdHelp(Ctx*, const hcmd::Tokens&) noexcept -> bool {
 	Out("verbs: pkt <hex bytes> | pickup <item id> [inv] | cursor | ground [code] | move <x> <y> [walk] [packet] | packclear | remove <code> [n]|id <item id> | istat <item id> <stat> [layer|scan] | interact nearest|<npc class> | menu list|<line>|cancel (client) | msg nearest|<npc class> <message> | quest <id> dump|<bit> [get|set|clear] | xp <amount> | moveto <id>|nearest [class] | presets [type|rooms] | place <x> <y>");
 	Out("verbs (lane act1start, read only): walkmap <x> <y> <half> <step> [mask] | find <class>");
 	Out("verbs (lane realpath): gold get|set <carried> <bank> | shop [npc class] | gamble | usecheck <item id> | tiles");
-	Out("verbs: states player|mon:<id> [state] | cstates player|mon:<id> [state] (client) | asserttrace on|count|show [n]|clear (client) | watch cltdo|srvhit <index> | watch [off] (client)");
-	Out("verbs (client): stashpage state|open|close|toggle|msgs|uia <target> <command> [text]|widget <panel> [child]|vis <panel> <child> <0|1>|put <code> [x y]|fill <1|2> [code]|drop <code>|list|move <id> <1|2> [x y]|result");
+	Out("verbs: states player|mon:<id> [state] | cstates player|mon:<id> [state] (client) | cstat <stat> [layer] (client) | asserttrace on|count|show [n]|clear (client) | watch cltdo|srvhit <index> | watch [off] (client)");
+	Out("verbs (client): stashpage state|open|close|toggle|msgs|uia <target> <command> [text]|widget <panel> [child]|vis <panel> <child> <0|1>|put <code> [x y]|fill <1|2> [code]|drop <code>|list|move <id> <1|2> [x y]|result | sendstash [state|press]");
 	Out("verbs: merc [dead] | mercprice [level] | interact <npc class>|nearest | menu list|<line>|cancel (client) | hire [npc class] [n] [reopen] | cursor | shop [npc class] | gamble | pkt <hex bytes> | quest <id> <bit>|dump [set|clear|get]");
 	return true;
 }
@@ -2527,6 +2528,23 @@ auto CmdClientIstat(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `cstat <stat> [layer]`: the stat of the CLIENT's copy of the player (`stat player` reads the server's): what the HUD draws from.
+auto CmdClientStat(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	long long stat = 0, layer = 0;
+	if (t.n < 2 || !hcmd::ParseInt(t.tok[1], &stat) || (t.n > 2 && !hcmd::ParseInt(t.tok[2], &layer))) {
+		return Fail(c, "usage: cstat <stat> [layer]");
+	}
+	if (g_playerId == 0) {
+		return Fail(c, "cstat: no player seen yet (run a server verb such as state first)");
+	}
+	Unit* unit = Fn<ClientFindFn>(RvaClientFind)(static_cast<uint32_t>(g_playerId), 0);
+	if (unit == nullptr) {
+		return Fail(c, "cstat: no client unit");
+	}
+	Out("cstat %lld:%lld = %d", stat, layer, Stat(unit, static_cast<int>(stat), static_cast<int>(layer)));
+	return true;
+}
+
 // `durwatch on|show|off`: counts packet 0x3e for stat 0x48 (durability) on its way: the server sender 0x47a190 (D2RLoader's slot
 // 0x3e2a1b8 behind its `jmp [rip]` thunk, wrapped), the client packet table's 0x3e handler (entry 0x22bc210, wrapped) and the
 // client's stat apply 0x1c7710 (id, set flag, stat, value, param; inline hook), with the client item's stat 0x48 after the apply.
@@ -2962,6 +2980,23 @@ auto CmdStashPage(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return queued == 1 ? true : Fail(c, "%s", text);
 }
 
+// `sendstash [state|press]` (client side, lane sendstash): the button's counters, the last summary line and the slot counts
+// of the last read; `press` queues what a click of the button queues, `slots` queues a read of the RotW stash's slot counts.
+auto CmdSendStash(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const bool press = t.n >= 2 && hcmd::LowerEq(t.tok[1], "press");
+	if (t.n >= 2 && !press && !hcmd::LowerEq(t.tok[1], "state")) {
+		return Fail(c, "usage: sendstash [state|press]");
+	}
+	if (press && !SendStashPress()) {
+		return Fail(c, "sendstash: the part is off or a run is going");
+	}
+	char status[384];
+	SendStashStatus(status, sizeof(status));
+	Out("sendstash %s%s", status, press ? " (press queued)" : "");
+	Out("sendstash last=\"%s\"", SendStashLastLine());
+	return true;
+}
+
 using VerbFn = bool (*)(Ctx*, const hcmd::Tokens&) noexcept;
 struct Verb {
 	const char* name;
@@ -2987,9 +3022,9 @@ const Verb Verbs[] = {
     {"walkmap", CmdWalkMap, false},   {"find", CmdFind, false},
     {"gold", CmdGold, false},        {"shop", CmdShop, false},        {"gamble", CmdGamble, false},     {"usecheck", CmdUseCheck, false},
     {"tiles", CmdTiles, false}, {"hashscan", CmdHashScan, false},
-    {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
+    {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"cstat", CmdClientStat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
-    {"stashpage", CmdStashPage, true},
+    {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {

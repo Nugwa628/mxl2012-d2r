@@ -123,6 +123,35 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(big.size, (16, 16))
         self.assertTrue(all(big.getpixel((x, 8))[0] >= 190 for x in range(4) if big.getpixel((x, 8))[3] > 200))
 
+    def test_stash_cube_cells_lie_under_the_grid(self):   # bug #515: PANEL\mxl\stashcube under the stash window's grid
+        row = {"invLeft": 0, "gridX": 10, "gridY": 8, "gridLeft": 16, "gridTop": 15, "gridBoxWidth": 29, "gridBoxHeight": 29}
+        cube = Image.new("RGB", (320, 432), (0, 0, 0))   # a white line on each cell's left / top edge
+        for i in range(11):
+            for y in range(15, 15 + 8 * 29):
+                cube.putpixel((16 + 29 * i, y), (255, 255, 255))
+        for j in range(9):
+            for x in range(16, 16 + 10 * 29):
+                cube.putpixel((x, 15 + 29 * j), (255, 255, 255))
+        orig = ui_layouts.table_rows
+        ui_layouts.table_rows = lambda *a: {"Transmogrify Box Page 1": row}
+        try:
+            im = ui_panels.stash_cube(cube)
+            low = ui_panels.stash_cube(cube, 2)
+        finally:
+            ui_layouts.table_rows = orig
+        b = ui_layouts.STASH_CUBE_BEVEL
+        wx, wy, ww, wh = ui_layouts.STASH_CUBE_WINDOW
+        self.assertEqual(im.size, (ww + 2 * b, wh + 2 * b))
+        self.assertEqual(low.size, (round(im.width / 2), round(im.height / 2)))
+        gx, gy, cell = ui_layouts.stash_cube_grid(10, 8)
+        mid = round(gy - wy + b + 3.5 * cell)
+        for i in range(11):   # each line where the grid's cell edge is, give or take a pixel
+            x = gx - wx + b + i * cell
+            self.assertGreater(max(im.getpixel((round(x) + d, mid))[0] for d in (-1, 0, 1)), 100, i)
+        self.assertLess(im.getpixel((round(gx - wx + b + 0.5 * cell), mid))[0], 30)   # a cell's inside dark
+        self.assertLess(im.getpixel((round(ww / 2), b + 10))[0], 30)   # above the grid: black, no D2R line
+        self.assertEqual(im.getpixel((0, 100))[:3], ui_panels.STASH_CUBE_BEVEL_RAMP[0])   # the bevel whole
+
 
 LAYOUT = """{
     "type": "X", "name": "L",
@@ -279,7 +308,7 @@ class LayoutTests(unittest.TestCase):
         finally:
             ui_layouts.baseline = orig
 
-    def test_stash_cube_window_shows_the_cover(self):   # bug #515: the RotW stash's 3 x 4 window, as classic Median
+    def test_stash_cube_window_holds_the_cube_on_its_cells(self):   # bug #515: the RotW stash's 3 x 4 window
         bank = r"""{ "children": [
             { "type": "TabBarWidget", "name": "BankTabs", "fields": { "textStrings": [ "@personal", "@shared", "@gems", "@materials", "@runes" ] } },
             { "type": "Widget", "name": "basicstash_container", "children": [
@@ -301,20 +330,27 @@ class LayoutTests(unittest.TestCase):
         orig = ui_layouts.baseline
         ui_layouts.baseline = lambda name: bank
         try:
-            t = ui_layouts.stash_hd()
+            t = ui_layouts.stash_hd({"gridX": 10, "gridY": 8})
         finally:
             ui_layouts.baseline = orig
         lay = json.loads(t)   # still JSON
         self.assertNotIn('"@', t)
         self.assertIn('"textStrings": [ "Personal", "Shared", "Gems", "Materials", "Runes" ]', t)
         s, e = ui_layouts.block_span(t, ui_layouts.STASH_CUBE_GRID)
-        g = t[s:e]   # D2R's grid, cells and count kept, off the panel
-        self.assertIn('"rect": { "x": -1500, "y": -1500 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize"', g)
+        g = t[s:e]   # Median's 10 x 8, ten columns across the window's inside (435..722) with the cells' edge line
+        self.assertIn('"rect": { "x": 438, "y": 869, "scale": 0.2869 }, "cellCount": { "x": 10, "y": 8 }, "cellSize": { "x": 98, "y": 98 }', g)
+        gx, gy, cell = ui_layouts.stash_cube_grid(10, 8)
+        wx, wy, ww, wh = ui_layouts.STASH_CUBE_WINDOW
+        edge = ui_layouts.STASH_CUBE_EDGE * cell
+        self.assertAlmostEqual(gx - edge, wx)
+        self.assertAlmostEqual(gx + 10 * cell + edge, wx + ww)
+        self.assertAlmostEqual(gy - wy, wy + wh - (gy + 8 * cell))   # centred down
+        self.assertAlmostEqual(cell, 98 * 0.2869, places=1)
         cube = next(c for c in lay["children"] if c["name"] == "advancedstash_horadriccube")["children"]
-        self.assertEqual([c["name"] for c in cube], ["horadriccube_grid", "convert", "horadriccube_lid", "horadriccube_cover",
-                                                     "withdraw_button"])
-        self.assertEqual(cube[2]["fields"], cube[3]["fields"])   # the lid: D2R's cover, under a name D2R does not hide
-        self.assertEqual(cube[1]["fields"], {"rect": {"x": 520, "y": 1239}, "tooltipString": "Transmute"})
+        self.assertEqual([c["name"] for c in cube], ["horadriccube_cells", "horadriccube_grid", "convert", "horadriccube_cover",
+                                                     "withdraw_button"])   # the cells under the items, no lid over them
+        self.assertEqual(cube[0]["fields"], {"rect": {"x": 432, "y": 786}, "filename": "PANEL\\mxl\\stashcube"})
+        self.assertEqual(cube[2]["fields"], {"rect": {"x": 520, "y": 1239}, "tooltipString": "Transmute"})
         gems = next(c for c in lay["children"] if c["name"] == "advancedstash_gems")["children"]   # + Median's (median_stash)
         self.assertEqual([c["name"] for c in gems][:2], ["gcv", "yo1"])
         self.assertEqual(gems[0]["fields"]["rect"], {"width": 98, "height": 98, "x": 114, "y": 218})

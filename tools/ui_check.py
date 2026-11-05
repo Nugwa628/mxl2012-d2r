@@ -191,8 +191,12 @@ def check_sprites() -> tuple[list[str], list[str]]:
                         problems.append(f"{p.name}: frame {i} has no tab strip")
                     if f.crop((0, 100, fw, fh)).getchannel("A").getbbox() is None:
                         problems.append(f"{p.name}: frame {i} has no sockets")
-    for name in ui_panels.PANELS:
-        for suffix, (w, h) in ((".sprite", (1162, 1507)), (".lowend.sprite", (581, 753))):
+    b = ui_layouts.STASH_CUBE_BEVEL
+    cube_window = (ui_layouts.STASH_CUBE_WINDOW[2] + 2 * b, ui_layouts.STASH_CUBE_WINDOW[3] + 2 * b)
+    sizes = {name: ((1162, 1507), (581, 753)) for name in ui_panels.PANELS}
+    sizes[ui_panels.STASH_CUBE] = (cube_window, tuple(round(v / 2) for v in cube_window))
+    for name, (full, low) in sizes.items():
+        for suffix, (w, h) in ((".sprite", full), (".lowend.sprite", low)):
             p = HD_OUT / "panel" / "mxl" / f"{name}{suffix}"
             try:
                 info = dc6.sprite_info(p)

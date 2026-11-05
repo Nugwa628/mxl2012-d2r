@@ -53,6 +53,17 @@ int main() {
 	Check(!SkipPicture(&item, &draw), "with one it is drawn");
 	Check(!SkipPicture(nullptr, nullptr), "a null item goes to D2R as before");
 
+	// the empty slots' dimming
+	std::memcpy(&rel, SlotPlaceholderDraw + 1, sizeof(rel));
+	Check(SlotPlaceholderDraw[0] == 0xe8 && Rel32Call(SlotPlaceholderDrawCall, ItemDrawRva) == rel, "0x2ce636 calls 0x15bb80");
+	Check(sizeof(ItemDrawEntry) == 19 && sizeof(CelDrawEntry) == 18, "whole instructions at both entries");
+	const DrawAlpha slot{0.2f, 1}, full{1.0f, 1}, unused{0.2f, 0};
+	Check(DimDraw(false, &slot), "classic, the slot's 0.2: dimmed");
+	Check(!DimDraw(true, &slot), "HD tints by itself");
+	Check(!DimDraw(false, &full) && !DimDraw(false, &unused) && !DimDraw(false, nullptr), "alpha 1, an unused alpha, none: as D2R");
+	Check(CelMode(CelModeNormal, true) == CelModeDim && CelMode(CelModeNormal, false) == CelModeNormal, "mode 5 turns translucent while dimmed");
+	Check(CelMode(1, true) == 1 && CelMode(3, true, 2) == 3 && CelMode(5, true, 2) == 2, "other modes stay; the dev mode is used");
+
 	if (failures == 0) {
 		std::printf("rotwstash_tests: all passed\n");
 		return 0;

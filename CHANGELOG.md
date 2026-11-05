@@ -7,6 +7,45 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.13 (2026-11-06)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**New:**
+
+- A "Send storable/stackable items to stash" button on the inventory (HD: the empty square at the bottom left; legacy
+  graphics: next to the close button). One click puts every gem, rune and material in your backpack that has a slot on the
+  stash's Gems, Materials or Runes pages into that slot, from anywhere, with the stash closed. A full slot (99) keeps its item
+  in the backpack, and one line in the chat says what happened, for example "Sent 14 items. 3 stayed: stack full (El Rune,
+  Chipped Ruby x2)." The button is greyed in classic and expansion games (no such stash pages) and, for now, when you joined
+  another player's game.
+- Akara's "Reset Skills and Stats" is unlimited up to character level 100: a character of level 1 to 100 can use it any number
+  of times, on every difficulty, without the Den of Evil first. From level 101 the usual rule is back: one respec per
+  difficulty, the Den of Evil's reward (a reward you have not used yet is still there). From level 101 Akara's menu shows the
+  line only while that reward is waiting (D2R showed it in Hell also without one, and then did nothing). In multiplayer the
+  host's game decides.
+- The small Horadric Cube window on the stash's Gems, Materials and Runes pages (HD) shows the cube's items again, scaled down
+  on the cube's own 10 x 8 cells: you can take an item out, drop it on another cell, or Ctrl-click it into your backpack.
+  Legacy graphics still shows the cube's cover there (#515).
+- Legacy graphics: empty slots on the stash's Gems, Materials and Runes pages are dimmed as in HD, so the slots that hold
+  items stand out (#546).
+- Buff HUD: the buff icons hide while the stash or the Horadric Cube is open, and while another panel (character, quests,
+  waypoints, a vendor, inventory, skill tree) covers one of them; they come back when it closes. In legacy graphics that
+  is every left-side panel, and the inventory or skill tree once six or seven buffs show; in HD the inventory stays clear.
+  `hide_with_panels = false` in `mods\mxl2012\d2rloader\config\buff-panel.toml` keeps them shown.
+- Buff HUD: Arcane (Elemental) Fury, Blades Of Light, Superbeast Neutral, Mark of the Bear and Mark of the Wolf show a real icon
+  instead of "?" (their skills have none in Median XL 2012, so they borrow one from the mod's own icons: Elemental, Bladestorm,
+  Superbeast, a bear and a wolf).
+- Transmute with a key: bind D2RLoader's "Transmute Horadric Cube" in Options > Controls (group "D2RLoader"; no key by
+  default). It works while the Horadric Cube is open, or a stash page with the cube window is open.
+
+**Known:** a player saw the life orb's text stay at full ("Life: 970 / 970") while the orb was a third full (#547). We could not
+reproduce it; if you see it, please tell us what you were doing and which plugins you use. The gamepad stash is not tested with
+the new cube window. Life and mana leech on Nightmare and Hell is very small, as in Median XL 2012 (#540). In HD, Median's runes
+still show their classic pictures scaled up and the HD pet row shows at most 9 icons (D2R's own limit).
+
 ### 0.1.12 (2026-11-05)
 
 D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
@@ -51,10 +90,8 @@ files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also mak
   versions delete those stacks when the character loads (#545).
 
 **Known:** life and mana leech on Nightmare and Hell is very small, as in Median XL 2012 (it divides leech by 100 and 200;
-#540, checked against the original). The gamepad stash has no page arrows and no slots for Median's runes and gems. A few
-Median buffs show "?" in the Buff HUD (Elemental Fury, Blades Of Light, Superbeast Neutral, Mark of the Bear, Mark of the
-Wolf). In HD, Median's runes still show their classic pictures scaled up and the HD pet row shows at most 9 icons (D2R's own
-limit).
+#540, checked against the original). The gamepad stash has no page arrows and no slots for Median's runes and gems. In
+HD, Median's runes still show their classic pictures scaled up and the HD pet row shows at most 9 icons (D2R's own limit).
 
 ### 0.1.11 (2026-11-05)
 

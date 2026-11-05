@@ -587,6 +587,7 @@ craft, catalyst, etc.) and return; otherwise call the original. The "Talk" line 
 | Vanilla respec packet | `0x4b2530` = packet 0x39 (`CCMD_RESPEC`; 0x38 is `CCMD_SUBSCRIBE_TO_VENDOR`) | requires NPC table byte `+5`, and the quest `byte[+0x10] - 1` bit 1; then `0x580f20(game, player, 0)` and, when `+0x10 != 0`, `0x5d9ae0(game, player)` |
 | Respec | `0x580f20` | `0x4360f0` (skills: refunds into stat 5, `0x46f220`, `0x474d20`), `0x52ddf0` (stat points back to the charstats start values), `0x470c90` (equipment re-check), `0x2f3760`, `0x474d60`, `0x491960(player, 2, player)` |
 | Respec bookkeeping | `0x5d9ae0` | quest 41: sets bit 0, clears bit 1; if bit 0xf is clear the respec quest (a1q1 `+0x12`) is deactivated ("deactivated respec quest") |
+| Respec line (client) | service table `0x22a70e0` entry 4 `{0x94, 1, 0, 1, 0x109200}` (opener `0x1141d0`); filter in the builder `0x1147a0` at `0x114c20` | line string 0x2ba0, handler `0x112d40` (Yes / No page), Yes `0x1130d0` sends 0x39 with the NPC id; shown when the client record `0x2a48778` has quest 1 bit 0, quest 41 bit 0 clear and bit 1 set. NPC row `+0x10` = 0x2a (quest 41) for Akara, the only row with `+5`. Hooked by part `akararespec` (plugin-plan.md section 31) |
 | Imbue / sockets / personalize panel | panel 0xd = `ImbueItemsPanel` (`0xc7aa0`) | client opener `0x1e3e20` (mode 1 at `0x2a96960`, then `0x1e5b20`), called by the line handler `0x10dd30` and from the server-to-client message handler `0x1e3c00` (packet 0x58, byte `+5`: 0 open, 4, 5, 6/7 close). Class check `0x10d150` (current NPC class `0x2a48764`): 0x9a Charsi, 0x1ff Larzuk, 0x200 Anya. Item filters (D2Common, client and server): `0x36aed0` imbue, `0x36b410` sockets, `0x36b1d0` personalize |
 | Service lines (client) | fix table RVA `0x22a70e0`, 9 x 24 bytes (class u32, quest u32, bit u32, condition u32, function), count dword `0x22a71b8`; consumer `0x1141d0` (the NPC menu opener) | Charsi q3 b1 -> `0x109100` (line `0xfb1`), Larzuk q35 b1 -> `0x109300` (`0x58dc`), Anya q38 b1 -> `0x109400` (`0x58dd`), all with handler `0x10dd30`; Warriv q6 b0 and Meshif q14 b0 add the travel lines. Run on the client's own quest record `0x2a48778` |
 | Confirmation page (client) | list widget global `0x2a48798`; closer `0x110670`; creator `0x1e9200(cancel handler, 0, 1)`; line adder `0x1e9030(widget, text, flags, 1, handler, selectable)`; string thunk `0x3e2b730(id)` | D2R's own Yes / No page (its Repair All, `0x110b60` / `0x10d160`): the closer clears the eight list globals (`0x2a487b8`, `c0`, `b0`, `d0`, `98`, `a0`, `a8`, `c8`) and frees their widgets; the creator returns a centred list, byte `+8` = 1 is set by the caller; the header line has flags 4 and no handler, Yes and No are selectable lines (flags 0, handler, selectable 1) with the stock strings `0xd10` (3344) / `0xd11` (3345); `0x2a486a4` = 3 while it is up. The plugin builds it for npcext `PromptConfirm` lines (Akara's respec; `npc_actions.cpp` `OpenConfirm`), its Yes handler closes everything, sends the kind and runs the Cancel handler. `0x110740` (D2R's own No / Escape handler) returns to the vendor panel, so the plugin uses its own. Entries (whole instructions, no rip-relative): `0x110670` `40 53 48 83 ec 20`; `0x1e9200` `48 89 5c 24 08 48 89 6c 24 10 56 57 41 56 48 83 ec 40 41 8b f0 48 8b ea 4c 8b f1`; `0x1e9030` `48 89 5c 24 08 48 89 6c 24 10 56 57 41 56 48 83 ec 20 83 79 1c 0a 41 8b d9 41 8b e8 4c 8b f2`; `0x3e2b730` `ff 25` (D2RCore thunk). Checked in game (`game_checks respec`: click, `menu confirm`, `menu no`, `menu yes`) |
@@ -1261,3 +1262,29 @@ entry and the enabled run must refuse it. Missing borders or failed setup are BL
 Same branches, same arithmetic in both: no signed read, no clamp. Median 2012's missiles.bin (1.13c, record 0x1a4) holds
 `cell & 0xff` at +0x12d for all 2665 rows, and -1 in the Skill word (+0x194) for a skill name its skills.txt lacks.
 
+
+## Send to stash: deposit packet, RotW stash unit, a chat line, the button (lane sendstash, 2026-11-06; plugin/src/send_stash.cpp)
+
+| What | D2R 93847 |
+|-|-|
+| client send of a fixed-size packet `(op, sub, a, b, c, d, e)`; the RotW stash's deposit is op 0x63 sub 0, `a` the item id, `b` the stash unit's id (0x19 bytes) | `0xec880` |
+| server: op 0x63 handler, deposit | `0x4c4af0` -> `0x4f92f0`: refuses (message "Impossible.", `0x491960`) when the slot's count is above 0x62; no town, bank or open-panel test |
+| client local player id (returns 0 in a game: not usable; the part reads the client player's unit id instead) / player by id / unit by (id, type) | `0x8b2d0` / `0x9a480` / `0x9a5d0` |
+| a unit's inventory `(unit, file, line)` (magic 0x1020304 at +0, cursor item +0x40, linked units +0x68: node +0 unit id, +0xa kind, +0x10 next) | `0x34a360` |
+| the RotW stash unit: the linked unit with state 0xd1 (HasState `0x3351b0`) | |
+| the stack item of an item class on the stash unit `(stash, class)` (asserts when the unit lacks state 0xd1) | `0x46d8f0` |
+| a stack's count? (D2RCore thunk, returns a byte): reads 0 in game on the client and the server stash unit, and the stack items carry no non-zero stat (0 to 511, layer 0), so the count was not found | `0x3e2b118` |
+| inventory first / next item; item page (0 backpack) | `0x388c10` / `0x38aba0`; `0x36cfe0` |
+| unit class / unit id `(unit, file, line)`; data flag; items record `(flag, class)`, code at +0x80 | `0x349860` / `0x34a330`; `0x34a0e0`; `0x314110` |
+| server player of a game `(game, 0, id)`, its client | `0x48fe80`, `0x48fde0` |
+| send a chat record (packet 0x26, 0x147 bytes: type 4 = message log line at +1, colour +8, text +0x47) to a client | `0x477a30` |
+
+The client button sends one 0x63 per item and waits until the item leaves the backpack before the next one. An item still in
+the backpack after 1 s was refused, and the server's only refusal for a slot item is a full slot, so the summary lists it as
+"stack full". Deposits work outside town with the stash closed (game run 2026-11-06). A chat record sent while an NPC talks
+freezes the NPC's speech.
+
+Button (D2RLoader widgets on the inventory panel): D2R forwards a button's click message only when the message names a
+registered panel, so the part registers an empty panel `SendStash` (layouts `SendStash.json` / `SendStashhd.json`) through the
+resource and panel services. D2R also hit-tests hidden widgets: a hidden greyed button placed over the live one took its clicks,
+so the live button is the last widget of the list.

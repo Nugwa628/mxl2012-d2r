@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 import ui_art  # noqa: E402
 import upscale  # noqa: E402
@@ -55,7 +55,46 @@ def build(out_dir: Path = HD_OUT / "panel" / "mxl", preview: Path | None = None)
         report.append(f"panel {name}: {dc6_name} set {number} -> {HD_W}x{HD_H} (+ lowend {HD_W // 2}x{HD_H // 2})")
         if preview:
             ui_art.save_png(preview / f"panel_{name}.png", full.resize((HD_W // 3, HD_H // 3), Image.LANCZOS))
+    dc6_name, number = PANELS["cube"]
+    cube = ui_art.panel_sets(MOD_UI / "panel" / dc6_name, pal)[number]
+    full, low = stash_cube(cube), stash_cube(cube, 2)
+    ui_art.write_sprite(out_dir / f"{STASH_CUBE}.sprite", [full])
+    ui_art.write_sprite(out_dir / f"{STASH_CUBE}.lowend.sprite", [low])
+    report.append(f"panel {STASH_CUBE}: the cube's 10 x 8 cells -> {full.width}x{full.height} (+ lowend {low.width}x{low.height})")
+    if preview:
+        ui_art.save_png(preview / f"panel_{STASH_CUBE}.png", full)
     return report
+
+
+STASH_CUBE = "stashcube"  # PANEL\\mxl\\stashcube: the RotW stash's cube window (ui_layouts.stash_hd, bug #515)
+
+
+STASH_CUBE_BEVEL_RAMP = ((49, 38, 31), (128, 107, 99), (67, 54, 43))  # outer to inner, the window's grey bevel
+
+
+def stash_cube(cube: Image.Image, div: int = 1) -> Image.Image:
+    """The RotW stash's cube window (ui_layouts.STASH_CUBE_WINDOW, 287 x 385 inside a 3-pixel bevel): the bevel drawn
+    whole, a black inside with the cube picture's own 10 x 8 cells (the classic grid of inventory.txt's Transmogrify Box,
+    29 pixels a cell) resized to the cells the window's grid draws its items on (ui_layouts.stash_cube_grid), so each item
+    sits in its own cell. `div` 2: the lowend."""
+    import ui_layouts
+    row = ui_layouts.table_rows()["Transmogrify Box Page 1"]
+    cols, rows = row["gridX"], row["gridY"]
+    wx, wy, ww, wh = ui_layouts.STASH_CUBE_WINDOW
+    b = ui_layouts.STASH_CUBE_BEVEL
+    gx, gy, cell = ui_layouts.stash_cube_grid(cols, rows)
+    left, top = row["gridLeft"] - row["invLeft"], row["gridTop"]
+    e = round(ui_layouts.STASH_CUBE_EDGE * row["gridBoxWidth"])  # the line round the cells, in the picture's pixels
+    cells = cube.crop((left - e, top - e, left + cols * row["gridBoxWidth"] + e, top + rows * row["gridBoxHeight"] + e))
+    w, h = ww + 2 * b, wh + 2 * b
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    for i, colour in enumerate(STASH_CUBE_BEVEL_RAMP):
+        ImageDraw.Draw(im).rectangle((i, i, w - 1 - i, h - 1 - i), outline=colour + (255,))
+    im.paste((0, 0, 0, 255), (b, b, b + ww, b + wh))
+    edge = ui_layouts.STASH_CUBE_EDGE * cell
+    im.paste(cells.convert("RGBA").resize((round(cols * cell + 2 * edge), round(rows * cell + 2 * edge)), Image.LANCZOS),
+             (round(gx - edge - wx + b), round(gy - edge - wy + b)))
+    return im if div == 1 else im.resize((round(w / div), round(h / div)), Image.LANCZOS)
 
 
 def main(argv: list[str] | None = None) -> int:

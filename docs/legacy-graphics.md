@@ -422,6 +422,11 @@ so items past the first 3 x 4 cells run off the frame (HD and classic). Classic 
 `rotwstash_cubecover` in the frame: no items there, the cube's own panel shows them, as in classic Median. HD does the
 same since the owner's ruling (2026-11-01; a 10 x 8 grid at scale 0.3 came first): docs/hd-ui.md.
 
+Lane cubewindow (owner 2026-11-05: the items back, "with the correct grid size behind it"): HD shows them again, small, on
+10 x 8 cells of the mod's own cube art (docs/hd-ui.md). Classic keeps the cover: the window is 87 x 116 classic pixels, so
+Median's ten columns would get 8 pixels a cell, and classic draws item pictures at their full 28 pixels a cell whatever the
+grid's `scale` or `cellSize` says (lane cubeui); shrinking them needs a plugin hook in D2R's classic item drawing (not done).
+
 ### 9.6 Why it crashed, and the plugin part `rotwstash` (lane rotwgate, 2026-10-31; docs/plugin-plan.md section 29)
 
 Owner (2026-10-31): "we will need to code it so they only work in rotw some how". Read in the dumped D2R.exe (`d2r_find.py`):
@@ -456,6 +461,11 @@ it out. The text below is the state before that: a RotW account has not opened t
 without RotW the step's tab bar is a small step back from D2R's own: "Personal" is cut to "PERSON" on the 63-pixel tab (D2R's
 own classic tabs are wider; fixed in 9.7). Once the owner test passes, the layout can go into the mod by default; the part is
 already on.
+
+**Empty slots dimmed (bug #546, lane cubewindow, 2026-11-05).** Classic drew every empty Gems / Materials / Runes slot's
+placeholder icon fully lit (HD draws it at alpha 0.2), so only the count showed which slots hold items. The part now draws those
+icons with D2's 25% opaque mode (docs/plugin-plan.md section 29); filled slots are unchanged. Before / after:
+`mxl2012-runs/cubewindow/compare_dim_legacy_runes.png`.
 
 ### 9.7 Tab names that fit (lane stashtab, 2026-10-31, slot 2; docs/testing.md "Lane stashtab")
 

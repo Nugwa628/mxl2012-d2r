@@ -15249,5 +15249,40 @@ def check_leech():
 
 CHECKS += [("leech", check_leech)]
 
+
+def check_akararespec():
+    """Akara's respec without the Den of Evil limit up to level 100, D2R's above (tools/akara_checks.py; run with a NEW MXL_CHAR)."""
+    import akara_checks
+    akara_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("akararespec", check_akararespec)]
+
+
+def check_lifetext():
+    """Bug #547: the life / mana orb text against the client's and the server's life and mana, HD and legacy, after zombie hits
+    and stat writes (tools/lifetext_checks.py)."""
+    import lifetext_checks
+    lifetext_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("lifetext", check_lifetext)]
+
+
+def check_sendstash():
+    """The inventory's send-to-stash button in a RotW game: outside town, a full slot, the summary line, the counts after a
+    reload, HD and legacy (tools/sendstash_checks.py)."""
+    import sendstash_checks
+    sendstash_checks.run(sys.modules[__name__])
+
+
+def check_sendstashclassic():
+    """The send-to-stash button greyed in a classic / expansion game (MXL_CHAR=<an expansion character>; tools/sendstash_checks.py)."""
+    import sendstash_checks
+    sendstash_checks.run_classic(sys.modules[__name__])
+
+
+CHECKS += [("sendstash", check_sendstash), ("sendstashclassic", check_sendstashclassic)]
+
 if __name__ == "__main__":
     main()

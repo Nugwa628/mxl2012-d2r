@@ -67,7 +67,7 @@ D2R has it), **plugin** (needs plugin work, another lane), **owner** (decision n
 | Loot filter (3.x) | D2R UI | no (display only) | keep | - | kept |
 | Chronicle (3.x collection log, cosmetic rewards: portal / footsteps / backlight) | uniques/sets `disableChronicle`, itemtypes `UICategory` / `RunewordCategory1-2`, states chronicle* | no gameplay effect | keep, tracks Median's items (owner 2026-10-28) | `tools/chronicle.py`, see "Chronicle" below | done (data); game check below |
 | Auto gold pickup option | D2R option | small QoL; Median 2012 had none | keep | hiding the option = plugin | owner (question 4) |
-| Akara respec (Reset Stat/Skill Points once per difficulty) and Token of Absolution | D2R engine, misc `toa` | owner: D2R's | keep | Median's cube rows decide whether a Token can be made | kept |
+| Akara respec (Reset Stat/Skill Points once per difficulty) and Token of Absolution | D2R engine, misc `toa` | owner: D2R's; 2026-11-05: unlimited up to level 100 | keep | Median's cube rows decide whether a Token can be made; plugin part `akararespec` (plugin-plan.md section 31) | kept |
 | Diablo Clone world event (2.x online "Terror gazes upon Sanctuary") | Battle.net | no (online only; `diablocloneweight` empty on every Median row) | keep | - | kept |
 | Rite of Passage / D2R hardcoded fixes | engine | no (plugin-plan 9: 1.13c's grant is the same; no hook needed) | keep | - | kept |
 | Potion % per class (`HealthPotionPercent`, `ManaPotionPercent`) | charstats | no (1.13c hardcodes, same values) | keep | - | kept |

@@ -41,6 +41,39 @@ inline constexpr uint64_t ItemPictureRva = 0x154ac0;
 inline constexpr uint8_t ItemPictureEntry[] = {0x44, 0x89, 0x44, 0x24, 0x18, 0x89, 0x54, 0x24, 0x10, 0x55, 0x53, 0x56, 0x41, 0x54, 0x41, 0x56};
 inline constexpr size_t ItemDrawDataOffset = 0x78;
 
+// An empty AdvancedStashSlotWidget (draw 0x2ce4d0, no stack item at +0x608) draws its placeholder item (+0x600) through
+// 0x15bb80(item, position, scale, &{alpha, use}) with the alpha at +0x610 (0.2, set by the widget's constructor 0x2ce3f0):
+// the call at 0x2ce636 is that function's only draw of the placeholder. In HD 0x15bb80 tints by the alpha; in classic it
+// calls 0x150df0, which draws the item's cel through 0x656020 with draw mode 5 (normal; 1, half transparent, for an
+// ethereal item) and drops the alpha, so classic drew every empty slot's icon fully lit (owner 2026-11-05: "make legacy
+// match HD"). The part notes "a classic draw with alpha < 1" around 0x15bb80 and, while it holds, gives 0x656020 a
+// translucent mode instead of 5.
+inline constexpr uint64_t ItemDrawRva = 0x15bb80;
+inline constexpr uint8_t ItemDrawEntry[] = {0x40, 0x53, 0x55, 0x56, 0x48, 0x81, 0xec, 0x40, 0x01, 0x00, 0x00,
+                                            0x0f, 0x29, 0xb4, 0x24, 0x20, 0x01, 0x00, 0x00};  // push x3, sub rsp, movaps
+inline constexpr uint64_t CelDrawRva = 0x656020;
+inline constexpr uint8_t CelDrawEntry[] = {0x4c, 0x8b, 0xdc, 0x53, 0x55, 0x56, 0x57, 0x41, 0x56, 0x41, 0x57,
+                                           0x48, 0x81, 0xec, 0xb8, 0x00, 0x00, 0x00};  // mov r11,rsp, push x6, sub rsp
+inline constexpr uint64_t SlotPlaceholderDrawCall = 0x2ce636;
+inline constexpr uint8_t SlotPlaceholderDraw[] = {0xe8, 0x45, 0xd5, 0xe8, 0xff};  // call 0x15bb80 (compared, not patched)
+inline constexpr uint32_t CelModeNormal = 5;
+inline constexpr uint32_t CelModeDim = 0;   // D2's 25% opaque mode (1 is the ethereal 50%)
+
+struct DrawAlpha {   // 0x15bb80's fourth argument
+	float alpha;
+	uint8_t use;
+};
+
+// 0x15bb80 in classic with this argument: a dimmed draw.
+constexpr auto DimDraw(bool hd, const DrawAlpha* a) noexcept -> bool {
+	return !hd && a != nullptr && a->use != 0 && a->alpha < 0.999f;
+}
+
+// The mode 0x656020 gets: a normal draw inside a dimmed one turns translucent, anything else stays.
+constexpr auto CelMode(uint32_t mode, bool dim, uint32_t dimMode = CelModeDim) noexcept -> uint32_t {
+	return dim && mode == CelModeNormal ? dimMode : mode;
+}
+
 // When the stash wires its pages in classic graphics.
 enum class Mode {
 	Always,  // every game, as D2R does in HD (the default): D2R's own RotW rule then keeps the RotW tabs closed without RotW

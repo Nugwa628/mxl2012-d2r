@@ -69,7 +69,7 @@ LAUNCH = {"default_mod": NAME, "launch_arguments": ""}
 # the gitlink third_party/D2R-Legacy169 pins (tools/build_legacy169.ps1), unless --legacy169 is given. Its default config goes
 # in too, as a `preserve` file: D2RLoader would write it at the first start, but the downloader removes files the release does
 # not list, so a player's `enabled = false` would not survive an update.
-LEGACY169 = {"name": "D2R Legacy 16:9", "version": "0.1.0", "repo": "https://github.com/Nugwa628/D2R-Legacy169",
+LEGACY169 = {"name": "D2R Legacy 16:9", "version": "0.1.1", "repo": "https://github.com/Nugwa628/D2R-Legacy169",
              "dll": "d2rloader/plugins/legacy169.dll", "config": "d2rloader/config/legacy169.toml"}
 LEGACY169_BUILD = ROOT / "build" / "legacy169"
 # Buff HUD by Lukaszpg (MIT), shipped as our fork (branch mxl2012: the generic fixes offered upstream plus the Median XL 2012

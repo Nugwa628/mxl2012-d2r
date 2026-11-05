@@ -16,7 +16,7 @@ PC); lane legacy169ship, docs/testing.md "Lane legacy169ship".
   embedded in the DLL), but the downloader removes files the release does not list, so the package lists it as a `preserve`
   file: written when missing, never overwritten, and a player's `enabled = false` survives Update and Repair. The manifest's
   `bundledPlugins` names the plugin, version, repository and commit.
-- **Reproducible build:** the gitlink `third_party/D2R-Legacy169` pins the commit (v0.1.0 + #544's fix, `2fb00af`).
+- **Reproducible build:** the gitlink `third_party/D2R-Legacy169` pins the commit (v0.1.1, `d6fe85d`: v0.1.0 plus #544's fix).
   `tools/build_legacy169.ps1` exports exactly that commit (`git archive`) from the submodule, or from `MXL_LEGACY169_DIR`
   (a local clone, `.mxl-local.json`), builds it with release options (no test harness, no bad-bytes table) against the
   PluginSDK of `tools/build_plugin.ps1` and runs its unit tests. `tools/package_release.py` runs it (or takes `--legacy169
@@ -74,7 +74,7 @@ HD, `ScreenSizeX` x `ScreenSizeY` in legacy), also while the game window is in t
   `tools/build_buffhud.ps1` exports exactly that commit (`git archive`, files as committed, so the MPQ has the same bytes on
   any machine) from the submodule or from `MXL_BUFFHUD_DIR` (a local clone, `.mxl-local.json`), exports the PluginSDK commit the
   fork pins from the PluginSDK of `tools/build_plugin.ps1`, and runs the fork's own `scripts\build.ps1` (release preset, its
-  15 tests) and companion pack. `tools/package_release.py` runs it (or takes `--buffhud DLL`, the MPQ next to it) and refuses
+  16 tests) and companion pack. `tools/package_release.py` runs it (or takes `--buffhud DLL`, the MPQ next to it) and refuses
   a build that is not our fork (no embedded `buff-panel.toml`), another version or a missing / unpacked MPQ;
   `tools/verify_package.py` checks all five files are in a player package. `--no-data` (CI) and `--no-bundled` (unit tests)
   packages leave it out. To move to a new fork commit: push it to the fork, `git -C third_party/d2rl-buff-hud checkout
@@ -82,8 +82,25 @@ HD, `ScreenSizeX` x `ScreenSizeY` in legacy), also while the game window is in t
 - **Turn it off:** `enabled = false` under `[buff_panel]` in `buff-panel.toml`, then start the game again: the plugin loads,
   logs it and starts nothing (no panel, no hook). Delete the DLL to remove it (the downloader puts it back on Repair).
 - **Next to mxl2012-core (and legacy169):** no hook refused (`mxl2012`: `plugin clashes: none`), checked in game in HD and
-  legacy (docs/testing.md "Lane buffship"). The panel does not hide when the stash or another panel is open (seen in HD and
-  legacy): it is not a feature of the plugin. In legacy it overlaps the lower edge of the stash panel.
+  legacy (docs/testing.md "Lane buffship").
+- **Hides with big panels (fork, lane buffhide):** `hide_with_panels = true` (the default; a `buff-panel.toml` without the
+  key keeps it) hides the icons while the stash or the Horadric Cube is open, in HD and legacy (owner decision 2026-11-05:
+  in legacy they covered the stash's corner and close button), and shows them again when it closes. A side panel
+  (character, quests, waypoints, vendor / trade, mercenary, party on the left; inventory and skill tree on the right) hides
+  them only while it covers an occupied icon slot, so a player can still fight with the inventory open: in legacy (also
+  with legacy169 at 16:9 and 16:10) every left panel covers the first icon and a right panel the sixth (16:10) or seventh
+  (16:9) one; in HD the panels end above the grid and only the top row's seventh icon reaches a right panel.
+  `hide_with_panels = false` keeps them shown always. `buff-panel status` reports `hiddenBy=<panel>`, `buff-panel panels`
+  which native panels are open. docs/testing.md "Lane buffhide".
+- **Icons for buffs without one (fork, lane bufficons):** Median XL 2012 gives some buff skills no icon (skilldesc
+  `IconCel` 0 of the shared sheet, the "?" picture). `buff-hud-display.txt` points those rows at a frame of the mod's own
+  skill icon sheets (Median's art, built from the game data into the mod, never in git): Elemental Fury (state 31) druid
+  frame 20 (Elemental), Blades Of Light (81) sorceress 56 (Bladestorm), Superbeast Neutral (178) paladin 54 (Superbeast),
+  Mark Of The Bear (190) druid 50 (an unused bear frame) and Mark Of The Wolf (191) druid 6 (an unused wolf-head frame).
+  Class sheets have the same frames in HD and legacy, so one row serves both. The two Marks are D2R's own item-effect
+  rows that no Median skill or item grants, so only the other three were seen in game. Rows that still use global frame 0: Lightning
+  Enchant (222), Cold Enchant (223), Shadowform (232), Lifeblood (240), Elixir of Power (241, shows its item picture),
+  Stamina Potion (271, item picture) and Cow Disguise (301). docs/testing.md "Lane bufficons".
 - **Test runs:** a dev install (`tools/install_mod.py`) does not install it; a release install does.
 
 ## Auto Belt Refill by jaycachou-svg

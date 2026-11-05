@@ -31,7 +31,7 @@ class VerifyPackageTests(unittest.TestCase):
         src.mkdir()
         (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\n", encoding="utf-8")
         (src / "PINNED_COMMIT").write_text(pr.legacy169_commit(), encoding="ascii")
-        (self.tmp / "legacy169.dll").write_bytes(b"MZ legacy169\0 0.1.0\0")
+        (self.tmp / "legacy169.dll").write_bytes(b"MZ legacy169\0 0.1.1\0")
         pr.stage_legacy169(self.mod, self.tmp / "legacy169.dll", src)
         buff = self.tmp / "buffhud-src"  # what tools/build_buffhud.ps1 exports
         (buff / "external" / "PluginSDK").mkdir(parents=True)
@@ -49,7 +49,7 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / "modinfo.json").write_text(json.dumps({"name": "mxl2012", "savepath": "mxl2012-s2/"}))
         (self.mod / "d2rloader" / "plugins" / "mxl2012-core.dll").write_bytes(b"MZ mxl2012-testharness.txt\0")
         (self.mod / "Hero.d2s").write_bytes(b"x")
-        (self.mod / pr.LEGACY169["dll"]).write_bytes(b"MZ legacy169\0 0.1.0-test\0")
+        (self.mod / pr.LEGACY169["dll"]).write_bytes(b"MZ legacy169\0 0.1.1-test\0")
         (self.mod / pr.LEGACY169["config"]).unlink()
         (self.mod / pr.BUFFHUD["mpq"]).write_bytes(b"PK")
         (self.mod / pr.BUFFHUD["licence"]).unlink()

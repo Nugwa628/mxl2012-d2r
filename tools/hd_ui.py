@@ -69,6 +69,11 @@ def build() -> int:
     materials = read_sprite(BASE_UI / STASH_ART_DIR / f"{STASH_ART[0]}.sprite")[0]
     for line in median_stash.build(d2r_layout, materials, HD_OUT / STASH_ART_DIR):
         print(line)
+    print("== send to stash button")
+    import send_stash
+    from ui_paths import OUT_DATA
+    for line in send_stash.art(OUT_DATA):
+        print(line)
     print("== check")
     return rc | ui_check.main()
 

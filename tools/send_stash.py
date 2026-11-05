@@ -1,0 +1,286 @@
+"""The "Send storable/stackable items to stash" button on the inventory panel (plugin part `sendstash`, plugin/src/send_stash.cpp;
+owner request 2026-11-05).
+
+A click sends every backpack item that has a slot on a Reign of the Warlock stash page (Gems / Materials / Runes) into that slot,
+the way D2R's own Ctrl+click into those pages does, from anywhere and with the stash closed. The item codes are the
+`AdvancedStashSlotWidget` codes of the mod's HD stash layout (D2R's own plus Median's, tools/median_stash.py): the server takes
+any item whose row has `AdvancedStashStackable`, also one with no slot widget, and that item would be stored but never shown, so
+the plugin sends only codes from this list.
+
+Three buttons on the same spot; the layouts show the first, the plugin shows the one that fits the game:
+
+  MxlSendStash         the button (its click sends PanelManager:OpenPanel:mxl2012-core/SendStash, which the plugin's UI message
+                       listener takes: D2R passes only known targets to plugin listeners, docs/bugs.md #543)
+  MxlSendStashNoSlots  greyed, no click: a game without the RotW stash pages (classic / expansion games)
+  MxlSendStashJoined   greyed, no click: joined to another player's game (the round trip of a joiner's stash is not tested)
+
+Places: HD, the empty square under the backpack grid on the bottom left of the mod's inventory picture (Median's old close
+square); legacy (classic layouts, G), on the stone between the close button and the gold box at the bottom of the panel. Both are
+in the inventory layouts, so they move and scale with the panel at every aspect ratio.
+
+Art (written by `tools/hd_ui.py build` through `art`): HD `PANEL\\mxl\\sendstash` (.sprite + .lowend, 4 frames: normal, hovered,
+pressed, greyed), classic `PANEL\\mxl_sendstash` (DC6, 3 frames: normal, pressed, greyed; a gold-rimmed recess like the gold box beside it).
+
+  py -3 -I tools/send_stash.py header          write plugin/src/mxl_send_stash.h (needs the D2R baseline, tools/hd_ui.py)
+  py -3 -I tools/send_stash.py art [DIR]       the art into DIR (default work/hd-ui/data) and a preview PNG next to it
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+ROOT = Path(__file__).resolve().parent.parent
+HEADER = ROOT / "plugin" / "src" / "mxl_send_stash.h"
+
+PLUGIN_ID = "mxl2012-core"
+MESSAGE_PANEL = f"{PLUGIN_ID}/SendStash"
+MESSAGE = f"PanelManager:OpenPanel:{MESSAGE_PANEL}"
+BUTTON = "MxlSendStash"
+NO_SLOTS = "MxlSendStashNoSlots"
+JOINED = "MxlSendStashJoined"
+INVENTORY_PANELS = ("PlayerInventoryExpansionLayout", "PlayerInventoryOriginalLayout")  # the layouts' root names
+TIP = "Send storable/stackable items to stash"
+TIP_NO_SLOTS = TIP + "\nNeeds a stash page with slots (Reign of the Warlock games)"
+TIP_JOINED = TIP + "\nNot available when joined to another player's game"
+
+# HD: inside the bottom-left square of the mod's inventory picture (classic 17..50 x 386..417, measured on an HD capture of
+# lane legacy169ship: 1045..1096 x 646..694 at 1600 x 900)
+HD_RECT = (70, 1350, 104, 100)
+HD_ART = "sendstash"
+HD_FRAMES = {"normal": 0, "hovered": 1, "pressed": 2, "greyed": 3}
+# classic: the stone between the close button (buysellbtn at 18, 384, 32 x 32) and the gold box (coin recess from 82)
+SD_RECT = (53, 388, 24, 24)
+SD_ART = "mxl_sendstash"
+SD_FRAMES = {"normal": 0, "pressed": 1, "greyed": 2}
+
+
+# ---- slot codes ------------------------------------------------------------------------------------------------------
+def slot_codes(layout: dict) -> list[str]:
+    """Every `AdvancedStashSlotWidget` itemCode of a parsed HD stash layout, in layout order, without repeats."""
+    out: list[str] = []
+
+    def walk(node: dict) -> None:
+        if node.get("type") == "AdvancedStashSlotWidget":
+            code = node.get("fields", {}).get("itemCode")
+            if code and code not in out:
+                out.append(code)
+        for c in node.get("children", []):
+            walk(c)
+    walk(layout)
+    return out
+
+
+def mod_stash_layout() -> dict:
+    """The mod's HD stash layout as tools/ui_layouts.stash_hd writes its slot pages: D2R's baseline with Median's slots."""
+    import median_stash
+    import ui_layouts
+    from rotw_stash_legacy import lenient_json
+    return median_stash.apply(lenient_json(ui_layouts.baseline("bankexpansionlayouthd.json")))
+
+
+def header(codes: list[str] | None = None) -> str:
+    """plugin/src/mxl_send_stash.h: the slot codes (4 characters, space padded as the items record keeps them) and the widget
+    names and texts the plugin uses."""
+    codes = mod_stash_layout_codes() if codes is None else codes
+    bad = [c for c in codes if not 1 <= len(c) <= 4]
+    if bad:
+        raise ValueError(f"item codes longer than 4 characters: {bad}")
+    rows = [", ".join(json.dumps(c.ljust(4)) for c in codes[i:i + 12]) for i in range(0, len(codes), 12)]
+    return ("// Generated by tools/send_stash.py (header); do not edit.\n#pragma once\n\nnamespace mxl_send_stash {\n\n"
+            f'inline constexpr char MessagePanel[] = "{MESSAGE_PANEL}";\n'
+            f'inline constexpr char Button[] = "{BUTTON}";\n'
+            f'inline constexpr char NoSlots[] = "{NO_SLOTS}";\n'
+            f'inline constexpr char Joined[] = "{JOINED}";\n'
+            + "".join(f'inline constexpr char Panel{i}[] = "{p}";\n' for i, p in enumerate(INVENTORY_PANELS))
+            + f"// the codes of the slot widgets of the mod's HD stash layout ({len(codes)})\n"
+            f"inline constexpr unsigned CodeCount = {len(codes)};\n"
+            "inline constexpr char Codes[CodeCount][5] = {\n" + "".join(f"    {r},\n" for r in rows) + "};\n"
+            "\n}  // namespace mxl_send_stash\n")
+
+
+def mod_stash_layout_codes() -> list[str]:
+    return slot_codes(mod_stash_layout())
+
+
+# ---- layouts ---------------------------------------------------------------------------------------------------------
+def widgets(hd: bool) -> list[dict]:
+    """The three buttons (ui_layouts puts them into the four inventory layouts)."""
+    x, y, w, h = HD_RECT if hd else SD_RECT
+    frames = HD_FRAMES if hd else SD_FRAMES
+    filename = f"PANEL\\mxl\\{HD_ART}" if hd else f"PANEL\\{SD_ART}"
+
+    def button(name: str, tip: str, live: bool) -> dict:
+        f = {"rect": {"x": x, "y": y, "width": w, "height": h}, "filename": filename, "tooltipString": tip}
+        if live:
+            f.update(normalFrame=frames["normal"], pressedFrame=frames["pressed"], onClickMessage=MESSAGE)
+            if hd:
+                f.update(hoveredFrame=frames["hovered"])
+        else:  # hidden until the plugin shows it
+            f.update(normalFrame=frames["greyed"], pressedFrame=frames["greyed"], visible=False)
+            if hd:
+                f.update(hoveredFrame=frames["greyed"])
+        return {"type": "ButtonWidget", "name": name, "fields": f}
+    # the live button last: D2R hit-tests a hidden widget too, so a greyed one drawn over it would take its clicks
+    return [button(NO_SLOTS, TIP_NO_SLOTS, False), button(JOINED, TIP_JOINED, False), button(BUTTON, TIP, True)]
+
+
+def add_to_layout(text: str, hd: bool) -> str:
+    """An inventory layout's text with the buttons after its `close` button (D2R's four inventory layouts all name one)."""
+    import ui_layouts
+    if f'"name": "{BUTTON}"' in text:
+        return text
+    _s, e = ui_layouts.block_span(text, '"type": "ButtonWidget", "name": "close"')
+    line_start = text.rindex("\n", 0, _s) + 1
+    indent = text[line_start:_s]
+    if not text[e - 1] == ",":
+        text, e = text[:e] + "," + text[e:], e + 1
+    added = "".join(f"\n{indent}{json.dumps(w)}," for w in widgets(hd))
+    return text[:e] + added + text[e:]
+
+
+# ---- art -------------------------------------------------------------------------------------------------------------
+SS = 4  # supersampling of the glyph
+
+
+def glyph(w: int, h: int, fg: tuple, filled: bool = False):
+    """A stash chest with an arrow pointing left, out of it towards the stash (the left panel)."""
+    from PIL import Image, ImageDraw
+    W, H = w * SS, h * SS
+    g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(g)
+    s = min(W, H)
+    ox, oy = (W - s) // 2, (H - s) // 2
+
+    def P(x, y):
+        return (ox + x * s, oy + y * s)
+    if filled:
+        d.rectangle([P(0.40, 0.26), P(0.92, 0.44)], fill=fg)
+        d.rectangle([P(0.40, 0.49), P(0.92, 0.82)], fill=fg)
+        d.rectangle([P(0.61, 0.40), P(0.71, 0.56)], fill=(0, 0, 0, 0))
+    else:
+        lw = max(1, int(s * 0.05))
+        for box in ([P(0.40, 0.28), P(0.90, 0.46)], [P(0.40, 0.46), P(0.90, 0.80)]):
+            d.rectangle(box, outline=fg, width=lw)
+        d.rectangle([P(0.61, 0.40), P(0.69, 0.54)], fill=fg)
+    d.polygon([P(0.08, 0.54), P(0.30, 0.38), P(0.30, 0.48), P(0.40, 0.48), P(0.40, 0.60), P(0.30, 0.60), P(0.30, 0.70)], fill=fg)
+    return g.resize((w, h), Image.LANCZOS)
+
+
+def hd_frames(w: int = HD_RECT[2], h: int = HD_RECT[3]) -> list:
+    """Normal, hovered, pressed, greyed: a dark bevelled plate with a gold glyph (the greyed one grey on a darker plate)."""
+    from PIL import Image, ImageDraw
+    out = []
+    for kind in ("normal", "hovered", "pressed", "greyed"):
+        im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        d.rectangle([0, 0, w - 1, h - 1], fill=(20, 16, 12, 255) if kind == "greyed" else (30, 24, 17, 255))
+        ramp = [(120, 96, 52), (96, 77, 43), (78, 62, 36), (60, 48, 30), (50, 40, 26)]
+        if kind == "pressed":
+            ramp = ramp[::-1]
+        if kind == "greyed":
+            ramp = [(72, 70, 66), (60, 58, 55), (50, 48, 46), (42, 40, 38), (36, 34, 32)]
+        for i, c in enumerate(ramp):
+            d.rectangle([i, i, w - 1 - i, h - 1 - i], outline=c + (255,))
+        if kind == "hovered":
+            im = Image.alpha_composite(im, Image.new("RGBA", (w, h), (255, 230, 160, 30)))
+        colour = {"normal": (214, 180, 96), "hovered": (240, 208, 120), "pressed": (190, 158, 80), "greyed": (104, 100, 94)}[kind]
+        m = 14
+        gl = glyph(w - 2 * m, h - 2 * m, colour + (255,))
+        sh = Image.new("RGBA", gl.size, (0, 0, 0, 200))
+        sh.putalpha(gl.getchannel("A"))
+        shift = 2 if kind == "pressed" else 0
+        im.alpha_composite(sh, (m + 2 + shift, m + 2 + shift))
+        im.alpha_composite(gl, (m + shift, m + shift))
+        out.append(im)
+    return out
+
+
+def pixel_glyph(fg: tuple):
+    """The glyph drawn pixel by pixel for the classic 24-pixel button (17 x 13): a chest (lid, body, lock) and an arrow left."""
+    from PIL import Image, ImageDraw
+    g = Image.new("RGBA", (17, 13), (0, 0, 0, 0))
+    d = ImageDraw.Draw(g)
+    d.rectangle([8, 0, 16, 3], outline=fg)
+    d.rectangle([8, 3, 16, 12], outline=fg)
+    d.rectangle([11, 2, 13, 5], fill=fg)
+    d.point((12, 4), fill=(0, 0, 0, 0))
+    d.polygon([(0, 7), (3, 4), (3, 10)], fill=fg)
+    d.rectangle([3, 6, 7, 8], fill=fg)
+    return g
+
+
+def sd_frames(pal, size: tuple[int, int] = SD_RECT[2:]) -> list:
+    """Normal, pressed, greyed at the classic size, as palette indices of D2R's units palette: a dark recess with a gold rim
+    like the gold box beside it, the glyph in gold (pressed: one pixel down and right, darker; greyed: grey)."""
+    from PIL import Image, ImageDraw
+    import rotw_stash_legacy as rsl
+    w, h = size
+    out = []
+    for kind in ("normal", "pressed", "greyed"):
+        im = Image.new("RGBA", (w, h))
+        d = ImageDraw.Draw(im)
+        rim = (112, 108, 100, 255) if kind == "greyed" else (190, 160, 84, 255)
+        d.rectangle([0, 0, w - 1, h - 1], outline=(24, 20, 16, 255))
+        d.rectangle([1, 1, w - 2, h - 2], outline=rim)
+        d.rectangle([2, 2, w - 3, h - 3], fill=(14, 12, 10, 255))
+        if kind == "pressed":
+            d.line([(2, 2), (w - 3, 2)], fill=(4, 4, 4, 255))
+            d.line([(2, 2), (2, h - 3)], fill=(4, 4, 4, 255))
+        fg = {"normal": (224, 190, 100, 255), "pressed": (186, 154, 76, 255), "greyed": (110, 106, 98, 255)}[kind]
+        g = pixel_glyph(fg)
+        shift = 1 if kind == "pressed" else 0
+        im.alpha_composite(g, ((w - g.width) // 2 + shift, (h - g.height) // 2 + shift))
+        im.putalpha(255)
+        out.append(rsl.quantise(im, pal, dither=False))
+    return out
+
+
+def art(out_data: Path, preview: Path | None = None) -> list[str]:
+    """HD sprite (+ .lowend) under out_data/hd/global/ui/panel/mxl, classic DC6 under out_data/global/ui/panel."""
+    from PIL import Image
+    import rotw_stash_legacy as rsl
+    import ui_art
+    from ui_paths import PAL
+    frames = hd_frames()
+    w, h = frames[0].size
+    hd_dir = Path(out_data) / "hd" / "global" / "ui" / "panel" / "mxl"
+    ui_art.write_sprite(hd_dir / f"{HD_ART}.sprite", frames, w + 2)
+    low = [f.resize((w // 2, h // 2), Image.LANCZOS) for f in frames]
+    ui_art.write_sprite(hd_dir / f"{HD_ART}.lowend.sprite", low, w // 2 + 2)
+    pal = ui_art.palette(PAL)
+    sd = sd_frames(pal)
+    sd_dir = Path(out_data) / "global" / "ui" / "panel"
+    sd_dir.mkdir(parents=True, exist_ok=True)
+    (sd_dir / f"{SD_ART}.dc6").write_bytes(rsl.dc6_bytes(sd))
+    if preview:
+        sheet = Image.new("RGBA", (4 * (w + 8) + 3 * (SD_RECT[2] * 4 + 8), max(h, SD_RECT[3] * 4) + 8), (60, 0, 60, 255))
+        for i, f in enumerate(frames):
+            sheet.alpha_composite(f, (4 + i * (w + 8), 4))
+        for i, idx in enumerate(sd):
+            im = rsl.to_rgba(idx, pal).resize((SD_RECT[2] * 4, SD_RECT[3] * 4), Image.NEAREST)
+            sheet.alpha_composite(im, (4 * (w + 8) + 4 + i * (SD_RECT[2] * 4 + 8), 4))
+        Path(preview).parent.mkdir(parents=True, exist_ok=True)
+        sheet.convert("RGB").save(preview)
+    return [f"send to stash: {HD_ART}.sprite {w}x{h} x {len(frames)} (+ lowend), {SD_ART}.dc6 {SD_RECT[2]}x{SD_RECT[3]} x {len(sd)}"]
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv == ["header"]:
+        HEADER.write_text(header(), encoding="utf-8", newline="\n")
+        print(f"{HEADER}: {HEADER.stat().st_size} bytes")
+        return 0
+    if argv and argv[0] == "art" and len(argv) <= 2:
+        from ui_paths import OUT_DATA
+        out = Path(argv[1]) if len(argv) == 2 else OUT_DATA
+        print("\n".join(art(out, out.parent / "send_stash_preview.png")))
+        return 0
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

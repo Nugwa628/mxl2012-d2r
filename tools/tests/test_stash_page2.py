@@ -56,10 +56,11 @@ class StashPage2Test(unittest.TestCase):
         if not (ui_layouts.BASE_UI / "layouts" / "bankexpansionlayouthd.json").exists():
             self.skipTest("no D2R baseline (py -3 tools/hd_ui.py baseline <extraction>)")
         from rotw_stash_legacy import lenient_json
-        lay = lenient_json(ui_layouts.stash_hd())
+        cube = {"gridX": 10, "gridY": 8}
+        lay = lenient_json(ui_layouts.stash_hd(cube))
         box = find(lay, "basicstash_container")
         self.assertEqual([c["name"] for c in box["children"]][-2:], ["MxlPersonalNavigation", "SharedStashTabContainer"])
-        ctl = ui_layouts.stash_hd("controller/bankexpansionlayouthd.json")
+        ctl = ui_layouts.stash_hd(cube, "controller/bankexpansionlayouthd.json")
         self.assertNotIn("MxlPersonalNavigation", ctl)  # the gamepad layout has no arrows to click
 
 

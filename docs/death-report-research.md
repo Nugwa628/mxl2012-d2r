@@ -197,4 +197,15 @@ In-game test (slot 2, `game_checks.py` check `deathlog`, mortal character, god m
 - Should other players in the game see a one-line "killed by" in chat?
 - Hardcore: keep every death report of a character (file), or only the last one?
 
+## 6. Owner decisions (2026-11-05)
+
+Planned for a later release, not scheduled yet:
+
+- Window: the last 30 seconds before the death (at most about 64 hits).
+- Nothing is saved: no `deaths.txt`, no file in the save folder. The report is a panel on the death screen that closes
+  with the respawn, the killing blow highlighted at the bottom, and a Copy button that puts the text on the clipboard
+  (for Discord or a bug report); players can also take a screenshot.
+- So stage 1's file and the questions about the file place and Hardcore history fall away; the console lines stay as a
+  tester tool. Single player and the host only (3.3).
+
 Evidence and scratch: `mxl2012-runs/deathlog/notes.md`.

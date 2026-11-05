@@ -81,24 +81,42 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
 - [ ] Ship PyreFly's plugins with the mod (controller-qol, pyre-lootfilter, pyre-stashsearch, item-roll-ranges,
   inventory-deposit),
   adapted to Median XL 2012 where needed: docs/bundled-plugins.md (after 0.1.11)
-- [ ] Release 0.1.12 (owner list, 2026-11-05):
+- [x] Release 0.1.12 (2026-11-05, owner list of 2026-11-05):
   - [x] Barbarian spirits: stricter fight rule (target within 25 of the owner, at most 4 s; lane spiritfight, #534)
   - [x] Ship the D2R Legacy 16:9 plugin (lane legacy169ship)
   - [x] Ship Buff HUD by Lukaszpg (our fork, branch `mxl2012`: Median buffs, legacy, elixir pictures, hover names; lane
     buffship)
-  - [ ] Ship jaycachou-svg's Auto Belt Refill plugin if its author agrees (docs/bundled-plugins.md; lane beltrefill)
-  - [ ] "Send to stash" button in the empty cell under the inventory, from the owner's Sigma work (the Sigma port has only the design, docs/unported.md: waits for the owner's choice of behaviour)
   - [x] Median XL potions (experience, greed, ...) no longer stack onto life / mana potions in the belt (#541, lane beltstack)
   - [x] Does life / mana leech work? (#540, lane leech: yes, as Median)
   - [x] Act 4 Heretics: an HD model that can be seen (#542, lane heretic)
   - [x] Research: stackable shrines, new runes, new potions (lane stackres): [stacking-research.md](stacking-research.md)
   - [x] Median's runes r34-r56 and its 25 gems stack in the RotW stash's Runes / Gems pages, HD and classic (owner
     2026-11-05, lane medstash; stacking-research.md section 4)
-  - [ ] A "Median XL" stash tab for shrines, elixirs, signets, crystals, oils: designed, not built, owner questions open
-    ([median-stash-tab.md](median-stash-tab.md))
   - [x] Research: does D2R's inventory auto sort work with the mod, or could it (lane autosort):
     [docs/autosort-research.md](autosort-research.md). Controller only ("Hold to Sort"); nothing for mouse and keyboard;
     our own plugin part would take about 5-6 days
   - [x] Research: a death report (who hit the player for how much, up to the death) (lane deathlog; design in
     [death-report-research.md](death-report-research.md), feasible: one read-only hook on D2R's apply-damage `0x44ce80`)
+- [x] Release 0.1.13 (2026-11-06):
+  - [x] "Send to stash" button in the empty cell under the inventory (owner's answers 2026-11-05; lane sendstash, plugin part
+    `sendstash`, docs/testing.md "Lane sendstash"): backpack items with a RotW stash slot go into it, full slots stay, one chat
+    line; greyed in classic / expansion games and for joiners (joiners stay off until a two-instance test)
+  - [x] Akara's respec unlimited up to level 100, D2R's one per difficulty above (owner 2026-11-05, lane akararespec;
+    plugin part `akararespec`, plugin-plan.md section 31)
+  - [x] use D2RLoader's Transmute Horadric Cube (documented)
+  - [x] The RotW stash cube window shows the cube's items again on a matching 10 x 8 grid (owner 2026-11-05, lane cubewindow, #515)
+  - [x] Legacy graphics dim the RotW-only stash slots (#546); Buff HUD hides behind open panels; five new buff icons
+- [ ] Later: death report panel on the death screen (last 30 s, Copy button, nothing saved; owner 2026-11-05,
+  [death-report-research.md](death-report-research.md) section 6)
+- [ ] Release 0.1.14, to look into (owner 2026-11-06; no work yet):
+  - [ ] Ship jaycachou-svg's Auto Belt Refill plugin if its author agrees (docs/bundled-plugins.md; lane beltrefill)
+  - [ ] A "Median XL" stash tab for shrines, elixirs, signets, crystals, oils: designed and probed
+    (option D, MEDIAN and ORBS tabs, Vanilla/Median selector in Materials), not built; waits for the owner's go
+    ([median-stash-tab.md](median-stash-tab.md))
+  - [ ] Transition immunity
+    ([D2R-Tools/plugins/transition-immunity](https://github.com/Nugwa628/D2R-Tools/tree/main/plugins/transition-immunity)):
+    check that it works first, then maybe build it into the mod in some form instead of shipping the plugin
+  - [ ] MapSense
+    ([RuffnecKk-D2RLoader-Suite/plugins/mapsense](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/mapsense)):
+    probably not all of its features; decide which ones we want
 - [x] GitHub mirror and issue templates live (2026-10-29: https://github.com/Nugwa628/mxl2012-d2r, public; fresh history, one snapshot commit per mirror run)
