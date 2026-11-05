@@ -5443,6 +5443,34 @@ and runs 20 + 20 west from a live zombie. Distances are sub-tiles from the playe
 | Harness on the shared frame hook | all verbs ran in both modes |
 | Crash | none (HD and legacy, 12 summons) |
 
+## Lane spiritfight: a stricter fight hold for the Barbarian spirits (bug #534, 2026-11-05, slot 2, background mode)
+
+Owner: the spirits should come back to the player reliably at about 20. Lane spiritwarp's rule held a spirit beyond 20 while its
+target was alive and in reach **or** within 40 of the owner, with no time limit. New rule (`spirit_warp_logic.h`): held only while
+its own target is alive, in its reach and within 25 of the owner, for at most 4 s; always warped beyond 40. Lab:
+`mxl2012-runs/spiritfight/lab.py` (lane spiritwarp's, plus `roam`: 4 x 25 sub-tile walks with the Blood Moor's monsters left alive,
+and the new `spiritheld` line of `mxl`), Guardian / Defender / Protector Spirit and Wolf Companion, HD then legacy. Both runs use
+the same counters: `runA_old` (old rule, `dll/diag-oldrule.dll`), `runB_strict` (new rule). Per mode below (the counters add
+up over the run); polls are the lab's 1 s spirit distances during the follow, flee and roam legs (`analyze.py`).
+
+| Check | Old rule (`runA_old`) | New rule (`runB_strict`) |
+|-|-|-|
+| checks beyond 20 left fighting, HD | 45 of 80 (56%), 35 warps | 22 of 83 (27%), 61 warps |
+| checks beyond 20 left fighting, legacy | 98 of 131 (75%), 33 warps | 6 of 47 (13%), 41 warps |
+| what held them | all 143 a lab zombie (none an ambient monster); target 26-40 from the owner in 84, out of reach in 8; spirit 31-40 off in 45 | all 28 a target in reach within 25 of the owner (26 a lab zombie); spirit 21-30 off |
+| longest hold of one spirit | 15 s (HD), 34 s (legacy) | 4 s (7 warps at the cap) |
+| polls over 20 / 25 / 30, HD | 14.2% / 6.5% / 6.1%, max 40 | 10.1% / 3.9% / 2.3%, max 36 |
+| polls over 20 / 25 / 30, legacy | 13.3% / 11.3% / 6.0%, max 43 | 6.8% / 5.2% / 1.2%, max 34 |
+| fights near the player (zombie 10 / 20 / 30 off, and 10 after the walks) | attack and hit at 10 and 20 every time; 30: hit in 4 of 6 | the same at 10 and 20; 30: hit in 3 of 6 (a "-" is a zombie that was not spawned or not reached in 14 s, in both runs) |
+| Wolf Companion (not touched by the part) | attacks at 10 and 20, follows within about 1-16 | the same (once 29 off in HD, back at 10 one poll later) |
+| unit test `spiritwarp_tests` | - | passed (in reach and within 25, the 4 s cap, one hold per spirit) |
+| crash | none; only the exit-only pool asserts | the same |
+
+The 75% of lane spiritwarp came from the lab's own zombies 26-40 from the player, not from ambient monsters: in `runA_old` every held
+check had the lab zombie as target, and `roam` found at most one live monster within 40. With the new rule a spirit that walks out
+to a monster farther than 25 from the player is warped back and engages again from the player's side. Not tested: a pack of many
+monsters, Nightmare / Hell, a party (two owners).
+
 ## Lane stashpage2: a second personal stash page (bug #537, 2026-11-05, slot 2, background mode)
 
 Owner (2026-11-04): the personal stash gets a second page through D2RLoader 1.3.1's one custom player page (`stash2`, item page 6,
@@ -5527,3 +5555,237 @@ Tool gap seen on the way: `game_ctl` finds only the slot's renamed loader (`D2RL
 
 Tests: `tools/tests` 1034 OK, `tools` `test_*.py` 520 OK (5 skipped), `check_docs_links` 0, `check_public` 0 hits,
 `build_plugin.ps1 -Release -Tests` all passed, `launcher_tests` 370 checks, 0 failures.
+
+## Lane heretic: the Heretics in HD (bug #542, 2026-11-05, slot 2, background mode, build of lane/heretic)
+
+Scripts and evidence (outside git): `mxl2012-runs/heretic/` (`lab.py`, one folder per run, `review-542.png`). Character
+HereticLane (Barbarian, made by the run, god mode), Act 4 Mesa 1 (104), Hatred. Each `!5` row spawned alone 4 sub-tiles from the
+player (`cultist2`, `hell_cultist`, `su_cultist2`, `uq_cultist2`, `cultist1`), then a pack of three `cultist2`; HD, then legacy.
+
+| Run | Build | Result |
+|-|-|-|
+| `run1` | before | no game: lane beltrefill's script stopped the game during the start (its lock call failed, the script went on; fixed there). Discarded |
+| `run2` | before (`!5` on councilmember1 x1) | HD: a thin dark figure with bone spikes and a dark red cloth, hard to tell from the dark ground even 4 sub-tiles away. Legacy: red-robed cultists, clearly visible. 0 engine asserts |
+| `run3` | after (`!5` on nihlathakboss x1.2, value +0.3) | HD: pale grey-robed men, clearly visible next to the player; they walk, cast the skull swarm (drawn) and die by the harness `kill`. Legacy as in `run2`. 0 engine asserts, shared files restored |
+
+Run: `MXL_RUN=heretic MXL_SLOT=2 py -3 lab.py <worktree> <out>`. Not done: a player-hit death in HD (the #519 assert was the
+Wraith's; Nihlathak died clean in lane rathma's trial); the Act 1 Cultists (same unit) were seen in Mesa 1 only.
+
+## Lane deathlog: a death report, research only (2026-11-05, no game slot)
+
+Static work: the redivivus database (1.14d Game.exe, `SUnitDmg.cpp` functions) and `tools/d2r_find.py` on the build 93847
+dump. No plugin change, nothing run in game. Result and design: [death-report-research.md](death-report-research.md) (D2R's
+apply-damage `0x44ce80` matched to 1.14d `DAMAGE_ApplyDamageToUnit`, the damage block's field offsets, the planned check
+`deathlog` in its section 4). Notes: `mxl2012-runs/deathlog/` (outside git).
+
+## Lane beltrefill: Auto Belt Refill by jaycachou-svg next to mxl2012-core (2026-11-05, slot 2, background input)
+
+Evaluation of the third-party plugin for 0.1.12 (docs/bundled-plugins.md). The plugin was built from jaycachou-svg's
+source with the SDK renames listed there (v0.35.8 and v0.35.9). For each run it was placed in
+`mods\mxl2012\d2rloader\plugins\` with its toml in `mods\mxl2012\d2rloader\config\`, and removed after the run. Both
+`d2rloader\config` folders were snapshotted and restored. Driver: `mxl2012-runs/beltrefill/scripts/belt_run.py` (not in
+git). Character `BeltRefill` (barbarian), belt `859` (16 slots); potions made with the harness `item`, drunk with the
+belt keys 1-4. Belt contents come from the plugin's `belt-scan` / `belt-policy` output in
+`mods\mxl2012\d2rloader\logs\auto-belt-refill.log`.
+
+| Run | Build, config | Result |
+|-|-|-|
+| run1, run2 | v0.35.8, columns hp / mp / hp / mp unlocked | Loads (all four hooks installed, debug log), no hook refused, no crash. `belt-fill` moved 11 potions per the lists; auto-refill pulled `hp5` after a drink. The new character's `hp1` in every column (and state left by run1) made the game refuse mana potions there: vanilla routing |
+| run3 | v0.35.8, hp / mp / hp / `ey2` unlocked | Empty belt: `belt-fill` placed all 16 exactly per the lists. Elixir refill into column 4 works while the life columns are full. With a free slot in life column 1 the game routed `ey2` there, and the column learned it (`hp5 > ... > hp1 > ey2`, an Elixir of Experience on hotkey 1); column 4 learned `hp5`. Unlisted Median items (`ey3`, `0g0`) were never moved |
+| run5 | v0.35.9, the same columns `locked = true` | 16 placed per the lists, auto-refill ok; the routed `ey2` was refused by locked column 1 ("refused by a locked ... column"), no list changed |
+
+`belt-verify` prints "bytes differ" for all four addresses in every run: it reads the entries after the plugin's own
+hooks patched them (false alarm). The only engine asserts were the exit-only pool checks (`m_freed == 0` and the like, ignored). Evidence:
+`mxl2012-runs/beltrefill/run1` ... `run5` (`run.txt`, PNGs, `auto-belt-refill.log`). (run4 was an aborted start while
+lane heretic held slot 2; the driver now refuses to start unless it holds the lock and no game runs.)
+
+## Lane stackres: can Median's shrines, runes and consumables stack (2026-11-05, research, no game slot)
+
+Static only: Median's tables (`work/named`), D2R 3.3's misc.txt, `tools/d2save.py`, the slot-2 RotW stash of lane stashhdr
+(`mxl2012-runs/stashhdr/backup0`) and the 1.14d engine (Redivivus). Findings and options in
+[stacking-research.md](stacking-research.md); scratch in `mxl2012-runs/stackres/` (`median_misc.tsv`, `rotw_tab_items.txt`).
+Not run in game: how D2R 3.3 loads an old simple item whose row turned stackable, and the RotW tab's stack count format.
+
+## Lane autosort: does auto sort work with the mod (2026-11-05, static, no game slot)
+
+Research only; results in [docs/autosort-research.md](autosort-research.md). D2R 3.3's only sort is the controller's
+"Hold to Sort" (R3 on a grid; string `ControllerPromptHoldToSortInventory`, legend builder `0x2c8cc2` in the 93847
+dump). D2RLoader 1.3.1 and PyreFly's 12 plugins have none. **No in-game run:** the sort needs a controller, and the
+slot rules allow background mouse and keyboard input only (a virtual gamepad is a driver install). Slot 2 was not
+locked. No mod code changed.
+
+## Lane beltstack: Median belt potions in the life column (bug #541, 2026-11-05, slot 2, background mode)
+
+Check `beltstack` (`MXL_RUN=beltstack MXL_SLOT=2 MXL_CHAR=Beltstk py -3 tools/game_checks.py --slot 2 all beltstack`;
+`MXL_BELTSTACK_GRAPHICS=legacy` for legacy graphics, pickup path only there since `INV_CELL` is the HD grid). Set-up by the
+harness: the belt emptied (a new character starts with four `hp1` in it), a girdle `859` worn (16 boxes), `hp5` / `mp5` / `hp3` /
+`mp3` picked up (column 0 life, column 1 mana). Then each of 15 Median belt potions plus `vps` / `yps` / `rvl` is made on the
+ground and picked up with the to-inventory flag (packet 0x16, a plain click), and put into the backpack and moved by a real Shift +
+left click in the open inventory; `items` lists a belt item as page 255, body 0, x = belt slot (column = slot % 4). Last step
+"kinds": `ey2`, `ey2`, `ey3`, `0g1` picked up in turn. Evidence: `mxl2012-runs/beltstack/` (outside git).
+
+| Run | Build | Result |
+|-|-|-|
+| `before-checks-20261105-123634-s2` | main 2efe62d (0.1.12 data) | every `hpot` Median potion (13 codes) by pickup and by Shift + click: belt slot 8, column 0 = the **life column**; `c@c` / `dog` / `rvl` the empty column 2 (no other code of their type in the belt) |
+| `after-checks-20261105-132010-s2` (HD) | lane/beltstack | all 15 Median codes, both paths: column 2 (own); kinds: `ey2` slots 2 and 6, `ey3` slot 3, `0g1` in the backpack (no column left), as 1.13c; base potions stack by kind; no new engine assert (the five allocator asserts at game stop are in the before run too) |
+| `after-checks-20261105-132537-s2` (legacy) | lane/beltstack | the same, pickup path |
+
+`vps` / `yps` picked up go to the backpack in both builds (misc `autobelt` 0, as 1.13c); Shift + click puts them in an empty
+column. Not checked: buying a potion with the belt filled from a vendor.
+
+## Lane legacy169ship: ship our D2R Legacy 16:9 plugin (2026-11-05, slots 2 and 1, background mode)
+
+Owner (2026-11-05): `legacy169.dll` ([D2R-Legacy169](https://github.com/Nugwa628/D2R-Legacy169) v0.1.0, `3537c68`) ships in the
+release from 0.1.12 (docs/bundled-plugins.md). The runs used the release build of `tools/build_legacy169.ps1` (no test harness),
+put into `mods\mxl2012\d2rloader\plugins\` of a dev install for the run and removed afterwards. Character `Legacynine`
+(Barbarian, level 1). Evidence and scratch: `mxl2012-runs/legacy169ship/` (outside git): `run_slot.ps1`, `run-*.log`, the
+copied `legacy169*.log`; the run folders under `work/runs/` of the worktree. Check `legacy169` (`tools/game_checks.py`): per panel
+an HD shot, legacy shots in mode 1 (1066x600) and mode 0 (853x480, `legacy169 mode n`), and an HD shot after; env
+`MXL_L169_EXPECT` (on|off), `MXL_L169_MODES`, `MXL_L169_PANELS`. `graphics_mode()` now reads the panel manager's HD flag
+(harness `lvlbtn`, `panelmgr+0xb9`) in a game: the side-bar pixel test fails with legacy169 on (no side bars).
+
+| Check | Run | Result |
+|-|-|-|
+| load, clashes | `checks-20261105-132923-s2` | PASS: "legacy169 0.1.0 loaded (mod scope, mod mxl2012)", "on: 36 patches", `mxl2012` "plugin clashes: none (no other plugin was refused a hook)", no D2RLoader hook refusal or conflict line, 0 crash files; only the exit-only pool asserts (`s_StatsPool.IsEmpty`, seen in other lanes' runs without legacy169) |
+| panels at 1066x600 (mode 1) | `checks-20261105-132923-s2` | PARTIAL (pictures by hand, all right): inventory + character, skill tree, personal stash (10 x 10) with tabs and arrows, page 2 ("2 / 2"), Shared tab ("Page 1 / 7"), cube, waypoint, automap (area name at the top right), automap + inventory sit at the window edges, the control panel with the belt stays 4:3 in the middle, the mini panel moves beside an open panel (`l169_<panel>_legacy_m1.png`) |
+| trade at 1066x600 / 853x480 | `checks-20261105-140253-s1` | PARTIAL (by hand, right): Akara's trade panel at the left edge (`l169_trade_legacy_m1.png`, `_m0.png`). The graphics switch closes the trade panel (also without legacy169), so the check talks to Akara again in legacy; in the first run it was not open (`checks-20261105-132923-s2`) |
+| panels at 853x480 (mode 0) | `checks-20261105-132923-s2` | PARTIAL: the panels sit at the edges; the orbs cover the lower corners of Median's panels (character resists, cube art, stash and inventory gold rows; `l169_*_legacy_m0.png`). The same in stock 4:3 640x480 with legacy169 off (below): Median's panels are taller than the classic 640x480 slot, not a legacy169 fault |
+| `enabled = false` | `checks-20261105-135901-s2` | PASS: "enabled = false in legacy169.toml; nothing patched", status "off (enabled = false) ... panels: not moved"; legacy is 4:3 with side bars at 800x600 and 640x480 (`l169_invchar_legacy_m1.png`, `_m0.png`); `legacy169 mode n` still switches the game's own resolution |
+| HD unchanged | both runs | PASS: HD shots before and after each legacy round trip differ by at most 0.4 % of the panel pixels; HD with legacy169 on vs off (same panels) at most 1.6 %, the world behind |
+
+Not checked: RotW's Gems / Materials / Runes tabs in legacy (D2R's own HD-only pages, docs/hd-ui.md), a game-wide copy of
+legacy169 next to the mod-scoped one, the gamepad. Note for legacy checks on a release install: the calibrated legacy click
+places of `tools/game_checks.py` are 4:3 with side bars; with legacy169 on they need its `enabled = false`.
+
+## Lane legacyhud: legacy169 top-corner HUD cut off (bug #544, 2026-11-05, slot 1, background mode)
+
+Fix in [D2R-Legacy169](https://github.com/Nugwa628/D2R-Legacy169) `2fb00af` (branch fix/hud-corners, not released yet; the
+gitlink pins it, `tools/build_legacy169.ps1` builds it and its unit tests pass). Character `Legacyhud` (Barbarian, level 1, a
+Rogue merc from Kashya, two Wolf Companions by harness `setskill 438 2` / `cast 438 self` in the Blood Moor), `/fps` on.
+Evidence and scratch: `mxl2012-runs/legacyhud/` (outside git): `slot_check.py`, `scene.py`, `evidence/*.png` and the copied
+`legacy169.log` files. The window is fitted to the client size by `L169_SIZE`; `L169_ASPECT` writes `aspect` into legacy169.toml.
+
+| Check | Run | Result |
+|-|-|-|
+| before: 0.1.0 at 16:10 (1600x1000) | `before_16x10_*` | FAIL (reproduced): 1066x600 cropped to the window height: merc portrait, "Wolf Companion", "FPS / Ping" cut at the left, the automap's "Blood Moor / mxl2012" at the right; 853x480 the same |
+| after: 16:10, `aspect = "16:10"` | `after_16x10_*` | PASS: log "screen 16:10 ... classic 960x600 and 768x480, view shift (x * 107 + 63) >> 9, panel anchors 0.4169 / 0.5836", "on: 36 patches"; portraits, names, FPS / ping and the area text fully on screen in mode 1 (960x600) and mode 0 (768x480) |
+| after: panels at 16:10 | `after_16x10_*_invchar*`, `_inv_automap`, `_automap_nopanel` | PASS: inventory and character panels at the window edges in both modes, the 800x600 frame beside them, the automap overlay shifted with one panel open and centred without |
+| after: 16:9, `aspect = "auto"` (1600x900) | `after_16x9_*` | PASS: "screen 3840:2160 (the primary monitor): classic 1066x600 and 853x480, view shift (x * 3 + 9) >> 4, panel anchors 0.3755 / 0.625" (the bytes of 0.1.0); corners all on screen |
+| plain D2R (`mods\legacy169-plain`, test build) | `plain_16x10_*` | NOT JUDGED: the plugin loaded with the 960 widths, but the new character was a RotW one, so legacy graphics were refused ("Only Available in Classic and Expansion games"); the shots are HD |
+| unit tests | D2R-Legacy169 `legacy169_tests`, `--image` on the 93847 dump | PASS: the 16:10 table has the same sites and expected bytes as 16:9, a sweep of screens 4:3 .. 16:9 keeps the shift exact and the panels in place (456 of them up to 4 px narrower than the screen) |
+
+Not checked: the clock (D2R's option is off in the test install and was not changed), party portraits (no second player),
+plain D2R in legacy (needs an Expansion character in `legacy169-plain`).
+
+## Lane stashp2fix: personal stash page 2 inside the stash (bug #543, 2026-11-05, slot 1, background mode)
+
+Owner (0.1.11): page 2 replaced the stash panel (no tabs, empty gold box) and the way back left D2R's large left frame off. Now
+`StashPage2` is drawn over the open stock stash (docs/plugin-plan.md 8.2 "Changed", docs/bugs.md #543). Evidence and scripts:
+`mxl2012-runs/stashp2fix/` (outside git): `owner/` (the owner's shots), `runs1.ps1` / `runany.ps1` (slot 1 or 2, lock per run),
+`s1-rotw.log`, `s1-exp.log`. Characters `StashFixRotw` (new RotW Barbarian) and `StashTab` (expansion; its stash files copied from
+mxl2012-s2, s2's files untouched). `sp2_switches` in `stashpage2` adds: page 1 -> 2 -> 1 three times, a tab click from page 2
+(Shared; Gems in RotW only: `MXL_SP2_TABS=shared` for an expansion game, which has no Gems tab), Escape and the stock X on page 2,
+the stash closed and opened again.
+
+**Findings.** D2R passes only known message targets to plugin UI listeners: an own `MxlStashPage:Show:2` never arrived, so the
+arrows send `PanelManager:OpenPanel` / `ClosePanel` `mxl2012-core/StashPage2`, which the plugin consumes. The plugin's own
+`openPanel` sends that message to the listener as well; consumed, the open failed and was queued again (first run: 77 000 failed
+opens), so the plugin lets its own open and close through.
+
+| Check | Run | Result |
+|-|-|-|
+| `stashpage2`, before the fix (0.1.11 layout) | owner's shots | page 2 without tabs and gold box; page 1 after it without the left frame |
+| `stashpage2`, RotW game, overlay with the old arrow message | `checks-20261105-132209-s1` | FAIL (arrows only): harness-opened page 2 right (tabs, gold, X, both frames), tab clicks, Esc, X, Ctrl+click, save; the arrows did nothing |
+| `stashpage2`, RotW game, HD and legacy | `checks-20261105-142649-s1` | PARTIAL (pictures by hand, all right): 3 of 3 switches; Shared and Gems from page 2 show that tab, page 2 shut (`stashpage2_hd_p2_to_gems.png`); Esc, X, reopen on page 1 with the strip; page 2 "2 / 2" with tabs, gold box and both frames (`stashpage2_hd_p2.png`), page 1 again whole (`stashpage2_hd_p1_again.png`); legacy page 2 with tabs and "Gold Max" (`stashpage2_legacy_p2.png`), back (`stashpage2_legacy_back.png`); Ctrl+click both ways; Save and Exit + reload keeps r05 and r06; 0 failed opens |
+| `stashpage2`, expansion game (StashTab), HD and legacy | `checks-20261105-144405-s1` | PARTIAL (pictures by hand, all right): the same; Shared from page 2 shows "Page 1 / 5" (`stashpage2_hd_p2_to_shared.png`), reopen on page 1 (`stashpage2_hd_reopened.png`), legacy page 2 with Personal / Shared tabs; 0 new crash files |
+| logs | both runs | only the exit-only pool asserts (`s_StatsPool.IsEmpty` and the pool block checks at exit) |
+
+Runs `checks-20261105-142240-s1` (the open loop above) and `-144005-s1` (slot 1 reinstalled by another lane in between, the old
+DLL) do not count. Not done: "1 / 2" on page 1 (D2R's "Page n / m" is in that place on the Shared tab, the tab cannot be told),
+the gamepad stash.
+
+## Lane leech: life and mana leech on Normal, Nightmare and Hell (bug #540, 2026-11-05, slot 1, background mode)
+
+Before release 0.1.12. Dev plugin 0.1.11 of `lane/leech` (`build_plugin.ps1 -Tests`; the release build has no harness), mod of
+the lane (`tools/build.py`). Evidence and scratch: `mxl2012-runs/leech/` (outside git): the static compare scripts
+(`static_cmp.py`, `skills_leech.py`, `drain0.py`), the run logs and `parse_run.py` (per-hit reads from a run log). Character
+`LeechLane` (Barbarian, its own name: `MXL_CHAR=LeechLane`), slot 1 locked per run.
+
+Check `leech` (`tools/leech_checks.py`, unit tests `tools/tests/test_leech_checks.py`):
+`MXL_RUN=leech MXL_SLOT=1 MXL_CHAR=LeechLane py -3 tools/game_checks.py all mxl2012 leech`. Set-up (named in the note): the
+game's experience award to level 60 or more, harness stats (leech 60 / 62, pools, mana recovery -100, flat damage reduction,
+attack rating, strength), a 150-damage dagger, spawned zombies with their regeneration and Nightmare / Hell damage reduction off;
+Nightmare / Hell entered by the save edit of `tools/nmh_checks.py`. The hit is the game's own Attack (`cast 0 unit`); each gain
+is judged against 1.14d's leech step (`expected_gain`, 0x57c420) with Median's divisors 4 / 100 / 200.
+
+| Round | Damage | Life gained (want) | Mana gained (want) |
+|-|-|-|-|
+| Normal, 100 % life | 626.6 | +156.65 (156.65) | +0 (0) |
+| Normal, 100 % mana | 624.9 | +0 (0) | +156.21 (156.21) |
+| Normal, 10 % / 10 % | 624.8 | +15.61 (15.61) | +15.61 (15.61) |
+| Normal, skeleton2 (Drain blank), 100 / 100 | 469.6 | +0 (0) | +0 (0) |
+| Normal, bow 161 + arrows, 100 / 100 | 69.0 | +17.25 (17.25) | +17.25 (17.25) |
+| Nightmare, 0 / 0 | 468.9 | +0 (0) | +0 (0) |
+| Nightmare, 100 / 100 | 1565.3 | +15.64 (15.64) | +15.64 (15.64) |
+| Hell, 0 / 0 | 469.1 | +0 (0) | +0 (0) |
+| Hell, 100 / 100 | 1563.6 | +7.80 (7.80) | +7.80 (7.80) |
+
+Run `checks-20261105-144738-s1`: PASS. Eagle Stance (Median's leech stance, skill 432): stat 60 = 6 from its aura at level 10
+(1 + blvl / 2; its reqlevel formula gates each level, ulvl - 18 >= (blvl - 1) * 6, so the check judges the level reached).
+Things found on the way, all in the check, not the build: the level stat set alone does not hold (the to-hit level factor
+made every Nightmare / Hell Attack miss at level 3), so the check uses the experience award; the stance stays on and its
+regeneration hides later rounds, so it runs last and is set back to level 0 at the start and the end.
+
+## Lane medstash: Median's runes and gems in the RotW Runes / Gems pages (2026-11-05, slot 2, background input)
+
+Owner (2026-11-05): Median's new runes and gems stack in the RotW stash's Runes and Gems pages like D2R's; everything else gets a
+"Median XL" tab ([median-stash-tab.md](median-stash-tab.md): designed, not built). Evidence and scratch:
+`mxl2012-runs/medstash/` (outside git): `runs/<run>/` (shots), `d2i/` (the shared stash after each session), `oldsave/` (the old
+save), `t3_tab_items.txt`, `preview/` (the two HD pages with the codes written in), session scripts `s*.py`, `o1.py`, `t*.py`.
+Character `MedStashA` (RotW Barbarian). Calibration as lane stashpage2 (HD layout -> client 0.4163, origin 97.95, 86.8); legacy:
+classic panel -> client 1.5, origin (318, 90), tabs y 106 (Personal 367, Shared 463, Gems 560, Materials 655, Runes 752),
+backpack cells (829, 406, 43.4 x 43.3).
+
+| Check | Result | Evidence |
+|-|-|-|
+| Stack count format (1, 2, 4 Ith in the tab, kind-1 page diffed) | after the guid one bit (1) and an 8-bit count, LSB first; 7 bits ruled out by the padding of 16 records; `d2save.py` reads / writes it (`stack`) | `d2i/s1_r20x1.d2i`, `s2_r20x2`, `s3_r20x4` |
+| A new code from data + layout alone (test widgets for `r40`, `yo1` on slot 2) | Ctrl-click deposit, stack 2, count drawn; no plugin code | runs `checks-20261105-142717-s2`, `-144429-s2`, `d2i/s4_r40_yo1.d2i` |
+| Old save (0.1.11 data: `r50`, `5$a` in the personal stash, `r45`, `9$c`, `yo3`, `r34` in the backpack) loaded with the new build | all six there, same places | run `-153034-s2` (`o1_old_build_personal.png`), `oldsave/`, run `-155252-s2` log |
+| HD deposit (Ctrl-click, old and new items), stack, count | r45 x 3, r34, r56; yo3 x 2, Onyx, Bloodstone, Turquoise, Amber | `t1_runes_deposit_hd.png`, `t1_gems_deposit_hd.png` |
+| HD withdraw (click the slot, drop in the backpack) | r45 twice onto the cursor and into the backpack; the slot shows 1 | `t1_runes_withdraw_hd.png` |
+| Cube use of withdrawn runes | 2 x r45 -> Transmute -> r46 ("rune upgrade: r45 x2 -> r46") | `t1_cube_after.png` |
+| Save and Exit, reload | stacks and counts kept (r45 1, r20 4, yo3 2 ...), r46 in the cube | `t2_runes_reload_hd.png`, `t2_gems_reload_hd.png`, `d2i/t1.d2i` |
+| Legacy (G): pages, deposit, stack, withdraw | 56 rune / 60 gem slots on the redrawn classic pages; Ctrl-click r45, r52, 9$a, yo5 x 2; r45 withdrawn into the backpack | `t2_runes_legacy.png`, `t3_*_legacy.png`, `d2i/t3.d2i` (`t3_tab_items.txt`) |
+| A build without the flag (#545) | r40 x 2 and yo1 deposited with the test build were deleted by one load + save with the 0.1.11 data | `d2i/s5.d2i` -> `oldsave/ModernSharedStashSoftCoreV2.d2i` |
+| A slot widget missing, flag kept (r52's widget removed on the slot) | the r52 stack survives load, open Runes tab, Save and Exit: the gamepad layout (no Median slots) does not delete stacks | run `-155938-s2`, `d2i/t4_no_r52_widget.d2i` |
+
+Not checked in game: a classic / expansion game (the build changes nothing they read: the base bank's misc gets no flag, and
+those games show no Gems / Runes pages); the gamepad UI itself (no background way to switch to it).
+
+## Lane buffship: ship Buff HUD by Lukaszpg (2026-11-05, slot 2, background mode)
+
+Owner (2026-11-05): Buff HUD ([d2rl-buff-hud](https://github.com/Lukaszpg/d2rl-buff-hud) by Lukaszpg, MIT) ships from 0.1.12
+in our fork ([Nugwa628/d2rl-buff-hud](https://github.com/Nugwa628/d2rl-buff-hud), branch `mxl2012`, pinned by the gitlink
+`third_party/d2rl-buff-hud`; docs/bundled-plugins.md). The runs used the pinned build of `tools/build_buffhud.ps1`, put
+into `mods\mxl2012\d2rloader\plugins\` of a dev install with mxl2012-core and legacy169 for the run and removed afterwards
+(the scratch `buff-panel.toml` that D2RLoader writes is removed too). Character `BuffShip` (Paladin, level 120 by the
+harness), Cold Plains. Scratch and evidence: `mxl2012-runs/buffship/` (outside git): `run_buffship.py`, `run*.out`; the run
+folders under `work/runs/` of the worktree. The script casts Median buffs (Holy Armor, Judgement, Superbeast, Merkabah),
+spawns and operates a shrine (`object 2 2 2`, `objmode <id> 0`, `operate <id> 2`), drinks an Elixir of Power (`0g7`),
+shoots the panel in HD and legacy, moves the virtual cursor over each slot and runs `buff-panel status`, which logs the
+label under the cursor (`hover="..."`), and opens the stash in town in both modes.
+
+| Check | Run | Result |
+|-|-|-|
+| load, clashes | `checks-20261105-204837-s2` | PASS: "Buff HUD 1.1.0 loaded (D2R build 93847; PluginSDK 0.3.0/ABI 4)", `mxl2012` "plugin clashes: none", 0 crash files; only the exit-only pool asserts seen in other lanes |
+| skill buffs | `checks-20261105-204837-s2` | PASS: Holy Armor, Judgement, Merkabah, Superbeast with their icon and countdown in HD and legacy (`buffs_hd_a.png`, `buffs_legacy_a.png`) |
+| shrines | `checks-20261105-165905-s2`, `-183319-s2`, `-204837-s2` | PASS: Experience, Skill and Stamina Shrine with icon and countdown. Skill Shrine (and Cold Resist Shrine) showed the "?" picture (`global` frame 0) in `183319`; fork `6c4bc38` gives them frames 2 and 70 of `Spells\Skillicon` (checked on the sheet, `mxl2012-runs/buffship/skillicon_hd.png`; the random shrine of the last run was Stamina) |
+| elixir | `checks-20261105-182025-s2`, `-204837-s2` | PASS: the green flask of the inventory (`inv_elixir_*.png`) with its countdown in HD and legacy. Elixirs last seconds in these harness runs, so the script drinks right before the shots |
+| hover names | `checks-20261105-181456-s2`, `-183319-s2`, `-204837-s2` | PASS (log): "Superbeast", "Vessel of Judgement", "Merkabah", the shrine's name, "Elixir of Power" in HD and legacy, window in the background. `181456` was the first run after the fork took the UI screen from the game (D2RLoader 1.3.1 returns the authored rects, the panel 0 x 0: no hit before, `174611`). In `182025` the elixir read "1Elixir of Power": D2R gives "ÿc" as U+E07E; fork `83877a4` strips it |
+| stash open | `checks-20261105-162901-s2`, `-182025-s2`, `-204837-s2` | PASS as observed: the panel stays visible with the stash and inventory open, HD and legacy (`stash_hd.png`, `stash_legacy.png`); in legacy it overlaps the lower edge of the stash. The plugin has no hide rule; the owner judges whether that is fine |
+
+**Not seen on screen.** The hover label is a D2RLoader overlay draw, not part of the PrintWindow capture of a background
+window (as for `bufficons`, above); the log shows it. **By hand (owner / user):** hover a buff icon in HD and in legacy
+and check that the name shows next to it. Not checked: the gamepad, a game-wide copy of Buff HUD next to the bundled one,
+other Median rows that still use the "?" picture (Elemental Fury, Blades Of Light, Superbeast Neutral, Mark Of The Bear,
+Mark Of The Wolf).

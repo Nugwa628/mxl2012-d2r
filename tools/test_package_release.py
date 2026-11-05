@@ -78,6 +78,108 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertTrue(set(m["preserve"]) <= set(paths))
         self.assertEqual(m["emptyDirs"], ["d2rloader/patches"])
 
+    def legacy169_src(self, commit=None):
+        """A fake build/legacy169-src: the default toml and the PINNED_COMMIT tools/build_legacy169.ps1 writes."""
+        src = self.tmp / "legacy169-src"
+        src.mkdir(exist_ok=True)
+        (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\nreset_screen = true\n", encoding="utf-8")
+        (src / "PINNED_COMMIT").write_text((commit or pr.legacy169_commit()) + "\n", encoding="ascii")
+        dll = self.tmp / "legacy169.dll"
+        dll.write_bytes(b"MZ...legacy169\0...0.1.0\0...")
+        return src, dll
+
+    def test_legacy169_is_pinned(self):
+        self.assertRegex(pr.legacy169_commit(), r"^[0-9a-f]{40}$")
+        self.assertEqual(pr.LEGACY169["dll"], "d2rloader/plugins/legacy169.dll")
+        self.assertEqual(pr.LEGACY169["config"], "d2rloader/config/legacy169.toml")
+
+    def test_legacy169_staged_with_its_config_preserved(self):
+        mod = self.staged()
+        src, dll = self.legacy169_src()
+        pr.stage_legacy169(mod, dll, src)
+        self.assertEqual((mod / pr.LEGACY169["dll"]).read_bytes(), dll.read_bytes())
+        self.assertIn("enabled = true", (mod / pr.LEGACY169["config"]).read_text())
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod))
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/legacy169.toml"])
+        self.assertTrue(set(m["preserve"]) <= {f["path"] for f in files})
+        self.assertEqual(pr.preserve_list(self.staged()), pr.PRESERVE)  # a package without it: only d2rloader.toml
+
+    def test_legacy169_source_of_another_commit_is_refused(self):
+        mod = self.staged()
+        src, dll = self.legacy169_src("0" * 40)
+        with self.assertRaises(SystemExit):
+            pr.stage_legacy169(mod, dll, src)
+        self.assertFalse((mod / pr.LEGACY169["dll"]).exists())
+
+    def buffhud_src(self, commit=None):
+        """A fake build/buffhud-src (tools/build_buffhud.ps1's export) and a fork DLL with its MPQ next to it."""
+        src = self.tmp / "buffhud-src"
+        (src / "external" / "PluginSDK").mkdir(parents=True, exist_ok=True)
+        (src / "buff-panel.toml").write_text("[buff_panel]\nenabled = true\n", encoding="utf-8")
+        (src / "LICENSE").write_text("MIT License\n\nCopyright (c) 2026 \u0141ukasz\n", encoding="utf-8")
+        (src / "external" / "PluginSDK" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+        (src / "PINNED_COMMIT").write_text((commit or pr.buffhud_commit()) + "\n", encoding="ascii")
+        dll = self.tmp / "d2rl-buff-panel.dll"
+        dll.write_bytes(b"MZ...buff-panel\0...1.1.0\0...[buff_panel]\nenabled = true\n")
+        dll.with_suffix(".mpq").write_bytes(b"MPQ\x1a...")
+        return src, dll
+
+    def test_buffhud_is_pinned(self):
+        self.assertRegex(pr.buffhud_commit(), r"^[0-9a-f]{40}$")
+        self.assertEqual(pr.BUFFHUD["dll"], "d2rloader/plugins/d2rl-buff-panel.dll")
+        self.assertEqual(pr.BUFFHUD["mpq"], "d2rloader/plugins/d2rl-buff-panel.mpq")
+        self.assertEqual(pr.BUFFHUD["config"], "d2rloader/config/buff-panel.toml")
+
+    def test_buffhud_staged_with_licences_and_its_config_preserved(self):
+        mod = self.staged()
+        src, dll = self.buffhud_src()
+        pr.stage_buffhud(mod, dll, src)
+        self.assertEqual((mod / pr.BUFFHUD["dll"]).read_bytes(), dll.read_bytes())
+        self.assertEqual((mod / pr.BUFFHUD["mpq"]).read_bytes(), dll.with_suffix(".mpq").read_bytes())
+        self.assertIn("\u0141ukasz", (mod / pr.BUFFHUD["licence"]).read_text(encoding="utf-8"))
+        self.assertTrue((mod / pr.BUFFHUD["sdk_licence"]).is_file())
+        self.assertIn("enabled = true", (mod / pr.BUFFHUD["config"]).read_text())
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, True))
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/buff-panel.toml"])
+        paths = {f["path"] for f in files}
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["author"], entry["commit"]), ("Buff HUD", "Lukaszpg", pr.buffhud_commit()))
+        self.assertTrue(set(entry["files"]) <= paths, set(entry["files"]) - paths)
+        self.assertEqual([b["name"] for b in pr.bundled_plugins(True, True)], ["D2R Legacy 16:9", "Buff HUD"])
+
+    def test_buffhud_source_of_another_commit_is_refused(self):
+        mod = self.staged()
+        src, dll = self.buffhud_src("0" * 40)
+        with self.assertRaises(SystemExit):
+            pr.stage_buffhud(mod, dll, src)
+        self.assertFalse((mod / pr.BUFFHUD["dll"]).exists())
+
+    def test_buffhud_builds_that_are_not_ours_are_refused(self):
+        _src, dll = self.buffhud_src()
+        self.assertEqual(pr.check_buffhud(dll), [])
+        for body, words in ((b"MZ buff-panel\0 1.1.0\0", "not our fork"), (b"MZ buff-panel\0 1.0.11\0 [buff_panel]", "version")):
+            dll.write_bytes(body)
+            problems = pr.check_buffhud(dll)
+            self.assertTrue(problems and any(words in p for p in problems), (body, problems))
+        dll.write_bytes(b"MZ buff-panel\0 1.1.0\0 [buff_panel]")
+        dll.with_suffix(".mpq").write_bytes(b"PK")
+        self.assertTrue(any("not a packed MPQ" in p for p in pr.check_buffhud(dll)))
+        dll.with_suffix(".mpq").unlink()
+        self.assertTrue(any("d2rl-buff-panel.mpq" in p for p in pr.check_buffhud(dll)))
+
+    def test_legacy169_test_builds_are_refused(self):
+        _src, dll = self.legacy169_src()
+        self.assertEqual(pr.check_legacy169(dll), [])
+        for body, words in ((b"MZ legacy169\0 0.1.0-test\0", "test build"), (b"MZ legacy169-testharness.txt 0.1.0\0", "test build"),
+                            (b"MZ legacy169\0 0.0.9\0", "version")):
+            dll.write_bytes(body)
+            problems = pr.check_legacy169(dll)
+            self.assertTrue(problems and any(words in p for p in problems), (body, problems))
+        self.assertTrue(pr.FORBIDDEN.search("d2rloader/plugins/legacy169-testharness.txt"))
+
     def test_d2rloader_block_is_installable(self):
         self.assertEqual(pr.loader_problems(pr.D2RLOADER), [])
         self.assertEqual(pr.D2RLOADER["url"], "https://d2rloader.net/download/D2RLoader-1.3.1-beta.zip")
@@ -187,8 +289,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("PluginVersion", r.stdout)
         r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll),
-                            "--data-from", str(data), "--out", str(out)], capture_output=True, text=True,
-                           env=self.baseline_env())
+                            "--data-from", str(data), "--out", str(out), "--no-bundled"], capture_output=True,
+                           text=True, env=self.baseline_env())
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         seven = out / f"D2R-XL-2012-{v}.7z"
         self.assertEqual(sorted(p.name for p in out.iterdir()),
@@ -225,7 +327,7 @@ class PackageReleaseTests(unittest.TestCase):
         (data / "global" / "excel" / "armor.txt").write_bytes(b"Median armor\n")
         out = self.tmp / "dist"
         args = [sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll), "--data-from", str(data),
-                "--out", str(out)]
+                "--out", str(out), "--no-bundled"]
         env = {**os.environ, "MXL_D2R_EXTRACT": str(self.tmp / "nothing-here")}
         r = subprocess.run(args, capture_output=True, text=True, env=env)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)

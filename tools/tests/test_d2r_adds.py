@@ -141,10 +141,10 @@ class D2rAddsTests(unittest.TestCase):
         log = adds.run(self.mod, self.out, self.d2r, only=["advanced_stash"])
         for bank in ("", "base/"):
             rows = self.table(self.out, f"{bank}misc.txt")[1]
-            # D2R's code and type: flag on; Median's own rune (no slot in the tab) and another item on pk1: off
-            self.assertEqual([r[3] for r in rows], ["1", "1", "", ""])
+            # D2R's code and type: flag on; Median's own rune (its slot: tools/median_stash.py) on; another item on pk1: off
+            self.assertEqual([r[3] for r in rows], ["1", "1", "1", ""])
             self.assertEqual([r[4] for r in rows], ["0"] * 4)
-        self.assertIn("on 4 rows by code and type, 4 cells set", log[0])
+        self.assertIn("on 4 rows by code and type, 1 on 2 Median rune / gem rows, 6 cells set", log[0])
         adds.run(self.out, self.out, self.d2r, advanced_stash="off", only=["advanced_stash"])
         self.assertEqual([r[3] for r in self.table(self.out, "misc.txt")[1]], ["", "", "", ""])
 

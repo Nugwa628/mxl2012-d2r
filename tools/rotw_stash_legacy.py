@@ -51,6 +51,7 @@ from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 
 import dc6  # noqa: E402
 import fxpaths  # noqa: E402
+import median_stash  # noqa: E402
 import stash_page2  # noqa: E402
 import ui_art  # noqa: E402
 
@@ -396,7 +397,11 @@ def named_tab_frames(tabs: list[Image.Image], font: Font, pal) -> list[np.ndarra
 
 def page_picture(d2r: D2R, page: str, slots: list[tuple[str, tuple]], cube: tuple[tuple, tuple]) -> Image.Image:
     """The classic 320 x 432 page (RGBA, before quantising)."""
-    hd = d2r.sprite(f"panel/stash/additionalstash/{HD_PAGE_ART[page]}")[0]
+    if page in median_stash.PAGES:  # the mod's HD page with Median's runes / gems (tools/median_stash.py)
+        materials = d2r.sprite(f"panel/stash/additionalstash/{HD_PAGE_ART['materials']}")[0]
+        hd = median_stash.page_image(page, d2r.layout(HD_LAYOUT), materials)
+    else:
+        hd = d2r.sprite(f"panel/stash/additionalstash/{HD_PAGE_ART[page]}")[0]
     if hd.size != (HD_W, HD_H):
         raise ValueError(f"{HD_PAGE_ART[page]}: {hd.size}, {HD_W} x {HD_H} expected")
     im = down(hd, ui_art.PANEL_W, ui_art.PANEL_H)
@@ -408,7 +413,7 @@ def page_picture(d2r: D2R, page: str, slots: list[tuple[str, tuple]], cube: tupl
 
 
 def build(d2r: D2R, out: Path) -> list[str]:
-    hd, sd = d2r.layout(HD_LAYOUT), d2r.layout(SD_LAYOUT)
+    hd, sd = median_stash.apply(d2r.layout(HD_LAYOUT)), d2r.layout(SD_LAYOUT)  # the mod's HD layout
     font = d2r.font(TAB_FONT)
     named = font is not None and all(fits for _t, _w, fits in tab_label_fit(font))
     lay = classic_layout(hd, sd, d2r.layout(SD_BASE), named_tabs=named)
@@ -464,7 +469,7 @@ def check(d2r: D2R, out: Path, mod: Path | None = None) -> tuple[list[str], list
     lay = lenient_json(text)
     if AT_KEY.findall(text):
         problems.append(f"{lp.name}: @keys left: {sorted(set(AT_KEY.findall(text)))}")
-    hd = d2r.layout(HD_LAYOUT)
+    hd = median_stash.apply(d2r.layout(HD_LAYOUT))
     want = hd_pages(hd)
     got = {p: [(c["fields"]["itemCode"], tuple(c["fields"]["rect"][k] for k in ("x", "y", "width", "height")))
                for c in (find(lay, f"advancedstash_{p}") or {}).get("children", [])] for p in PAGES}

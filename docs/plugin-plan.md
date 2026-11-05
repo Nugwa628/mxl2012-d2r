@@ -310,6 +310,17 @@ the stock stash gets a strip with two arrows under its grid (`tools/stash_page2.
 and WidgetService has no visibility getter, so the plugin does not know the open tab (an SDK request). HD and legacy, RotW
 and expansion games: docs/testing.md "Lane stashpage2".
 
+**Changed (lane stashp2fix, bug #543, owner report on 0.1.11):** taking the left slot closed the stock stash, so page 2 had no
+tabs and no gold box, and the way back left D2R's left border (`PanelBordersPanel`, the large frame beside left panels) off
+until the next panel. `StashPage2` is now registered without `GameplayLeftSlot` and drawn **over the open stock stash**
+(priority 6, the stock panel's rect): only page 2's grid at the stock grid's place and the "2 / 2" strip, no click catcher,
+background or X. The stock strip sends `PanelManager:OpenPanel:mxl2012-core/StashPage2` and page 2's strip `...:ClosePanel:...` (D2R passes
+only known targets to UI listeners: an own `MxlStashPage:Show` never arrived). The listener consumes both; it opens
+or closes the panel and hides the stock `grid` and strip while page 2 shows. A tab click (`BankPanelMessage:SelectTab`), the
+stock X (`BankPanelMessage:Close`), the stock stash closing or opening, and Escape (the panel's CloseOnEscape; a UI-thread
+watcher sees the panel shut) bring page 1 back. Page 1 still has no "1 / 2": on the Shared tab D2R's own "Page n / m" is drawn
+in that place and the plugin cannot tell the tab. docs/testing.md "Lane stashp2fix".
+
 ## 9. K: D2R additions that conflict with Median (data cannot switch off?)
 
 Lane d2radds owns the data side. This section lists the additions, how each is handled, and whether a hook could be
@@ -1004,19 +1015,24 @@ harness is on, and `spiritwarp`).
   (`guardianspet`, `defenderspet`, `protectorspet` of the build's pettype.txt; `0x5013f0` as in section 26). Other pets are
   never looked at. Distances are Euclidean, in sub-tiles (the unit x / y; the harness's `state` and lane summonai's readings use
   the same unit).
-- A live spirit farther than 20 from its owner is warped with `0x596d40`, unless it is fighting and within 40. Beyond 40 it is
-  warped even in a fight.
+- A live spirit farther than 20 from its owner is warped with `0x596d40`, unless it is fighting and within 40, and then for at
+  most 4 s (the hold starts at the first check that keeps it and ends at a check within 20 or a warp; fight notes that come and
+  go do not restart it). Beyond 40 it is warped even in a fight.
 - Fighting comes from the thinks, which are wrapped (the note is taken before the think, which then runs as before). For a
-  monster whose owner (`0x4a53c0`) is a player with it in one of those pet lists, the think notes "fighting" when it has a live
-  target (`+0x10`, unit mode not DT 0 / DD 12) that is in reach (`+0x24`) or within 40 of the owner, so a spirit walking out to
-  a monster near its owner is not pulled back. The frame check takes a note under 1.5 s old as fighting (the thinks run every
+  monster whose owner (`0x4a53c0`) is a player with it in one of those pet lists, the think notes "fighting" when its own target
+  (`+0x10`) is alive (unit mode not DT 0 / DD 12), in its reach (`+0x24`) and within 25 of the owner. Lane spiritwarp's first
+  rule (in reach **or** within 40 of the owner, no time cap) kept about 75% of the checks beyond 20 "left fighting" and let
+  spirits stand 26-40 off for 10 s and more (lane spiritfight, docs/testing.md "Lane spiritfight"). A spirit walking out to a
+  monster is now warped back and goes at it again from its owner's side. The frame check takes a note under 1.5 s old as fighting (the thinks run every
   0.6 s while a spirit has a target, and stop when it has none, so the note goes stale). 16 slots by unit id. A killed target
   stays in the tick as a corpse: the first build, which did not check the mode, held spirits 21-39 away next to dead zombies.
   Hostile Vampires / PinHeads and the other Vampire pets (Daystar, Sinner) pay only the owner lookup.
 - The warp is the game's own, so it lands where D2R's pet warp puts a pet (a random spot in the owner's room first). It goes
   through `petspread`'s hook when that part is on; spirits are no totems, so `petspread` leaves them where D2R put them.
 - `mxl2012` prints "checks N, beyond 20 N, left fighting N, warps N, failed N (last: class N, D -> D sub-tiles); thinks N,
-  fighting N; last check D sub-tiles verdict V" (V: 0 stay, 1 left fighting, 2 warp).
+  fighting N; last check D sub-tiles verdict V" (V: 0 stay, 1 left fighting, 2 warp), and a `spiritheld` line: of the checks
+  left fighting, those with the target in reach, a zombie (class 5, the lab's), the target's and the spirit's distance from the
+  owner in bands, the last target class, the warps at the 4 s cap and the longest hold in ms.
 
 **In game** (slot 2, HD and legacy, run `run7_on`, 2026-11-05): all three spirits came back after the player walked off with no
 target, warps 55 -> 4, 47 -> 19, 34 -> 9, 30 -> 1, 27 -> 1, 22 -> 8 sub-tiles (55 warps, 0 failed); before the part they stood

@@ -290,6 +290,7 @@ class LayoutTests(unittest.TestCase):
                 { "type": "Widget", "name": "SharedStashTabContainer", "children": [ ] } ] },
             { "type": "Widget", "name": "advancedstash_gems", "children": [
                 { "type": "AdvancedStashSlotWidget", "name": "gcv", "fields": { "rect": { "x": 470, "y": 214, "width": 98, "height": 98 }, "itemCode": "gcv" } } ] },
+            { "type": "Widget", "name": "advancedstash_runes", "children": [ ] },
             { "type": "Widget", "name": "advancedstash_horadriccube", "children": [
                 { "type": "InventoryGridWidget", "name": "horadriccube_grid",
                   "fields": { "rect": { "x": 431, "y": 784 }, "cellCount": { "x": 3, "y": 4 }, "cellSize": "$ItemCellSize" } },
@@ -314,7 +315,11 @@ class LayoutTests(unittest.TestCase):
                                                      "withdraw_button"])
         self.assertEqual(cube[2]["fields"], cube[3]["fields"])   # the lid: D2R's cover, under a name D2R does not hide
         self.assertEqual(cube[1]["fields"], {"rect": {"x": 520, "y": 1239}, "tooltipString": "Transmute"})
-        self.assertIn('"name": "gcv", "fields": { "rect": { "x": 470, "y": 214, "width": 98, "height": 98 }', t)   # slots: D2R's
+        gems = next(c for c in lay["children"] if c["name"] == "advancedstash_gems")["children"]   # + Median's (median_stash)
+        self.assertEqual([c["name"] for c in gems][:2], ["gcv", "yo1"])
+        self.assertEqual(gems[0]["fields"]["rect"], {"width": 98, "height": 98, "x": 114, "y": 218})
+        runes = next(c for c in lay["children"] if c["name"] == "advancedstash_runes")["children"]
+        self.assertEqual(len(runes), 23)
         self.assertIn('"rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 }', t)   # the stash grid untouched
         arrows = lay["children"][1]["children"][1:3]
         self.assertEqual([c["name"] for c in lay["children"][1]["children"][3:]], ["MxlPersonalNavigation", "SharedStashTabContainer"])   # page 2's strip

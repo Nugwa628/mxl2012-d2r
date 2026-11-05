@@ -27,6 +27,20 @@ class VerifyPackageTests(unittest.TestCase):
             (data / rel).write_bytes(body)
         self.mod = self.tmp / "stage" / "mxl2012"
         pr.stage(self.mod, pr.plugin_version(), self.dll, self.tmp, data_from=data)
+        src = self.tmp / "legacy169-src"  # what tools/build_legacy169.ps1 exports
+        src.mkdir()
+        (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\n", encoding="utf-8")
+        (src / "PINNED_COMMIT").write_text(pr.legacy169_commit(), encoding="ascii")
+        (self.tmp / "legacy169.dll").write_bytes(b"MZ legacy169\0 0.1.0\0")
+        pr.stage_legacy169(self.mod, self.tmp / "legacy169.dll", src)
+        buff = self.tmp / "buffhud-src"  # what tools/build_buffhud.ps1 exports
+        (buff / "external" / "PluginSDK").mkdir(parents=True)
+        for rel in ("buff-panel.toml", "LICENSE", "external/PluginSDK/LICENSE"):
+            (buff / rel).write_text("x\n", encoding="utf-8")
+        (buff / "PINNED_COMMIT").write_text(pr.buffhud_commit(), encoding="ascii")
+        (self.tmp / "d2rl-buff-panel.dll").write_bytes(b"MZ buff-panel\0 1.1.0\0 [buff_panel]")
+        (self.tmp / "d2rl-buff-panel.mpq").write_bytes(b"MPQ\x1a")
+        pr.stage_buffhud(self.mod, self.tmp / "d2rl-buff-panel.dll", buff)
 
     def test_a_staged_package_is_a_player_mod_folder(self):
         self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
@@ -35,9 +49,15 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / "modinfo.json").write_text(json.dumps({"name": "mxl2012", "savepath": "mxl2012-s2/"}))
         (self.mod / "d2rloader" / "plugins" / "mxl2012-core.dll").write_bytes(b"MZ mxl2012-testharness.txt\0")
         (self.mod / "Hero.d2s").write_bytes(b"x")
+        (self.mod / pr.LEGACY169["dll"]).write_bytes(b"MZ legacy169\0 0.1.0-test\0")
+        (self.mod / pr.LEGACY169["config"]).unlink()
+        (self.mod / pr.BUFFHUD["mpq"]).write_bytes(b"PK")
+        (self.mod / pr.BUFFHUD["licence"]).unlink()
         problems = vp.check_mod_folder(self.mod, "9.9.9")
         text = "\n".join(problems)
-        for want in ("modinfo.json", "modVersion", "test harness", "PluginVersion", "Hero.d2s"):
+        for want in ("modinfo.json", "modVersion", "test harness", "PluginVersion", "Hero.d2s", "legacy169 test build",
+                     "legacy169.toml is missing",
+                     "not a packed MPQ", "d2rl-buff-panel-LICENSE.txt is missing"):
             self.assertIn(want, text)
 
     def test_archive_paths_must_stay_in_the_mod_folder(self):
@@ -58,6 +78,8 @@ class VerifyPackageTests(unittest.TestCase):
         (extract / "data" / "global" / "excel").mkdir(parents=True)
         (extract / "data" / "global" / "excel" / "sounds.txt").write_bytes(b"vanilla\n")
         (ref / "mxl2012.mpq" / "data" / "global" / "excel" / "sounds.txt").write_bytes(b"vanilla\n")  # left out: D2R's own
+        for rel in vp.BUNDLED:  # install_mod.py does not install the bundled legacy169: not a difference
+            (ref / rel).unlink()
         problems, stats = vp.compare_reference(self.mod, ref, extract, self.tmp / "no-cache")
         self.assertEqual(problems, [])
         self.assertEqual(stats["blizzardCopiesLeftOut"], 1)

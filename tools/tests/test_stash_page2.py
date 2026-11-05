@@ -29,10 +29,13 @@ class StashPage2Test(unittest.TestCase):
             self.assertEqual(lay["name"], "mxl2012-core/StashPage2")  # D2RCore: <plugin id>/<local id>
             grid = find(lay, sp.GRID)["fields"]
             self.assertEqual(grid["cellCount"], {"x": 10, "y": 10})
-            self.assertEqual(find(lay, "close")["fields"]["onClickMessage"], "PanelManager:ClosePanel:BankExpansionLayout")
+            # an overlay on the open stock stash (bug #543): the strip and the grid only, so the stock tabs, gold box and X
+            # under it keep their clicks
+            self.assertEqual([c["name"] for c in lay["children"]], [sp.PAGE_STRIP, sp.GRID])
+            self.assertGreater(lay["fields"]["priority"], 5)  # over the stock stash (bankoriginallayout(hd).json: 5)
             strip = find(lay, sp.PAGE_STRIP)
             self.assertEqual({c["fields"].get("onClickMessage") for c in strip["children"] if c["type"] == "ButtonWidget"},
-                             {"PanelManager:OpenPanel:BankExpansionLayout"})  # both take the left slot: the stock stash replaces page 2
+                             {"PanelManager:ClosePanel:mxl2012-core/StashPage2"})
             self.assertEqual(find(strip, "MxlPageText")["fields"]["text"], "2 / 2")
             self.assertNotIn('"@', json.dumps(lay))  # no string keys in a served layout (bug #30)
         self.assertEqual(find(sp.panel_hd(), sp.GRID)["fields"]["rect"], {"x": 89, "y": 219})  # bankexpansionlayouthd.json grid
@@ -43,7 +46,7 @@ class StashPage2Test(unittest.TestCase):
             self.assertEqual(strip["name"], "MxlPersonalNavigation")
             self.assertIsNone(find(strip, "MxlPageText"))  # D2R's "Page n / m" shows there on the Shared tab
             self.assertEqual({c["fields"].get("onClickMessage") for c in strip["children"] if c["type"] == "ButtonWidget"},
-                             {"PanelManager:TogglePanel:mxl2012-core/StashPage2"})
+                             {"PanelManager:OpenPanel:mxl2012-core/StashPage2"})
         # at D2R's shared stash arrows (StashNavigation), which the Personal tab does not show
         self.assertEqual(sp.stock_strip_hd()["fields"]["rect"], {"x": 369, "y": 1211, "width": 420, "height": 93})
         self.assertEqual(sp.stock_strip_sd()["fields"]["rect"], {"x": 15, "y": 385, "width": 164, "height": 32})

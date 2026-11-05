@@ -11,9 +11,15 @@ over is his; this project only moves it to Diablo II: Resurrected.
 - Median XL 2012 and its files (the source of the mod files this port uses): <https://modsbylaz.vn.cz/>
 - Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods): <https://www.nexusmods.com/profile/EnaiSiaion/mods>
 
-Third-party D2RLoader plugins planned to ship with the port, credited to their authors: Buff HUD by **Lukaszpg**
-(<https://github.com/Lukaszpg/d2rl-buff-hud>, MIT) and PyreFly's plugins by **PyreFly**
+Shipped with the mod from 0.1.12: **Buff HUD** by **Lukaszpg** (<https://github.com/Lukaszpg/d2rl-buff-hud>, MIT; copyright
+and licence notice in `mods\mxl2012\d2rloader\plugins\d2rl-buff-panel-LICENSE.txt`), in our fork for Median XL 2012
+(<https://github.com/Nugwa628/d2rl-buff-hud>): a panel of your timed buffs with timers and names. Turn it off with
+`enabled = false` in `mods\mxl2012\d2rloader\config\buff-panel.toml`. Planned: PyreFly's plugins by **PyreFly**
 (<https://github.com/Pyre-Flies/D2R-Mods>, by permission). See [docs/bundled-plugins.md](docs/bundled-plugins.md).
+
+Shipped with the mod: our own plugin **D2R Legacy 16:9** (`legacy169.dll`, <https://github.com/Nugwa628/D2R-Legacy169>, MIT), the
+classic graphics in 16:9 (1066x600 / 853x480). Turn it off with `enabled = false` in
+`mods\mxl2012\d2rloader\config\legacy169.toml`.
 
 Diablo II and Diablo II: Resurrected belong to Blizzard Entertainment. D2RLoader is its own project
 (<https://d2rloader.net>). This port is not affiliated with or endorsed by Brother Laz or Blizzard. See [NOTICE.md](NOTICE.md).

@@ -43,5 +43,22 @@ class MentionRule(unittest.TestCase):
         self.assertEqual([r.pattern for r in self.builtin], pats, "re-encode MENTION_FALLBACK (check_public.py docstring)")
 
 
+class StagedScan(unittest.TestCase):
+    def test_a_staged_submodule_is_skipped(self):
+        """A gitlink (mode 160000) has no blob: `git show :<path>` fails, so the pre-commit scan must not ask for it."""
+        import shutil
+        import subprocess
+        import tempfile
+        repo = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(repo, ignore_errors=True))
+        run = lambda *a: subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True)  # noqa: E731
+        run("init", "-q")
+        with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as f:
+            f.write("plain text\n")
+        run("add", "a.txt")
+        run("update-index", "--add", "--cacheinfo", "160000,3537c6849104361002d4eaf15e0dd919ba289f53,third_party/lib")
+        self.assertEqual(cp.scan_staged(repo, {}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

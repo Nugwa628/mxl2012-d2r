@@ -99,6 +99,18 @@ class Items(unittest.TestCase):
         self.assertTrue(same(it, back))
         self.assertEqual(end, len(data) * 8)
 
+    def test_rotw_stash_stack_count(self):
+        """A RotW advanced stash stack: the bit after the guid is 1 and an 8-bit count follows (slot 2's stash: Ith x 4)."""
+        raw = bytes.fromhex("1000a800050508f430df1d008d615d54141a747c2529823d75434800")
+        back, end = d2save.read_item(raw, 0, T)
+        self.assertEqual((back["code"], back["filled"], back["stack"], end), ("r20", 1, 4, len(raw) * 8))
+        self.assertEqual(d2save.write_item(back, T), raw)
+        it = dict(flags=0x00A80010, b105=5, version=5, location=0, equip=0, x=1, y=0, page=5, code="r40", guid=7, filled=1,
+                  stack=200)
+        data, back, end = roundtrip(it)
+        self.assertTrue(same(it, back))
+        self.assertEqual(end, len(data) * 8)
+
     def test_weapon_armor_stack_fields(self):
         for it in (item(), item(code="600", defense=1234, maxdur=250, dur=0),
                    item(code="149", quantity=511, maxdur=0), item(code="119", maxdur=0)):

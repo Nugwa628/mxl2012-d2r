@@ -87,7 +87,12 @@ manifest's `launcher` as a self-update). `package_release.py` writes the fields 
  "launch": {"default_mod": "mxl2012", "launch_arguments": ""},
  "modFolder": "mxl2012",
  "saveFolder": "mxl2012/",
- "preserve": ["d2rloader/config/d2rloader.toml"],
+ "preserve": ["d2rloader/config/d2rloader.toml", "d2rloader/config/legacy169.toml", "d2rloader/config/buff-panel.toml"],
+ "bundledPlugins": [{"name": "D2R Legacy 16:9", "version": "0.1.0", "repo": "https://github.com/Nugwa628/D2R-Legacy169",
+                     "commit": "3537c68...", "files": ["d2rloader/plugins/legacy169.dll", "d2rloader/config/legacy169.toml"]},
+                    {"name": "Buff HUD", "version": "1.1.0", "repo": "https://github.com/Nugwa628/d2rl-buff-hud",
+                     "upstream": "https://github.com/Lukaszpg/d2rl-buff-hud", "author": "Lukaszpg", "commit": "...",
+                     "files": ["d2rloader/plugins/d2rl-buff-panel.dll", "d2rloader/plugins/d2rl-buff-panel.mpq", "..."]}],
  "archive": {"format": "7z", "name": "D2R-XL-2012-0.1.0.7z", "size": 372345678, "sha256": "...",
              "path": "releases/0.1.0/D2R-XL-2012-0.1.0.7z"},
  "emptyDirs": ["d2rloader/patches"],
@@ -111,7 +116,8 @@ manifest's `launcher` as a self-update). `package_release.py` writes the fields 
 | `launch` | what the game folder's own `d2rloader/config/d2rloader.toml` (section `[d2rloader]`) needs: `default_mod` = `mxl2012`. The player sets it in the game (gear on the character screen, Default Mod); the downloader does not write that file. `-txt` is not needed: D2RLoader 1.3.1 compiles the mod's `.txt` tables itself at each start (tested 2026-10-27, docs/launcher.md), except on the start that builds its base compiler snapshot (first start after installing or updating D2RLoader or D2R): that start has D2R's own sounds table with or without `-txt`, the plugin says so on screen and the next start is right (docs/bugs.md #46) |
 | `modFolder` | every `files[].path` is relative to `<game>/mods/<modFolder>/`, with `/` separators |
 | `saveFolder` | characters live in `Saved Games/Diablo II Resurrected/mods/<saveFolder>` (modinfo.json `savepath`); the downloader never writes there |
-| `preserve` | files the player may edit: write them only when missing, never overwrite |
+| `preserve` | files the player may edit: write them only when missing, never overwrite (`legacy169.toml` and `buff-panel.toml` from 0.1.12: the bundled plugins' settings, docs/bundled-plugins.md) |
+| `bundledPlugins` | (information, from 0.1.12) our other plugins in the mod folder: name, version, repository, source commit and their files (which are also in `files`); the downloader does not read it |
 | `files` | the complete mod folder, sorted by path. Update = for each entry, download when the local file is missing or its size / sha256 differ; then delete local files under the mod folder that are not listed (except `preserve` entries and their `.retail-backup` copies (bug #512), and `d2rloader/logs/`, which D2RLoader writes) |
 | `emptyDirs` | folders of the mod folder that hold no file (`d2rloader/patches`): the downloader creates them, the 7z has them |
 | `archive` | the same content as a solid `.7z`: `format` `"7z"`, `name`, `size`, `sha256`; `archive.path` is where the host has it. The downloader uses it when the objects it would fetch add up to more than `size` (a fresh install): download resumable, check sha256, unpack with the built-in decoder, check every file (docs/launcher.md). Manual installs use it too |

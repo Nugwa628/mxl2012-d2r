@@ -20,6 +20,8 @@ CHECK_LAYOUTS = ("bankexpansionlayouthd", "tradelayouthd", "vendorpanellayouthd"
 CONTROLLER_LAYOUTS = ("horadriccubelayouthd", "bankexpansionlayouthd")  # layouts/controller: ui_layouts (gamepad UI)
 CLASSIC_LAYOUTS = ("skillstreepanel",)  # classic only (ui_layouts.skilltree_classic, bug #33)
 CLASS_PREFIXES = ("am", "so", "ne", "pa", "ba", "dr", "as")
+STASH_ART_DIR = Path("panel") / "stash" / "additionalstash"
+STASH_ART = ("panel_additionalstash_consumables",)  # D2R's Materials page: the base of the Gems / Runes pages (median_stash)
 
 
 def baseline(src: Path) -> int:
@@ -39,6 +41,9 @@ def baseline(src: Path) -> int:
     for name in [f"{p}skilltree" for p in CLASS_PREFIXES] + ["panel_skilltreebg"]:  # bg: lane skillhd's candidates
         jobs.append((src / "data" / "hd" / "global" / "ui" / "spells" / "skill_trees" / f"{name}.sprite",
                      BASE_UI / "spells" / "skill_trees" / f"{name}.sprite"))
+    for name in STASH_ART:
+        jobs.append((src / "data" / "hd" / "global" / "ui" / STASH_ART_DIR / f"{name}.sprite",
+                     BASE_UI / STASH_ART_DIR / f"{name}.sprite"))
     for a, b in jobs:
         b.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(a, b)
@@ -55,6 +60,15 @@ def build() -> int:
     for name, mod in (("skill trees", skill_tree_art), ("panels", ui_panels), ("layouts", ui_layouts)):
         print(f"== {name}")
         rc |= mod.main([])
+    print("== stash pages")
+    import median_stash
+    from rotw_stash_legacy import lenient_json
+    from ui_art import read_sprite
+    from ui_paths import HD_OUT
+    d2r_layout = lenient_json((BASE_UI / "layouts" / "bankexpansionlayouthd.json").read_text("utf-8-sig"))
+    materials = read_sprite(BASE_UI / STASH_ART_DIR / f"{STASH_ART[0]}.sprite")[0]
+    for line in median_stash.build(d2r_layout, materials, HD_OUT / STASH_ART_DIR):
+        print(line)
     print("== check")
     return rc | ui_check.main()
 

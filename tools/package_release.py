@@ -9,6 +9,11 @@ here unless --plugin is given) it writes into dist/:
                                    mxl2012.mpq/data/...       install_mod.build_data (work/mod/data + the install-time merges)
                                    d2rloader/plugins/mxl2012-core.dll, d2rloader/config/d2rloader.toml, d2rloader/patches/,
                                    d2rloader/metadata.json     (modVersion = <version>, website = the GitHub repo)
+                                   d2rloader/plugins/legacy169.dll, d2rloader/config/legacy169.toml (D2R Legacy 16:9 at
+                                   the pinned commit, tools/build_legacy169.ps1 unless --legacy169 is given)
+                                   d2rloader/plugins/d2rl-buff-panel.dll + .mpq + licences, d2rloader/config/buff-panel.toml
+                                   (Buff HUD, our fork of Lukaszpg's plugin at the pinned commit, tools/build_buffhud.ps1
+                                   unless --buffhud is given)
                                  The manual download for players, and where tools/publish_release.py reads the file bytes
                                  from. There is no zip (owner decision 2026-10-26). Needs 7-Zip: the run stops without it.
   release-manifest.json          schemaVersion 2: version, required D2R build, required D2RLoader + sha256, every file of
@@ -23,7 +28,7 @@ files: D2R reads those from its own install). Without a baseline that check cann
 The release plugin is built by tools/build_plugin.ps1 -Release (CMake on PATH or Visual Studio's, the PluginSDK of
 .mxl-local.json; nothing is downloaded). tools/verify_package.py checks the finished 7z; tools/cut_alpha.ps1 runs it all.
 
-  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
+  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--legacy169 DLL] [--buffhud DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
   py -3 tools/package_release.py --no-data --plugin build/mxl2012-core.dll   (CI: no game files there; plugin + config only)
 Version: PluginVersion of plugin/src/mxl2012_core.cpp; --version must equal it (only --no-data builds may differ).
 """
@@ -60,6 +65,25 @@ D2RLOADER = {"version": "1.3.1-beta", "url": "https://d2rloader.net/download/D2R
 # the mod starts by itself. The player sets it in the game (Default Mod); the downloader does not write that file. No -txt:
 # D2RLoader 1.3.1 compiles the mod's .txt tables itself at each start (docs/launcher.md "How the player starts the game").
 LAUNCH = {"default_mod": NAME, "launch_arguments": ""}
+# Our own D2R Legacy 16:9 plugin (docs/bundled-plugins.md), shipped in the mod folder: built from its source at the commit
+# the gitlink third_party/D2R-Legacy169 pins (tools/build_legacy169.ps1), unless --legacy169 is given. Its default config goes
+# in too, as a `preserve` file: D2RLoader would write it at the first start, but the downloader removes files the release does
+# not list, so a player's `enabled = false` would not survive an update.
+LEGACY169 = {"name": "D2R Legacy 16:9", "version": "0.1.0", "repo": "https://github.com/Nugwa628/D2R-Legacy169",
+             "dll": "d2rloader/plugins/legacy169.dll", "config": "d2rloader/config/legacy169.toml"}
+LEGACY169_BUILD = ROOT / "build" / "legacy169"
+# Buff HUD by Lukaszpg (MIT), shipped as our fork (branch mxl2012: the generic fixes offered upstream plus the Median XL 2012
+# buff list inside its companion MPQ), docs/bundled-plugins.md. Built from the commit the gitlink third_party/d2rl-buff-hud pins
+# (tools/build_buffhud.ps1), unless --buffhud is given. The MPQ sits next to the DLL; the fork's MIT licence (copyright
+# Lukaszpg) and the PluginSDK licence it links go next to them. Its default config is a `preserve` file, as legacy169's.
+BUFFHUD = {"name": "Buff HUD", "version": "1.1.0", "repo": "https://github.com/Nugwa628/d2rl-buff-hud",
+           "upstream": "https://github.com/Lukaszpg/d2rl-buff-hud", "author": "Lukaszpg",
+           "dll": "d2rloader/plugins/d2rl-buff-panel.dll", "mpq": "d2rloader/plugins/d2rl-buff-panel.mpq",
+           "config": "d2rloader/config/buff-panel.toml",
+           "licence": "d2rloader/plugins/d2rl-buff-panel-LICENSE.txt",
+           "sdk_licence": "d2rloader/plugins/d2rl-buff-panel-PluginSDK-LICENSE.txt"}
+BUFFHUD_BUILD = ROOT / "build" / "buffhud"
+BUFFHUD_FILES = ("dll", "mpq", "config", "licence", "sdk_licence")
 # The player's own settings: the downloader writes these only when they are missing (docs/release.md).
 PRESERVE = ["d2rloader/config/d2rloader.toml"]
 SCHEMA = 2  # 2: the 7z ("archive") replaced the zip; the downloader installs from it or from objects (docs/release.md)
@@ -71,7 +95,7 @@ SEVENZ_NAMES = ("7z", "7zz", "7za", "7zr")
 NO_7Z = ("no 7-Zip found (Program Files\\7-Zip\\7z.exe, or 7z / 7zz / 7za / 7zr on PATH). A release is a .7z only: install "
          "7-Zip (https://www.7-zip.org; Debian / Ubuntu: apt install 7zip) and run again")
 
-FORBIDDEN = re.compile(r"(^|/)(mxl2012-testharness[^/]*|mxl2012-core-off\.txt|input-bindings\.toml|imgui\.ini|debugsettings\.json)$"
+FORBIDDEN = re.compile(r"(^|/)(mxl2012-testharness[^/]*|legacy169-testharness[^/]*|mxl2012-core-off\.txt|input-bindings\.toml|imgui\.ini|debugsettings\.json)$"
                        r"|\.(d2s|d2i|d2x|d2rl|ctc|ctl|key|map|ma\d|log|dmp|pdb|orig)$", re.I)  # saves: D2R and D2RLoader sidecars
 
 
@@ -90,6 +114,72 @@ def build_release_plugin() -> Path:
     subprocess.check_call([shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                            str(ROOT / "tools" / "build_plugin.ps1"), "-Release"], cwd=ROOT)
     return RELEASE_BUILD / "Release" / "mxl2012-core.dll"
+
+
+def pinned_commit(path: str) -> str:
+    """The commit a gitlink of this repo pins (index, as HEAD in a clean checkout)."""
+    out = subprocess.run(["git", "ls-files", "-s", path], cwd=ROOT, capture_output=True, text=True).stdout.split()
+    if len(out) < 2 or out[0] != "160000":
+        raise SystemExit(f"{path} is not a pinned submodule of this repo")
+    return out[1]
+
+
+def legacy169_commit() -> str:
+    """The D2R-Legacy169 commit this repo pins: the gitlink third_party/D2R-Legacy169."""
+    return pinned_commit("third_party/D2R-Legacy169")
+
+
+def buffhud_commit() -> str:
+    """The d2rl-buff-hud fork commit this repo pins: the gitlink third_party/d2rl-buff-hud."""
+    return pinned_commit("third_party/d2rl-buff-hud")
+
+
+def build_legacy169() -> Path:
+    """tools/build_legacy169.ps1: legacy169.dll from the pinned commit's source (release options, its unit tests run)."""
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        raise SystemExit("no PowerShell to run tools/build_legacy169.ps1: build legacy169.dll there and pass --legacy169 DLL")
+    subprocess.check_call([shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_legacy169.ps1")], cwd=ROOT)
+    return LEGACY169_BUILD / "Release" / "legacy169.dll"
+
+
+def check_legacy169(dll: Path) -> list:
+    """Problems of a legacy169.dll for a release: no test build (harness or bad-bytes table), the pinned version."""
+    b = dll.read_bytes()
+    problems = []
+    if b"legacy169-testharness" in b or b"-test\0" in b:
+        problems.append(f"{dll} is a legacy169 test build (build it with tools/build_legacy169.ps1)")
+    if b"legacy169" not in b or LEGACY169["version"].encode() + b"\0" not in b:
+        problems.append(f"{dll} does not carry legacy169 version {LEGACY169['version']}")
+    return problems
+
+
+def build_buffhud() -> Path:
+    """tools/build_buffhud.ps1: d2rl-buff-panel.dll + .mpq from the pinned commit's source (the fork's release preset and tests)."""
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        raise SystemExit("no PowerShell to run tools/build_buffhud.ps1: build Buff HUD there and pass --buffhud DLL")
+    subprocess.check_call([shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_buffhud.ps1")], cwd=ROOT)
+    return BUFFHUD_BUILD / "Release" / "d2rl-buff-panel.dll"
+
+
+def check_buffhud(dll: Path) -> list:
+    """Problems of a Buff HUD build for a release: our fork (its buff-panel.toml switch is embedded), the pinned version, and
+    a packed companion MPQ next to the DLL."""
+    b = dll.read_bytes()
+    problems = []
+    if b"buff-panel" not in b or BUFFHUD["version"].encode() + b"\0" not in b:
+        problems.append(f"{dll} does not carry Buff HUD version {BUFFHUD['version']}")
+    if b"[buff_panel]" not in b:
+        problems.append(f"{dll} is not our fork's build (no buff-panel.toml embedded): build it with tools/build_buffhud.ps1")
+    mpq = dll.with_suffix(".mpq")
+    if not mpq.is_file():
+        problems.append(f"no {mpq.name} next to {dll}")
+    elif mpq.read_bytes()[:4] != b"MPQ\x1a":
+        problems.append(f"{mpq} is not a packed MPQ")
+    return problems
 
 
 def check_release_plugin(dll: Path, version: str) -> list:
@@ -111,7 +201,8 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False) -> None:
+def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
+          legacy169: Path = None, buffhud: Path = None) -> None:
     if mod.exists():
         shutil.rmtree(mod)
     data = mod / f"{NAME}.mpq" / "data"
@@ -122,6 +213,53 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
     install_mod.write_mod_files(mod, NAME, f"{NAME}/", plugin, {
         "modVersion": version, "website": REPO_URL,
         "description": "D2R-XL 2012: Median XL 2012 (v005) for Diablo II: Resurrected (build %s) through D2RLoader." % install_mod.D2R_BUILD})
+    if legacy169 is not None:
+        stage_legacy169(mod, legacy169)
+    if buffhud is not None:
+        stage_buffhud(mod, buffhud)
+
+
+def stage_legacy169(mod: Path, dll: Path, src: Path = ROOT / "build" / "legacy169-src") -> None:
+    """legacy169.dll into d2rloader/plugins/ (mod-scoped: only with this mod) and its default legacy169.toml from the pinned
+    source (tools/build_legacy169.ps1 exports it to build/legacy169-src) into d2rloader/config/."""
+    pinned = (src / "PINNED_COMMIT").read_text("ascii").strip() if (src / "PINNED_COMMIT").is_file() else None
+    if pinned != legacy169_commit():
+        raise SystemExit(f"{src} is not the pinned commit {legacy169_commit()[:9]} (it is {pinned}): run "
+                         "tools/build_legacy169.ps1")
+    shutil.copy2(dll, mod / LEGACY169["dll"])
+    shutil.copy2(src / "legacy169.toml", mod / LEGACY169["config"])
+
+
+def stage_buffhud(mod: Path, dll: Path, src: Path = ROOT / "build" / "buffhud-src") -> None:
+    """d2rl-buff-panel.dll and its companion MPQ (the Median buff list is inside it) into d2rloader/plugins/ (mod-scoped), the
+    fork's LICENSE and its PluginSDK's next to them, and the default buff-panel.toml into d2rloader/config/, all from the pinned
+    source that tools/build_buffhud.ps1 exports to build/buffhud-src."""
+    pinned = (src / "PINNED_COMMIT").read_text("ascii").strip() if (src / "PINNED_COMMIT").is_file() else None
+    if pinned != buffhud_commit():
+        raise SystemExit(f"{src} is not the pinned commit {buffhud_commit()[:9]} (it is {pinned}): run tools/build_buffhud.ps1")
+    shutil.copy2(dll, mod / BUFFHUD["dll"])
+    shutil.copy2(dll.with_suffix(".mpq"), mod / BUFFHUD["mpq"])
+    shutil.copy2(src / "LICENSE", mod / BUFFHUD["licence"])
+    shutil.copy2(src / "external" / "PluginSDK" / "LICENSE", mod / BUFFHUD["sdk_licence"])
+    shutil.copy2(src / "buff-panel.toml", mod / BUFFHUD["config"])
+
+
+def preserve_list(mod: Path) -> list:
+    """PRESERVE plus the bundled plugins' configs the package holds."""
+    return PRESERVE + [c for c in (LEGACY169["config"], BUFFHUD["config"]) if (mod / c).is_file()]
+
+
+def bundled_plugins(legacy169: bool, buffhud: bool) -> list:
+    """The manifest's bundledPlugins: name, version, repository, source commit and files of each plugin the package holds."""
+    out = []
+    if legacy169:
+        out.append({"name": LEGACY169["name"], "version": LEGACY169["version"], "repo": LEGACY169["repo"],
+                    "commit": legacy169_commit(), "files": [LEGACY169["dll"], LEGACY169["config"]]})
+    if buffhud:
+        out.append({"name": BUFFHUD["name"], "version": BUFFHUD["version"], "repo": BUFFHUD["repo"],
+                    "upstream": BUFFHUD["upstream"], "author": BUFFHUD["author"], "commit": buffhud_commit(),
+                    "files": [BUFFHUD[k] for k in BUFFHUD_FILES]})
+    return out
 
 
 def baselines(extract: Path = EXTRACT, cache: Path = None) -> list:
@@ -233,7 +371,7 @@ def loader_problems(block: dict) -> list:
     return out
 
 
-def manifest(version: str, files: list, archive_path: Path, complete: bool, dirs=()) -> dict:
+def manifest(version: str, files: list, archive_path: Path, complete: bool, dirs=(), preserve=None, bundled=()) -> dict:
     """archive_path: the .7z. The launcher installs from the objects (docs/release.md), never from the archive."""
     problems = loader_problems(D2RLOADER)
     if problems:
@@ -250,7 +388,8 @@ def manifest(version: str, files: list, archive_path: Path, complete: bool, dirs
         "launch": LAUNCH,
         "modFolder": NAME,  # the paths below are relative to <D2R>/mods/<modFolder>/
         "saveFolder": f"{NAME}/",  # under Saved Games/Diablo II Resurrected/mods/ (modinfo.json savepath)
-        "preserve": PRESERVE,
+        "preserve": PRESERVE if preserve is None else preserve,
+        "bundledPlugins": list(bundled),  # our other plugins in the mod folder: name, version, repo, commit, files
         "archive": {"format": "7z", "name": archive_path.name, "size": archive_path.stat().st_size,
                     "sha256": sha256(archive_path)},  # the manual download
         "emptyDirs": list(dirs),  # folders the 7z holds although no file is in them (d2rloader/patches)
@@ -309,6 +448,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", help="release version (default: PluginVersion)")
     ap.add_argument("--plugin", type=Path, help="a release mxl2012-core.dll (default: build it with -DMXL_RELEASE=ON)")
+    ap.add_argument("--legacy169", type=Path, help="a release legacy169.dll of the pinned commit (default: build it with "
+                    "tools/build_legacy169.ps1; --no-data builds leave it out unless given)")
+    ap.add_argument("--buffhud", type=Path, help="a release d2rl-buff-panel.dll of the pinned fork commit, its .mpq next to it "
+                    "(default: build both with tools/build_buffhud.ps1; --no-data builds leave it out unless given)")
+    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169 and Buff HUD unless given (unit tests; "
+                    "tools/verify_package.py refuses such a package)")
     ap.add_argument("--data-from", type=Path, help="copy this finished mxl2012.mpq/data instead of building it")
     ap.add_argument("--no-data", action="store_true", help="no mxl2012.mpq/data (CI): manifest says complete=false")
     ap.add_argument("--game", type=Path, default=Path(install_mod.DEFAULT_GAME), help="D2R folder read for maps_hd (CASC)")
@@ -348,13 +493,19 @@ def main() -> int:
         print(f"no plugin at {plugin}")
         return 1
     problems = check_release_plugin(plugin, plugin_version())
+    legacy169 = a.legacy169 or (None if a.no_data or a.no_bundled else build_legacy169())
+    if legacy169 is not None:
+        problems += check_legacy169(legacy169) if legacy169.is_file() else [f"no legacy169.dll at {legacy169}"]
+    buffhud = a.buffhud or (None if a.no_data or a.no_bundled else build_buffhud())
+    if buffhud is not None:
+        problems += check_buffhud(buffhud) if buffhud.is_file() else [f"no d2rl-buff-panel.dll at {buffhud}"]
     if problems:
         print("\n".join(problems))
         return 1
 
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
-    stage(mod, version, plugin, a.game, a.data_from, a.no_data)
+    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
@@ -375,8 +526,9 @@ def main() -> int:
     t7 = time.time() - t7
     files = file_list(mod)
     man_path = a.out / "release-manifest.json"
-    man_path.write_text(json.dumps(manifest(version, files, seven_path, not a.no_data, empty_dirs(mod)), indent=1) + "\n",
-                        encoding="utf-8")
+    bundled = bundled_plugins(legacy169 is not None, buffhud is not None)
+    man_path.write_text(json.dumps(manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod),
+                                            bundled), indent=1) + "\n", encoding="utf-8")
     notes = a.out / f"RELEASE_NOTES-{version}.md"
     notes.write_text(template.format(version=version, plugin=plugin_version(), build=D2R["build"], d2rver=D2R["version"],
                                   loader=D2RLOADER["version"], loader_url=D2RLOADER["url"], loader_sha=D2RLOADER["sha256"],

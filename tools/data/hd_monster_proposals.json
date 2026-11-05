@@ -237,6 +237,25 @@
    "enabled": true,
    "before": "vampire1 x1.4",
    "why": "Rathma Primus: in Median a necromancer; the classic art is a pale winged humanoid caster (68x109 px). Owner pick (2026-10-30, for now): the Oblivion Knight (doomknight3 x1.2), a bronze skeletal caster with glowing hands; drawn, casts, dies, 0 asserts in lane rathma's trial (checks-20261030-204213-s3). Also tried: Nihlathak (nihlathakboss x1.35, value +0.3: a bald robed man). The Vampire is a bare-skinned winged man; succubus1 drew nothing for this Id and ancientbarb2 asserted at death (lane standin)"
+  },
+  "!5": {
+   "donor": "nihlathakboss",
+   "scale": 1.2,
+   "adjust": [
+    0.0,
+    0.0,
+    0.3
+   ],
+   "tint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "confidence": "medium",
+   "enabled": true,
+   "before": "councilmember1 x1",
+   "why": "Heretic / Heresiarch / Cultist (cultist1, cultist2, hell_cultist, su_cultist2, uq_cultist2, res_cultist1, sumelite_1273; Act 4 Mesa 1 and 2, Act 1 Monastery and Barracks): Median reuses D2R's Council Member art, a robed caster. In HD the Council Member's dark red robe vanished on the dark Act 4 ground (bug #542). Nihlathak (the Act 5 boss unit) is a bald, gaunt man in long grey robes with attack1, attack2 and cast clips: a robed renegade caster whose pale robe stands out; value +0.3 as in lane rathma's trial"
   }
  }
 }

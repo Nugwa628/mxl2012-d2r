@@ -204,7 +204,7 @@ class BuildTests(unittest.TestCase):
             # a slot moved onto its neighbour
             lp = out / "global" / "ui" / "layouts" / "bankexpansionlayout.json"
             lay = json.loads(lp.read_text("utf-8"))
-            a, b = rs.find(lay, "advancedstash_gems")["children"]
+            a, b = rs.find(lay, "advancedstash_gems")["children"][:2]
             b["fields"]["rect"] = dict(a["fields"]["rect"])
             lp.write_text(json.dumps(lay), "utf-8")
             problems, _notes = rs.check(d2r, out, mod)

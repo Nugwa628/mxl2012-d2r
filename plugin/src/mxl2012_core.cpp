@@ -117,7 +117,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.11";
+constexpr const char* PluginVersion = "0.1.12";
 constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -706,6 +706,15 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	std::snprintf(swLine + swLen, sizeof(swLine) - swLen, "; thinks %ld, fighting %ld; last check %ld sub-tiles verdict %ld", swThinks, swNotes,
 	              swDist, swVerdict);
 	SayPart(command, "spiritwarp", swLine);
+	if (!Off("spiritwarp")) {
+		long hReach = 0, hZombie = 0, hTarget[3] = {}, hAt[3] = {}, hClass = -1, hCapped = 0, hLongest = 0;
+		SpiritWarpHeld(&hReach, &hZombie, hTarget, hAt, &hClass, &hCapped, &hLongest);
+		std::snprintf(line, sizeof(line),
+		              "spiritheld left fighting: target in reach %ld, a zombie %ld; target from the owner <=20 %ld, 21-25 %ld, 26-40 %ld; "
+		              "spirit from the owner 21-25 %ld, 26-30 %ld, 31-40 %ld; last target class %ld; warped at the 4 s cap %ld; longest hold %ld ms",
+		              hReach, hZombie, hTarget[0], hTarget[1], hTarget[2], hAt[0], hAt[1], hAt[2], hClass, hCapped, hLongest);
+		Say(command, line);
+	}
 	long appleCasts = 0, appleRefused = 0, appleBooks = 0;
 	AppleUseCounts(&appleCasts, &appleRefused, &appleBooks);
 	std::snprintf(line, sizeof(line), "%s; casts %ld, refused %ld, Books of Skill left to D2R %ld", g_appleUseReport, appleCasts, appleRefused, appleBooks);

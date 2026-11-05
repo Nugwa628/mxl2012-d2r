@@ -39,7 +39,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from icon_paths import EXCEL, read_tsv  # noqa: E402
 from ui_paths import BASE_UI, LAYOUT_OUT  # noqa: E402
+import median_stash  # noqa: E402
 import stash_page2  # noqa: E402
+from rotw_stash_legacy import lenient_json  # noqa: E402
 
 SX, SY = 1162 / 320, 1507 / 432
 ITEM_CELL = 98                      # D2R's HD item sprite size per cell
@@ -274,6 +276,11 @@ def stash_hd(name: str = "bankexpansionlayouthd.json") -> str:
         s, _e = block_span(t, '"name": "SharedStashTabContainer"')
         indent = t[t.rindex("\n", 0, s) + 1:s]
         t = t[:s] + json.dumps(stash_page2.stock_strip_hd()) + ",\n" + indent + t[s:]
+        for page in median_stash.PAGES:  # Median's runes and gems in the Runes / Gems pages (tools/median_stash.py)
+            s, e = block_span(t, f'"name": "advancedstash_{page}"')
+            comma = "," if t[e - 1] == "," else ""
+            w = median_stash.widget(page, lenient_json(t[s:e - len(comma)]))
+            t = t[:s] + json.dumps(w) + comma + t[e:]
     from rotw_stash_legacy import LITERALS as STASH_LITERALS
     for key, literal in {**STASH_LITERALS, **STASH_KEYS}.items():
         t = t.replace(json.dumps(key), json.dumps(literal))

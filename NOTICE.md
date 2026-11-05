@@ -56,6 +56,10 @@ These are Git submodules that keep their own licenses (all MIT):
 
 Their license texts are in their own folders (`third_party/<name>/LICENSE`).
 
+The release package also ships **Buff HUD** by Lukaszpg (<https://github.com/Lukaszpg/d2rl-buff-hud>, MIT, copyright
+Lukaszpg), built from our fork (`third_party/d2rl-buff-hud`, <https://github.com/Nugwa628/d2rl-buff-hud>), with its licence
+text and its PluginSDK's in `mods\mxl2012\d2rloader\plugins\` (docs/bundled-plugins.md).
+
 ## The downloader's 7z decoder (`launcher/third_party/lzma`)
 
 `D2R-XL-2012-Downloader.exe` unpacks the release's `.7z` with the C 7z decoder of the

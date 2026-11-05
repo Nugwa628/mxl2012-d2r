@@ -18,35 +18,40 @@ namespace spirit_warp {
 inline constexpr int32_t SpiritPetTypes[] = {30, 31, 32};
 
 // Distances are in sub-tiles (the unit x / y D2R keeps, as the harness's `state` prints them). A spirit farther than WarpBeyond
-// from its owner is warped, unless it is fighting and still within HardBeyond: then it keeps fighting there and is warped once
-// that fight ends or the owner runs farther off.
+// from its owner is warped, unless it is fighting and still within HardBeyond: then it keeps fighting there for at most HoldMaxMs
+// and is warped once that fight ends, the time is up or the owner runs farther off (owner, 2026-11-05: spirits come back reliably
+// at about 20; lane spiritfight).
 inline constexpr int32_t WarpBeyond = 20;
 inline constexpr int32_t HardBeyond = 40;
+inline constexpr uint64_t HoldMaxMs = 4000;
 
 constexpr auto DistanceSq(int32_t ax, int32_t ay, int32_t bx, int32_t by) noexcept -> int64_t {
 	const int64_t dx = static_cast<int64_t>(ax) - bx, dy = static_cast<int64_t>(ay) - by;
 	return dx * dx + dy * dy;
 }
 
-// Fighting: the spirit has a live target (tick +0x10; not in mode DT 0 / DD 12) that is in reach (tick +0x24) or within
-// HardBeyond of the owner, so a spirit on its way to a monster near its owner is not warped back before it gets there. A killed
-// target stays in the tick as a corpse (seen in game: spirits held next to a dead zombie), so it does not count.
+// Fighting: the spirit's own target (tick +0x10) is alive (not in mode DT 0 / DD 12), in its reach (tick +0x24) and within
+// FightNear of the owner. A killed target stays in the tick as a corpse (seen in game: spirits held next to a dead zombie), so it
+// does not count. Lane spiritwarp's rule (in reach OR within 40 of the owner) held spirits that walked out to the Blood Moor's
+// own monsters 26-40 off; a spirit walking to a monster near its owner is now warped and starts again from the owner's side.
+inline constexpr int32_t FightNear = 25;
 inline constexpr int32_t ModeDeath = 0;
 inline constexpr int32_t ModeDead = 12;
 constexpr auto Alive(int32_t mode) noexcept -> bool {
 	return mode != ModeDeath && mode != ModeDead;
 }
 constexpr auto Fighting(bool liveTarget, bool targetInReach, int64_t targetOwnerSq) noexcept -> bool {
-	return liveTarget && (targetInReach || targetOwnerSq <= static_cast<int64_t>(HardBeyond) * HardBeyond);
+	return liveTarget && targetInReach && targetOwnerSq <= static_cast<int64_t>(FightNear) * FightNear;
 }
 
 enum class Verdict { Stay, Held, Warp };
-// Stay: within WarpBeyond; Held: farther, but fighting within HardBeyond; Warp: bring it to the owner.
-constexpr auto Decide(int64_t distanceSq, bool fighting) noexcept -> Verdict {
+// Stay: within WarpBeyond; Held: farther, but fighting within HardBeyond and held for less than HoldMaxMs so far (`heldMs`: since
+// the first check of this hold, 0 at that check); Warp: bring it to the owner.
+constexpr auto Decide(int64_t distanceSq, bool fighting, uint64_t heldMs) noexcept -> Verdict {
 	if (distanceSq <= static_cast<int64_t>(WarpBeyond) * WarpBeyond) {
 		return Verdict::Stay;
 	}
-	if (fighting && distanceSq <= static_cast<int64_t>(HardBeyond) * HardBeyond) {
+	if (fighting && distanceSq <= static_cast<int64_t>(HardBeyond) * HardBeyond && heldMs < HoldMaxMs) {
 		return Verdict::Held;
 	}
 	return Verdict::Warp;
@@ -91,6 +96,32 @@ inline auto FightingRecently(const Slot* slots, uint32_t unitId, uint64_t nowMs)
 		}
 	}
 	return false;
+}
+
+// A spirit's hold: the time of the first check that would hold it, by unit id (Slot.lastMs; 0: free). `wouldHold` true: returns the
+// ms since that check (0 at the first); false (the check stays or warps): the hold ends and 0 is returned. A spirit whose fight
+// notes come and go beyond WarpBeyond keeps one hold, so the cap is not reset by a think in between.
+inline auto HoldFor(Slot* holds, uint32_t unitId, bool wouldHold, uint64_t nowMs) noexcept -> uint64_t {
+	int free = -1, oldest = 0;
+	for (int i = 0; i < SlotCount; ++i) {
+		if (holds[i].lastMs != 0 && holds[i].unitId == unitId) {
+			if (!wouldHold) {
+				holds[i].lastMs = 0;
+				return 0;
+			}
+			return nowMs - holds[i].lastMs;
+		}
+		if (holds[i].lastMs == 0 && free < 0) {
+			free = i;
+		}
+		if (holds[i].lastMs < holds[oldest].lastMs) {
+			oldest = i;
+		}
+	}
+	if (wouldHold) {
+		holds[free >= 0 ? free : oldest] = {unitId, nowMs != 0 ? nowMs : 1};
+	}
+	return 0;
 }
 
 }  // namespace spirit_warp

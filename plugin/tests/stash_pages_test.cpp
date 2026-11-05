@@ -35,6 +35,27 @@ int main() {
 	Check(!StockStashOpens("OpenPanel", "mxl2012-core/StashPage2", mxl_stash_page::StockPanel), "our own panel");
 	Check(!StockStashOpens(nullptr, nullptr, mxl_stash_page::StockPanel), "no text");
 
+	// the arrows' own message (bug #543)
+	const char* const page = mxl_stash_page::PanelName;
+	Check(std::strcmp(page, "mxl2012-core/StashPage2") == 0, "the page panel's name");
+	Check(ShowRequest("PanelManager", "OpenPanel", page, page) == 2, "stock arrows: page 2");
+	Check(ShowRequest("PanelManager", "ClosePanel", page, page) == 1, "page 2 arrows: page 1");
+	Check(ShowRequest("PanelManager", "TogglePanel", page, page) == -1 && ShowRequest("PanelManager", "OpenPanel", "BankExpansionLayout", page) == -1,
+	      "another panel message");
+	Check(ShowRequest("BankPanelMessage", "OpenPanel", page, page) == -1, "another target");
+	Check(ShowRequest(nullptr, nullptr, nullptr, page) == -1, "null");
+
+	// what brings page 1 back
+	Check(LeavesPage2("BankPanelMessage", "SelectTab", "", mxl_stash_page::StockPanel), "a tab click (empty text)");
+	Check(LeavesPage2("BankPanelMessage", "SelectTab", "1", mxl_stash_page::StockPanel), "a tab click (with index)");
+	Check(LeavesPage2("BankPanelMessage", "Close", "", mxl_stash_page::StockPanel), "the stock X");
+	Check(LeavesPage2("PanelManager", "ClosePanel", "BankExpansionLayout", mxl_stash_page::StockPanel), "the stash closed");
+	Check(LeavesPage2("PanelManager", "TogglePanel", "BankExpansionLayout", mxl_stash_page::StockPanel), "the stash toggled");
+	Check(!LeavesPage2("BankPanelMessage", "SharedStashRight", "", mxl_stash_page::StockPanel), "shared page arrows");
+	Check(!LeavesPage2("BankPanelMessage", "Withdraw", "", mxl_stash_page::StockPanel), "gold");
+	Check(!LeavesPage2("PanelManager", "ClosePanel", "PlayerInventoryExpansionLayout", mxl_stash_page::StockPanel), "another panel");
+	Check(!LeavesPage2(nullptr, nullptr, nullptr, mxl_stash_page::StockPanel), "null");
+
 	// the strip: Personal tab with the page only
 	Check(StripVisible(true, 0), "page and Personal");
 	Check(!StripVisible(true, 1) && !StripVisible(true, 2), "other tabs");
@@ -58,7 +79,14 @@ int main() {
 	Check(std::strstr(mxl_stash_page::LayoutHd, mxl_stash_page::GridName) != nullptr && std::strstr(mxl_stash_page::LayoutClassic, mxl_stash_page::GridName) != nullptr,
 	      "both layouts have the bound grid");
 	Check(std::strstr(mxl_stash_page::LayoutHd, "\"@") == nullptr && std::strstr(mxl_stash_page::LayoutClassic, "\"@") == nullptr, "no string keys (bug #30)");
-	Check(std::strstr(mxl_stash_page::LayoutHd, "PanelManager:ClosePanel:BankExpansionLayout") != nullptr, "X closes the stock stash");
+	// an overlay on the open stock stash: no click catcher, background or X of its own; the arrows close the page panel (bug #543)
+	const char* const layouts[] = {mxl_stash_page::LayoutHd, mxl_stash_page::LayoutClassic};
+	for (const char* lay : layouts) {
+		Check(std::strstr(lay, "PanelManager:ClosePanel:mxl2012-core/StashPage2") != nullptr, "page 2's arrows close the page panel");
+		Check(std::strstr(lay, "ClickCatcherWidget") == nullptr && std::strstr(lay, "\"background\"") == nullptr && std::strstr(lay, "\"close\"") == nullptr,
+		      "nothing over the stock tabs, gold or X");
+		Check(std::strstr(lay, "OpenPanel") == nullptr && std::strstr(lay, "BankExpansionLayout") == nullptr, "no other PanelManager message");
+	}
 	if (failures == 0) {
 		std::printf("stash_pages: all checks passed\n");
 	}

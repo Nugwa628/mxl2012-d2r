@@ -787,8 +787,15 @@ def _setskill(skill, level):
 
 
 def graphics_mode():
-    """'legacy' when the capture is pillarboxed (legacy graphics draw 4:3 with black side bars), else 'hd'. Only reliable in a lit
-    area (the town): in a dark cave HD's own edges are black too."""
+    """'legacy' or 'hd'. In a game: the panel manager's HD flag (harness `lvlbtn`: panelmgr+0xb9 is 1 in HD, 0 in legacy
+    graphics). Otherwise the capture: pillarboxed is legacy (legacy graphics draw 4:3 with black side bars). The picture test is
+    wrong with the bundled legacy169 (a 16:9 classic view has no bars) and only reliable in a lit area (the town): in a dark cave
+    HD's own edges are black too."""
+    if STATE.get("in_game"):
+        _ok, lines = H("lvlbtn")
+        m = re.search(r"panelmgr\+0xb9=(\d)", " ".join(lines))
+        if m:
+            return "hd" if m.group(1) == "1" else "legacy"
     import numpy as np
     a = grab()
     h, w, _ = a.shape
@@ -14584,6 +14591,135 @@ def check_crash532():
 
 CHECKS += [("crash532", check_crash532)]
 
+# lane beltstack: bug #541, Median's belt potions (elixirs, Goodberry, Moon Icon, Apple) going into a column of life / mana potions.
+# 1.14d's column rule (INVENTORY_FindBeltSlotForPotion 0x63c600, ITEM_CheckIfBothItemsAreSameTypeOfPotions 0x628a40): a column
+# takes a potion only of the same item code, or when both codes are in one of the fixed groups hp1-hp5, mp1-mp5, rvs / rvl; else
+# the first empty column (autobelt 1), else the backpack.
+BELTSTACK_GIRDLE = "859"  # Belt (Grade 6), belts.txt row 3 "girdle": 16 boxes, 4 rows
+BELTSTACK_CODES = ("ey2", "ey3", "ey4", "0g0", "0g1", "0g2", "et1", "0g7", "0g8", "eo7", "ey5", "ey9", "b@b", "c@c", "dog",
+                   "vps", "yps", "rvl")  # the last three: vanilla probes of D2R's rule (spot, apot, rpot = Equiv hpot / mpot)
+BELTSTACK_BASE = ("hp5", "mp5", "hp3", "mp3")  # hp5 -> column 0, mp5 -> column 1, hp3 joins column 0, mp3 column 1 (classic)
+
+
+def in_belt(i):
+    """`items` lists a belt item with page 255 (as worn items) but body 0; x is the belt slot."""
+    return i.get("page") == RC_PAGE_BODY and i.get("body", 0) == 0
+
+
+def beltstack_belt(log):
+    """The belt's items: {slot: code} (slot = x of the item line; column = slot % 4, row = slot // 4)."""
+    return {i["x"]: i["code"] for i in rc_items(log) if in_belt(i)}
+
+
+def beltstack_reset(log):
+    """An empty belt (a new character starts with four hp1 in it), no test potion in the backpack, then BELTSTACK_BASE picked up."""
+    for i in rc_items(log):
+        if in_belt(i) or (i.get("page") == RC_PAGE_INV and i.get("code") in BELTSTACK_CODES + BELTSTACK_BASE + ("hp1",)):
+            Hl("remove id %d" % i["id"], log)
+    for code in BELTSTACK_BASE:
+        _, ln = Hl("item %s ground" % code, log)
+        made = parse_items(ln)
+        if made:
+            Hl("pickup %d inv" % made[0]["id"], log)
+            time.sleep(0.4)
+
+
+def check_beltstack():
+    """Bug #541: with life and mana potions in the belt (hp5 and hp3 in one column, mp5 and mp3 in another, a 16-box girdle worn),
+    each Median belt potion of BELTSTACK_CODES is (a) made on the ground and picked up with the to-inventory flag (packet 0x16, a
+    plain click: the auto-belt path) and (b) put into the backpack and moved by packet 0x63 (the client's shift + click to the belt).
+    Where it lands is read from `items`. Classic (1.14d's code-group rule): never in the life or mana column, in the first empty
+    column instead. PASS when every potion avoids the life / mana columns on both paths and the base potions still stack by kind."""
+    mark = engine_mark()
+    log, rows, bad, shots = [], [], [], []
+    enable_debug()
+    cheat("god 1")
+    goto(1, timeout=60)
+    mode = os.environ.get("MXL_BELTSTACK_GRAPHICS", "hd")  # hd or legacy
+    if not set_graphics(mode):
+        bad.append("graphics mode %s not reached" % mode)
+    rows.append("graphics %s" % mode)
+    worn = [i for i in rc_items(log) if i.get("body") == 8]
+    if not worn or worn[0].get("code") != BELTSTACK_GIRDLE:
+        if worn:
+            Hl("unequip belt", log)
+        Hl("equip %s belt" % BELTSTACK_GIRDLE, log)
+    beltstack_reset(log)
+    base = beltstack_belt(log)
+    rows.append("base belt %s" % sorted(base.items()))
+    life_cols = {s % 4 for s, c in base.items() if c.startswith("hp")}
+    mana_cols = {s % 4 for s, c in base.items() if c.startswith("mp")}
+    if len(life_cols) != 1 or len(mana_cols) != 1 or life_cols == mana_cols:
+        bad.append("base belt not as expected (life columns %s, mana columns %s)" % (sorted(life_cols), sorted(mana_cols)))
+    g.press("`")  # show all belt rows
+    time.sleep(1.0)
+    shots.append(sh("beltstack_base"))
+    for code in BELTSTACK_CODES:
+        for path in ("pickup", "shift") if mode == "hd" else ("pickup",):  # INV_CELL is the HD grid only
+            beltstack_reset(log)
+            if path == "pickup":
+                _, ln = Hl("item %s ground" % code, log)
+                made = parse_items(ln)
+                if not made:
+                    bad.append("%s: not made" % code)
+                    break
+                iid = made[0]["id"]
+                Hl("pickup %d inv" % iid, log)
+            else:
+                _, ln = Hl("item %s inv" % code, log)
+                made = parse_items(ln)
+                if not made:
+                    bad.append("%s: not put into the backpack" % code)
+                    break
+                iid = made[0]["id"]
+                rc_open_inventory()
+                px, py = inv_px(made[0]["x"], made[0]["y"])
+                hover_px(px, py)
+                g.click(px / 1600, py / 900, mods=("shift",))  # Shift + left click: the player's move to the belt
+                time.sleep(1.0)
+                close_right_panel()
+            time.sleep(0.6)
+            it = next((i for i in rc_items(log) if i["id"] == iid), None)
+            if it is None:
+                rows.append("%s %s: gone" % (code, path))
+                bad.append("%s %s: item gone" % (code, path))
+                continue
+            if in_belt(it):
+                col = it["x"] % 4
+                kind = "LIFE column" if col in life_cols else ("MANA column" if col in mana_cols else "own column")
+                where = "belt slot %d (column %d, row %d): %s" % (it["x"], col, it["x"] // 4, kind)
+                if col in life_cols or col in mana_cols:
+                    bad.append("%s %s: %s" % (code, path, where))
+            else:
+                where = "page %s x %s y %s (not in the belt)" % (it.get("page"), it.get("x"), it.get("y"))
+            rows.append("%s %s: %s" % (code, path, where))
+            if code in ("ey2", "0g1") and path == "pickup":
+                shots.append(sh("beltstack_%s_%s" % (code.replace("@", "at"), path)))
+            Hl("remove id %d" % iid, log)
+    # kinds: the same code stacks in its column, another elixir takes the last empty one, a third finds none (backpack, as 1.13c)
+    beltstack_reset(log)
+    for code in ("ey2", "ey2", "ey3", "0g1"):
+        _, ln = Hl("item %s ground" % code, log)
+        made = parse_items(ln)
+        if made:
+            Hl("pickup %d inv" % made[0]["id"], log)
+            time.sleep(0.4)
+    belt = beltstack_belt(log)
+    rows.append("kinds: belt %s, 0g1 in the backpack %s" % (sorted(belt.items()),
+                                                            any(i.get("code") == "0g1" and i.get("page") == RC_PAGE_INV for i in rc_items(log))))
+    cols = {c: {s % 4 for s, k in belt.items() if k == c} for c in ("ey2", "ey3", "0g1")}
+    if sorted(s for s, k in belt.items() if k == "ey2") != [2, 6] or cols["ey3"] != {3} or cols["0g1"]:
+        bad.append("kinds: expected ey2 in slots 2 and 6, ey3 in column 3, 0g1 not in the belt")
+    shots.append(sh("beltstack_kinds_%s" % mode))
+    g.press("`")
+    if mode != "hd":
+        set_graphics("hd")
+    finish("beltstack", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots,
+           rows + log[-400:], partial="the belt rows on the beltstack_* shots are read by hand")
+
+
+CHECKS += [("beltstack", check_beltstack)]
+
 
 # ---------------------------------------------------------------- lane stashpage2: personal stash page 2 (D2RLoader player page)
 # docs/plugin-plan.md 8.2. Page 2 is D2RLoader's custom player page (item page 6, <char>.d2rl), drawn by the plugin panel
@@ -14672,6 +14808,71 @@ def sp2_ids(out):
     return {m.group(2): (m.group(1), m.group(3)) for m in re.finditer(r"(p\d|inv):(\w+)@\d+,\d+#(\d+)", out)}
 
 
+def sp2_tab(k):
+    """A background click on stash tab k (0 Personal, 1 Shared, 2 Gems, 3 Materials, 4 Runes) of the HD stock stash."""
+    g.click(*sp2_xy(82 + 195 * (k + 0.5), 146 + 36))
+    time.sleep(1.2)
+
+
+def sp2_switches(log, res, bad, shots):
+    """Bug #543: page 2 is drawn over the open stock stash. Page 1 -> 2 -> 1 three times; a tab click from page 2 (Shared, Gems in RotW)
+    shows that tab and page 2 shuts; Escape on page 2 and the stock X on page 2; the stash closed and opened again comes back on
+    page 1 with its tabs, gold box and left border (the shots are judged by hand)."""
+    n = 0
+    for i in range(3):
+        sp2_arrow("right")
+        a = sp2_wait_state(2, log)[0] == 2
+        if i == 2:
+            shots.append(sh("stashpage2_hd_p2_again"))
+        sp2_arrow("left")
+        b = sp2_wait_state(1, log)[0] == 1
+        n += a and b
+    shots.append(sh("stashpage2_hd_p1_again"))
+    res.append("page 1 -> 2 -> 1 three times: %d of 3" % n)
+    if n != 3:
+        bad.append("page switches %d of 3" % n)
+    # an expansion game's stash has no Gems tab: MXL_SP2_TABS=shared there
+    tabs = os.environ.get("MXL_SP2_TABS", "shared,gems").split(",")
+    for k, tab in ((k, t) for k, t in ((1, "shared"), (2, "gems")) if t in tabs):
+        sp2_arrow("right")
+        sp2_wait_state(2, log)
+        sp2_tab(k)
+        st = sp2_wait_state(1, log)
+        shots.append(sh("stashpage2_hd_p2_to_%s" % tab))
+        res.append("%s tab clicked on page 2: page 2 %s" % (tab, "shut" if st[0] == 1 else "OPEN"))
+        if st[0] != 1:
+            bad.append("the %s tab left page 2 open" % tab)
+        sp2_tab(0)
+    shots.append(sh("stashpage2_hd_personal_after_tabs"))
+    sp2_arrow("right")
+    sp2_wait_state(2, log)
+    g.press("esc")
+    time.sleep(1.2)
+    st = sp2_state(log)
+    shots.append(sh("stashpage2_hd_p2_esc"))
+    res.append("Escape on page 2: page 2 %s, stash %s" % ("shut" if st[0] == 1 else "OPEN", "open" if right_panel_open() else "closed"))
+    if st[0] != 1:
+        bad.append("Escape left page 2 open")
+    if not sp2_open_stash(log):
+        bad.append("the stash did not open again after Escape")
+    sp2_arrow("right")
+    sp2_wait_state(2, log)
+    g.click(563 / 1600.0, 103 / 900.0)  # the stock X, over which page 2 has nothing
+    time.sleep(1.5)
+    st, inv = sp2_state(log), right_panel_open()
+    shots.append(sh("stashpage2_hd_x_from_p2"))
+    res.append("stock X on page 2: page 2 %s, inventory %s" % ("shut" if st[0] == 1 else "OPEN", "OPEN" if inv else "closed"))
+    if st[0] != 1 or inv:
+        bad.append("the X on page 2 left a panel open (state %s, inventory %s)" % (st, inv))
+    if not sp2_open_stash(log):
+        bad.append("the stash did not open again after the X")
+    st = sp2_state(log)
+    shots.append(sh("stashpage2_hd_reopened"))
+    res.append("stash opened again: page %s, strip=%d" % ("1" if st[0] == 1 else "2", st[2]))
+    if st[0] != 1 or st[2] != 1:
+        bad.append("the stash opened again not on page 1 with its arrows (%s)" % (st,))
+
+
 def check_stashpage2():
     name = "stashpage2"
     if not need_game():
@@ -14719,6 +14920,8 @@ def check_stashpage2():
         bad.append("the page 2 arrow did not return")
         Hl("stashpage close", log)
         sp2_wait_state(1, log)
+    shots.append(sh("stashpage2_hd_p1_back"))
+    sp2_switches(log, res, bad, shots)
     # the Shared tab: D2R's own arrows and "Page n / m" draw over ours; its right arrow turns the shared page, page 2 stays shut
     g.click(*sp2_xy(82 + 195 * 1.5, 146 + 36))
     time.sleep(1.2)
@@ -14859,6 +15062,192 @@ def check_stashpage2off():
 
 CHECKS += [("stashpage2", check_stashpage2), ("stashpage2keep", check_stashpage2keep), ("stashpage2after", check_stashpage2after),
            ("stashpage2off", check_stashpage2off)]
+
+# --- lane legacy169ship: the bundled D2R Legacy 16:9 plugin (legacy169.dll) next to mxl2012-core ---------------------------------
+# Needs legacy169.dll in mods\mxl2012\d2rloader\plugins (the release package has it; a dev install by hand) and its
+# legacy169.toml. Each panel is opened in HD (the click places are HD's), shot, then G: shot in legacy at 1066x600 (legacy169
+# mode 1) and at 853x480 (mode 0), then G back. The pictures are judged by hand; the check reads the logs for clashes.
+L169_PANELS = ("town", "invchar", "skills", "stash", "stash2", "shared", "cube", "waypoint", "trade", "automap", "automapinv")
+
+
+def l169_logs():
+    """legacy169.log lines: D2RLoader writes a plugin's log into the d2rloader\\logs folder next to its plugins folder."""
+    out = []
+    for p in (os.path.join(os.path.dirname(g.MXL_LOG), "legacy169.log"), os.path.join(g.GAME_DIR, "d2rloader", "logs", "legacy169.log")):
+        try:
+            with open(p, encoding="utf-8-sig", errors="replace") as f:
+                out += [ln.rstrip() for ln in f]
+        except OSError:
+            pass
+    return out
+
+
+def l169_close(kind):
+    """Closes what l169_open opened: a key panel with its key, a click panel (stash, cube, waypoint, trade) with Esc."""
+    if kind in ("invchar",):
+        g.press("c")
+        time.sleep(0.6)
+        g.press("i")
+    elif kind == "skills":
+        g.press("t")
+    elif kind in ("automap", "automapinv"):
+        g.press("tab")
+        if kind == "automapinv":
+            time.sleep(0.6)
+            g.press("i")
+    elif kind == "trade":
+        rp_close_trade()
+    elif kind != "town":
+        for _ in range(2):
+            if not right_panel_open():
+                break
+            g.press("esc")
+            time.sleep(0.8)
+        if kind == "waypoint":
+            g.press("esc")
+    time.sleep(1.0)
+
+
+def l169_open(kind, log):
+    """Opens one panel (set) in HD as a player does, or with the harness where a click cannot reach it. True when it opened."""
+    if kind == "town":
+        return True
+    if kind == "invchar":
+        g.press("i")
+        time.sleep(0.8)
+        g.press("c")
+    elif kind == "skills":
+        g.press("t")
+    elif kind in ("stash", "stash2", "shared"):
+        if not sp2_open_stash(log):
+            return False
+        if kind == "stash2":
+            Hl("stashpage open", log)
+            return sp2_wait_state(2, log)[0] == 2
+        if kind == "shared":
+            g.click(*sp2_xy(82 + 195 * 1.5, 146 + 36))  # the Shared tab (HD calibration of lane stashpage2)
+    elif kind == "cube":
+        ensure_cube()
+        if not _cube_panel_open(log):
+            return False
+    elif kind == "waypoint":
+        Hl("waypoint open", log)
+    elif kind == "trade":
+        menu = rp_npc_menu(148, log)  # Akara
+        line = rp_menu_line(menu, RP_TRADE) if menu else None
+        if line is None:
+            close_menu()
+            return False
+        Hl("menu %d" % line, log)
+        time.sleep(4.0)
+        return trade_panel_open()
+    elif kind == "automap":
+        g.press("tab")
+    elif kind == "automapinv":
+        g.press("i")
+        time.sleep(0.8)
+        g.press("tab")
+    time.sleep(1.5)
+    return True
+
+
+def l169_mode(n, log):
+    """`legacy169 mode n` (0: 853x480, 1: 1066x600); its status line goes to legacy169.log."""
+    con("legacy169 mode %d" % n)
+    time.sleep(2.5)
+    con("legacy169")
+    time.sleep(0.8)
+    st = next((ln for ln in reversed(l169_logs()) if "classic screen" in ln), "")
+    log.append("legacy169 mode %d: %s" % (n, st[-200:]))
+    return st
+
+
+def check_legacy169():
+    name = "legacy169"
+    if not need_game():
+        return add(name, "BLOCKED", "not in a game")
+    mark = engine_mark()
+    bad, res, log, shots = [], [], [], []
+    goto(1)
+    # loading: legacy169's own log, D2RLoader's lines about it, mxl2012-core's view of the other plugins and hook clashes
+    con("legacy169")
+    time.sleep(1.0)
+    l169 = l169_logs()
+    log += ["legacy169.log: " + ln for ln in l169[-30:]]
+    loaded = next((ln for ln in l169 if " loaded (" in ln), "")
+    refused = [ln for ln in l169 if "nothing patched" in ln or "not moved" in ln or "refused" in ln]
+    off = any("off:" in ln or "enabled = false" in ln for ln in l169)  # refused (Fail) or turned off in legacy169.toml
+    loader = g._read_from(g.LOADER_LOG, 0) or ""
+    lrows = [ln.strip() for ln in loader.splitlines() if re.search(r"legacy169|Native Hook|conflict|overlap", ln, re.I)]
+    log += ["d2rloader.log: " + ln[:220] for ln in lrows[-20:]]
+    mx = mxl_text().splitlines()
+    clash = next((ln for ln in mx if ln.startswith("plugin clashes")), "-")
+    others = next((ln for ln in mx if ln.startswith("other plugins")), "-")
+    failed = [ln for ln in mx if "FAILED" in ln]
+    log += ["mxl2012: " + ln for ln in mx]
+    res.append("legacy169 %s" % (loaded[-120:] or "NOT LOADED"))
+    res.append("%s; %s" % (others[:160], clash[:200]))
+    want_on = os.environ.get("MXL_L169_EXPECT", "on") == "on"
+    if not loaded:
+        bad.append("legacy169 did not load")
+    if want_on and (refused or off):
+        bad.append("legacy169 refused or off: %s" % ((refused or ["off"])[0][-160:]))
+    if not want_on and not off:  # MXL_L169_EXPECT=off: legacy169.toml says enabled = false
+        bad.append("legacy169 is not off with enabled = false")
+    if not clash.startswith("plugin clashes: none"):
+        bad.append("mxl2012: %s" % clash[:200])
+    if failed:
+        bad.append("mxl2012 FAILED parts: %s" % failed[:3])
+    if any(re.search(r"could not install a Native Hook|refused", ln, re.I) for ln in lrows):
+        bad.append("D2RLoader refused a hook or patch (log)")
+    modes = [int(m) for m in os.environ.get("MXL_L169_MODES", "1,0").split(",")]
+    panels = [p for p in os.environ.get("MXL_L169_PANELS", ",".join(L169_PANELS)).split(",") if p]
+    status = {}
+    for kind in panels:
+        set_graphics("hd")
+        opened = l169_open(kind, log)
+        shots.append(sh("l169_%s_hd" % kind))
+        if not opened:
+            status[kind] = "did not open"
+            bad.append("%s did not open (HD)" % kind)
+            l169_close(kind)
+            continue
+        if not set_graphics("legacy"):
+            status[kind] = "legacy not reached"
+            bad.append("%s: legacy graphics not reached" % kind)
+        else:
+            if kind == "trade":  # the graphics switch closes the trade panel: talk to Akara again (trade_panel_open() is HD-only)
+                menu = rp_npc_menu(148, log)
+                line = rp_menu_line(menu, RP_TRADE) if menu else None
+                if line is not None:
+                    Hl("menu %d" % line, log)
+                    time.sleep(4.0)
+            for n in modes:
+                l169_mode(n, log)
+                shots.append(sh("l169_%s_legacy_m%d" % (kind, n)))
+            if modes[-1] != 1:
+                l169_mode(1, log)
+            status[kind] = "shot"
+        set_graphics("hd")
+        shots.append(sh("l169_%s_hd_after" % kind))
+        l169_close(kind)
+        if kind in ("stash2",) and sp2_state(log)[0] == 2:
+            sp2_close(log)
+    res.append("panels: " + ", ".join("%s %s" % kv_ for kv_ in status.items()))
+    finish(name, not bad, "; ".join(res) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial="the panel pictures (HD and legacy at 1066x600 / 853x480) are judged by hand on the l169_* shots")
+
+
+CHECKS += [("legacy169", check_legacy169)]
+
+
+def check_leech():
+    """Bug #540: life / mana leech per hit on Normal, Nightmare and Hell against 1.14d's leech step (tools/leech_checks.py)."""
+    import leech_checks
+    leech_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("leech", check_leech)]
 
 if __name__ == "__main__":
     main()

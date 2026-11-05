@@ -30,6 +30,29 @@ inline auto StockStashOpens(const char* command, const char* text, const char* s
 	       (std::strcmp(command, "LoadPanel") == 0 || std::strcmp(command, "OpenPanel") == 0);
 }
 
+// The arrows' messages (tools/stash_page2.py): "PanelManager:OpenPanel:<page panel>" shows page 2, "...:ClosePanel:<page panel>"
+// page 1 (D2R passes only known targets to UI listeners); -1 for any other message.
+inline auto ShowRequest(const char* target, const char* command, const char* text, const char* panelName) noexcept -> int {
+	if (target == nullptr || command == nullptr || text == nullptr || panelName == nullptr || std::strcmp(target, "PanelManager") != 0 ||
+	    std::strcmp(text, panelName) != 0) {
+		return -1;
+	}
+	return std::strcmp(command, "ClosePanel") == 0 ? 1 : std::strcmp(command, "OpenPanel") == 0 ? 2 : -1;
+}
+
+// Messages after which page 2 must not stay over the stock stash: a tab switch (BankPanelMessage:SelectTab, whatever its text: the
+// tab bar then shows that tab), the stock X (BankPanelMessage:Close) and the stock stash closed or toggled by the PanelManager.
+inline auto LeavesPage2(const char* target, const char* command, const char* text, const char* stockPanel) noexcept -> bool {
+	if (target == nullptr || command == nullptr) {
+		return false;
+	}
+	if (std::strcmp(target, "BankPanelMessage") == 0) {
+		return std::strcmp(command, "SelectTab") == 0 || std::strcmp(command, "Close") == 0;
+	}
+	return std::strcmp(target, "PanelManager") == 0 && text != nullptr && stockPanel != nullptr && std::strcmp(text, stockPanel) == 0 &&
+	       (std::strcmp(command, "ClosePanel") == 0 || std::strcmp(command, "TogglePanel") == 0);
+}
+
 // The page 2 arrows on the stock stash: only with the page registered and its panel bound (else they lead nowhere), and only on
 // the Personal tab when a tab index is known (D2R 3.3's SelectTab text is empty: the tab stays 0; on the Shared tab D2R's own
 // arrows draw over ours, the RotW pages hide the whole container).

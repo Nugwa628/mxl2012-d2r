@@ -15,7 +15,9 @@ it must be inside the project root R or the repo, and only its own unpacked/ and
    mxl2012/, as on a player's PC) into reference/ and compares: every file must be the same bytes, except
    d2rloader/plugins/mxl2012-core.dll (the release DLL against the dev DLL) and d2rloader/metadata.json (modVersion,
    description, website); a reference file the package lacks must be a byte copy of D2R's own (the D2R baseline or the shared
-   D2R cache, package_release.baselines()); the package has no file the reference lacks.
+   D2R cache, package_release.baselines()); the package has no file the reference lacks except the bundled plugins' files
+   (legacy169.dll / legacy169.toml and Buff HUD's DLL, MPQ, licences and buff-panel.toml; checked in step 2: present, a
+   release build of the pinned version).
 
 unpacked/ and reference/ are deleted at the end unless --keep (or a check failed). Exit 0 = the package installs the same game
 as install_mod.py. Reads the build (work/mod/data) and the baselines; writes only into DIR.
@@ -35,6 +37,8 @@ import package_release as pr  # noqa: E402
 
 NAME = pr.NAME
 DIFFERS_BY_DESIGN = {"d2rloader/plugins/mxl2012-core.dll", "d2rloader/metadata.json"}
+# our other plugins (package_release.LEGACY169, BUFFHUD): the package has them, install_mod.py does not install them
+BUNDLED = {pr.LEGACY169["dll"], pr.LEGACY169["config"]} | {pr.BUFFHUD[k] for k in pr.BUFFHUD_FILES}
 STRING_FILES = ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json")
 
 
@@ -93,6 +97,19 @@ def check_mod_folder(mod: Path, version: str) -> list:
         problems += pr.check_release_plugin(dll, pr.plugin_version())
     else:
         problems.append("d2rloader/plugins/mxl2012-core.dll is missing")
+    l169 = mod / pr.LEGACY169["dll"]
+    if l169.is_file():
+        problems += pr.check_legacy169(l169)
+    else:
+        problems.append(f"{pr.LEGACY169['dll']} is missing")
+    if not (mod / pr.LEGACY169["config"]).is_file():
+        problems.append(f"{pr.LEGACY169['config']} is missing")
+    buff = mod / pr.BUFFHUD["dll"]
+    if buff.is_file():
+        problems += pr.check_buffhud(buff)
+    for k in pr.BUFFHUD_FILES:
+        if k != "mpq" and not (mod / pr.BUFFHUD[k]).is_file():  # check_buffhud names a missing MPQ
+            problems.append(f"{pr.BUFFHUD[k]} is missing")
     if not (mod / "d2rloader" / "patches").is_dir():
         problems.append("d2rloader/patches/ is missing")
     data = mod / f"{NAME}.mpq" / "data"
@@ -168,7 +185,7 @@ def compare_reference(mod: Path, ref: Path, extract: Path = pr.EXTRACT, cache: P
     rf = {p.relative_to(ref).as_posix() for p in ref.rglob("*") if p.is_file()}
     roots = pr.baselines(extract, cache)
     problems, blizzard = [], 0
-    for rel in sorted(pkg - rf):
+    for rel in sorted(pkg - rf - BUNDLED):
         problems.append(f"the package has {rel}, install_mod.py does not install it")
     data = f"{NAME}.mpq/data/"
     for rel in sorted(rf - pkg):

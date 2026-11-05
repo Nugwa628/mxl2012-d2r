@@ -20,22 +20,27 @@ int main() {
 	          DistanceSq(4937, 4667, 4940, 4663) == 25,
 	      "squared distance in sub-tiles");
 	// the lane summonai readings (bug #534): spirits stood 32-51 sub-tiles off after a fight, once 91
-	Check(Decide(DistanceSq(0, 0, 32, 0), false) == Verdict::Warp, "32 sub-tiles off, no target: warp");
-	Check(Decide(DistanceSq(0, 0, 51, 0), true) == Verdict::Warp, "51 off, fighting: warp (beyond 40)");
-	Check(Decide(DistanceSq(0, 0, 91, 0), false) == Verdict::Warp, "91 off: warp");
-	Check(Decide(DistanceSq(0, 0, 20, 0), false) == Verdict::Stay, "exactly 20: stays");
-	Check(Decide(DistanceSq(0, 0, 14, 14), false) == Verdict::Stay, "14,14 (19.8): stays");
-	Check(Decide(DistanceSq(0, 0, 15, 14), false) == Verdict::Warp, "15,14 (20.5): warp");
-	Check(Decide(DistanceSq(0, 0, 11, 0), true) == Verdict::Stay, "fighting at 11: stays");
-	Check(Decide(DistanceSq(0, 0, 30, 0), true) == Verdict::Held, "fighting at 30: keeps fighting");
-	Check(Decide(DistanceSq(0, 0, 40, 0), true) == Verdict::Held, "fighting at 40: keeps fighting");
-	Check(Decide(DistanceSq(0, 0, 41, 0), true) == Verdict::Warp, "fighting at 41: warp");
-	Check(Decide(DistanceSq(0, 0, 30, 0), false) == Verdict::Warp, "30 off, not fighting: warp");
-	// fighting: a live target in reach, or within 40 of the owner (a spirit walking out to it is not warped back)
-	Check(Fighting(true, true, DistanceSq(0, 0, 60, 0)), "a live target in reach");
-	Check(Fighting(true, false, DistanceSq(0, 0, 30, 0)), "a live target 30 from the owner");
-	Check(Fighting(true, false, DistanceSq(0, 0, 40, 0)), "a live target 40 from the owner");
-	Check(!Fighting(true, false, DistanceSq(0, 0, 41, 0)), "a target left 41 behind: not fighting");
+	Check(Decide(DistanceSq(0, 0, 32, 0), false, 0) == Verdict::Warp, "32 sub-tiles off, no target: warp");
+	Check(Decide(DistanceSq(0, 0, 51, 0), true, 0) == Verdict::Warp, "51 off, fighting: warp (beyond 40)");
+	Check(Decide(DistanceSq(0, 0, 91, 0), false, 0) == Verdict::Warp, "91 off: warp");
+	Check(Decide(DistanceSq(0, 0, 20, 0), false, 0) == Verdict::Stay, "exactly 20: stays");
+	Check(Decide(DistanceSq(0, 0, 14, 14), false, 0) == Verdict::Stay, "14,14 (19.8): stays");
+	Check(Decide(DistanceSq(0, 0, 15, 14), false, 0) == Verdict::Warp, "15,14 (20.5): warp");
+	Check(Decide(DistanceSq(0, 0, 11, 0), true, 0) == Verdict::Stay, "fighting at 11: stays");
+	Check(Decide(DistanceSq(0, 0, 30, 0), true, 0) == Verdict::Held, "fighting at 30: keeps fighting");
+	Check(Decide(DistanceSq(0, 0, 40, 0), true, 0) == Verdict::Held, "fighting at 40: keeps fighting");
+	Check(Decide(DistanceSq(0, 0, 41, 0), true, 0) == Verdict::Warp, "fighting at 41: warp");
+	Check(Decide(DistanceSq(0, 0, 30, 0), false, 0) == Verdict::Warp, "30 off, not fighting: warp");
+	// the hold is capped: 4 s beyond 20, then a warp even in a fight
+	Check(Decide(DistanceSq(0, 0, 30, 0), true, 3999) == Verdict::Held, "fighting at 30, held 3.999 s: keeps fighting");
+	Check(Decide(DistanceSq(0, 0, 30, 0), true, 4000) == Verdict::Warp, "fighting at 30, held 4 s: warp");
+	Check(Decide(DistanceSq(0, 0, 15, 0), true, 9000) == Verdict::Stay, "within 20 the cap does not apply");
+	// fighting (lane spiritfight): the spirit's own live target, in its reach and within 25 of the owner
+	Check(Fighting(true, true, DistanceSq(0, 0, 10, 0)), "a live target in reach, 10 from the owner");
+	Check(Fighting(true, true, DistanceSq(0, 0, 25, 0)), "a live target in reach, 25 from the owner");
+	Check(!Fighting(true, true, DistanceSq(0, 0, 26, 0)), "a target in reach 26 from the owner: not fighting");
+	Check(!Fighting(true, true, DistanceSq(0, 0, 60, 0)), "a target in reach 60 from the owner: not fighting");
+	Check(!Fighting(true, false, DistanceSq(0, 0, 10, 0)), "a live target near the owner, out of reach (walking to it): not fighting");
 	Check(!Fighting(false, true, 0), "a dead target (or none): not fighting");
 	Check(Alive(4) && Alive(15) && Alive(1) && !Alive(ModeDeath) && !Alive(ModeDead), "modes DT and DD are dead");
 	Check(SpiritPetTypes[0] == 30 && SpiritPetTypes[1] == 31 && SpiritPetTypes[2] == 32, "pettype rows guardianspet..protectorspet");
@@ -62,6 +67,20 @@ int main() {
 		Note(full, id, true, 10000 + id);
 	}
 	Check(!FightingRecently(full, 100, 10200) && FightingRecently(full, 100 + SlotCount + 3, 10200), "the oldest note gave way");
+
+	// the hold: from its first check, ended by a check that does not hold, one per spirit
+	Slot holds[SlotCount] = {};
+	Check(HoldFor(holds, 18, true, 20000) == 0, "first held check: 0 ms");
+	Check(HoldFor(holds, 18, true, 21000) == 1000 && HoldFor(holds, 18, true, 24000) == 4000, "the hold runs on");
+	Check(HoldFor(holds, 19, true, 23000) == 0 && HoldFor(holds, 19, true, 24000) == 1000, "another spirit has its own hold");
+	Check(HoldFor(holds, 18, false, 25000) == 0 && HoldFor(holds, 18, true, 26000) == 0, "a check that does not hold ends it");
+	Check(HoldFor(holds, 7, false, 1000) == 0 && HoldFor(holds, 7, true, 1500) == 0, "no hold, nothing stored");
+	Slot fullHolds[SlotCount] = {};
+	for (uint32_t id = 100; id < 100 + SlotCount + 1; ++id) {
+		HoldFor(fullHolds, id, true, 10000 + id);
+	}
+	Check(HoldFor(fullHolds, 100, true, 20000) == 0 && HoldFor(fullHolds, 100 + SlotCount, true, 20116) == 10000,
+	      "more spirits than slots: the oldest hold gave way");
 
 	if (failures != 0) {
 		std::printf("spiritwarp_tests: %d failure(s)\n", failures);

@@ -6,9 +6,9 @@
 //
 // Once a second (server frame 0x406550 through server_frame.cpp, game +0x170 % 25) the part walks each in-game player's
 // guardianspet / defenderspet / protectorspet lists. A live spirit farther than 20 sub-tiles is warped with the game's own pet warp
-// 0x596d40(game, owner, pet), unless it is within 40 and fighting. D2R does not run the think of an idle spirit, so fighting comes
+// 0x596d40(game, owner, pet), unless it is within 40 and fighting, for at most 4 s. D2R does not run the think of an idle spirit, so fighting comes
 // from the two AIs' think functions (AI table 0x2397210: entry 28 -> 0x5b7590, entry 39 -> 0x5b2b10; both (game, unit, tick)): a
-// spirit's think notes whether it has a live target (tick +0x10) in reach (tick +0x24) or within 40 of the owner, and the frame
+// spirit's think notes whether it has a live target (tick +0x10) in reach (tick +0x24) and within 25 of the owner, and the frame
 // check takes a note under 1.5 s old as fighting (spirit_warp_logic.h). Other Vampire / PinHead units (hostile ones, Daystar,
 // Sinner) only pay the owner lookup in the think.
 #include "spirit_warp.h"
@@ -70,6 +70,23 @@ volatile LONG g_fightNotes = 0;    // ... that saw it fighting
 volatile LONG g_checkDist = -1;    // the last check: sub-tiles from the owner, verdict (0 stay, 1 held, 2 warp)
 volatile LONG g_checkVerdict = -1;
 spirit_warp::Slot g_slots[spirit_warp::SlotCount] = {};  // touched on the game's server thread only
+// What held a spirit: its last think's target, for the held counters below. Server thread only, as g_slots.
+struct Seen {
+	uint32_t unitId;
+	int32_t targetClass;  // -1: no live target
+	int32_t inReach;
+	int32_t targetOwner;  // sub-tiles from the owner
+};
+Seen g_seen[spirit_warp::SlotCount] = {};
+int g_seenNext = 0;
+volatile LONG g_heldReach = 0;       // held checks whose target was in reach ...
+volatile LONG g_heldZombie = 0;      // ... whose target was a zombie (class 5, the lab's)
+volatile LONG g_heldTarget[3] = {};  // ... target within 20 / 21-25 / 26-40 of the owner
+volatile LONG g_heldAt[3] = {};      // ... spirit 21-25 / 26-30 / 31-40 from the owner
+volatile LONG g_heldLastClass = -1;
+volatile LONG g_capped = 0;          // warps of a fighting spirit whose hold reached HoldMaxMs
+volatile LONG g_holdLongest = 0;     // the longest hold of one spirit (ms)
+spirit_warp::Slot g_holds[spirit_warp::SlotCount] = {};  // per spirit: the first check of its current hold (HoldFor)
 
 template <typename F>
 auto Fn(uint64_t rva) noexcept -> F {
@@ -119,7 +136,39 @@ void Think(d2r::Game* game, d2r::Unit* pet, const uint8_t* tick) noexcept {
 	if (fighting) {
 		InterlockedIncrement(&g_fightNotes);
 	}
-	spirit_warp::Note(g_slots, d2r::At<uint32_t>(pet, UnitId), fighting, GetTickCount64());
+	const uint32_t id = d2r::At<uint32_t>(pet, UnitId);
+	spirit_warp::Note(g_slots, id, fighting, GetTickCount64());
+	Seen* seen = nullptr;
+	for (Seen& s : g_seen) {
+		if (s.unitId == id) {
+			seen = &s;
+		}
+	}
+	if (seen == nullptr) {
+		seen = &g_seen[g_seenNext];
+		g_seenNext = (g_seenNext + 1) % spirit_warp::SlotCount;
+	}
+	*seen = {id, live ? d2r::At<int32_t>(target, d2r::UnitClass) : -1, d2r::At<int32_t>(tick, TickInReach) != 0 ? 1 : 0,
+	         live ? SubTiles(spirit_warp::DistanceSq(tx, ty, ox, oy)) : -1};
+}
+
+// A held check: count what held it (the spirit's last think).
+void CountHeld(uint32_t unitId, LONG dist) noexcept {
+	InterlockedIncrement(&g_heldAt[dist <= 25 ? 0 : dist <= 30 ? 1 : 2]);
+	for (const Seen& s : g_seen) {
+		if (s.unitId != unitId || s.targetClass < 0) {
+			continue;
+		}
+		if (s.inReach != 0) {
+			InterlockedIncrement(&g_heldReach);
+		}
+		if (s.targetClass == 5) {
+			InterlockedIncrement(&g_heldZombie);
+		}
+		InterlockedIncrement(&g_heldTarget[s.targetOwner <= 20 ? 0 : s.targetOwner <= 25 ? 1 : 2]);
+		InterlockedExchange(&g_heldLastClass, s.targetClass);
+		return;
+	}
 }
 
 void CheckPet(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, uint64_t nowMs) noexcept {
@@ -128,17 +177,30 @@ void CheckPet(d2r::Game* game, d2r::Unit* owner, d2r::Unit* pet, uint64_t nowMs)
 		return;
 	}
 	InterlockedIncrement(&g_checks);
+	const uint32_t id = d2r::At<uint32_t>(pet, UnitId);
 	const int64_t d2 = spirit_warp::DistanceSq(px, py, ox, oy);
-	const spirit_warp::Verdict v = spirit_warp::Decide(d2, spirit_warp::FightingRecently(g_slots, d2r::At<uint32_t>(pet, UnitId), nowMs));
+	const bool fighting = spirit_warp::FightingRecently(g_slots, id, nowMs);
+	// the hold runs while the check would keep the spirit (with no cap); it ends when the spirit stays or is warped for any other reason
+	const bool wouldHold = spirit_warp::Decide(d2, fighting, 0) == spirit_warp::Verdict::Held;
+	const uint64_t heldMs = spirit_warp::HoldFor(g_holds, id, wouldHold, nowMs);
+	const spirit_warp::Verdict v = spirit_warp::Decide(d2, fighting, heldMs);
 	InterlockedExchange(&g_checkDist, SubTiles(d2));
 	InterlockedExchange(&g_checkVerdict, static_cast<LONG>(v));
+	if (static_cast<LONG>(heldMs) > g_holdLongest) {
+		InterlockedExchange(&g_holdLongest, static_cast<LONG>(heldMs));
+	}
 	if (v == spirit_warp::Verdict::Stay) {
 		return;
 	}
 	InterlockedIncrement(&g_far);
 	if (v == spirit_warp::Verdict::Held) {
 		InterlockedIncrement(&g_held);
+		CountHeld(id, SubTiles(d2));
 		return;
+	}
+	if (wouldHold) {
+		InterlockedIncrement(&g_capped);
+		spirit_warp::HoldFor(g_holds, id, false, nowMs);
 	}
 	InterlockedExchange(&g_lastClass, d2r::At<int32_t>(pet, d2r::UnitClass));
 	InterlockedExchange(&g_lastFrom, SubTiles(d2));
@@ -244,4 +306,16 @@ void SpiritWarpLast(long* thinks, long* fightNotes, long* checkDist, long* check
 	*fightNotes = g_fightNotes;
 	*checkDist = g_checkDist;
 	*checkVerdict = g_checkVerdict;
+}
+
+void SpiritWarpHeld(long* inReach, long* zombie, long* targetOwner, long* spiritOwner, long* lastClass, long* capped, long* longestMs) noexcept {
+	*inReach = g_heldReach;
+	*zombie = g_heldZombie;
+	for (int i = 0; i < 3; ++i) {
+		targetOwner[i] = g_heldTarget[i];
+		spiritOwner[i] = g_heldAt[i];
+	}
+	*lastClass = g_heldLastClass;
+	*capped = g_capped;
+	*longestMs = g_holdLongest;
 }

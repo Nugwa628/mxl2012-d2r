@@ -267,7 +267,8 @@ def _item_layout(c):
     it = c.it
     if flags & 0x200000:  # simple
         c.opt("guid", 128)
-        c.f("filled", 1)
+        if c.f("filled", 1):  # set on the RotW advanced stash page's stacks: their count follows (docs/save-format.md)
+            c.f("stack", 8)
         return
     c.f("filled", 3)
     c.f("id", 32)
@@ -640,7 +641,7 @@ def describe(it, indent=""):
     q = QUALITY.get(it.get("quality"), "simple" if it["flags"] & 0x200000 else "?")
     extra = []
     for k in ("ilvl", "unique_id", "set_id", "prefix", "suffix", "runeword_id", "defense", "maxdur", "dur", "quantity",
-              "sockets", "filled"):
+              "stack", "sockets", "filled"):
         if k in it:
             extra.append(f"{k}={it[k]}")
     if it["flags"] & 0x400000:

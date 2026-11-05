@@ -3,13 +3,15 @@
 // D2RLoader's InventoryService gives a plugin one custom player page: item page 6 in the .d2s plus `<char>.d2rl`, restored on load
 // by D2RCore (which stops the load rather than drop an item it cannot place: the "protected page"), moved with the cursor and with
 // Ctrl+click like any stash page. This part registers that page (logical id `stash2`) at the stock stash's 10 x 10 and a panel,
-// "mxl2012-core/StashPage2", whose layout looks like the personal stash and whose grid is bound to the page (HD and classic layouts
-// from tools/stash_page2.py, in mxl_stash_page.h). The stock stash panel has two arrows under D2R's shared-stash ones that send
-// PanelManager:TogglePanel:mxl2012-core/StashPage2 (tools/ui_layouts.py, tools/rotw_stash_legacy.py); the plugin panel's "2 / 2"
-// strip opens the stock stash again. Both are D2R's own messages and the two panels share the left slot (opening one closes the
-// other), so no plugin code is in the switch. On the Shared tab D2R's arrows draw over ours. The plugin hides the stock arrows
-// when the page is not there; it would hide them on the other tabs too, but D2R 3.3 sends BankPanelMessage:SelectTab with an
-// empty text (seen in game), so the tab it follows stays 0.
+// "mxl2012-core/StashPage2", drawn OVER the open stock stash: only page 2's grid, bound to the page, at the stock grid's place and
+// its "2 / 2" strip (HD and classic layouts from tools/stash_page2.py, in mxl_stash_page.h). The stock stash stays open under it,
+// so its tabs, gold box, X and D2R's left border stay (bug #543: in 0.1.11 the panel took the left slot and replaced the stock
+// stash). The stock stash's arrows under D2R's shared-stash ones (tools/ui_layouts.py, tools/rotw_stash_legacy.py) and page 2's
+// arrows send PanelManager:OpenPanel / ClosePanel of that panel (D2R passes only known targets to UI listeners); the listener
+// consumes them and opens or closes the panel itself, hiding the stock
+// grid and strip while page 2 shows. A tab click, the stock X and the stock stash opening or closing bring page 1 back. On the
+// Shared tab D2R's arrows draw over ours. The plugin hides the stock arrows when the page is not there; it would hide them on the
+// other tabs too, but D2R 3.3 sends BankPanelMessage:SelectTab with an empty text (seen in game), so the tab it follows stays 0.
 //
 // Nothing here touches the save or the item lists: the page holds ordinary items, D2RCore saves them. The ItemService is used by the
 // test harness only (`stashpage put|list|move|fill|drop`).
@@ -45,7 +47,11 @@ bool g_ready = false;
 bool g_listening = false;
 
 std::atomic<int> g_tab{0}, g_stripShown{-1};
-std::atomic<uint32_t> g_openFailed{0}, g_messages{0}, g_stripSets{0};
+std::atomic<int> g_shown{1};              // the page on screen: 2 while the plugin panel is over the stock stash
+std::atomic<int> g_stockFound{-1};        // the last findPanel result for the stock stash (-1 never asked)
+std::atomic<bool> g_watching{false};
+std::atomic<bool> g_selfPanel{false};     // true while the plugin opens or closes its panel: that sends the arrows' messages too
+std::atomic<uint32_t> g_openFailed{0}, g_messages{0}, g_stripSets{0}, g_page2Opens{0}, g_lostPanel{0};
 
 constexpr uint32_t UiNames = 16, UiNameSize = 96;  // the last messages (g_messages counts them all)
 char g_uiNames[UiNames][UiNameSize] = {};
@@ -67,16 +73,32 @@ auto ContainsNoCase(const char* hay, const char* needle) noexcept -> bool {
 	return false;
 }
 
-// ---- the stock stash's strip: shown on the Personal tab with the page there, hidden otherwise (UI thread only) ----
+// ---- page 1 / page 2 on the stock stash (UI thread only) ----
 
-void __cdecl SetStripOnUiThread(const D2RL::PluginContext*, void*) noexcept {
+auto PanelOpen() noexcept -> bool {
+	D2RL::Panels::PanelInfo info{};
+	info.structSize = D2RL::Panels::PanelInfoSize;
+	return g_panels != nullptr && g_panel != 0 && g_panels->getPanelInfo(g_context, g_panel, &info) == D2RL::Panels::Result::Success &&
+	       info.presentationState == D2RL::Panels::PresentationState::Open;
+}
+
+// The stock stash under the plugin panel: its grid hidden while page 2 shows (page 2's grid is at its place), its strip shown on
+// page 1 of the Personal tab with the page there.
+void SetStock(bool page2) noexcept {
 	if (g_widgets == nullptr) {
 		return;
 	}
-	D2RL::Widgets::WidgetHandle panel = 0, strip = 0;
-	if (g_widgets->findPanel(g_context, mxl_stash_page::StockPanel, &panel) == D2RL::Widgets::Result::Success &&
-	    g_widgets->findWidget(g_context, panel, mxl_stash_page::StockStrip, &strip) == D2RL::Widgets::Result::Success) {
-		const bool show = stash_pages::StripVisible(g_ready, g_tab.load());
+	D2RL::Widgets::WidgetHandle panel = 0, grid = 0, strip = 0;
+	const auto found = g_widgets->findPanel(g_context, mxl_stash_page::StockPanel, &panel);
+	g_stockFound.store(static_cast<int>(found));
+	if (found != D2RL::Widgets::Result::Success) {
+		return;
+	}
+	if (g_widgets->findWidget(g_context, panel, mxl_stash_page::StockGrid, &grid) == D2RL::Widgets::Result::Success) {
+		(void)g_widgets->setWidgetVisible(g_context, grid, !page2);
+	}
+	if (g_widgets->findWidget(g_context, panel, mxl_stash_page::StockStrip, &strip) == D2RL::Widgets::Result::Success) {
+		const bool show = !page2 && stash_pages::StripVisible(g_ready, g_tab.load());
 		if (g_widgets->setWidgetVisible(g_context, strip, show) == D2RL::Widgets::Result::Success) {
 			g_stripShown.store(show ? 1 : 0);
 			g_stripSets.fetch_add(1);
@@ -84,22 +106,71 @@ void __cdecl SetStripOnUiThread(const D2RL::PluginContext*, void*) noexcept {
 	}
 }
 
+void __cdecl SetStripOnUiThread(const D2RL::PluginContext*, void*) noexcept {
+	SetStock(g_shown.load() == 2);
+}
+
+// While page 2 shows: Escape closes the plugin panel alone (CloseOnEscape), D2R closing every panel closes it too; then the stock
+// grid and strip come back. Queues itself again for the next UI update until page 1 shows.
+void __cdecl WatchOnUiThread(const D2RL::PluginContext* context, void*) noexcept {
+	if (g_shown.load() != 2) {
+		g_watching.store(false);
+		return;
+	}
+	if (!PanelOpen()) {
+		g_shown.store(1);
+		SetStock(false);
+		g_lostPanel.fetch_add(1);
+		g_watching.store(false);
+		return;
+	}
+	if (g_threads->runOnUiThread(context, &WatchOnUiThread, nullptr) != D2RL::Threads::Result::Success) {
+		g_watching.store(false);
+	}
+}
+
+void __cdecl ShowOnUiThread(const D2RL::PluginContext* context, void* user) noexcept {
+	const int page = static_cast<int>(reinterpret_cast<intptr_t>(user));
+	if (g_panels == nullptr || g_panel == 0) {
+		return;
+	}
+	if (page == 2) {
+		g_selfPanel.store(true);
+		const auto opened = g_panels->openPanel(context, g_panel);
+		g_selfPanel.store(false);
+		if (opened != D2RL::Panels::Result::Success) {
+			g_openFailed.fetch_add(1);
+			return;
+		}
+		g_shown.store(2);
+		g_page2Opens.fetch_add(1);
+		SetStock(true);
+		if (!g_watching.exchange(true) && g_threads->runOnUiThread(context, &WatchOnUiThread, nullptr) != D2RL::Threads::Result::Success) {
+			g_watching.store(false);
+		}
+		return;
+	}
+	if (PanelOpen()) {
+		g_selfPanel.store(true);
+		const auto closed = g_panels->closePanel(context, g_panel);
+		g_selfPanel.store(false);
+		if (closed != D2RL::Panels::Result::Success) {
+			g_openFailed.fetch_add(1);
+		}
+	}
+	g_shown.store(1);
+	SetStock(false);
+}
+
+void QueueShow(int page) noexcept {
+	if (g_threads != nullptr) {
+		(void)g_threads->runOnUiThread(g_context, &ShowOnUiThread, reinterpret_cast<void*>(static_cast<intptr_t>(page)));
+	}
+}
+
 auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::UiMessageEvent* event, void*) noexcept -> D2RL::SharedEvents::UiMessageAction {
 	if (event == nullptr || event->target == nullptr || event->command == nullptr) {
 		return D2RL::SharedEvents::UiMessageAction::Continue;
-	}
-	bool update = false;
-	if (stash_pages::StockStashOpens(event->command, event->text, mxl_stash_page::StockPanel)) {
-		g_tab.store(0);
-		update = true;
-	}
-	const int tab = stash_pages::SelectedTab(event->target, event->command, event->text);
-	if (tab >= 0) {
-		g_tab.store(tab);
-		update = true;
-	}
-	if (update && g_threads != nullptr) {
-		(void)g_threads->runOnUiThread(g_context, &SetStripOnUiThread, nullptr);  // after D2R has handled the message
 	}
 	if (ContainsNoCase(event->target, "bank") || ContainsNoCase(event->target, "stash") || ContainsNoCase(event->text, "bank") ||
 	    ContainsNoCase(event->text, "stash")) {
@@ -107,6 +178,26 @@ auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::U
 		std::snprintf(key, sizeof(key), "%s:%s(%s)", event->target, event->command, event->text != nullptr ? event->text : "");
 		const uint32_t n = g_messages.fetch_add(1);
 		std::memcpy(g_uiNames[n % UiNames], key, sizeof(key));
+	}
+	const int show = stash_pages::ShowRequest(event->target, event->command, event->text, mxl_stash_page::PanelName);
+	if (show > 0 && !g_selfPanel.load()) {  // an arrow: the plugin opens or closes the panel itself
+		if (g_ready) {
+			QueueShow(show);
+		}
+		return D2RL::SharedEvents::UiMessageAction::Consume;
+	}
+	// all queued: they run after D2R has handled the message
+	const int tab = stash_pages::SelectedTab(event->target, event->command, event->text);
+	if (tab >= 0) {
+		g_tab.store(tab);
+	}
+	if (stash_pages::StockStashOpens(event->command, event->text, mxl_stash_page::StockPanel)) {
+		g_tab.store(0);
+		QueueShow(1);  // a new stash opens on page 1
+	} else if (g_shown.load() == 2 && stash_pages::LeavesPage2(event->target, event->command, event->text, mxl_stash_page::StockPanel)) {
+		QueueShow(1);
+	} else if (tab >= 0 && g_threads != nullptr) {
+		(void)g_threads->runOnUiThread(g_context, &SetStripOnUiThread, nullptr);
 	}
 	return D2RL::SharedEvents::UiMessageAction::Continue;
 }
@@ -296,17 +387,6 @@ void __cdecl JobOnGameThread(const D2RL::PluginContext* context, void*) noexcept
 	job.state.store(2);
 }
 
-void __cdecl OpenOnUiThread(const D2RL::PluginContext* context, void* user) noexcept {
-	const int mode = static_cast<int>(reinterpret_cast<intptr_t>(user));
-	if (g_panels == nullptr || g_panel == 0) {
-		return;
-	}
-	const auto rc = mode == 0 ? g_panels->closePanel(context, g_panel) : mode == 1 ? g_panels->openPanel(context, g_panel) : g_panels->togglePanel(context, g_panel);
-	if (rc != D2RL::Panels::Result::Success) {
-		g_openFailed.fetch_add(1);
-	}
-}
-
 auto RegisterLayout(const D2RL::ResourceService* resources, const D2RL::PluginContext* context, const char* suffix, const char* layout) noexcept -> bool {
 	char path[160];
 	std::snprintf(path, sizeof(path), "data/global/ui/layouts/mxl2012-core/%s%s.json", mxl_stash_page::PanelLocalId, suffix);
@@ -375,7 +455,9 @@ auto InstallStashPages(const D2RL::PluginContext* context, char* report, size_t 
 	const bool classic = RegisterLayout(resources, context, "", mxl_stash_page::LayoutClassic);
 	D2RL::Panels::PanelRegistration panel{};
 	panel.structSize = D2RL::Panels::PanelRegistrationSize;
-	panel.flags = D2RL::Panels::PanelFlags::CloseOnEscape | D2RL::Panels::PanelFlags::GameplayLeftSlot;
+	// not GameplayLeftSlot: that slot is the stock stash's, taking it closed the stock stash (and lost D2R's left border on the way
+	// back, bug #543). The panel is drawn over the open stock stash.
+	panel.flags = D2RL::Panels::PanelFlags::CloseOnEscape;
 	panel.localId = mxl_stash_page::PanelLocalId;
 	if (!hd || g_panels->registerPanel(context, &panel, &g_panel) != D2RL::Panels::Result::Success) {
 		std::snprintf(report, reportSize, "partial: the page is registered but the panel is not (layout resource %s / registerPanel failed)", hd ? "ok" : "refused");
@@ -395,16 +477,20 @@ auto InstallStashPages(const D2RL::PluginContext* context, char* report, size_t 
 }
 
 void StashPagesStatus(char* out, size_t outSize) noexcept {
-	std::snprintf(out, outSize, "%s; panel %s, stock tab %d, strip %s (%u sets), panel opens failed %u, %u stash messages seen",
-	              g_ready ? "page ready" : "no page", g_panel != 0 ? "registered" : "none", g_tab.load(),
-	              g_stripShown.load() < 0 ? "not set yet" : g_stripShown.load() ? "shown" : "hidden", g_stripSets.load(), g_openFailed.load(), g_messages.load());
+	std::snprintf(out, outSize,
+	              "%s; panel %s, page %d shown (page 2 opened %u times, closed alone %u), stock tab %d, strip %s (%u sets), stock findPanel %d, "
+	              "panel opens failed %u, %u stash messages seen",
+	              g_ready ? "page ready" : "no page", g_panel != 0 ? "registered" : "none", g_shown.load(), g_page2Opens.load(), g_lostPanel.load(),
+	              g_tab.load(), g_stripShown.load() < 0 ? "not set yet" : g_stripShown.load() ? "shown" : "hidden", g_stripSets.load(),
+	              g_stockFound.load(), g_openFailed.load(), g_messages.load());
 }
 
 auto StashPageOpen(int mode) noexcept -> int {
 	if (!g_ready || g_threads == nullptr) {
 		return -1;
 	}
-	return g_threads->runOnUiThread(g_context, &OpenOnUiThread, reinterpret_cast<void*>(static_cast<intptr_t>(mode))) == D2RL::Threads::Result::Success ? 0 : -1;
+	const int page = mode == 0 ? 1 : mode == 1 ? 2 : g_shown.load() == 2 ? 1 : 2;  // as the arrows do
+	return g_threads->runOnUiThread(g_context, &ShowOnUiThread, reinterpret_cast<void*>(static_cast<intptr_t>(page))) == D2RL::Threads::Result::Success ? 0 : -1;
 }
 
 auto StashPageState() noexcept -> int {

@@ -142,6 +142,42 @@ def item_spell_fix(row: dict[str, str], states: set[str]) -> dict[str, str]:
     return fix
 
 
+# Belt columns (bug #541). 1.13c puts a potion into a belt column only when the column holds the same item code or both codes are in
+# one of its fixed groups (1.14d Game.exe ITEM_CheckIfBothItemsAreSameTypeOfPotions 0x628a40: hp1-hp5, mp1-mp5, rvs / rvl); D2R
+# compares the item type id (GetFreeBeltSlot 0x3862d0 -> 0x36a8d0, type from 0x372c90; book / scroll ids 18 / 22 have their own
+# test). Median's elixirs, Goodberry, Moon Icon and Apple share `hpot` / `poti`, so D2R stacked them on the life potions. Each
+# Median-only beltable misc code that shares its type with another beltable code outside its classic group gets an item type of
+# its own, Equiv1 = the old type, so every "is it a hpot" test (cube inputs, Equiv chains) still holds.
+BELT_GROUPS = ({"hp1", "hp2", "hp3", "hp4", "hp5"}, {"mp1", "mp2", "mp3", "mp4", "mp5"}, {"rvs", "rvl"})
+BELT_OWN_TEST_TYPES = {"book", "scro"}  # D2R's 0x36a8d0 tests these on its own (type ids 18 / 22)
+
+
+def belt_potion_types(type_h: list[str], type_rows: list[list[str]], misc_h: list[str], misc_rows: list[list[str]],
+                      d2r_codes: set[str]) -> dict[str, tuple[str, str]]:
+    """{misc code: (new item type code, old type code)} for the Median-only beltable codes whose type D2R would share with a code
+    1.13c keeps in another column (bug #541). The new code is `b` + the item code."""
+    tc, bc = type_h.index("Code"), type_h.index("Beltable")
+    beltable = {r[tc].strip() for r in idmap.records(type_rows) if r[tc].strip() and r[bc].strip() == "1"}
+    used = {r[tc].strip().lower() for r in idmap.records(type_rows) if r[tc].strip()}
+    ci, ti = misc_h.index("code"), misc_h.index("type")
+    by_type: dict[str, list[str]] = defaultdict(list)
+    for r in idmap.records(misc_rows):
+        t = r[ti].strip()
+        if r[ci].strip() and t in beltable and t not in BELT_OWN_TEST_TYPES:
+            by_type[t].append(r[ci].strip())
+    group = {c: i for i, g in enumerate(BELT_GROUPS) for c in g}
+    out = {}
+    for t, codes in by_type.items():
+        for c in codes:
+            if c in d2r_codes or all(o == c or (c in group and group.get(o) == group[c]) for o in codes):
+                continue
+            new = "b" + c
+            if new.lower() in used or len(new) != 4:
+                raise SystemExit(f"txt_migrate: item type code {new!r} for belt potion {c!r} is taken or not 4 characters")
+            out[c] = (new, t)
+    return out
+
+
 # Scroll / tome cursor (bug #485). 1.13c takes a scroll's or tome's spell icon (the cursor after a right click: 0 = the identify
 # cursor, -1 = none) from books.txt `SpellIcon`: 1.14d's getter 0x62bb30 reads books byte +2 for item types `scro` / `book` and
 # misc `spellicon` (record +0x134) only for other items. D2R reads misc `spellicon` for every item (its server use check 0x5817f0
@@ -1022,6 +1058,40 @@ class Migrator:
                     r[si] = icons[code]
             write_tsv(d / "misc.txt", h, rows)
         self.report.append("\nmisc spellicon of scrolls / tomes from books.txt SpellIcon (bug #485): " + (", ".join(done) or "none"))
+
+    def belt_columns(self) -> None:
+        """An item type of its own for each Median belt potion that D2R would put into another kind's belt column (bug #541,
+        belt_potion_types): the type row is a copy of the old type's with Equiv1 = the old type, appended after the last type."""
+        done: list[str] = []
+        d2r_h, d2r_misc = read_tsv(D2R / "misc.txt")
+        d2r_codes = {r[d2r_h.index("code")].strip() for r in idmap.records(d2r_misc)}
+        for bank in ("base", ""):
+            d = OUT / "data" / "global" / "excel" / bank
+            if not (d / "misc.txt").exists() or not (d / "itemtypes.txt").exists():
+                continue
+            th, trows = read_tsv(d / "itemtypes.txt")
+            mh, mrows = read_tsv(d / "misc.txt")
+            fix = belt_potion_types(th, trows, mh, mrows, d2r_codes)
+            tc = th.index("Code")
+            src = {r[tc].strip(): r for r in idmap.records(trows)}
+            for c, (new, old) in fix.items():
+                row = list(src[old])
+                row[th.index("ItemType")] = f"Belt Potion {c}"
+                row[tc] = new
+                row[th.index("Equiv1")] = old
+                row[th.index("Equiv2")] = ""
+                if "TreasureClass" in th:
+                    row[th.index("TreasureClass")] = "0"
+                trows.append(row)
+            ci, ti = mh.index("code"), mh.index("type")
+            for r in idmap.records(mrows):
+                if r[ci].strip() in fix:
+                    r[ti] = fix[r[ci].strip()][0]
+            write_tsv(d / "itemtypes.txt", th, trows)
+            write_tsv(d / "misc.txt", mh, mrows)
+            if bank == "base":
+                done = [f"{c} {old} -> {new}" for c, (new, old) in fix.items()]
+        self.report.append("\nbelt potions with an item type of their own (bug #541): " + (", ".join(done) or "none"))
 
     def conversion_calcs(self) -> None:
         """calc1 / calc2 of the srvdofunc / srvprgfunc 51 rows: 1.13c's conversion chance and length where D2R reads them (bugs
@@ -2085,6 +2155,7 @@ def main() -> int:
     m.item_spell_states()
     m.state_colour_shifts()
     m.book_cursors()
+    m.belt_columns()
     m.conversion_calcs()
     m.cube_unresolved_inputs()
     m.fill_skilldesc()

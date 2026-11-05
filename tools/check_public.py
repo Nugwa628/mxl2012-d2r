@@ -6,6 +6,8 @@ Usage:
   py -3 tools/check_public.py --history    also scan every added line of `git log --all -p` and all commit messages
   py -3 tools/check_public.py --repo DIR   scan another checkout / bare repo (for example a rewritten mirror)
   py -3 tools/check_public.py --strings    list the distinct private strings found (input for the history scrub)
+  py -3 tools/check_public.py --staged --quiet                 scan the staged files only (the git pre-commit hook)
+  py -3 tools/check_public.py --message-file FILE --quiet      scan a commit message (the git commit-msg hook)
 
 Prints `path:line: [rule] text` and exits 1 on hits. In history mode the location is `<commit>:<path>:<line in diff>`.
 Intentional hits go in tools/check_public.allow: `path-glob | regex matched against the line`, one per line, `#` comments.
@@ -168,6 +170,38 @@ def scan_tree(repo, allow):
     return out
 
 
+def scan_staged(repo, allow):
+    """The staged (index) content of the added, copied, modified and renamed files: what the next commit adds."""
+    out = []
+    names = git(repo, "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR").decode("utf-8", "replace").split("\0")
+    # submodules (gitlinks, mode 160000) are a commit of another repository, not a file of this one: nothing to show
+    stage = git(repo, "ls-files", "-s", "-z").decode("utf-8", "replace").split("\0")
+    gitlinks = {e.split("\t", 1)[1] for e in stage if e.startswith("160000 ") and "\t" in e}
+    for rel in names:
+        if not rel or rel.startswith("assets/") or rel in SELF or rel in gitlinks:
+            continue
+        data = git(repo, "show", f":{rel}")
+        if len(data) > MAX_BYTES or b"\0" in data[:8192]:
+            continue
+        for n, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
+            for rule, s in scan_line(line) + scan_mentions(line):
+                if not allowed(rel, line, allow):
+                    out.append((f"{rel}:{n}", rule, s, line.strip()[:200]))
+    return out
+
+
+def scan_message(path, allow):
+    """A commit message file; git's `#` comment lines are skipped."""
+    out = []
+    for n, line in enumerate(Path(path).read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if line.startswith("#"):
+            continue
+        for rule, s in scan_line(line):
+            if not allowed("<message>", line, allow):
+                out.append((f"<message>:{n}", rule, s, line.strip()[:200]))
+    return out
+
+
 def scan_history(repo, allow, with_assets=False):
     """Added lines of every commit on every ref plus commit messages (author lines included)."""
     out = []
@@ -215,16 +249,23 @@ def scan_history(repo, allow, with_assets=False):
 def main():
     sys.stdout.reconfigure(errors="replace")  # binary-looking lines on a non-UTF-8 console
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo", default=str(ROOT))
+    ap.add_argument("--repo", "--root", default=str(ROOT))
     ap.add_argument("--history", action="store_true", help="also scan all history and commit messages")
     ap.add_argument("--history-only", action="store_true")
     ap.add_argument("--assets", action="store_true", help="history scan: include assets/ (the tree scan never does)")
     ap.add_argument("--strings", action="store_true", help="print the distinct matched strings with counts")
     ap.add_argument("--no-allow", action="store_true", help="ignore tools/check_public.allow")
+    ap.add_argument("--staged", action="store_true", help="scan only the staged content (pre-commit hook)")
+    ap.add_argument("--message-file", help="scan only this commit message file (commit-msg hook)")
+    ap.add_argument("--quiet", action="store_true", help="print nothing when there are no hits")
     a = ap.parse_args()
     allow = [] if a.no_allow else load_allow()
     hits = []
-    if not a.history_only:
+    if a.message_file:
+        hits += scan_message(a.message_file, allow)
+    elif a.staged:
+        hits += scan_staged(a.repo, allow)
+    elif not a.history_only:
         hits += scan_tree(a.repo, allow)
     if a.history or a.history_only:
         hits += scan_history(a.repo, allow, a.assets)
@@ -235,7 +276,8 @@ def main():
     else:
         for where, rule, s, line in hits:
             print(f"{where}: [{rule}] {s}  <- {line}")
-    print(f"{len(hits)} hit(s)", file=sys.stderr)
+    if hits or not a.quiet:
+        print(f"{len(hits)} hit(s)", file=sys.stderr)
     return 1 if hits else 0
 
 

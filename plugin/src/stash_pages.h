@@ -2,7 +2,7 @@
 //
 // D2R has one personal stash page. D2RLoader lets ONE plugin own ONE custom player page (item page 6 in the .d2s plus
 // `<char>.d2rl`, saved and restored by D2RCore), so the port has two personal pages: the stock stash (page 1) and a plugin panel
-// with the same look and the same 10 x 10 grid (page 2). Both panels carry a "n / 2" strip with two arrows
+// over the open stock stash with the same 10 x 10 grid at the same place (page 2). Both carry a strip with two arrows
 // (tools/stash_page2.py). The shared stash keeps its tabs (d2rloader.toml add_shared_tabs, bug #535).
 #pragma once
 
@@ -23,7 +23,7 @@ void StashPagesStatus(char* out, size_t outSize) noexcept;
 
 // ---- test harness (harness_cmds.cpp `stashpage`; client side = UI thread) ----
 
-// Open / close / toggle the plugin panel. 0 queued, -1 not available.
+// Page 2 shown / page 1 shown / the other page, as the arrows do. 0 queued, -1 not available.
 auto StashPageOpen(int mode /* 0 close, 1 open, 2 toggle */) noexcept -> int;
 // PanelState of the plugin panel: 0 unknown, 1 closed, 2 open, -1 not registered.
 auto StashPageState() noexcept -> int;

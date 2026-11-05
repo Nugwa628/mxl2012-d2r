@@ -7,3 +7,10 @@
 [submodule "third_party/PluginSDK"]
 	path = third_party/PluginSDK
 	url = https://github.com/D2RLoader/PluginSDK
+[submodule "third_party/D2R-Legacy169"]
+	path = third_party/D2R-Legacy169
+	url = https://github.com/Nugwa628/D2R-Legacy169
+[submodule "third_party/d2rl-buff-hud"]
+	path = third_party/d2rl-buff-hud
+	url = https://github.com/Nugwa628/d2rl-buff-hud
+	branch = mxl2012

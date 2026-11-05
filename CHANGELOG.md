@@ -7,6 +7,55 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.12 (2026-11-05)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**Fixed in 0.1.12:**
+
+- Legacy graphics on a 16:10 screen: the merc and summon portraits, the `/fps` text, the clock and the area name are no longer cut
+  off at the screen edges. The classic picture is now widened to the shape of your screen (960x600 on 16:10, 1066x600 on
+  16:9); a game in a window of another shape can set `aspect` in `legacy169.toml` (#544).
+- The belt sorts Median's potions as in classic: the Experience and Greed elixirs, the Goodberry and Median's other belt
+  potions no longer join the life (or mana) potion column. Each takes its own column and stacks only with itself; with no free
+  column it goes to the backpack (#541).
+- The Heretics of Act 4 (and the Heresiarch, Viletouch and the Cultists, which share their art) can be seen in HD: pale robed
+  casters instead of a dark figure that disappeared on the ground. Classic graphics are unchanged (#542).
+- Personal stash page 2 keeps the stash's tabs and gold box: it now opens inside the stash instead of replacing it. You can
+  click Shared, Gems, Materials or Runes on page 2 again. Going back to page 1 no longer removes the large frame next to the
+  stash. HD and legacy (#543).
+- The Barbarian's spirits come back sooner: a spirit more than 20 sub-tiles away now stays behind only while the monster it
+  hits is within 25 of you, and then for at most 4 seconds. In 0.1.11 a fight up to 40 away could keep one there for half
+  a minute (#534).
+
+**New:**
+
+- Buff HUD: the mod now comes with **Buff HUD** by **Lukaszpg** (<https://github.com/Lukaszpg/d2rl-buff-hud>, MIT), in our
+  fork for Median XL 2012 (<https://github.com/Nugwa628/d2rl-buff-hud>, branch `mxl2012`). A panel above the skill bar shows
+  your timed buffs with a countdown: Median's skill buffs (Holy Armor, Judgement, Superbeast, Merkabah and the others),
+  shrines, and the elixirs (Experience, Greed, Wealth, Power, Love, Concentration) with the elixir's picture. Hover an icon
+  for the buff's name. It works in HD and in legacy graphics. To turn it off, set `enabled = false` in
+  `mods\mxl2012\d2rloader\config\buff-panel.toml` and start the game again (the downloader keeps your copy of that file on
+  updates). Thanks to Lukaszpg for the plugin and for the hover names (his pull request #6).
+- Legacy graphics in 16:9: the mod now comes with our own D2RLoader plugin **D2R Legacy 16:9** (`legacy169.dll`,
+  <https://github.com/Nugwa628/D2R-Legacy169>, MIT). The classic picture fills a 16:9 window: 800x600 shows as 1066x600, 640x480
+  as 853x480; the side panels sit at the window edges and the bottom control panel stays 4:3 in the middle. HD is not changed.
+  To turn it off, set `enabled = false` in `mods\mxl2012\d2rloader\config\legacy169.toml` and start the game again (the
+  downloader keeps your copy of that file on updates).
+- Reign of the Warlock games: Median's own runes (Sha to Sha'ad) and gems (Rainbow Stone, Onyx, Bloodstone, Turquoise, Amber)
+  go into the stash's Runes and Gems pages and stack there like D2R's own, in HD and legacy graphics. Ctrl-click puts them
+  in. Both pages are redrawn with room for them. With a gamepad the pages stay D2R's, without the new slots (stacks you
+  already put there stay). **Do not go back to 0.1.11 or older after putting Median runes or gems in these pages:** older
+  versions delete those stacks when the character loads (#545).
+
+**Known:** life and mana leech on Nightmare and Hell is very small, as in Median XL 2012 (it divides leech by 100 and 200;
+#540, checked against the original). The gamepad stash has no page arrows and no slots for Median's runes and gems. A few
+Median buffs show "?" in the Buff HUD (Elemental Fury, Blades Of Light, Superbeast Neutral, Mark of the Bear, Mark of the
+Wolf). In HD, Median's runes still show their classic pictures scaled up and the HD pet row shows at most 9 icons (D2R's own
+limit).
+
 ### 0.1.11 (2026-11-05)
 
 D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its

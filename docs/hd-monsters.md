@@ -1195,3 +1195,19 @@ modes; the Thunder Bear teal in legacy (its classic colour: the art through row 
 HD as before. Putting `_hd` there instead would draw them green in legacy. Monsters and players that get `preventheal` from a
 skill or an item (Mon Rust Storm, "prevent monster heal") keep state 52 alone: classic colour in legacy, none in HD, as
 before.
+
+## 20. The Heretics off the Council Member (lane heretic, 2026-11-05, bug #542)
+
+The owner found the Act 4 Heretics nearly invisible in HD. Token `!5` (`cultist2` Heretic, `hell_cultist` Heresiarch,
+`su_cultist2` Viletouch, `uq_cultist2`, `sumelite_1273`, the Cultists `cultist1` and `res_cultist1`) is Median's copy of D2R's
+Council Member art and was mapped to `councilmember1` x1 (section 3). In HD that unit drew a thin dark figure with bone spikes
+and a dark red cloth that vanished on the dark Mesa ground; the classic sprite is a red-robed cultist and reads well.
+
+| Token | Change | Why |
+|-|-|-|
+| `!5` | councilmember1 x1 -> **nihlathakboss x1.2**, value +0.3 (proposal entry, on) | a robed caster that stands out: Nihlathak (the Act 5 boss unit, a renegade elder) is a gaunt man in long pale grey robes; he has attack1, attack2 and cast clips for the Heretics' A1 skull swarm and SC. Value +0.3 as in lane rathma's trial (at x1.15 without it he was dark) |
+
+Others looked at (clips in `tools/data/d2r_unit_clips.json`): `cantor1` (white robes, but a Zakarum priest and no cast clip),
+`vampire1` (a dark red cloak, as dark as the Council Member), `unraveler1` (taken by the Glowing One, section 17). Seen in game
+on slot 2 (docs/testing.md "Lane heretic"): pale robed men, clearly visible next to the player, the skull swarm drawn, 0 engine
+asserts; legacy unchanged. Review sheet (outside git): `mxl2012-runs/heretic/review-542.png` (HD and legacy, before and after).
