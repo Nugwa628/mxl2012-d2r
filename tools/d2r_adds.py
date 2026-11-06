@@ -233,8 +233,12 @@ def step_advanced_stash(mod: Mod, d2r: Path, log: list[str]) -> None:
     """D2R's materials / gems / runes tab (bankexpansionlayouthd.json, one AdvancedStashSlotWidget per item code) takes an
     item only when its misc row has AdvancedStashStackable 1. The migration leaves D2R-only columns empty, so every Median
     row lost it (bug #510: no rune could go into the runes tab). A mod row with D2R's code and item type takes D2R's flag;
-    Median's own runes and gems (tools/median_stash.py: their slots in the mod's Runes / Gems pages) take 1."""
+    Median's own runes and gems (tools/median_stash.py: their slots in the mod's Runes / Gems pages) and the codes of the MEDIAN /
+    ORBS tabs and the Materials tab's Median page (tools/median_tabs.py) take 1. Once shipped a code keeps it: a build without
+    the flag deletes that code's stacks (#545)."""
     import median_stash
+    import median_tabs
+    own = set(median_stash.CODES) | set(median_tabs.CODES)
     n, rows, median = 0, 0, 0
     for bank in BANKS:
         ts = [t for t in mod.tables("misc") if t.path.parent.name == ("base" if bank else "excel")]
@@ -248,7 +252,7 @@ def step_advanced_stash(mod: Mod, d2r: Path, log: list[str]) -> None:
             continue
         d2r_rows = {base.get(r, bcode): r for r in base.rows if base.get(r, bflag) not in ("", "0")}
         for r in t.rows:
-            if d2r_rows and t.get(r, code) in median_stash.CODES:  # only in the bank D2R flags (RotW)
+            if d2r_rows and t.get(r, code) in own:  # only in the bank D2R flags (RotW)
                 median += 1
                 n += t.set(r, flag, "1")
                 continue
@@ -260,7 +264,7 @@ def step_advanced_stash(mod: Mod, d2r: Path, log: list[str]) -> None:
             rows += 1
             n += t.set(r, flag, base.get(src_row, bflag))
     log.append(f"advanced_stash: kept (D2R's stack tab; owner question, docs/d2r-additions.md); {STASH_FLAG} of D2R on "
-               f"{rows} rows by code and type, 1 on {median} Median rune / gem rows, {n} cells set")
+               f"{rows} rows by code and type, 1 on {median} Median rows (runes / gems, Median tabs), {n} cells set")
 
 
 def step_warlock(mod: Mod, log: list[str]) -> None:

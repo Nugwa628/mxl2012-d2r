@@ -74,6 +74,40 @@ constexpr auto CelMode(uint32_t mode, bool dim, uint32_t dimMode = CelModeDim) n
 	return dim && mode == CelModeNormal ? dimMode : mode;
 }
 
+// The stash cube window's items small in classic (lane legacycube; HD: ui_layouts.stash_hd). A grid widget draws an item
+// through 0x15bb80(item, position, scale, ...) with its scale (the widget's `scale` times its parent's, 0x2a72e2) and places
+// it by that scale too; classic (0x150df0) drops the scale and draws the cel at its full size from the item's top left. The
+// classic cel draw 0x656020 -> 0x65fa70 already sizes a cel by D2R's sprite scale: when 0x6bbad0() is non-zero and
+// 0x6bbac0() (256ths) is not 256, the cel's size and offsets are multiplied by it (its place, the x / y given, is not).
+// While a classic item draw with a scale below 1 runs, the part answers those two with that scale, and moves every place
+// 0x656020 gets toward the item's top left by it (the picture: y = top + height; the socket marks: the item's centre).
+inline constexpr uint64_t SpriteScaleRva = 0x6bbac0;   // mov eax, [0x341d248] / ret, then 9 int3
+inline constexpr uint8_t SpriteScaleCode[] = {0x8b, 0x05, 0x82, 0x17, 0xd6, 0x02, 0xc3, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};
+inline constexpr uint64_t SpriteScaleValueRva = 0x341d248;
+inline constexpr uint64_t SpriteScaleOnRva = 0x6bbad0;  // mov rax, [0x32f0868] / cmp dword [rax+4], 0 / je / mov eax, [rax] / ret / xor eax, eax / ret
+inline constexpr uint8_t SpriteScaleOnCode[] = {0x48, 0x8b, 0x05, 0x91, 0x4d, 0xc3, 0x02, 0x83, 0x78, 0x04, 0x00, 0x74, 0x03,
+                                                0x8b, 0x00, 0xc3, 0x33, 0xc0, 0xc3};
+inline constexpr uint64_t SpriteScaleOnRefRva = 0x32f0868;
+inline constexpr uint32_t SpriteScaleOne = 256;
+
+// 0x15bb80 in classic with this scale: a small draw.
+constexpr auto SmallDraw(bool hd, float scale) noexcept -> bool {
+	return !hd && scale > 0.05f && scale < 0.99f;
+}
+
+// What 0x6bbac0 answers inside a small draw: D2R's own scale (when on) times the item's, at least 1.
+constexpr auto SpriteScale(uint32_t own, bool on, float scale) noexcept -> uint32_t {
+	const float base = static_cast<float>(on && own != 0 ? own : SpriteScaleOne);
+	const auto s = static_cast<uint32_t>(base * scale + 0.5f);
+	return s == 0 ? 1 : s;
+}
+
+// A place 0x656020 gets inside a small draw, moved toward the item's top left (`origin`).
+constexpr auto SmallPlace(int32_t v, int32_t origin, float scale) noexcept -> int32_t {
+	const float d = static_cast<float>(v - origin) * scale;
+	return origin + static_cast<int32_t>(d < 0 ? d - 0.5f : d + 0.5f);
+}
+
 // When the stash wires its pages in classic graphics.
 enum class Mode {
 	Always,  // every game, as D2R does in HD (the default): D2R's own RotW rule then keeps the RotW tabs closed without RotW

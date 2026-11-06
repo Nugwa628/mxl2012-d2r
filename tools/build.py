@@ -55,6 +55,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   rotw_stash_legacy.py build  classic layout + art of D2R's RotW Gems / Materials / Runes stash pages, down-rendered from
                      D2R's HD art (docs/legacy-graphics.md section 9); into the mod by default (owner, 2026-10-31);
                      MXL2012_ROTW_LEGACY=0 stages it in work/rotw_stash_legacy instead
+  median_tabs.py apply  the stash's MEDIAN / ORBS tabs and the Materials tab's Median page (docs/median-stash-tab.md): 7 tabs in
+                     both stash layouts, the slots, the pages' art; needs the plugin part medtab
   merge_string_overrides.py, strings_check.py   as above, after the writers
   validate.py        D2R schema checks        -> work/mod/validate_report.md
 
@@ -136,7 +138,9 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              # after legacy_art: its item pictures. In the mod by default (owner, 2026-10-31): the plugin's rotwstash part keeps
              # it from crashing without RotW (docs/legacy-graphics.md 9.6). MXL2012_ROTW_LEGACY=0 stages it outside the mod
              ["rotw_stash_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data"), "--out",
-              str(MOD / "data" if os.environ.get("MXL2012_ROTW_LEGACY", "1") != "0" else ROOT / "work" / "rotw_stash_legacy" / "data")]]
+              str(MOD / "data" if os.environ.get("MXL2012_ROTW_LEGACY", "1") != "0" else ROOT / "work" / "rotw_stash_legacy" / "data")],
+             # after rotw_stash_legacy: the 7 stash tabs and the Median pages into both stash layouts (they need the plugin's medtab)
+             ["median_tabs.py", "apply", str(MOD / "data")]]
 STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["validate.py"]]
 LOGS = ROOT / "work" / "build-logs"
 

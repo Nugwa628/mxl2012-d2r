@@ -86,6 +86,22 @@ def fake_d2r(root: Path) -> None:
         ui_art.write_sprite(hd / f"{rel}.sprite", [Image.new("RGBA", size, (120, 100, 60, 255))] * n, stride=size[0] + 2 if n > 1 else None)
 
 
+def fake_mod(mod: Path) -> None:
+    """The mod's cube picture (cells of 29 with a 3-pixel line: index 60 lines, 20 insides) and an inventory.txt row for it."""
+    panel, excel = mod / "global" / "ui" / "panel", mod / "global" / "excel"
+    panel.mkdir(parents=True, exist_ok=True)
+    excel.mkdir(parents=True, exist_ok=True)
+    im = np.full((432, 320), 40, np.int32)
+    left, top = 15, 50
+    im[top - 3:top + 8 * 29 + 3, left - 3:left + 10 * 29 + 3] = 60
+    for i in range(10):
+        for j in range(8):
+            im[top + j * 29 + 1:top + j * 29 + 28, left + i * 29 + 1:left + i * 29 + 28] = 20
+    (panel / "supertransmogrifier.dc6").write_bytes(rs.dc6_bytes([im[y0:y1, x0:x1] for x0, y0, x1, y1 in ui_art.TILES]))
+    (excel / "inventory.txt").write_text("class\tinvLeft\tgridLeft\tgridTop\tgridX\tgridY\tgridBoxWidth\tgridBoxHeight\n"
+                                         "Transmogrify Box Page 1\t0\t15\t50\t10\t8\t29\t29\n", "utf-8")
+
+
 def fake_font(adv: int) -> tuple[bytes, list]:
     """A classic font whose every glyph advances `adv` with `adv - 1` columns of ink (cells 12 x 10)."""
     tbl = b"Woo!\x01\x00\x00\x00\x00\x01\x0a\x14" + b"".join(
@@ -141,11 +157,36 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual((gw["rect"], gw["filename"], gw["tooltipString"]), ({"x": 15, "y": 357}, "PANEL\\goldcoinbtn", "Withdraw"))
         self.assertEqual(rs.find(lay, "CurrentSharedStashText")["fields"]["text"], "Page %u / %u")
         self.assertEqual(sum(1 for c in lay["children"] if c["name"] == "grid"), 0)
-        # bug #515: classic draws the 10 x 8 cube's items full size, so the grid leaves the panel and the lid fills the frame
+        # bug #515: the whole 10 x 8 cube small in the frame (the plugin draws the items at the grid's scale), on the
+        # cube's own cells; the cover after both (D2R shows it without a cube), no lid
         _box, frame = rs.cube_grid(HD)
-        self.assertEqual(rs.find(lay, "horadriccube_grid")["fields"]["rect"], {"x": -1500, "y": -1500})
-        lid = rs.find(lay, "horadriccube_lid")["fields"]
-        self.assertEqual((lid["rect"], lid["filename"]), ({"x": frame[0], "y": frame[1]}, f"PANEL\\{rs.COVER}"))
+        self.assertEqual(frame[2:], (87, 116))
+        cube = rs.find(lay, "advancedstash_horadriccube")["children"]
+        self.assertEqual([c["name"] for c in cube], ["horadriccube_cells", "horadriccube_grid", "convert", "horadriccube_cover",
+                                                     "withdraw_button"])
+        cells, grid = cube[0]["fields"], cube[1]["fields"]
+        self.assertEqual((cells["rect"], cells["filename"]), ({"x": frame[0], "y": frame[1]}, f"PANEL\\{rs.CELLS}"))
+        self.assertEqual((grid["cellCount"], grid["cellSize"]), ({"x": 10, "y": 8}, "$ItemCellSize"))
+        # 8 pixels a cell: 80 x 64, centred inside the 1-pixel edge of the 87 x 116 frame
+        self.assertEqual(grid["rect"], {"x": frame[0] + 1 + 2, "y": frame[1] + 1 + 25, "scale": round(8 / 29, 4)})
+
+    def test_cube_cells_follow_the_grid(self):
+        frame = (100, 200, 87, 116)
+        gx, gy, s = rs.mini_grid(frame)
+        self.assertEqual((gx, gy, round(s * 29)), (103, 226, 8))
+        with self.assertRaises(ValueError):
+            rs.mini_grid((0, 0, 60, 60))
+        with tempfile.TemporaryDirectory() as t:
+            fake_mod(Path(t))
+            picture, row = rs.cube_picture(Path(t), PAL, Path(t) / "global" / "excel" / "inventory.txt")
+        im = np.asarray(rs.cube_cells(picture, row, frame)).astype(int)
+        self.assertEqual(im.shape, (116, 87, 4))
+        self.assertEqual((im[0, 0, 3], im[1, 1, 3], tuple(im[5, 5, :3])), (0, 255, (0, 0, 0)))   # edge clear, black inside
+        # cell (0, 0) is 103..110 x 226..233 in the panel: its middle is the cells' inside, the row above it the line
+        near = lambda px, rgb, tol: self.assertLess(sum(abs(a - b) for a, b in zip(px[:3], rgb)), tol, (tuple(px), rgb))
+        near(im[226 - 200 + 4, 103 - 100 + 4], PAL[20], 40)
+        near(im[226 - 200 - 1, 103 - 100 + 4], PAL[60], 80)
+        self.assertEqual(tuple(im[226 - 200 + 64 + 3, 103 - 100 + 4, :3]), (0, 0, 0))   # below the cube: black
 
     def test_tab_names_fit(self):
         # 6-pixel advances: MATERIALS = 9 * 6 - 1 = 53 of ink, inside 63 less 3 + 3; 7 pixels: 62, too wide
@@ -183,18 +224,22 @@ class BuildTests(unittest.TestCase):
             fake_d2r(root / "d2r")
             d2r = rs.D2R(root / "d2r")
             out, mod = root / "stage" / "data", root / "mod" / "data"   # staged as tools/build.py does by default
-            rs.build(d2r, out)
+            fake_mod(mod)
+            with self.assertRaises(FileNotFoundError):   # the cells need the mod's cube picture
+                rs.build(d2r, out, inventory=mod / "global" / "excel" / "inventory.txt")
+            rs.build(d2r, out, mod, mod / "global" / "excel" / "inventory.txt")
             panel = out / "global" / "ui" / "panel"
             self.assertEqual([f[:2] for f in dc6.read_dc6(panel / "rotwstash_gems.dc6")],
                              [(256, 256), (64, 256), (256, 176), (64, 176)])
             self.assertEqual([f[:2] for f in dc6.read_dc6(panel / "rotwstash_tabs.dc6")], [(63, 24)] * 2)
             self.assertEqual([f[:2] for f in dc6.read_dc6(panel / "rotwstash_cubecover.dc6")], [(87, 116)])
+            self.assertEqual([f[:2] for f in dc6.read_dc6(panel / "rotwstash_cubecells.dc6")], [(87, 116)])
             problems, notes = rs.check(d2r, out, mod)
             self.assertEqual(problems, [])
             self.assertTrue(any("no built tables" in n for n in notes))
             # the tables: one item with a picture, one without
             excel, items = mod / "global" / "excel", mod / "global" / "items"
-            excel.mkdir(parents=True)
+            excel.mkdir(parents=True, exist_ok=True)
             items.mkdir(parents=True)
             (excel / "misc.txt").write_text("name\tcode\tinvfile\tAdvancedStashStackable\nEl Rune\tr01\tinvrEl\t1\n"
                                             "Eld Rune\tr02\tinvrEld\t1\n", "utf-8")
@@ -221,7 +266,8 @@ class BuildTests(unittest.TestCase):
             (fonts / "font6.dc6").write_bytes(dc6.build_dc6(frames))
             d2r = rs.D2R(root / "d2r")
             out = root / "stage" / "data"
-            rs.build(d2r, out)
+            fake_mod(out)
+            rs.build(d2r, out, inventory=out / "global" / "excel" / "inventory.txt")
             self.assertEqual([f[:2] for f in dc6.read_dc6(out / "global" / "ui" / "panel" / "rotwstash_tabs.dc6")],
                              [(63, 24)] * 10)
             problems, notes = rs.check(d2r, out)

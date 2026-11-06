@@ -17,6 +17,8 @@ mods\\<name> is written: the slot's game-wide d2rloader\\config is shared with t
 --placeholder installs an EMPTY mod (modinfo.json only: no data, no plugin, no d2rloader folder), for checking that a
 run starts mod mxl2012 without anything of ours in it.
 tools/package_release.py builds the same folder for a player release (build_data + write_mod_files).
+The stash layouts with the MEDIAN / ORBS tabs (tools/median_tabs.py) and the plugin part medtab ship together: write_mod_files
+refuses data with those layouts and no plugin, or a plugin without the part (tab 6 would assert and crash the game).
 Usage: MXL_SLOT=2 MXL_RUN=<lock owner> python tools/install_mod.py [--slot 1|2|3|4|5|all] [--name mxl2012] [--placeholder]
 (`all` = those of slots 2 to 5 that exist; a named slot that is missing is refused; slot 1, the owner's own game in Program Files, only by name. A write the folder refuses ends the
 install with a message: nothing is elevated or retried another way.)
@@ -323,10 +325,28 @@ def apply_toml_key(text: str, section: str, key: str, value: str, forced) -> str
     return ensure_toml_key(text, section, key, value, forced)
 
 
+def medtab_pair_problem(data: Path, plugin: Path) -> str:
+    """Why the mod's data and `plugin` must not ship together, or "": stash layouts with the 7 tabs (median_tabs.LAYOUT_MARK)
+    need a plugin with the part medtab (its DLL names the mark); without it tab 6 asserts and the game crashes."""
+    import median_tabs
+    layouts = [data / "global" / "ui" / "layouts" / f for f in ("bankexpansionlayouthd.json", "bankexpansionlayout.json")]
+    if not any(p.exists() and median_tabs.LAYOUT_MARK in p.read_text("utf-8", errors="replace") for p in layouts):
+        return ""
+    if not plugin.exists():
+        return f"the stash layouts have the Median tabs but there is no plugin at {plugin} (run tools/build_plugin.ps1)"
+    if median_tabs.LAYOUT_MARK.encode() not in plugin.read_bytes():
+        return f"the stash layouts have the Median tabs but {plugin} has no medtab part (an older plugin): build this one"
+    return ""
+
+
 def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, metadata: dict = None) -> None:
     """Everything of the mod folder except <name>.mpq/data: modinfo.json, d2rloader/{metadata.json, plugins, config, patches}.
-    metadata: modVersion / description / website for d2rloader/metadata.json (default: the dev install's)."""
+    metadata: modVersion / description / website for d2rloader/metadata.json (default: the dev install's).
+    Refuses (SystemExit) when <name>.mpq/data and `plugin` are not a pair (medtab_pair_problem)."""
     mpq = mod / f"{name}.mpq"
+    problem = medtab_pair_problem(mpq / "data", plugin)
+    if problem:
+        raise SystemExit(f"install refused: {problem}")
     mpq.mkdir(parents=True, exist_ok=True)
     # D2R (and D2RLoader's mod detection) read modinfo.json inside the folder-style MPQ; the copy at the mod
     # root follows the D2RLoader guide's layout and is harmless.

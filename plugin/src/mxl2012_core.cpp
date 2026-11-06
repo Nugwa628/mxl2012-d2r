@@ -59,7 +59,7 @@
 //      once every 30 s; the laugh itself still plays (vo_chat.cpp, off word vochat, #508);
 //   +  the stash wires its RotW pages (Gems, Materials, Runes) in classic graphics too, as D2R does in HD (its own RotW rule
 //      keeps them closed without RotW), the classic item picture skips an item without a draw record, and classic draws
-//      the pages' empty slot icons dimmed as HD does (rotw_stash.cpp, off word rotwstash, #516);
+//      the pages' empty slot icons dimmed as HD does, the cube window's items small (rotw_stash.cpp, off word rotwstash, #516);
 //   +  a unit other than the player that the client's unit reassign (server command 0x15) leaves without a client room is left
 //      so instead of D2R's "Could not get act!" end of the game (reassign_guard.cpp, off word reassign, #511 / #292);
 //   +  HD draws no ground plane on Median's Ancient Tunnels (level 65) either, as D2R does on 74, so its void shows round the
@@ -68,13 +68,12 @@
 //      warp, unless it is fighting a target in reach within 40 (spirit_warp.cpp, off word spiritwarp, #534);
 //   +  a second personal stash page on D2RLoader's one custom player page (item page 6 + <char>.d2rl, 10 x 10), drawn by the
 //      plugin panel StashPage2 and reached by arrows in the stock stash (stash_pages.cpp, off word stashpage2);
-//   +  a character of level 1-100 gets Akara's "Reset Skills and Stats" every time, without the Den of Evil's one per
-//      difficulty; above 100 it stays D2R's (akara_respec.cpp, off word akararespec);
+//   +  a RotW stash of 7 tabs: MEDIAN and ORBS run as the Runes page with their own slots, a Vanilla / Median selector on the
+//      Materials tab, the 9 item codes with "@" restored in their slots (median_tabs.cpp, off word medtab: tabs 6 and 7 hidden);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
 
-#include "akara_respec.h"
 #include "apple_use.h"
 #include "build_guard.h"
 #include "build_guard_logic.h"
@@ -93,6 +92,7 @@
 #include "orig_asserts_logic.h"
 #include "other_plugins_logic.h"
 #include "pet_spread.h"
+#include "median_tabs.h"
 #include "rotw_stash.h"
 #include "rune_letters.h"
 #include "save_mode.h"
@@ -122,7 +122,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.13";
+constexpr const char* PluginVersion = "0.1.14";
 constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -167,7 +167,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash void65 stashpage2 akararespec sendstash), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash medtab void65 stashpage2 sendstash), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -447,9 +447,9 @@ char g_petSpreadReport[192] = "";
 char g_spiritWarpReport[192] = "";
 char g_appleUseReport[192] = "";
 char g_voChatReport[160] = "";
-char g_akaraRespecReport[192] = "";
 char g_reassignReport[192] = "";
 char g_rotwStashReport[384] = "";
+char g_medTabReport[256] = "";
 char g_voidFloorReport[160] = "";
 char g_stashPageReport[192] = "";
 char g_sendStashReport[192] = "";
@@ -492,8 +492,8 @@ void FindHookClashes(char* out, size_t n) noexcept {
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
-	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport}, {"akararespec", g_akaraRespecReport},
-	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"void65", g_voidFloorReport},
+	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport},
+	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"medtab", g_medTabReport}, {"void65", g_voidFloorReport},
 	             {"cltdostub", g_stubReport}};
 	for (const auto& p : parts) {
 		words[count] = p.word;
@@ -581,7 +581,7 @@ DWORD WINAPI LogOtherPluginsLater(LPVOID) {
 
 // A status line for `mxl2012`: "<part> <report>" or "<part> off: left out by mxl2012-core-off.txt".
 void SayPart(const D2RL::ConsoleCommandContext* command, const char* part, const char* report) noexcept {
-	char line[448];
+	char line[640];
 	std::snprintf(line, sizeof(line), "%s %s", part, Off(part) ? OffNote : (report[0] != '\0' ? report : "not installed"));
 	Say(command, line);
 }
@@ -730,22 +730,21 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	VoChatCounts(&voPrinted, &voDropped);
 	std::snprintf(line, sizeof(line), "%s; Baal laugh lines printed %ld, left out %ld", g_voChatReport, voPrinted, voDropped);
 	SayPart(command, "vochat", line);
-	long arRespecs = 0, arToD2r = 0, arMenus = 0, arNoRecord = 0, arLevel = 0;
-	AkaraRespecCounts(&arRespecs, &arToD2r, &arMenus, &arNoRecord, &arLevel);
-	char arTrace[192];
-	AkaraRespecTrace(arTrace, sizeof(arTrace));
-	std::snprintf(line, sizeof(line), "%s; respecs %ld, packets left to D2R %ld, Akara menus with the line %ld, without a client quest record %ld, last menu level %ld; %s",
-	              g_akaraRespecReport, arRespecs, arToD2r, arMenus, arNoRecord, arLevel, arTrace);
-	SayPart(command, "akararespec", line);
 	unsigned reSeen = 0, reLeft = 0, reEnded = 0;
 	ReassignGuardStats(&reSeen, &reLeft, &reEnded);
 	std::snprintf(line, sizeof(line), "%s; commands %u, units left without a room %u, the player without a room %u", g_reassignReport, reSeen, reLeft, reEnded);
 	SayPart(command, "reassign", line);
 	RotwStashCounts rs{};
 	RotwStashState(&rs);
-	std::snprintf(line, sizeof(line), "%s; stash inits %ld (classic: pages wired %ld, left as D2R %ld), item pictures skipped %ld, empty slot draws dimmed %ld; game type %d, %s",
-	              g_rotwStashReport, rs.inits, rs.classicWired, rs.classicLeft, rs.skipped, rs.dimmed, rs.gameType, rs.hd ? "HD" : "legacy");
+	std::snprintf(line, sizeof(line), "%s; stash inits %ld (classic: pages wired %ld, left as D2R %ld), item pictures skipped %ld, empty slot draws dimmed %ld, small item draws %ld; game type %d, %s",
+	              g_rotwStashReport, rs.inits, rs.classicWired, rs.classicLeft, rs.skipped, rs.dimmed, rs.shrunk, rs.gameType, rs.hd ? "HD" : "legacy");
 	SayPart(command, "rotwstash", line);
+	{
+		char status[256];
+		MedianTabsStatus(status, sizeof(status));
+		std::snprintf(line, sizeof(line), "%s | %s", g_medTabReport, status);
+		Say(command, line);  // also with the off word: the guard stays
+	}
 	Say(command, Off("void65") ? "void65 off: left out by mxl2012-core-off.txt" : g_voidFloorReport);
 	{
 		char status[256];
@@ -960,11 +959,6 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voChatReport);
 		context->LogInfo(line);
 	}
-	if (!Off("akararespec")) {
-		InstallAkaraRespec(context, g_akaraRespecReport, sizeof(g_akaraRespecReport));
-		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_akaraRespecReport);
-		context->LogInfo(line);
-	}
 	if (!Off("reassign")) {
 		InstallReassignGuard(context, g_reassignReport, sizeof(g_reassignReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_reassignReport);
@@ -975,6 +969,10 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_rotwStashReport);
 		context->LogInfo(line);
 	}
+	// medtab off keeps the hooks (the 7-tab layout asserts without them) and hides the Median tabs
+	InstallMedianTabs(context, !Off("medtab"), g_medTabReport, sizeof(g_medTabReport));
+	std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_medTabReport);
+	context->LogInfo(line);
 	if (!Off("void65")) {
 		InstallVoidFloor(context, g_voidFloorReport, sizeof(g_voidFloorReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voidFloorReport);

@@ -423,9 +423,17 @@ so items past the first 3 x 4 cells run off the frame (HD and classic). Classic 
 same since the owner's ruling (2026-11-01; a 10 x 8 grid at scale 0.3 came first): docs/hd-ui.md.
 
 Lane cubewindow (owner 2026-11-05: the items back, "with the correct grid size behind it"): HD shows them again, small, on
-10 x 8 cells of the mod's own cube art (docs/hd-ui.md). Classic keeps the cover: the window is 87 x 116 classic pixels, so
+10 x 8 cells of the mod's own cube art (docs/hd-ui.md). Classic kept the cover (until lane legacycube, below): the window is 87 x 116 classic pixels, so
 Median's ten columns would get 8 pixels a cell, and classic draws item pictures at their full 28 pixels a cell whatever the
-grid's `scale` or `cellSize` says (lane cubeui); shrinking them needs a plugin hook in D2R's classic item drawing (not done).
+grid's `scale` or `cellSize` says (lane cubeui); shrinking them needs a plugin hook in D2R's classic item drawing.
+
+Lane legacycube (owner 2026-11-06: legacy shows the same mini grid as HD): the plugin part `rotwstash` now draws a classic
+item of a grid with a scale below 1 at that scale (docs/plugin-plan.md section 29), and `classic_layout` puts the grid back in
+the frame: 10 x 8 cells of 8 pixels (scale 8/29) at the frame's inside, centred (80 x 64 of 85 x 114), over
+`rotwstash_cubecells` (the mod's own cube cells from `supertransmogrifier.dc6` resized to 8 pixels a cell, on black, the page
+art's 1-pixel frame left showing), which hides the 3 x 4 lines of the down-rendered page art. No lid; D2R's cover
+(`rotwstash_cubecover`) still shows without a cube. Clicks, tooltips and Ctrl-click are D2R's grid's, as in HD. Seen at 4:3
+and with legacy169 at 16:9 (docs/testing.md "Lane legacycube").
 
 ### 9.6 Why it crashed, and the plugin part `rotwstash` (lane rotwgate, 2026-10-31; docs/plugin-plan.md section 29)
 

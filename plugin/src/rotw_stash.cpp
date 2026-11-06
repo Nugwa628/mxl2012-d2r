@@ -13,7 +13,10 @@
 //   - the classic item picture 0x154ac0 returns at once for an item without its draw record (+0x78) instead of reading
 //     null + 0x440 (lane rotwstash's +0x154AF2; not reached once the pages are wired, kept as a guard);
 //   - an empty slot's placeholder icon is dimmed in classic as in HD: 0x15bb80 (the item draw with an alpha) notes a classic
-//     draw with alpha < 1, and 0x656020 (the classic cel draw) draws mode 5 translucent while it holds (lane cubewindow).
+//     draw with alpha < 1, and 0x656020 (the classic cel draw) draws mode 5 translucent while it holds (lane cubewindow);
+//   - a classic item draw with a scale below 1 (the stash cube window's 10 x 8 grid, lane legacycube) draws small: 0x15bb80
+//     notes the scale and the item's top left, 0x656020 moves its places toward that corner, and D2R's sprite scale getters
+//     0x6bbac0 / 0x6bbad0 (whole functions replaced by jumps to SpriteScaleHook / SpriteScaleOnHook) answer that scale.
 // The game type (client game byte +0x5c, 3 = RotW) is read for `mxl2012` and the dev mode `rotw`.
 // Dev builds: MXL_ROTWSTASH_TEST=rotw wires the pages in classic only in a RotW game, =never keeps D2R's HD-only rule;
 // MXL_ROTWSTASH_DIM=<mode> draws the empty slots with another classic draw mode (0-8) instead of CelModeDim.
@@ -41,6 +44,13 @@ BoolFn g_rotwGame = nullptr;
 PictureFn g_picture = nullptr;
 ItemDrawFn g_itemDraw = nullptr;
 CelDrawFn g_celDraw = nullptr;
+struct Small {
+	float scale;
+	int32_t x, y;  // the item's top left
+};
+thread_local Small t_small{0.0f, 0, 0};
+bool g_smallOn = false;
+volatile LONG g_small = 0;
 uint32_t g_dimMode = CelModeDim;
 thread_local bool t_dim = false;
 volatile LONG g_dimmed = 0;
@@ -67,12 +77,35 @@ void PictureGuard(void* item, uint64_t a, uint64_t b, uint64_t c, uint64_t d, ui
 }
 
 uint64_t ItemDrawHook(void* item, uint64_t pos, float scale, DrawAlpha* alpha) noexcept {
-	const bool dim = DimDraw(g_hd(), alpha);
+	const bool hd = g_hd();
+	const bool dim = DimDraw(hd, alpha);
 	const bool was = t_dim;
+	const Small wasSmall = t_small;
 	t_dim = dim;
+	if (g_smallOn && SmallDraw(hd, scale)) {
+		t_small = {scale, static_cast<int32_t>(pos), static_cast<int32_t>(pos >> 32)};
+		InterlockedIncrement(&g_small);
+	}
 	const uint64_t r = g_itemDraw(item, pos, scale, alpha);
 	t_dim = was;
+	t_small = wasSmall;
 	return r;
+}
+
+// 0x6bbad0 and 0x6bbac0 as D2R has them, and their answers inside a small draw
+uint32_t OwnScaleOn() noexcept {
+	const auto* on = *reinterpret_cast<const uint32_t* const volatile*>(g_base + SpriteScaleOnRefRva);
+	return on[1] != 0 ? on[0] : 0;
+}
+
+uint32_t SpriteScaleOnHook() noexcept {
+	const uint32_t own = OwnScaleOn();
+	return t_small.scale > 0.0f && own == 0 ? 1 : own;
+}
+
+uint32_t SpriteScaleHook() noexcept {
+	const uint32_t own = *reinterpret_cast<const volatile uint32_t*>(g_base + SpriteScaleValueRva);
+	return t_small.scale > 0.0f ? SpriteScale(own, OwnScaleOn() != 0, t_small.scale) : own;
 }
 
 // 0x656020's own arguments are four registers and stack dwords (the mode the first of them); eight are passed on
@@ -83,6 +116,10 @@ uint64_t CelDrawHook(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t mo
 			InterlockedIncrement(&g_dimmed);
 			mode = (mode & 0xffffffff00000000ull) | m;
 		}
+	}
+	if (t_small.scale > 0.0f) {
+		b = (b & 0xffffffff00000000ull) | static_cast<uint32_t>(SmallPlace(static_cast<int32_t>(b), t_small.x, t_small.scale));
+		c = (c & 0xffffffff00000000ull) | static_cast<uint32_t>(SmallPlace(static_cast<int32_t>(c), t_small.y, t_small.scale));
 	}
 	return g_celDraw(a, b, c, d, mode, f, g, h);
 }
@@ -127,12 +164,22 @@ auto InstallRotwStash(const D2RL::PluginContext* context, char* report, size_t r
 	bool dim = ok && dimSame &&
 	           context->InstallInlineHook(CelDrawRva, CelDrawEntry, sizeof(CelDrawEntry), reinterpret_cast<void*>(&CelDrawHook),
 	                                      reinterpret_cast<void**>(&g_celDraw));
+	// the small items: both getters replaced while nothing is noted yet (they answer as D2R's), then the item draw notes
+	const bool smallSame = std::memcmp(image + SpriteScaleRva, SpriteScaleCode, sizeof(SpriteScaleCode)) == 0 &&
+	                       std::memcmp(image + SpriteScaleOnRva, SpriteScaleOnCode, sizeof(SpriteScaleOnCode)) == 0;
+	if (dim && smallSame) {
+		const AbsJump on = AbsJumpBytes(reinterpret_cast<uint64_t>(&SpriteScaleOnHook));
+		const AbsJump value = AbsJumpBytes(reinterpret_cast<uint64_t>(&SpriteScaleHook));
+		g_smallOn = context->PatchBytes(SpriteScaleOnRva, SpriteScaleOnCode, sizeof(on.bytes), on.bytes, sizeof(on.bytes)) &&
+		            context->PatchBytes(SpriteScaleRva, SpriteScaleCode, sizeof(value.bytes), value.bytes, sizeof(value.bytes));
+	}
 	dim = dim && context->InstallInlineHook(ItemDrawRva, ItemDrawEntry, sizeof(ItemDrawEntry), reinterpret_cast<void*>(&ItemDrawHook),
 	                                        reinterpret_cast<void**>(&g_itemDraw));
 	std::snprintf(report, reportSize, "rotwstash %s: the stash wires its RotW pages in classic graphics in %s (init 0x23b1b0, HD check "
 	              "0x23b204); classic item pictures without a draw record skipped (0x154ac0); empty slots dimmed in classic %s "
-	              "(0x15bb80 / 0x656020, mode %u)", ok ? "on" : "FAILED", ModeName(g_mode),
-	              dim ? "on" : dimSame ? "FAILED" : "off (bytes differ)", g_dimMode);
+	              "(0x15bb80 / 0x656020, mode %u); small items in classic %s (0x6bbac0 / 0x6bbad0)",
+	              ok ? "on" : "FAILED", ModeName(g_mode), dim ? "on" : dimSame ? "FAILED" : "off (bytes differ)", g_dimMode,
+	              dim && g_smallOn ? "on" : !smallSame ? "off (bytes differ)" : "FAILED");
 	return ok;
 }
 
@@ -142,6 +189,7 @@ void RotwStashState(RotwStashCounts* out) noexcept {
 	out->classicLeft = g_left;
 	out->skipped = g_skipped;
 	out->dimmed = g_dimmed;
+	out->shrunk = g_small;
 	out->mode = ModeName(g_mode);
 	out->hd = g_hd != nullptr && g_hd();
 	out->gameType = -1;

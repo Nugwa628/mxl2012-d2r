@@ -64,6 +64,22 @@ int main() {
 	Check(CelMode(CelModeNormal, true) == CelModeDim && CelMode(CelModeNormal, false) == CelModeNormal, "mode 5 turns translucent while dimmed");
 	Check(CelMode(1, true) == 1 && CelMode(3, true, 2) == 3 && CelMode(5, true, 2) == 2, "other modes stay; the dev mode is used");
 
+	// the cube window's small items
+	std::memcpy(&rip, SpriteScaleCode + 2, sizeof(rip));
+	Check(SpriteScaleRva + 6 + rip == SpriteScaleValueRva && SpriteScaleCode[6] == 0xc3, "0x6bbac0 returns the dword 0x341d248");
+	std::memcpy(&rip, SpriteScaleOnCode + 3, sizeof(rip));
+	Check(SpriteScaleOnRva + 7 + rip == SpriteScaleOnRefRva && SpriteScaleOnCode[sizeof(SpriteScaleOnCode) - 1] == 0xc3,
+	      "0x6bbad0 reads through 0x32f0868 and ends with its ret");
+	Check(sizeof(SpriteScaleCode) >= sizeof(AbsJump::bytes) && sizeof(SpriteScaleOnCode) >= sizeof(AbsJump::bytes),
+	      "the absolute jump fits both");
+	Check(SmallDraw(false, 0.2759f) && !SmallDraw(true, 0.2759f), "classic with a scale below 1: small; HD draws it itself");
+	Check(!SmallDraw(false, 1.0f) && !SmallDraw(false, 0.0f) && !SmallDraw(false, 1.5f), "scale 1, none, larger: as D2R");
+	Check(SpriteScale(0, false, 0.2759f) == 71 && SpriteScale(512, true, 0.5f) == 256 && SpriteScale(512, false, 0.5f) == 128,
+	      "256ths: D2R's own scale only when it is on");
+	Check(SpriteScale(256, true, 0.001f) == 1, "never 0");
+	Check(SmallPlace(100, 100, 0.25f) == 100 && SmallPlace(158, 100, 0.25f) == 115 && SmallPlace(90, 100, 0.25f) == 97,
+	      "places move toward the origin");
+
 	if (failures == 0) {
 		std::printf("rotwstash_tests: all passed\n");
 		return 0;

@@ -102,21 +102,29 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
     `sendstash`, docs/testing.md "Lane sendstash"): backpack items with a RotW stash slot go into it, full slots stay, one chat
     line; greyed in classic / expansion games and for joiners (joiners stay off until a two-instance test)
   - [x] Akara's respec unlimited up to level 100, D2R's one per difficulty above (owner 2026-11-05, lane akararespec;
-    plugin part `akararespec`, plugin-plan.md section 31)
+    plugin part `akararespec`, plugin-plan.md section 31); removed again 2026-11-06 (owner: Median's Token of Absolution
+    does it)
   - [x] use D2RLoader's Transmute Horadric Cube (documented)
   - [x] The RotW stash cube window shows the cube's items again on a matching 10 x 8 grid (owner 2026-11-05, lane cubewindow, #515)
   - [x] Legacy graphics dim the RotW-only stash slots (#546); Buff HUD hides behind open panels; five new buff icons
 - [ ] Later: death report panel on the death screen (last 30 s, Copy button, nothing saved; owner 2026-11-05,
   [death-report-research.md](death-report-research.md) section 6)
-- [ ] Release 0.1.14, to look into (owner 2026-11-06; no work yet):
+- [x] Release 0.1.14 (2026-11-06):
+  - [x] RotW stash: MEDIAN and ORBS tabs, Vanilla/Median selector in Materials (lane medtab,
+    [median-stash-tab.md](median-stash-tab.md); plugin-plan.md section 33)
+  - [x] Legacy stash cube window shows the cube's items on a mini 10 x 8 grid (lane legacycube, #515)
+  - [x] Buff HUD icons for Lightning Enchant, Cold Enchant, Shadowform, Lifeblood, Cow Disguise (lane bufficons2)
+  - [x] Akara's unlimited respec removed again (owner: Median's Token of Absolution covers respecs)
+  - [x] Research: Transition Immunity (the owner's D2RLoader plugin) (lane transimm,
+    [transition-immunity-research.md](transition-immunity-research.md)): loads and runs on 93847 next to mxl2012-core, but
+    does not stop damage (its hook is the get-hit reaction `0x44a9b0`, life is taken in `0x44ce80`); curses are blocked.
+    Pick: port into mxl2012-core server side with a stricter window and a toggle (about 2 days)
+- [ ] Later (owner 2026-11-06):
   - [ ] Ship jaycachou-svg's Auto Belt Refill plugin if its author agrees (docs/bundled-plugins.md; lane beltrefill)
-  - [ ] A "Median XL" stash tab for shrines, elixirs, signets, crystals, oils: designed and probed
-    (option D, MEDIAN and ORBS tabs, Vanilla/Median selector in Materials), not built; waits for the owner's go
-    ([median-stash-tab.md](median-stash-tab.md))
-  - [ ] Transition immunity
-    ([D2R-Tools/plugins/transition-immunity](https://github.com/Nugwa628/D2R-Tools/tree/main/plugins/transition-immunity)):
-    check that it works first, then maybe build it into the mod in some form instead of shipping the plugin
-  - [ ] MapSense
-    ([RuffnecKk-D2RLoader-Suite/plugins/mapsense](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/mapsense)):
-    probably not all of its features; decide which ones we want
+  - [ ] Transition immunity: owner 2026-11-06, low priority, may ship in a later update: protected through the
+    loading screen, then 3 s after the client has loaded; any step, attack, skill or item use ends it; all areas
+    (bosses and ubers too); no work until the owner picks it up again
+  - [ ] MapSense: only a "pity" map reveal (after a share of a level is explored, a hotkey or a button completes its map);
+    research lane mapreveal ([RuffnecKk-D2RLoader-Suite/plugins/mapsense](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/mapsense))
+  - [ ] HD fonts in legacy graphics, with a toggle: research lane hdtext
 - [x] GitHub mirror and issue templates live (2026-10-29: https://github.com/Nugwa628/mxl2012-d2r, public; fresh history, one snapshot commit per mirror run)

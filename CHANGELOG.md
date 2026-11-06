@@ -7,6 +7,42 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.14 (2026-11-06)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+**New:**
+
+- Reign of the Warlock games: the stash has two more tabs, **MEDIAN** and **ORBS** (legacy graphics: PERSON / SHARED / GEMS /
+  MATS / RUNES / MEDIAN / ORBS). MEDIAN holds the elixirs and Goodberry, the signets and packs (Moon Symbol, Boom!, Signet of
+  Skill, Apple), the uberquest trophies and the 20 full shrines; ORBS holds the 100 Mystic Orbs. The Materials tab gets a
+  Vanilla / Median selector: the Median page holds the oils and catalysts, arcane crystals and shards and the cube reagents
+  (brains, Sacrificial Heart, Meditation Candle, sigils, Poser!), and D2R's own page stays as it was. Each item stacks in its
+  slot like the runes and gems do; Ctrl-click puts it into its slot, and the "Send storable/stackable items to stash" button
+  sends these items too. The Horadric Cube stays on both Materials pages. Used shrines stay ordinary items. Classic and
+  expansion games keep Personal and Shared only; with a gamepad the stash stays D2R's. Your stash from 0.1.13 loads unchanged.
+  **Do not go back to 0.1.13 or older after putting items into the new slots:** older versions delete those stacks when the
+  character loads (#545).
+- Buff HUD: Lightning Enchant, Cold Enchant, Shadowform, Lifeblood and Cow Disguise use fitting icons from Median's sheets
+  instead of the question mark; the two enchants have distinct hover names.
+- Legacy graphics: the small Horadric Cube window on the stash's Gems, Materials and Runes pages shows the cube's items, as
+  HD does, scaled down on the cube's own 10 x 8 cells (it showed only the cube's cover). Hover for the tooltip, click to take
+  an item, drop it on another cell, or Ctrl-click it into your backpack (#515).
+
+**Changed:**
+
+- Akara's "Reset Skills and Stats" is back to the usual rule: one respec per difficulty, the Den of Evil's reward. The
+  unlimited respec up to level 100 from 0.1.13 is gone; Median's own respec item does the same at any level: the Token of
+  Absolution (Belladonna), made in the cube from an Oil of Absolution and a rune.
+
+**Known:** the life orb text staying at full (#547) is still not reproduced; please tell us if you see it. The gamepad
+stash is not tested with the cube window. The first stash open can log a burst of item asserts in
+d2rloader.log (#548, no crash, nothing lost, seen since 0.1.3). Life and mana leech on Nightmare and Hell is very small, as in
+Median XL 2012 (#540). In HD, Median's runes still show their classic pictures scaled up and the HD pet row shows at most 9
+icons (D2R's own limit).
+
 ### 0.1.13 (2026-11-06)
 
 D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
@@ -23,9 +59,7 @@ files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also mak
   another player's game.
 - Akara's "Reset Skills and Stats" is unlimited up to character level 100: a character of level 1 to 100 can use it any number
   of times, on every difficulty, without the Den of Evil first. From level 101 the usual rule is back: one respec per
-  difficulty, the Den of Evil's reward (a reward you have not used yet is still there). From level 101 Akara's menu shows the
-  line only while that reward is waiting (D2R showed it in Hell also without one, and then did nothing). In multiplayer the
-  host's game decides.
+  difficulty, the Den of Evil's reward (a reward you have not used yet is still there). In multiplayer the host's game decides.
 - The small Horadric Cube window on the stash's Gems, Materials and Runes pages (HD) shows the cube's items again, scaled down
   on the cube's own 10 x 8 cells: you can take an item out, drop it on another cell, or Ctrl-click it into your backpack.
   Legacy graphics still shows the cube's cover there (#515).

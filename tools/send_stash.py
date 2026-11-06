@@ -3,7 +3,8 @@ owner request 2026-11-05).
 
 A click sends every backpack item that has a slot on a Reign of the Warlock stash page (Gems / Materials / Runes) into that slot,
 the way D2R's own Ctrl+click into those pages does, from anywhere and with the stash closed. The item codes are the
-`AdvancedStashSlotWidget` codes of the mod's HD stash layout (D2R's own plus Median's, tools/median_stash.py): the server takes
+`AdvancedStashSlotWidget` codes of the mod's HD stash layout (D2R's own plus Median's, tools/median_stash.py and the MEDIAN /
+ORBS tabs and the Materials tab's Median page of tools/median_tabs.py, with their real codes for the "@" ones): the server takes
 any item whose row has `AdvancedStashStackable`, also one with no slot widget, and that item would be stored but never shown, so
 the plugin sends only codes from this list.
 
@@ -59,12 +60,14 @@ SD_FRAMES = {"normal": 0, "pressed": 1, "greyed": 2}
 
 # ---- slot codes ------------------------------------------------------------------------------------------------------
 def slot_codes(layout: dict) -> list[str]:
-    """Every `AdvancedStashSlotWidget` itemCode of a parsed HD stash layout, in layout order, without repeats."""
+    """Every `AdvancedStashSlotWidget` item code of a parsed HD stash layout, in layout order, without repeats (a code written with
+    median_tabs.PLACEHOLDER as its real code)."""
+    import median_tabs
     out: list[str] = []
 
     def walk(node: dict) -> None:
         if node.get("type") == "AdvancedStashSlotWidget":
-            code = node.get("fields", {}).get("itemCode")
+            code = median_tabs.real_code(node.get("fields", {}).get("itemCode") or "")
             if code and code not in out:
                 out.append(code)
         for c in node.get("children", []):
@@ -74,11 +77,13 @@ def slot_codes(layout: dict) -> list[str]:
 
 
 def mod_stash_layout() -> dict:
-    """The mod's HD stash layout as tools/ui_layouts.stash_hd writes its slot pages: D2R's baseline with Median's slots."""
+    """The mod's HD stash layout as tools/ui_layouts.stash_hd and tools/median_tabs.py write its slot pages: D2R's baseline with
+    Median's slots."""
     import median_stash
+    import median_tabs
     import ui_layouts
     from rotw_stash_legacy import lenient_json
-    return median_stash.apply(lenient_json(ui_layouts.baseline("bankexpansionlayouthd.json")))
+    return median_tabs.apply_hd(median_stash.apply(lenient_json(ui_layouts.baseline("bankexpansionlayouthd.json"))))
 
 
 def header(codes: list[str] | None = None) -> str:

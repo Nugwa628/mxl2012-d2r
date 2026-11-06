@@ -14808,9 +14808,17 @@ def sp2_ids(out):
     return {m.group(2): (m.group(1), m.group(3)) for m in re.finditer(r"(p\d|inv):(\w+)@\d+,\d+#(\d+)", out)}
 
 
+STASH_TAB_W = 139  # the mod's 7 stash tabs share D2R's 5 x 195 row (tools/median_tabs.py HD_TAB_W), in every game type
+
+
+def sp2_tab_xy(k):
+    return sp2_xy(82 + STASH_TAB_W * (k + 0.5), 146 + 36)
+
+
 def sp2_tab(k):
-    """A background click on stash tab k (0 Personal, 1 Shared, 2 Gems, 3 Materials, 4 Runes) of the HD stock stash."""
-    g.click(*sp2_xy(82 + 195 * (k + 0.5), 146 + 36))
+    """A background click on stash tab k (0 Personal, 1 Shared, 2 Gems, 3 Materials, 4 Runes, 5 Median, 6 Orbs) of the HD stock
+    stash."""
+    g.click(*sp2_tab_xy(k))
     time.sleep(1.2)
 
 
@@ -14923,7 +14931,7 @@ def check_stashpage2():
     shots.append(sh("stashpage2_hd_p1_back"))
     sp2_switches(log, res, bad, shots)
     # the Shared tab: D2R's own arrows and "Page n / m" draw over ours; its right arrow turns the shared page, page 2 stays shut
-    g.click(*sp2_xy(82 + 195 * 1.5, 146 + 36))
+    g.click(*sp2_tab_xy(1))
     time.sleep(1.2)
     shots.append(sh("stashpage2_hd_shared"))
     sp2_arrow("right")
@@ -14933,7 +14941,7 @@ def check_stashpage2():
     sp2_arrow("left")
     time.sleep(1.0)
     Hl("stashpage msgs", log)
-    g.click(*sp2_xy(82 + 195 * 0.5, 146 + 36))
+    g.click(*sp2_tab_xy(0))
     time.sleep(1.2)
     shots.append(sh("stashpage2_hd_personal_again"))
     res.append("Shared tab: its right arrow left page 2 %s (shots stashpage2_hd_shared*)" % ("shut" if shared[0] == 1 else "OPEN"))
@@ -15125,7 +15133,7 @@ def l169_open(kind, log):
             Hl("stashpage open", log)
             return sp2_wait_state(2, log)[0] == 2
         if kind == "shared":
-            g.click(*sp2_xy(82 + 195 * 1.5, 146 + 36))  # the Shared tab (HD calibration of lane stashpage2)
+            g.click(*sp2_tab_xy(1))  # the Shared tab (HD calibration of lane stashpage2)
     elif kind == "cube":
         ensure_cube()
         if not _cube_panel_open(log):
@@ -15250,14 +15258,6 @@ def check_leech():
 CHECKS += [("leech", check_leech)]
 
 
-def check_akararespec():
-    """Akara's respec without the Den of Evil limit up to level 100, D2R's above (tools/akara_checks.py; run with a NEW MXL_CHAR)."""
-    import akara_checks
-    akara_checks.run(sys.modules[__name__])
-
-
-CHECKS += [("akararespec", check_akararespec)]
-
 
 def check_lifetext():
     """Bug #547: the life / mana orb text against the client's and the server's life and mana, HD and legacy, after zombie hits
@@ -15283,6 +15283,22 @@ def check_sendstashclassic():
 
 
 CHECKS += [("sendstash", check_sendstash), ("sendstashclassic", check_sendstashclassic)]
+
+
+def check_medtab():
+    """The stash's MEDIAN / ORBS tabs and the Materials tab's Vanilla / Median selector in a RotW game: deposits that stack,
+    Ctrl-click routing, a take-out, the "@" codes, HD and legacy, a reload (tools/medtab_checks.py)."""
+    import medtab_checks
+    medtab_checks.run(sys.modules[__name__])
+
+
+def check_medtabclassic():
+    """Tabs 6 and 7 hidden in a classic / expansion game (MXL_CHAR=<an expansion character>; tools/medtab_checks.py)."""
+    import medtab_checks
+    medtab_checks.run_classic(sys.modules[__name__])
+
+
+CHECKS += [("medtab", check_medtab), ("medtabclassic", check_medtabclassic)]
 
 if __name__ == "__main__":
     main()

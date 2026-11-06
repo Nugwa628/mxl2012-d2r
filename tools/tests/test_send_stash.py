@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import median_stash  # noqa: E402
+import median_tabs  # noqa: E402
 import send_stash as ss  # noqa: E402
 import sendstash_checks as sc  # noqa: E402
 import ui_layouts  # noqa: E402
@@ -96,7 +97,9 @@ class SendStashTest(unittest.TestCase):
         self.assertEqual(ss.HEADER.read_text("utf-8"), ss.header(), "run `py -3 tools/send_stash.py header`")
         codes = ss.mod_stash_layout_codes()
         self.assertTrue(set(median_stash.CODES) <= set(codes))
-        self.assertGreaterEqual(len(codes), 91 + len(median_stash.CODES))
+        self.assertTrue(set(median_tabs.CODES) <= set(codes))  # the "@" codes as their real codes
+        self.assertFalse([c for c in codes if median_tabs.PLACEHOLDER in c])
+        self.assertGreaterEqual(len(codes), 91 + len(median_stash.CODES) + len(median_tabs.CODES))
 
     def test_layouts(self):
         if not have_baseline():

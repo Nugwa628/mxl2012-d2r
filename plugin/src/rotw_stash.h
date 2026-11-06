@@ -6,7 +6,7 @@
 #include <cstddef>
 
 // Part rotwstash: the stash's init asks the plugin instead of the HD check whether to wire its five pages, and the classic
-// item picture skips an item without a draw record, and classic empty slot icons are dimmed (rotw_stash_logic.h). The report gets one entry. Returns true when both
+// item picture skips an item without a draw record, and classic empty slot icons are dimmed, and classic items of a scaled grid are drawn small (rotw_stash_logic.h). The report gets one entry. Returns true when both
 // were installed; on any byte difference nothing is written.
 auto InstallRotwStash(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> bool;
 
@@ -16,6 +16,7 @@ struct RotwStashCounts {
 	long classicLeft;  // of them: classic, left as D2R (HD only)
 	long skipped;      // item pictures skipped (no draw record)
 	long dimmed;       // classic cel draws of empty slot icons made translucent
+	long shrunk;       // classic item draws made small (a grid scale below 1: the stash cube window)
 	int gameType;      // client game byte +0x5c now (-1: no game)
 	bool hd;           // graphics now
 	const char* mode;

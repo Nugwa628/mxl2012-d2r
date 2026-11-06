@@ -134,19 +134,20 @@ class D2rAddsTests(unittest.TestCase):
         for bank in ("", "base/"):
             self.put(self.mod, f"data/global/excel/{bank}misc.txt", tsv(
                 h, ["Ith Rune", "r06", "rune", "", "0"], ["Chipped Saphire", "gcb", "gems", "", "0"],
-                ["Sha Rune", "r34", "rune", "", "0"], ["Key", "pk1", "key", "", "0"]))
+                ["Sha Rune", "r34", "rune", "", "0"], ["Key", "pk1", "key", "", "0"], ["Goodberry", "b@b", "elix", "", "0"]))
             self.put(self.d2r, f"data/global/excel/{bank}misc.txt", tsv(
                 h, ["Ith Rune", "r06", "rune", "1", "0"], ["Chipped Sapphire", "gcb", "gems", "1", "0"],
                 ["Key of Terror", "pk1", "ques", "1", "0"], ["Key", "key", "key", "", "0"]))
         log = adds.run(self.mod, self.out, self.d2r, only=["advanced_stash"])
         for bank in ("", "base/"):
             rows = self.table(self.out, f"{bank}misc.txt")[1]
-            # D2R's code and type: flag on; Median's own rune (its slot: tools/median_stash.py) on; another item on pk1: off
-            self.assertEqual([r[3] for r in rows], ["1", "1", "1", ""])
-            self.assertEqual([r[4] for r in rows], ["0"] * 4)
-        self.assertIn("on 4 rows by code and type, 1 on 2 Median rune / gem rows, 6 cells set", log[0])
+            # D2R's code and type: flag on; Median's own rune (its slot: tools/median_stash.py) on; another item on pk1: off;
+            # a MEDIAN tab code (tools/median_tabs.py) on
+            self.assertEqual([r[3] for r in rows], ["1", "1", "1", "", "1"])
+            self.assertEqual([r[4] for r in rows], ["0"] * 5)
+        self.assertIn("on 4 rows by code and type, 1 on 4 Median rows (runes / gems, Median tabs), 8 cells set", log[0])
         adds.run(self.out, self.out, self.d2r, advanced_stash="off", only=["advanced_stash"])
-        self.assertEqual([r[3] for r in self.table(self.out, "misc.txt")[1]], ["", "", "", ""])
+        self.assertEqual([r[3] for r in self.table(self.out, "misc.txt")[1]], ["", "", "", "", ""])
 
     def test_missing_tables_stop(self):
         with self.assertRaises(SystemExit):

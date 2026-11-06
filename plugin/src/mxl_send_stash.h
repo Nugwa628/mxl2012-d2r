@@ -9,8 +9,8 @@ inline constexpr char NoSlots[] = "MxlSendStashNoSlots";
 inline constexpr char Joined[] = "MxlSendStashJoined";
 inline constexpr char Panel0[] = "PlayerInventoryExpansionLayout";
 inline constexpr char Panel1[] = "PlayerInventoryOriginalLayout";
-// the codes of the slot widgets of the mod's HD stash layout (139)
-inline constexpr unsigned CodeCount = 139;
+// the codes of the slot widgets of the mod's HD stash layout (343)
+inline constexpr unsigned CodeCount = 343;
 inline constexpr char Codes[CodeCount][5] = {
     "gcw ", "gfw ", "gsw ", "glw ", "gpw ", "gcg ", "gfg ", "gsg ", "glg ", "gpg ", "gcr ", "gfr ",
     "gsr ", "glr ", "gpr ", "gcy ", "gfy ", "gsy ", "gly ", "gpy ", "gcv ", "gfv ", "gsv ", "gzv ",
@@ -18,12 +18,29 @@ inline constexpr char Codes[CodeCount][5] = {
     "yo2 ", "yo3 ", "yo4 ", "yo5 ", "g$a ", "g$b ", "g$c ", "g$d ", "g$e ", "9$a ", "9$b ", "9$c ",
     "9$d ", "9$e ", "7$a ", "7$b ", "7$c ", "7$d ", "7$e ", "5$a ", "5$b ", "5$c ", "5$d ", "5$e ",
     "pk1 ", "pk2 ", "pk3 ", "ua1 ", "ua2 ", "ua3 ", "ua4 ", "ua5 ", "dhn ", "bey ", "mbr ", "xa1 ",
-    "xa2 ", "xa3 ", "xa4 ", "xa5 ", "rvs ", "rvl ", "toa ", "tes ", "ceh ", "bet ", "fed ", "r01 ",
-    "r02 ", "r03 ", "r04 ", "r05 ", "r06 ", "r07 ", "r08 ", "r09 ", "r10 ", "r11 ", "r12 ", "r13 ",
-    "r14 ", "r15 ", "r16 ", "r17 ", "r18 ", "r19 ", "r20 ", "r21 ", "r22 ", "r23 ", "r24 ", "r25 ",
-    "r26 ", "r27 ", "r28 ", "r29 ", "r30 ", "r31 ", "r32 ", "r33 ", "r34 ", "r35 ", "r36 ", "r37 ",
-    "r38 ", "r39 ", "r40 ", "r41 ", "r42 ", "r43 ", "r44 ", "r45 ", "r46 ", "r47 ", "r48 ", "r49 ",
-    "r50 ", "r51 ", "r52 ", "r53 ", "r54 ", "r55 ", "r56 ",
+    "xa2 ", "xa3 ", "xa4 ", "xa5 ", "rvs ", "rvl ", "toa ", "tes ", "ceh ", "bet ", "fed ", "6o^ ",
+    "2o^ ", "4o^ ", "5o^ ", "1o^ ", "7o^ ", "8o^ ", "0o^ ", "3o^ ", "9o^ ", "qus ", "qut ", "qux ",
+    "quy ", "qul ", "qum ", "2x5 ", "2x6 ", "2x7 ", "2x8 ", "2x9 ", "vic ", "mec ", "l@l ", "m@m ",
+    "o@o ", "p@p ", "q@q ", "u@v ", "r01 ", "r02 ", "r03 ", "r04 ", "r05 ", "r06 ", "r07 ", "r08 ",
+    "r09 ", "r10 ", "r11 ", "r12 ", "r13 ", "r14 ", "r15 ", "r16 ", "r17 ", "r18 ", "r19 ", "r20 ",
+    "r21 ", "r22 ", "r23 ", "r24 ", "r25 ", "r26 ", "r27 ", "r28 ", "r29 ", "r30 ", "r31 ", "r32 ",
+    "r33 ", "r34 ", "r35 ", "r36 ", "r37 ", "r38 ", "r39 ", "r40 ", "r41 ", "r42 ", "r43 ", "r44 ",
+    "r45 ", "r46 ", "r47 ", "r48 ", "r49 ", "r50 ", "r51 ", "r52 ", "r53 ", "r54 ", "r55 ", "r56 ",
+    "eo7 ", "eo8 ", "eo9 ", "ey1 ", "ey2 ", "ey3 ", "ey4 ", "ey5 ", "ey6 ", "ey7 ", "ey8 ", "ey9 ",
+    "et1 ", "0g7 ", "0g8 ", "0g0 ", "0g1 ", "0g2 ", "0g3 ", "0g4 ", "0g5 ", "0g6 ", "b@b ", "zkw ",
+    "zku ", "zkq ", "zkx ", "zky ", "zkr ", "zka ", "zkb ", "zkc ", "zkd ", "zke ", "zkf ", "quz ",
+    "zog ", "zoh ", "c@c ", "!@B ", "dog ", "^01 ", "^02 ", "^03 ", "^04 ", "^05 ", "^06 ", "^07 ",
+    "^08 ", "^09 ", "^10 ", "^11 ", "^12 ", "^13 ", "^14 ", "A0+ ", "B0+ ", "C0+ ", "D0+ ", "E0+ ",
+    "F0+ ", "G0+ ", "H0+ ", "I0+ ", "J0+ ", "K0+ ", "L0+ ", "M0+ ", "N0+ ", "O0+ ", "P0+ ", "Q0+ ",
+    "R0+ ", "S0+ ", "T0+ ", "&01 ", "&02 ", "&03 ", "&04 ", "&45 ", "&11 ", "&17 ", "&18 ", "&19 ",
+    "&20 ", "&05 ", "&06 ", "&07 ", "&08 ", "&09 ", "&10 ", "&12 ", "&13 ", "&14 ", "&15 ", "&16 ",
+    "&41 ", "&42 ", "&43 ", "&44 ", "&21 ", "&22 ", "&23 ", "&24 ", "&25 ", "&26 ", "&27 ", "&28 ",
+    "&29 ", "&30 ", "&46 ", "&47 ", "&48 ", "&49 ", "&50 ", "&51 ", "&52 ", "&53 ", "&54 ", "&55 ",
+    "&31 ", "&32 ", "&33 ", "&34 ", "&35 ", "&36 ", "&37 ", "&38 ", "&39 ", "&40 ", "&56 ", "&57 ",
+    "&58 ", "&59 ", "&60 ", "&61 ", "&62 ", "&63 ", "&64 ", "&65 ", "&66 ", "&67 ", "&68 ", "&69 ",
+    "&70 ", "&71 ", "&72 ", "&73 ", "&74 ", "&75 ", "&76 ", "&77 ", "&78 ", "&79 ", "&80 ", "&81 ",
+    "&82 ", "&83 ", "&84 ", "&85 ", "&a1 ", "&a2 ", "&a3 ", "&a4 ", "&a5 ", "&86 ", "&87 ", "&88 ",
+    "&89 ", "&90 ", "&91 ", "&92 ", "&93 ", "&94 ", "&95 ",
 };
 
 }  // namespace mxl_send_stash

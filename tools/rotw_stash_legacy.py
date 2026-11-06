@@ -20,6 +20,9 @@ This step writes, from the D2R extraction at build time (nothing of Blizzard's i
       tab names drawn in (5 inactive frames, then 5 active) in D2R's classic `font6`, capitals: D2R's own tab text is too wide
       for a 63-pixel tab in classic ("PERSON", "MATERIAL:") and the classic tab bar takes no font or spacing (lane stashtab)
   data/global/ui/panel/rotwstash_cubecover.dc6   HD `HoradricCubeCover` down-rendered to the classic cube grid (87 x 116)
+  data/global/ui/panel/rotwstash_cubecells.dc6   the same window holding Median's 10 x 8 cube small (bug #515; HD:
+      ui_layouts.stash_hd): the mod's cube picture's own cells (--mod's `supertransmogrifier.dc6`, inventory.txt's Transmogrify
+      Box) resized to MINI_CELL pixels a cell, on black inside the page art's 1-pixel frame, drawn under the grid
   data/global/ui/panel/rotwstash_button.dc6      HD `FrontEnd_ButtonSmall` (4 frames) down-rendered (the withdraw button)
   data/global/ui/panel/rotwstash_notify.dc6      HD `StashNotification` down-rendered (the "item went to this tab" mark)
 
@@ -65,6 +68,7 @@ HD_PAGE_ART = {"gems": "panel_additionalstash_gems", "materials": "panel_additio
                "runes": "panel_additionalstash_runes"}
 PANEL_DC6 = {p: f"rotwstash_{p}" for p in PAGES}
 TABS, COVER, BUTTON, NOTIFY = "rotwstash_tabs", "rotwstash_cubecover", "rotwstash_button", "rotwstash_notify"
+CELLS = "rotwstash_cubecells"
 TAB_W, TAB_H, TAB_PAD = 63, 24, 1   # five tabs across the 320-pixel panel (D2R's classic two are 79 x 24)
 TAB_BAND = 29                   # rows 0-28 of D2R's classic stash: the black band with its gold line, where the tabs sit
 TAB_TEXT = ["Personal", "Shared", "Gems", "Materials", "Runes"]  # D2R's English for @personal @shared @gems @materials @runes
@@ -72,8 +76,12 @@ TAB_FONT = "font6"              # D2R's classic small font (data/local/font/lati
 TAB_TEXT_MARGIN = 3             # free pixels left and right of a name inside the tab's rim
 TAB_COLOURS = ((253, 253, 253), (191, 169, 105))  # inactive, active: D2R's classic tab text (lane stashtab's shots)
 CLEAR = {"r": 0, "g": 0, "b": 0, "a": 0}
-CUBE_CELLS = (3, 4)             # D2R's stash cube window (HD layout); see docs/legacy-graphics.md 9 for Median's 10 x 8 cube
-CUBE_OFF = (-1500, -1500)       # the classic stash cube grid's place: off the panel (bug #515, classic_layout)
+MXL_CUBE = (10, 8)              # Median's cube (inventory.txt "Transmogrify Box Page 1" gridX / gridY), small in that window
+CUBE_ROW = "Transmogrify Box Page 1"
+CUBE_PICTURE = "supertransmogrifier"  # the mod's classic cube panel (DC6, set 0), whose cells the window shows
+MINI_CELL = 8                   # classic pixels a cell of the small cube: 10 x 8 cells and their edge line fit the 85 x 114 inside
+CUBE_INSET = 1                  # the page art's frame round the window (HD's 3-pixel bevel down-rendered)
+CUBE_EDGE = 3 / 29              # the cube picture's line round its cells (3 of a cell's 29 pixels), as ui_layouts.STASH_CUBE_EDGE
 HD_LAYOUT = Path("data/global/ui/layouts/bankexpansionlayouthd.json")
 SD_LAYOUT = Path("data/global/ui/layouts/bankexpansionlayout.json")
 HD_SPRITES = Path("data/hd/global/ui")
@@ -130,6 +138,51 @@ def cube_grid(hd: dict) -> tuple[tuple[int, int, int, int], tuple[int, int, int,
     return box, (round((hx + box[2] / 2) / SX - w / 2), round((hy + box[3] / 2) / SY - h / 2), w, h)
 
 
+def mini_grid(frame: tuple[int, int, int, int], cols: int = MXL_CUBE[0], rows: int = MXL_CUBE[1]) -> tuple[int, int, float]:
+    """(x, y, scale) of the small cube grid in the classic cube window `frame` (cube_grid's classic rect): MINI_CELL pixels a
+    cell (the grid's $ItemCellSize 29 times the scale), centred inside the frame's 1-pixel edge. The plugin part `rotwstash`
+    draws the classic items of a grid with a scale below 1 at that scale (docs/plugin-plan.md section 29)."""
+    x, y, w, h = frame
+    iw, ih = w - 2 * CUBE_INSET, h - 2 * CUBE_INSET
+    if cols * MINI_CELL > iw or rows * MINI_CELL > ih:
+        raise ValueError(f"{cols} x {rows} cells of {MINI_CELL} do not fit the cube window {w} x {h}")
+    return x + CUBE_INSET + (iw - cols * MINI_CELL) // 2, y + CUBE_INSET + (ih - rows * MINI_CELL) // 2, MINI_CELL / CELL
+
+
+def cube_cells(cube: Image.Image, row: dict[str, int], frame: tuple[int, int, int, int]) -> Image.Image:
+    """The classic cube window (the frame's size): black inside the page art's 1-pixel edge (left clear), and the cube
+    picture's own cells with their edge line resized onto the small grid (mini_grid), so each item sits in its own cell."""
+    cols, rows, bw, bh = row["gridX"], row["gridY"], row["gridBoxWidth"], row["gridBoxHeight"]
+    gx, gy, _s = mini_grid(frame, cols, rows)
+    left, top = row["gridLeft"] - row["invLeft"], row["gridTop"]
+    e = round(CUBE_EDGE * bw)
+    src = cube.crop((left - e, top - e, left + cols * bw + e, top + rows * bh + e))
+    edge = round(CUBE_EDGE * MINI_CELL)
+    small = src.convert("RGBa").resize((cols * MINI_CELL + 2 * edge, rows * MINI_CELL + 2 * edge), Image.LANCZOS).convert("RGBA")
+    x, y, w, h = frame
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    im.paste((0, 0, 0, 255), (CUBE_INSET, CUBE_INSET, w - CUBE_INSET, h - CUBE_INSET))
+    im.alpha_composite(small, (gx - x - edge, gy - y - edge))
+    return im
+
+
+def cube_picture(mod: Path, pal, inventory: Path | None = None) -> tuple[Image.Image, dict[str, int]]:
+    """The mod's classic cube panel (set 0, from the mod's data folder) and Median's own inventory.txt row for it (`inventory`,
+    default the Median tree's, read as ui_panels.stash_cube does for HD: the built table carries D2R's 3 x 4 cube place)."""
+    import ui_layouts
+    path = mod / "global" / "ui" / "panel" / f"{CUBE_PICTURE}.dc6"
+    inv = inventory or ui_layouts.EXCEL / "inventory.txt"
+    for p in (path, inv):
+        if not p.exists():
+            raise FileNotFoundError(f"{p} missing: the small cube window needs the mod's cube picture and Median's inventory.txt")
+    row = ui_layouts.table_rows(inv).get(CUBE_ROW)
+    if row is None:
+        raise ValueError(f"{inv}: no {CUBE_ROW} row")
+    if (row["gridX"], row["gridY"]) != MXL_CUBE:
+        raise ValueError(f"{CUBE_ROW}: {row['gridX']} x {row['gridY']}, the layout has {MXL_CUBE}")
+    return ui_art.panel_sets(path, pal)[0], row
+
+
 def scaled(x: float, y: float) -> dict:
     return {"x": round(x / SX), "y": round(y / SY)}
 
@@ -170,6 +223,7 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: 
     if tabs.get("tabCount") != 5:
         raise ValueError("HD BankTabs: tabCount 5 expected")
     _box, grid = cube_grid(hd)
+    mini = mini_grid(grid)
     conv = find(hd, "convert")["fields"]["rect"]
     wd = find(hd, "withdraw_button")["fields"]
     root = {
@@ -198,14 +252,15 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: 
                 {"type": "AdvancedStashSlotWidget", "name": code,
                  "fields": {"rect": rect(*classic_box(r)), "itemCode": code}} for code, r in pages[p]]} for p in PAGES),
             {"type": "Widget", "name": "advancedstash_horadriccube", "children": [
-                # Median's cube is 10 x 8 and the grid draws every item at its cube cell, so the items ran out of the 3 x 4
-                # frame: as in classic Median (open the cube to see its items) the grid sits off the panel and the frame shows
-                # the cube's lid (bug #515; HD the same: ui_layouts.stash_hd)
+                # Median's cube is 10 x 8 and the grid draws every item at its cube cell: the grid holds all 80 cells small
+                # in the 3 x 4 frame, over the cube's own cells (bug #515, as HD: ui_layouts.stash_hd). Classic ignores a
+                # grid's scale for item pictures; the plugin part rotwstash draws them at it (lane legacycube)
+                {"type": "ImageWidget", "name": "horadriccube_cells", "fields": {
+                    "rect": rect(grid[0], grid[1]), "filename": f"PANEL\\{CELLS}"}},
                 {"type": "InventoryGridWidget", "name": "horadriccube_grid", "fields": {
-                    "rect": rect(*CUBE_OFF), "cellCount": {"x": CUBE_CELLS[0], "y": CUBE_CELLS[1]},
+                    "rect": {**rect(mini[0], mini[1]), "scale": round(mini[2], 4)},
+                    "cellCount": {"x": MXL_CUBE[0], "y": MXL_CUBE[1]},
                     "cellSize": "$ItemCellSize", "gemSocketFilename": "PANEL\\gemsocket"}},
-                {"type": "ImageWidget", "name": "horadriccube_lid", "fields": {
-                    "rect": rect(grid[0], grid[1]), "filename": f"PANEL\\{COVER}"}},
                 {"type": "ButtonWidget", "name": "convert", "fields": {
                     "rect": scaled(conv["x"], conv["y"]), "filename": "PANEL\\miniconvert", "tooltipString": "Transmute",
                     "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": find(hd, "convert")["fields"]["onClickMessage"]}},
@@ -412,7 +467,8 @@ def page_picture(d2r: D2R, page: str, slots: list[tuple[str, tuple]], cube: tupl
     return im
 
 
-def build(d2r: D2R, out: Path) -> list[str]:
+def build(d2r: D2R, out: Path, mod: Path | None = None, inventory: Path | None = None) -> list[str]:
+    """`mod`: the mod's data folder with its cube picture (default `out`); `inventory`: Median's inventory.txt (cube_picture)."""
     hd, sd = median_stash.apply(d2r.layout(HD_LAYOUT)), d2r.layout(SD_LAYOUT)  # the mod's HD layout
     font = d2r.font(TAB_FONT)
     named = font is not None and all(fits for _t, _w, fits in tab_label_fit(font))
@@ -443,6 +499,11 @@ def build(d2r: D2R, out: Path) -> list[str]:
             note = f"; no classic font {TAB_FONT}: D2R draws the names (cut in classic)" if name == TABS else ""
         (panel / f"{name}.dc6").write_bytes(dc6_bytes(idx))
         report.append(f"{name}.dc6: {src} -> {len(idx)} x {w} x {h}{note}")
+    picture, row = cube_picture(mod or out, d2r.pal, inventory)
+    (panel / f"{CELLS}.dc6").write_bytes(dc6_bytes([quantise(cube_cells(picture, row, cube[1]), d2r.pal, dither=False)]))
+    gx, gy, s = mini_grid(cube[1])
+    report.append(f"{CELLS}.dc6: {CUBE_PICTURE}.dc6's {MXL_CUBE[0]} x {MXL_CUBE[1]} cells at {MINI_CELL} pixels -> "
+                  f"{cube[1][2]} x {cube[1][3]}; the grid at {gx}, {gy}, scale {s:.4f}")
     return report
 
 
@@ -502,7 +563,7 @@ def check(d2r: D2R, out: Path, mod: Path | None = None) -> tuple[list[str], list
         notes.append(f"tab names drawn by D2R (no classic font {TAB_FONT} at build time): cut in classic (PERSON, MATERIAL:)")
     # the files the layout names, with the frame sizes it needs
     need = {**{PANEL_DC6[p]: [(256, 256), (64, 256), (256, 176), (64, 176)] for p in PAGES},
-            "expandedstash": None, "additionalstash": None, TABS: [(TAB_W, TAB_H)] * (10 if named_tabs else 2), COVER: None, BUTTON: None,
+            "expandedstash": None, "additionalstash": None, TABS: [(TAB_W, TAB_H)] * (10 if named_tabs else 2), COVER: None, CELLS: None, BUTTON: None,
             NOTIFY: None, "miniconvert": None, "gemsocket": None, "buysellbtn": None, "goldcoinbtn": None}
     named = {m.lower() for m in re.findall(r'PANEL\\\\(\w+)', text)}
     for name in sorted(named - set(need)):
@@ -519,6 +580,9 @@ def check(d2r: D2R, out: Path, mod: Path | None = None) -> tuple[list[str], list
     cover = panel_file(COVER, out, d2r, mod)
     if cover and [(w, h) for w, h, *_ in dc6.read_dc6(cover)] != [tuple(grid[2:])]:
         problems.append(f"{COVER}.dc6 is not the cube grid's size {grid[2:]}")
+    cells = panel_file(CELLS, out, d2r, mod)
+    if cells and [(w, h) for w, h, *_ in dc6.read_dc6(cells)] != [tuple(grid[2:])]:
+        problems.append(f"{CELLS}.dc6 is not the cube grid's size {grid[2:]}")
     # every code's item and classic picture
     excel = mod / "global" / "excel"
     items = {}
@@ -655,7 +719,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mod", type=Path, help="the mod's data folder (tables, item pictures) when --out is elsewhere")
     a = ap.parse_args(argv)
     d2r = D2R(a.d2r, use_cache=True)
-    built = build(d2r, a.out) if a.cmd == "build" else []
+    built = build(d2r, a.out, a.mod) if a.cmd == "build" else []
     if a.cmd == "sheet":
         for p in sheet(d2r, a.out, a.dest or Path("rotwstash-sheet"), a.mod):
             print(p)

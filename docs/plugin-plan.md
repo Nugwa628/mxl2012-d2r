@@ -11,7 +11,7 @@ subsystems, stash pages, release, bug list, plan),
 re-check against the ModDB zip); D2R baseline tables `<extract_dir>\...\excel\base\` (machine-local config, docs/setup.md).
 
 Owner decisions applied (2026-10-28): **Warlock stays playable** (no "hide Warlock" part) and **Akara's respec stays D2R's**
-(no respec part; changed 2026-11-05: unlimited up to level 100, section 31). Both rows are gone from this plan; no existing respec code (`quests_act2_5.cpp` `0x5d9ae0`
+(no respec part). Both rows are gone from this plan; no existing respec code (`quests_act2_5.cpp` `0x5d9ae0`
 hook, `respecbuffs`, `freerespec`) comes over.
 
 Effort: XS < 1 h, S < 1 day, M a few days, L a week or more (same scale as engine-triage.md).
@@ -988,6 +988,26 @@ alpha < 1, and `0x656020` turns a mode-5 draw into mode 0 (25% opaque) while it 
 nothing is noted). `mxl2012`: "empty slots dimmed in classic on (0x15bb80 / 0x656020, mode 0)", "empty slot draws dimmed N".
 Dev builds: `MXL_ROTWSTASH_DIM=<0-8>` uses another mode. Checked: docs/testing.md "Lane cubewindow" (slot 2, RotW game).
 
+**Small items in the stash cube window in classic** (bug #515, lane legacycube, 2026-11-06). HD shows Median's 10 x 8 cube
+small in the RotW pages' 3 x 4 cube window through the grid's `scale` (lane cubewindow). Classic places a grid's items by that
+scale too, but draws each picture full size (lane cubeui: they overlapped). Read in the dump:
+
+| What | Address | Notes |
+|---|---|---|
+| grid item draw | `0x2a72e2` | the widget's scale `+0x80` times its parent's (`0x1e6750`) goes to `0x15bb80` in `xmm2` |
+| classic item picture | `0x150df0(item, x, y, centre)` | from `0x15bd5f` (the classic branch of `0x15bb80`), scale dropped; the cel drawn at (x, y + height) through `0x656020`, then `0x154ac0` (socket marks) at the item's centre |
+| classic cel draw | `0x656020` -> `0x65fa70` | `0x65fa70` sizes the quad by the cel's width / height and offsets; when `0x6bbad0()` is non-zero and `0x6bbac0()` (256ths) is not 256, all four are multiplied by that scale; the place (x, y) is not |
+| sprite scale | `0x6bbac0()` | `mov eax, [0x341d248]` / `ret` (7 bytes, then 9 int3); also read at `0x7a4d15`, `0x7a519a`, `0x7a5253` |
+| sprite scale on | `0x6bbad0()` | the dword pair at `[0x32f0868]`: its first value when the second is non-zero, else 0 (19 bytes, then 13 int3) |
+
+The part: `0x15bb80`'s hook (the one of the dimming) notes a classic draw with a scale between 0.05 and 0.99, with the item's
+top left (`position`), in a thread-local; while it holds, `0x656020`'s hook moves the x / y it gets toward that corner by the
+scale (the picture's y = top + height becomes top + height x scale, the socket marks land on the small item's centre), and the
+two getters, replaced whole by absolute jumps (`PatchBytes`, the bytes compared first; on a mismatch only this stays off),
+answer "on" and D2R's own scale (256 when off) times the item's. Outside such a draw they answer as D2R's. Only the stash
+cube window has a classic grid with a scale (tools/rotw_stash_legacy.py: 8 pixels a cell, 8/29). `mxl2012`: "small items in
+classic on (0x6bbac0 / 0x6bbad0)", "small item draws N". Checked: docs/testing.md "Lane legacycube".
+
 ## 30. Barbarian spirits warp to their owner (lane spiritwarp, 2026-11-04; bug #534)
 
 Owner ruling (2026-11-04, release 0.1.11): Guardian, Defender and Protector Spirit teleport to their owner when they are more
@@ -1049,39 +1069,12 @@ target, warps 55 -> 4, 47 -> 19, 34 -> 9, 30 -> 1, 27 -> 1, 22 -> 8 sub-tiles (5
 Companion, Blood Elementals and Raise Skeleton followed and attacked as in lane summonai, and the part's counters did not move
 while they were out. No crash; the harness verbs (on the same frame hook) ran throughout.
 
-## 31. Akara's respec unlimited up to level 100 (lane akararespec, 2026-11-05; owner request)
+## 31. Akara's respec unlimited up to level 100 (lane akararespec; removed 2026-11-06)
 
-Owner (2026-11-05): "add in unlimited akara respecs up to level 100". A character of level 1-100 can use Akara's "Reset Skills
-and Stats" any number of times, on every difficulty, without the Den of Evil; above 100 D2R's rule stays (one per difficulty,
-the Den's reward). Median XL 2012 v005 has 1.13c's rule (1.14d `DeactivateRespecQuest`, ref 0x58fdbb), no data for it. D2R
-keeps the rule in code, so it cannot be data:
-
-| What | Address | Notes |
-|-|-|-|
-| Server packet 0x39 | `0x4b2530(game, player, packet, size 5)` | `u8 0x39, u32 npc unit id`; NPC within 50 (`0x53b8f0`), static NPC row (`0x3971a0(dataFlag, class)`, table `0x237ea60`, 0x2b rows of 0x1c): `+5` respec byte (only Akara's, row 0), `+0x10` gate = quest + 1 (Akara 0x2a: quest 41); gate set: quest 41 bit 1 must be set, then `0x580f20(game, player, 0)` and `0x5d9ae0` (41 bit 0 set, bit 1 cleared, quest object 0x1e `+0x12 = 0` unless 41 bit 15). Gate 0 respecs without bookkeeping; id -1 with game flag `+0x5658` 0x800000 respecs without an NPC |
-| Client service line | table `0x22a70e0` entry 4 `{0x94, quest 1, bit 0, set, 0x109200}` read by the opener `0x1141d0` (loop at `0x11432a`) | `0x109200` adds string 0x2ba0 with handler `0x112d40` (Yes / No page, Yes = `0x1130d0`: packet 0x39 with the menu NPC id `0x2a4875c`) |
-| Client filter | builder `0x1147a0` (chunk `0x114c20`) | line 0x2ba0 kept when the client record (`0x2a48778`, freed by `0x325a70` in `0x10b410`: the client's own copy) has quest 41 bit 0 clear and bit 1 set, or (`0x8af40() == 2` and quest 1 bit 0): `0x8af40` is the client's difficulty (it is the difficulty argument of the price function `0x36f0b0` at `0x10cd5f`), so in Hell D2R itself shows the line once Den of Evil is done, and its server refuses without the reward |
-
-**Part `akararespec`** (`akara_respec.cpp`, `akara_respec_logic.h`, test `akararespec_tests`, off word `akararespec`):
-- inline hook at `0x4b2530` (19 bytes): a 5-byte packet from a player of level 1-100 (stat 12) whose NPC is in range and has
-  the row's respec byte runs `0x580f20(game, player, 0)` and returns 0, without the quest test and without `0x5d9ae0`, so the
-  Den's own respec is kept for after 100. Everything else goes to D2R's handler.
-- inline hooks at the opener `0x1141d0` (14 bytes) and builder `0x1147a0` (23 bytes): for Akara (opener: the NPC unit's class;
-  builder: `0x2a48764`) and a local player of level 1-100 the client record shows quest 1 bit 0 set, 41 bit 1 set, 41 bit 0
-  clear while the original runs; the real bits are put back right after (client thread, client-only memory).
-- Above 100 (lane akarahide, owner 2026-11-05: no line without a respec left): the builder (chunk `0x114c20`) drops the line when
-  quest 41 bit 0 is set and keeps it when bit 1 is set, or in Hell when Den of Evil is done, so D2R alone shows it in Hell to a
-  character without the Den's respec (and its server refuses it). For Akara and a local player above 100 whose client record has
-  41 bit 1 clear, the builder hook shows 41 bit 0 as set while the original runs (put back right after), so the builder's first
-  test drops the line; with bit 1 set nothing changes (D2R's line and respec). Only the builder: the opener's service entry reads
-  quest 1, and the opener calls the builder anyway. The builder is the same code for HD and legacy.
-- `mxl2012` prints the respecs run, the packets left to D2R, the Akara menus shown with the line, the menus built without a
-  client quest record, the level at the last Akara menu, the menus built without the line above 100, and the opener / builder
-  calls with the class the builder saw.
-- The first talk to Akara in a difficulty plays her Den of Evil speech: the opener sends 0x30 and leaves before the builder
-  (`0xcd7c0(8, 0)` false), and the menu comes on the next talk. That is D2R's behaviour, not the part's.
-- Multiplayer: the host's server hook decides; a joining player's own plugin shows the line by that player's level. A joining
-  player of 1-100 whose host runs another build sees the line but the host's D2R refuses it (no effect).
+Shipped in 0.1.13, removed again on 2026-11-06 (owner): Median's own respec item, the Token of Absolution (Oil of Absolution
++ a rune in the cube, bug #240), already resets stats and skills at any level. Akara's respec is D2R's again (once per
+difficulty, the Den of Evil's reward). The part kept no state in saves (it skipped D2R's quest bookkeeping), so nothing
+needs converting. The design is in the history of this file (merge `e38e3aa`, lane akarahide `19295cf`).
 
 ## 32. Transmute key (lane transmutekey; dropped 2026-11-06)
 
@@ -1089,3 +1082,31 @@ The owner dropped our plugin part on 2026-11-06 in favour of D2RLoader's "Transm
 Bind it once in Options > Controls, group "D2RLoader" (no key by default). It transmutes while the Horadric Cube
 panel is open, or a stash page with the cube window is open (the RotW stash cube window has a Transmute button).
 It does nothing otherwise, including in chat and the Esc menu.
+
+## 33. Median XL stash tabs (lane medtab, 2026-11-06; owner request)
+
+Part `medtab` (`plugin/src/median_tabs.cpp`, rules in `median_tabs_logic.h`, test `medtab_tests`; widget names in the generated
+`medtab_names.h`); the data side and the player view are in [median-stash-tab.md](median-stash-tab.md). D2R's stash panel has
+5 pages (table `panel + 0x278 + tab * 8`, bounds-checked against 5 in the tab update `0x23e630`; `0x23af50` returns the tab bar's
+`+0x16c4` to 22 callers). The part, all sites checked with `memcmp` first:
+
+- **Tab getter:** the read `mov ebx, [rdi+0x16c4]` at `0x23af9f` becomes a call to a stub in the int3 pad `0x23afd2` that caps
+  the low byte at 4, so tabs 5 (MEDIAN) and 6 (ORBS) run as Runes for every caller (slot clicks, cube visibility, notification
+  mark).
+- **Tab update `0x23e630`** (inline hook): a panel without the layout mark `medtab_sel_vanilla` (an older or D2R layout) is left
+  as D2R. Otherwise a tab of 5 or more outside a live game goes back to Personal *before* D2R's update; after it the active
+  tab's slot group is shown (Runes' own / MEDIAN / ORBS; Materials Vanilla / Median by the selector) through the widgets' own
+  show / hide (vfuncs `+0x50`, `+0x48`), the cube (`panel + 0x2a0`) is hidden on 5 and 6, and outside a live game tabs 5 and 6
+  are hidden with D2R's own `0x879260` (as it hides Gems / Materials / Runes without RotW). Live = a RotW game (`0x8d3e0`) and
+  the part not off. Widgets are found with the native lookup `0x855c90` (WidgetService's `findWidget` cannot reach them).
+- **Selector:** its arrows send `PanelManager:OpenPanel:mxl2012-core/MedtabMaterials`; the UI message listener consumes it,
+  flips the Materials page and re-applies on the UI thread.
+- **"@" codes, `0x2ce910`** (inline hook, AdvancedStashSlotWidget's code read: `m_itemCode` data `+0x5d8`, size `+0x5e0`,
+  inline buffer `+0x5f0`; asserts `size() <= 4`, then packs the code and looks the item up with `0x313ef0`): the layouts write
+  the 9 codes with `@` as `_` (D2R's layout loader reads `@key` as a string key); the hook restores the `@` in the widget's
+  string before D2R's read. It is the class's only reader of the string (constructor `0x2ce3f0`, destructor `0x2ce1a0`).
+- **Off word `medtab`:** the same hooks, tabs 5 and 6 hidden everywhere and D2R's Materials page only (the 7-tab layout needs
+  the hooks not to crash). `mxl2012 medtab` prints the report and the counters (updates, no layout mark, bounces, cube hidden,
+  toggles, '@' codes restored).
+- **Ships with its layout:** `tools/install_mod.py` / `tools/package_release.py` refuse a 7-tab layout without a DLL that names
+  the layout mark.
