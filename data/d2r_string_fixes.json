@@ -13,5 +13,10 @@
     "key": "d2r:ChroniclePropertyGroupListBullet",
     "text": "- ",
     "why": "bugs.md #528: D2RLoader's Ctrl stat-range tooltip (D2RCore item_stat_ranges) starts each \"Possible base rolls\" line with this key, D2R's \"\\u2022 \". The classic (legacy graphics) font has no bullet glyph and draws a crossed-out box instead; a hyphen draws in both fonts."
+  },
+  {
+    "key": "d2r:DesecratedAutomapLevel",
+    "text": "Area Level %d",
+    "why": "Owner request 2026-11-06 (player): the automap's top-right text shows the area level. D2R's line for a terror zone (\"Terrorized: %d\") is the one mxl2012-core part arealvl fills with levels.txt MonLvlEx of the current area and difficulty when the area is not terrorized (area_level.cpp); Median 2012 has no terror zones."
   }
 ]

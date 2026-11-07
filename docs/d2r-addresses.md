@@ -722,6 +722,9 @@ Ready-made path, called not hooked, verified in game (slot 2, background mode):
   another game to enter again", clock "Closing in: mm:ss" and "ONCE YOU EXIT YOU CANNOT GO BACK" to every player of the game),
   the quest reward notices (Akara's Heart, Jerhyn / Cain crystals, Ormus shrines) and the goblin line ("Treasure Goblin appears!": Median's push notification is the unit name + string 12320 " appears!"). All shown in
   the screenshots of the lane report. The plugin counts messages sent / failed on the `mxl` command.
+- **Client-only lines** (lane mapreveal, 2026-11-06; map_reveal.cpp): a plugin part that runs on the client builds the record
+  itself (`map_reveal::BuildChatPacket`: type 4, colour, empty name, text) and calls the client handler `0x12c190` directly
+  on the UI thread. Nothing goes to the server, so it works in a joined game. Held while an NPC talks (`0x2a48760` non-zero).
 - Not used: the client packet table also has 0x5a (34 bytes, builder `0x5282b0(unit,type)`, sender `0x480510`; Median's goblin notice
   is type 0x15) and unit message `0x491960(player,msg,subject)` (0x14 = D2R's generic "Impossible." line; Median's 0x13 and 0x88
   have no D2R handler). Several client handlers sit behind protected thunks (`0x3e2b7xx`), so they cannot be read statically.

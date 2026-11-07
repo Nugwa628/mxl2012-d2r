@@ -14,3 +14,6 @@
 	path = third_party/d2rl-buff-hud
 	url = https://github.com/Nugwa628/d2rl-buff-hud
 	branch = mxl2012
+[submodule "third_party/auto-belt-refill"]
+	path = third_party/auto-belt-refill
+	url = https://github.com/jaycachou-svg/auto-belt-refill

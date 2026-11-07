@@ -119,12 +119,16 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
     [transition-immunity-research.md](transition-immunity-research.md)): loads and runs on 93847 next to mxl2012-core, but
     does not stop damage (its hook is the get-hit reaction `0x44a9b0`, life is taken in `0x44ce80`); curses are blocked.
     Pick: port into mxl2012-core server side with a stricter window and a toggle (about 2 days)
+- [x] Release 0.1.15 (2026-11-07): Auto Belt Refill bundled, pity map reveal (L after 70 %), area level on the automap,
+  Ctrl stat ranges back, whole tooltips in the advanced stash tabs (#551), HD wall fixes (Tran Athulua, Crypt, Fauztinville)
 - [ ] Later (owner 2026-11-06):
-  - [ ] Ship jaycachou-svg's Auto Belt Refill plugin if its author agrees (docs/bundled-plugins.md; lane beltrefill)
+  - [x] Ship jaycachou-svg's Auto Belt Refill plugin (author's permission 2026-11-06; v0.35.9 with the Median belt rows, for
+    0.1.15; docs/bundled-plugins.md; lanes beltrefill, beltship)
   - [ ] Transition immunity: owner 2026-11-06, low priority, may ship in a later update: protected through the
     loading screen, then 3 s after the client has loaded; any step, attack, skill or item use ends it; all areas
     (bosses and ubers too); no work until the owner picks it up again
-  - [ ] MapSense: only a "pity" map reveal (after a share of a level is explored, a hotkey or a button completes its map);
-    research lane mapreveal ([RuffnecKk-D2RLoader-Suite/plugins/mapsense](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/mapsense))
+  - [ ] Pity map reveal: the key part is built (lane mapreveal, part `mapreveal`, docs/plugin-plan.md section 34; not
+    released, the owner looks at it first). Later: a popup button like the level-up buttons; uber / boss levels may be
+    excluded (the exclusion list is empty for now)
   - [ ] HD fonts in legacy graphics, with a toggle: research lane hdtext
 - [x] GitHub mirror and issue templates live (2026-10-29: https://github.com/Nugwa628/mxl2012-d2r, public; fresh history, one snapshot commit per mirror run)

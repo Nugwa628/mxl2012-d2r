@@ -67,16 +67,10 @@ std::string SaveFormatMode(const std::string& text);
 // appended. Every other line, a UTF-8 BOM and the line endings stay as they were; an extended file comes back unchanged.
 std::string SetExtendedSaveFormat(const std::string& text);
 
-// ---- D2RLoader's Ctrl stat ranges (docs/bugs.md #528, owner decision 2026-11-03). D2RCore's `[d2rcore.items]
-// item_stat_ranges` prints repeated "Possible base rolls" lines for Median's automagic rows, so the mod's d2rloader.toml
-// turns it off; the kept (`preserve`) file of an older install gets the key too.
-// The value of `item_stat_ranges` in [d2rcore.items] (or the dotted `d2rcore.items.item_stat_ranges` before the first
-// table), unquoted; "" when missing.
+// ---- Ctrl stat ranges (#528, owner decision 2026-11-07): restore true once in older kept configs.
+// The migration comment is shared with install_mod.py; after it is present, player edits stay.
 std::string ItemStatRanges(const std::string& text);
-// The text with `item_stat_ranges = false`: an existing key line gets the value in place (indent and comment kept), else a
-// commented template line `# item_stat_ranges = ...` of [d2rcore.items] becomes the key, else the key goes under the
-// header, else the table is appended. A BOM and the line endings stay; a file already at false comes back unchanged.
-std::string SetItemStatRangesOff(const std::string& text);
+std::string MigrateItemStatRanges(const std::string& text);
 
 // `key = value` in [section] unless the player set the key (tools/install_mod.py ensure_toml_key, the same rules): an
 // uncommented key in [section], or the dotted `section.key` before the first table, is kept as it is; else a commented
@@ -103,7 +97,7 @@ struct ModConfigKey {
 	bool atLeast = false;  // an integer minimum: a larger integer stays, a smaller one (or not an integer) becomes `value`
 };
 // [d2rcore.save_format] mode = "extended" (#512, forced, with a backup: Launcher::EnsureExtendedSaves),
-// [d2rcore.items] item_stat_ranges = false (#528, forced),
+// [d2rcore.items] item_stat_ranges = true (#528, one-time migration, then player choice),
 // [d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true (#498, the G toggle in a RotW game; forced, owner
 // decision 2026-11-04: a false set by hand or left by D2RLoader's template becomes true),
 // [d2rcore.stash] add_shared_tabs at least 2 (#535: 5 shared stash pages in every game, as a RotW game has; a larger value

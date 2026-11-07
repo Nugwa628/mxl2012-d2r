@@ -154,26 +154,27 @@ version> to <new version>` (`none` for a first install; ` (2)` when two runs sha
 never touched (`IsSaveCopyFile`, `SaveCopyFolderName`, `SaveCopiesToRemove`, paths.h). A failed copy is reported and the install
 goes on. To go back: close the game and copy the files from a copy folder into the save folder.
 
-**Ctrl stat ranges off in a kept config** (bug #528, owner decision 2026-11-03). D2RLoader's
-Ctrl "Possible base rolls" block repeats lines for Median's automagic rows (upstream:
-D2RLoader/PluginSDK issue 6), so the release ships `[d2rcore.items] item_stat_ranges = false`.
-After `EnsureExtendedSaves`, `EnsureModConfigKeys` reads the same kept file and applies the other
-`ModConfigKeys` (paths.h). If `item_stat_ranges` is not `false` (missing, `true`, a commented
-template), only that key is set (`SetItemStatRangesOff`): an existing line in place with its indent
-and comment, a commented template line, else under the header, else the table is appended; BOM and
-line endings stay. No backup (one key), and a failed write is only reported: the game runs either way.
-A player who sets it back to `true` gets `false` again at the next update or repair while this owner
-decision stands.
+**Ctrl stat ranges back on in a kept config** (bug #528, owner decision 2026-11-07).
+The release explicitly ships `[d2rcore.items] item_stat_ranges = true`. Holding Ctrl shows ranges
+again; on some items with automagic mods a few range lines show twice (a D2RLoader issue,
+[D2RLoader/PluginSDK issue 6](https://github.com/D2RLoader/PluginSDK/issues/6)).
+After `EnsureExtendedSaves`, `EnsureModConfigKeys` applies `MigrateItemStatRanges` to the kept
+mod config. The Python installer uses the same `TOML_KEYS` one-time rule. Before the marker
+`# mxl2012 migration: ctrl-stat-ranges-on-v1` exists, they set the key to true once (including
+an older forced false), then prepend that comment. Value and marker are written together.
+Afterwards they leave the player's value alone, including false or a removed key, on updates
+and repairs. Keep the marker when editing the config. Only the ranges key and marker change;
+indent, comments, BOM and line endings stay. No backup for this key; a failed downloader write
+is reported and can be retried. The game-wide config is never changed.
 
 **Legacy graphics (G) in a RotW game** (bug #498). D2RLoader blocks G in a Reign of the Warlock game
 unless `[d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true`. Its game-wide
 `d2rloader\config\d2rloader.toml` ships `false`, and the mod's own file overrides it, so the release ships
 `true` (`tools/install_mod.py` `TOML_KEYS`). A kept file from an older install may hold only D2RLoader's
 commented template line (`# always_enable_rotw_legacy_graphics_keybind = true`). Then the game-wide
-false applied. The key is forced like `item_stat_ranges` (owner decision 2026-11-04):
+false applied. The G key is forced (owner decision 2026-11-04):
 `EnsureModConfigKeys` uses `ForceTomlKey`, the rules of `install_mod.ensure_toml_key` with
-`force` (each `TOML_KEYS` entry has a forced flag; the save format, this key and `item_stat_ranges`
-are forced). An uncommented value in `[d2rcore.player]`, or the dotted key before the first table,
+`force` (each `TOML_KEYS` entry has a forced flag; the save format and this key are forced; `item_stat_ranges` migrates once). An uncommented value in `[d2rcore.player]`, or the dotted key before the first table,
 gets `true` in place with its indent and comment, so a `false` set by hand or left by D2RLoader's
 1.3.1 template becomes `true`. Else a commented line (any `#` and spaces) becomes `... = true`. Else
 the key goes under the header, or the table is appended. Fresh installs, updates and repairs all
@@ -269,7 +270,7 @@ Tests can also be configured separately with `cmake -S launcher/tests -B build/l
 CI cross-builds with the existing xwin toolchain and runs portable tests on Linux.
 
 Tests cover detection, manifest/installation plans, hashes, marker/path protection,
-7z decoding and corruption, the ZIP reader and the D2RLoader package (`TestZip`, `TestLoaderPackage`), coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesOff`), the RotW G key (`TestModConfigKeys`), Play's enable rules and command line (`TestPlay`), plugin identification,
+7z decoding and corruption, the ZIP reader and the D2RLoader package (`TestZip`, `TestLoaderPackage`), coexistence, TOML preservation, the save format key (`TestSaveFormat`), the stat ranges key (`TestStatRangesMigration`), the RotW G key (`TestModConfigKeys`), Play's enable rules and command line (`TestPlay`), plugin identification,
 other-mod warnings, and protection of other mods from automatic cleanup. No downloader or
 in-game integration run is required for this cleanup; unit tests do not access a real
 D2R installation. Previous copied documentation's release/game test results are not

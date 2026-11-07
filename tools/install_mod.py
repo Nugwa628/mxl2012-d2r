@@ -41,6 +41,8 @@ import fxpaths  # noqa: E402  (Median's files: MXL_EXTRACT / assets/median / ext
 
 MXL_GLOBAL = fxpaths.MXL
 PLUGIN = Path(os.environ.get("MXL_PLUGIN") or ROOT / "build" / "plugin" / "Release" / "mxl2012-core.dll")
+# The plugin's own settings ([mapreveal] threshold, ...): installed when missing, never overwritten (the player's changes stay).
+CORE_CONFIG = ROOT / "plugin" / "mxl2012-core.toml"
 D2R_FILELIST = fxpaths.D2R_FILELIST
 
 
@@ -52,15 +54,15 @@ EXTRA_SHARED_TABS = 2
 # by tools/warlock_legacy_check.py; still untested on a RotW account).
 # The save format first: a d2rloader.toml that was already there (another mod's copy, an old install) can lack it, and then
 # D2RLoader writes retail saves, which cannot hold Median's stats 511-537 (docs/bugs.md #512; the plugin part savemode does the same
-# repair for players). D2RCore's Ctrl stat ranges are off (owner decision 2026-11-03, bug #528: repeated lines for Median's
-# automagic rows, D2RLoader/PluginSDK issue 6). The G toggle in a RotW game is on (owner decision 2026-11-04, bug #498: the
-# game-wide file says false and the mod's file must win). Forced keys get their value whatever the file says; the others keep a
+# repair for players). D2RCore's Ctrl stat ranges migrate to true once (owner decision 2026-11-07, #528),
+# then respect player edits. Some automagic lines repeat (D2RLoader/PluginSDK issue 6). The G toggle in a RotW game is on
+# (owner decision 2026-11-04, bug #498: the game-wide file says false and the mod's file must win). Forced keys get their value whatever the file says; the others keep a
 # value set by hand. The downloader sets the same keys in a kept file with the same rules (launcher ModConfigKeys /
 # EnsureModConfigKeys). The shared tabs are a minimum ("min"): a smaller value is raised, a larger one (set by hand, another mod's
 # file) stays, as lowering it would hide the items on the pages past it (bug #535). (section, key, value, forced, why)
 TOML_KEYS = [("d2rcore.save_format", "mode", '"extended"', True, "D2RLoader's extended saves, bug #512"),
              ("d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", True, "G toggle in RotW games, bug #498"),
-             ("d2rcore.items", "item_stat_ranges", "false", True, "Ctrl stat ranges off, bug #528"),
+             ("d2rcore.items", "item_stat_ranges", "true", "once", "Ctrl stat ranges back on, bug #528"),
              ("d2rcore.stash", "add_shared_tabs", str(EXTRA_SHARED_TABS), "min", "5 shared stash pages as in RotW, bug #535")]
 
 
@@ -319,7 +321,15 @@ def ensure_toml_min(text: str, section: str, key: str, value: str) -> str:
 
 
 def apply_toml_key(text: str, section: str, key: str, value: str, forced) -> str:
-    """One TOML_KEYS entry applied: forced True (always this value), False (a value set by hand stays) or "min"."""
+    """One TOML_KEYS entry applied: forced True (always this value), False (a value set by hand stays) or "min" / "once"."""
+    if forced == "once":
+        marker = "# mxl2012 migration: ctrl-stat-ranges-on-v1"
+        if marker in text.lstrip("\ufeff").splitlines():
+            return text  # already migrated: respect player edits, including a removed key
+        out = ensure_toml_key(text, section, key, value, True)
+        nl = "\r\n" if "\r\n" in text else "\n"
+        bom = "\ufeff" if out.startswith("\ufeff") else ""
+        return bom + marker + nl + out[len(bom):]
     if forced == "min":
         return ensure_toml_min(text, section, key, value)
     return ensure_toml_key(text, section, key, value, forced)
@@ -366,6 +376,9 @@ def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, 
         print(f"plugin {plugin.name} ({plugin.stat().st_size // 1024} KB)")
     else:
         print(f"no plugin at {plugin} (run tools/build_plugin.ps1); installing data only")
+    core_config = d2rl / "config" / "mxl2012-core.toml"
+    if CORE_CONFIG.is_file() and not core_config.exists():
+        shutil.copy2(CORE_CONFIG, core_config)
     toml = d2rl / "config" / "d2rloader.toml"
     if not toml.exists():  # never overwrite a config someone edited
         toml.write_text('[d2rcore.save_format]\nmode = "extended"\n', encoding="utf-8")

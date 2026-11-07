@@ -1110,3 +1110,57 @@ Part `medtab` (`plugin/src/median_tabs.cpp`, rules in `median_tabs_logic.h`, tes
   toggles, '@' codes restored).
 - **Ships with its layout:** `tools/install_mod.py` / `tools/package_release.py` refuse a 7-tab layout without a DLL that names
   the layout mark.
+
+## 34. Pity map reveal (lane mapreveal, 2026-11-06; owner request)
+
+Part `mapreveal` (`plugin/src/map_reveal.cpp`, rules in `map_reveal_logic.h`, test `mapreveal_tests`; research and probe in
+[map-reveal-research.md](map-reveal-research.md)). Client side only, per player, no hook and no patch, so it cannot clash
+with other parts or plugins (the hook clash report has nothing to list for it).
+
+- **Measure:** every 250 ms (a timer thread hands the work to the UI thread with `runOnUiThread`) the part walks the rooms of
+  the player's current level: player `0x9a480(0x8b2d0())`, path `+0x38`, room `0x341c30(path)`, DRLG room `+0x18`, level
+  `+0x90`, first room `level + 0x10`, next `+0x48`, size `+0x68` / `+0x6c`. A room whose active room `+0x58` is set now is
+  marked seen (one bit per place in the list, at most 4096). Explored = tile area of the seen rooms / area of all rooms of the
+  level, per level id, until the game ends (a new DRLG or map seed resets all levels; a level built again resets that level).
+- **Gate:** `seen * 100 >= threshold * total` (exact, the line shows the whole percent rounded down). Towns (1, 40, 75, 103,
+  109) never; an exclusion list (empty by default) for levels that should never be revealed (uber and boss levels may be
+  added later, owner 2026-11-06).
+- **Key:** a D2RLoader InputService action `mxl_map_level`, "Reveal Level Map" in Options > Controls (category D2R-XL 2012),
+  default **L** (free in D2R's key file and Median's own map reveal key; the first port's `mxl_map_reveal` id is not reused).
+- **Reveal:** for every room of the level, `CreateActiveRoom 0x3289a0(flag, room)` and the level's automap callback (DRLG
+  `+0x838`, checked to be `0xd2240`) on what it returns. `flag` is the player's data-table byte `0x34a0e0(player)` (unit
+  `+0x1bd`): the probe passed 0, the server's byte, and the game closed. Rooms that are active already come back unchanged.
+- **Chat:** one yellow line when the reveal becomes available on a level ("Map: 71% of this level explored. Press L to reveal
+  the rest."), one line per press (refused with the percent, "no reveal in this area" in towns, "already revealed", "off", or
+  "rest of the level revealed"). The line goes to the client's own chat handler `0x12c190` (packet 0x26 type 4), so it works
+  in a joined game too; while an NPC talks (`0x2a48760`) the line waits (at most 60 s), as a line then freezes the speech.
+- **Settings:** `d2rloader/config/mxl2012-core.toml` (`[mapreveal] threshold = 70`, 0 = always, 101 = off; `exclude = []`),
+  embedded in the DLL (`d2rlplugin_embed_config`), installed by `tools/install_mod.py` when missing and kept on updates
+  (`preserve` in the release manifest).
+- **Off word `mapreveal`.** `mxl2012 mapreveal` prints the report and the counters; harness `mapreveal [press | threshold N]`.
+- **Later (owner 2026-11-06):** a popup button like the legacy level-up buttons (section 24), next to the key.
+
+## 35. Area level on the automap (lane arealvl, 2026-11-06; owner request)
+
+A player asked for the area level in the automap's top-right text. Neither D2R nor a bundled plugin (docs/bundled-plugins.md)
+offers it, but D2R already has the line: in a terror zone that text (HUDWarningsPanel, the same panel in HD and legacy graphics,
+`showAutomapDesecratedLevel` true in both layouts) shows "Terrorized: <level>". Part `arealvl` (`plugin/src/area_level.cpp`,
+rules in `area_level_logic.h`, test `arealvl_tests`):
+
+- **The line:** the text builder `0x1475215` takes the player's level (`0x2efc10` of the room `0x9a180`) and calls
+  `0x90c70(&out, level)`, its only caller, which answers `{level, has, next}` (12 bytes) from the terror-zone list; with `has` it
+  appends `DesecratedAutomapLevel` with `level`, then `0x1474ee0(next)` (0 prints nothing). The inline hook on `0x90c70` runs
+  D2R's lookup and, for a level that is not terrorized, fills the area level, `has` = 1, `next` = 0. A terrorized level keeps
+  D2R's answer (Median 2012 has no terror zones: `d2r_adds.py`). Level 0 or a level without an area level (towns) prints nothing.
+- **Which column:** D2R's monster setup reads the area level with `0x32c700(dataFlag, level, difficulty, expansion)`: the
+  levels.txt record (`*(0x300a90(dataFlag) + 0x1460)`, count `+0x1468`, 0x18c bytes) `MonLvlEx[difficulty]` (i16 `+0x1e`) in an
+  expansion game, `MonLvl` (`+0x18`) in classic. The monster level gate (`0x543d32`) makes Normal use it too, so MonLvlEx is the
+  level of the area's monsters in every difficulty (checks `arealevel`, `nmh`). The part reads the same record itself (no
+  `int3` on a bad level as in `0x32c700`).
+- **Difficulty:** the client's own copy was not found cheaply, so the part takes the game's `+0x104` (and data flag `+0x106`) on
+  the shared server frame (its callback table grew from 4 to 8): single player and a host's own game. A client in another
+  host's game has no server frame here and sees D2R's text.
+- **Text:** `data/d2r_string_fixes.json` overrides `d2r:DesecratedAutomapLevel` with "Area Level %d" (all languages, as the
+  mod's other texts).
+- **Off word `arealvl`:** no hook, D2R's text. `mxl2012 arealvl` prints the report, lines filled, the last level and area level
+  and the difficulty seen.

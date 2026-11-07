@@ -5789,3 +5789,332 @@ window (as for `bufficons`, above); the log shows it. **By hand (owner / user):*
 and check that the name shows next to it. Not checked: the gamepad, a game-wide copy of Buff HUD next to the bundled one,
 other Median rows that still use the "?" picture (Elemental Fury, Blades Of Light, Superbeast Neutral, Mark Of The Bear,
 Mark Of The Wolf).
+
+## Lane hdtext: HD text in legacy, probe (2026-11-06, slot 1, background mode)
+
+Feasibility probe for the owner's "HD text in legacy" request, see [legacy-hd-text-research.md](legacy-hd-text-research.md).
+A harness verb that forced the text facade's HD checks (not committed; `mxl2012-runs/hdtext/probe.patch`) crashed on
+the first frame after it was turned on, both with all 11 sites (`checks-20261106-150314-s1`) and with only draw + measure
+(`checks-20261106-150831-s1`): `BC_ASSERT: result == FT_Err_Ok`, access violation at `0x90b627`. No feature code shipped.
+
+## Lane mapreveal: pity map reveal research (2026-11-06, slot 2, background mode)
+
+Research only (docs/map-reveal-research.md). One probe run with an uncommitted harness verb `mapprobe`: the explored area of the
+current level reads as 100 % in the Rogue Encampment and 20.4 % on arrival in Cold Plains (98 rooms), the room walk costs under
+1 ms. The hook-free per-level reveal (`CreateActiveRoom` with context `0x8b2d0()` + the automap callback `0xd2240`) closed the
+game: a feature must capture the context and level through an `InitLevel 0x3271c0` hook as MapSense does. Evidence:
+`mxl2012-runs\mapreveal\run-20261106-s2\`.
+
+
+## Lane skilldesc: multiline skill text order and colors (2026-11-06)
+
+Bug [skilldesc](bugs.md#skilldesc) (#549). Source evidence:
+`mxl2012-runs/skilldesc/report.png` and `source-comparison.json` (311 source/converted pairs).
+The v005 `.tbl` already stores skill text bottom-up; the converter previously preserved it for
+D2R's top-down skill tooltip. Conversion now follows source skilldesc long/short/alt references,
+reverses lines before color mapping and makes inherited colors explicit. No key prefix heuristic.
+301 long and 143 short keys (311 distinct combined). Another 153 multiline stat/flavor keys retain their bottom-up rendering order.
+No selected multiline key is shared with localization references in another source table.
+Item tooltips and dialogue have separate renderers and retain their source strings.
+
+Validation: conversion/data steps of `tools/build.py`, then standalone `validate.py` and
+`strings_check.py`; `tools/test_strings.py` (10 passed: ordering, blank lines,
+inherited / inline / EOL colors, the reported skills and reference selection); both required
+unittest discovery commands (1079 passed, 1 skipped; 533 passed, 5 skipped); docs links and
+public check (0 findings / 0 hits). An initial suite run during generation saw an incomplete
+monster-map failure in `test_spirit_classes`; rerun after that build step passed.
+All 311 expected strings match the generated output, including all emitted languages and
+legacy mirrors. Dev plugin built for the harness; no plugin source change or version bump.
+
+
+Slot 1, background input, throwaway Assassin `SkillText`; final run
+`mxl2012-runs/skilldesc/checks-20261106-171409-s1/`:
+
+| Skill | Evidence (HD / legacy) | Visual result |
+|---|---|---|
+| Batstrike | `batstrike_hd.png` / `batstrike_legacy.png` | PASS: prose, first / second / third charge, requirements, release instruction; source gray / red / gold retained |
+| Bloodbath | `bloodbath_hd.png` / `bloodbath_legacy.png` | PASS: complete white sentence, red dual-claw requirement; innate-skill and stat sections keep their original bottom-up order |
+| Dark Summoning | `dark_summoning_hd.png` / `dark_summoning_legacy.png` | PASS: white summon description, blank separator, complete two-line blue flavor sentence |
+
+Harness setup: `setskill` and select on right button, hover the button; no cast/combat verdict.
+No crash, no gameplay asserts; only the documented shutdown pool asserts after the final check
+(`s_StatsPool.IsEmpty`, allocator pools). Watchdog: 0 cursor changes, 0 foreground changes,
+no abort. Game closed, shared files restored and verified, slot unlocked.
+Earlier control run `checks-20261106-170823-s1/`: `rune_control_hd.png` (Ghal above Great Rune)
+and `item_description_control_hd.png` (Pearl of Wisdom's Players X instructions) confirm
+item name/description strings still draw bottom-up and must not reverse. That run also showed
+that `desctext` / `dsc2text` / `dsc3text` use the bottom-up builder: they are excluded by the
+regression test; the final run confirms Bloodbath's correct innate-skill/stat order.
+
+The game install staged the lane's generated tables and strings over completed main baseline
+art in `work/skilldesc-test/data`, through `install_mod` with the slot lock. The independent
+full art build was intentionally stopped in the unrelated, CPU-heavy `walls_hd.py` generation;
+all data/string steps and standalone validators completed. No plugin change. Final test logs:
+`mxl2012-runs/skilldesc/commit-tests-tools-tests.txt` and `commit-tests-tools.txt`.
+
+## Lane beltship: Auto Belt Refill shipped (2026-11-06, slot 2, background input)
+
+The bundled build (`tools/build_beltrefill.ps1`: jaycachou-svg's v0.35.9 at `a3b6805` + `0001` SDK renames + `0002` Median belt
+rows) and the shipped `auto-belt-refill.toml` were put into `mods\mxl2012\d2rloader\` for each run and removed afterwards; both
+`d2rloader\config` folders were snapshotted and restored, the plugin's log moved to the evidence folder. Driver
+`mxl2012-runs/beltship/scripts/belt_ship.py` (not in git), character `BeltShip` (barbarian). Per belt: belt emptied, belt worn
+with the harness `equip`, a full belt of `hp5` / `mp5` plus one each, `ey2`, `b@b`, `0g1` in the inventory; `belt-fill`;
+keys 1 and 2 drunk (auto-refill); key 1 drunk again with no life potion left, then `belt-place <top slot of column 1> ey2`
+(the game's own slot search) and `belt-fill`. Results from the plugin's `belt-scan`.
+
+| Run | Build | Result |
+|-|-|-|
+| runA-unpatched (`checks-20261106-172234-s2`) | v0.35.9 + SDK renames only | belt `627` (2 rows): plugin reports 4 rows / 16 slots; fill 8, refill ok (the game refuses the missing rows): the caveat confirmed |
+| runC-patched (`checks-20261106-173307-s2`) | shipped build | HD and legacy, belts `627` / `767` / `859` / none: fill 8 / 12 / 16 / 4 of 8 / 12 / 16 / 4, refill back to full, plugin rows 2 / 3 / 4 / 1, life only in columns 1 / 3 and mana only in 2 / 4; elixirs and Goodberry never moved; `ey2` for a life column refused by the game (#541 fixed). PASS 8 / 8 |
+
+runB (first try) is void: the harness could not take off a belt that still held potions, so the 3-, 4- and 1-row cases ran
+on the 2-row belt; the driver now empties the belt first. Logscan: only the exit-only pool asserts (`m_allocated == 0`,
+`m_freed == 0`, `s_StatsPool.IsEmpty()` and the like), no hook refused, 0 crash files. The belt screenshots failed (wrong
+path in the driver); the evidence is the `belt-scan` grids in `run.txt`. Evidence: `mxl2012-runs/beltship/runA-unpatched`,
+`runC-patched` (`run.txt`, `auto-belt-refill.log`). The slot-2 mod was the install already there (with #541's item types).
+
+## Lane mapreveal: pity map reveal, the part (2026-11-06, slot 1, background mode)
+
+Part `mapreveal` (docs/plugin-plan.md section 34). Slot 2 was held by another lane, so the run used slot 1 (lock `mapreveal`,
+shared files restored and verified after the run). Install `MXL_SLOT=1 MXL_RUN=mapreveal py -3 tools/install_mod.py --slot 1`,
+check `MXL_SLOT=1 MXL_RUN=mapreveal MXL_CHAR=MapRevealer py -3 tools/game_checks.py all mxl2012 mapreveal`
+(tools/mapreveal_checks.py; a new level 1 Barbarian). Run `checks-20261106-172408-s1`: **mxl2012 PASS, mapreveal PASS (30 rows)**,
+0 crash files, 0 ERROR / ASSERT lines in d2rloader.log, "plugin clashes: none". Shots and report:
+`mxl2012-runs\mapreveal\checks-20261106-172408-s1\`.
+
+| Where | Result |
+|-|-|
+| key | the real background L press reached the part every time (InputService action `mxl_map_level`, bound key read back as L); the harness `mapreveal press` was not needed |
+| Rogue Encampment | "Map: no reveal in this area." |
+| HD Cold Plains (3, 97 rooms) and Den of Evil (8, 83 rooms); legacy Blood Moor (2, 27 rooms) and Cave Level 1 (9, 36 rooms) | each: the share counted after 6 steps (19 % in Cold Plains, 38 % in Cave Level 1), refused at 70 with the percent, "off" at 101, the yellow "available" line at the current share, the press made **every room** of the level (made = rooms) in at most 16 ms, a second press "already revealed", 3 more steps on the level with 0 faults |
+| shots | `mapreveal_<hd\|legacy>_<level>_before.png` / `_after.png` (automap open): after the press the whole level is drawn |
+
+SHORTCUT (named in the check's note): the threshold is set to the level's current share with the harness `mapreveal threshold N`
+(walking 70 % of a level by script takes too long); the reveal itself is the real key. The level 1 character died in Cave
+Level 1 during the last steps (monsters; the check had passed its rows by then). Not checked: a joined (TCP / Battle.net-style)
+game as the second player, the gamepad, an edited `mxl2012-core.toml` in game (the parser is unit-tested), a real 70 % walk.
+
+## Lane hdfx: Celerity streaks and Mephisto's skills in HD (bug "hdfx", 2026-11-06, slot 2, background mode, build of lane/hdfx)
+
+Lab scripts in `mxl2012-runs/hdfx/` (kept outside the repo, made from lane fxpick's `fxlab.py`). `fxlab.py`: Mephisto's skills
+(Lightning Arena, Mythal, Countdown, MephistoMissile, PrimePoisonNova) given to a Necromancer with `setskill` and cast on itself or a
+zombie, HD and legacy, full-screen shots at 0.3 s to 4 s. `cellab.py`: Mon Celerity cast, the player walks off (`move`), shots
+round the cast and round the state's end 10 s later. The harness has no `setstate` in this build (the verb answered "unknown verb").
+`burst.py` and `fullsheet.py` make the sheets. This was seen through the harness, not on the player path.
+
+| run | build | result |
+|-|-|-|
+| `before`, `celbefore`, `celend` | main data | Celerity standing still: a fire swirl at cast and at the end, no streaks. Lightning Arena: a ring of tall Cairn bolts, the screen washed white (`before_lightningarena_hd_flash.png`) |
+| `celmove_before` | main data | **reproduced**: the state ends while the player walks, and a screen-wide orange streak appears (`before_celerity_hd_streak.png`, `_streak2.png`; `sheet_celmove_before_hd.png` e03 / e04) |
+| `celmove_after` | lane/hdfx | **PASS**: a small fire glow at cast and a short flash at the end, no streak while walking (`after_celerity_hd_cast.png`, `after_celerity_hd_end.png`, `sheet_celmove_after_hd.png`). Legacy unchanged (`sheet_celmove_*_legacy.png`) |
+| `after` | lane/hdfx | Lightning Arena: a ring of blue ground glows, no whiteout (`after_lightningarena_hd.png`). The tall bolts of legacy are not seen in HD (open). Mythal and Countdown: small sparks only (`sheet_after_meph.png`) |
+
+FPS stayed near 60 in both builds on this machine's GPU (D2R's FPS line in the shots). The player's FPS drop was not measured.
+
+## Lane tawalls: Tran Athulua walls in HD (2026-11-06, slot 1, background mode)
+
+Player report: Tran Athulua (level 60, `expansion/dystopic/desertpeak`) showed floor and a stray wall piece in HD where
+legacy has walls (docs/bugs.md "tawalls", docs/maps-hd.md item 16). Check `wall_maps`, character `TaWalls`, god mode.
+
+| Run | What | Result | Evidence (`mxl2012-runs/tawalls/`) |
+|---|---|---|---|
+| `checks-20261106-173447-s1` | before: the installed 0.1.14 scenes, `MXL_WALL_LEVELS=60` | reproduced: corridors drawn as floor only in HD, walls in classic; 0 asserts | `before/wall_desertpeak_{hd,classic}_*.png` |
+| `checks-20261106-182438-s1` | after: scenes of `walls_hd.py report` with `Library.lift` copied over slot 1's desertpeak, cypherpunk, moskvich and excelsior3 for the run (originals backed up and restored byte-equal after), `MXL_WALL_LEVELS=60,84,59,98` | **PASS by eye**: desertpeak's corridor walls stand where classic has them (`wall_desertpeak_hd_1.png` against `before/wall_desertpeak_hd_1.png`); excelsior3, cypherpunk, moskvich unchanged in look, nothing floating; all 4 levels reached in both modes, 0 asserts | `after/wall_*_{hd,classic}_*.png`, `walls_report.md` |
+
+Commands: `MXL_SLOT=1 py -3 -I tools/walls_hd.py report --out ../../mxl2012-runs/tawalls/report-after`, then
+`MXL_RUN=tawalls MXL_SLOT=1 MXL_CHAR=TaWalls MXL_CACHE_POLL=3 MXL_WALL_LEVELS=60,84,59,98 py -3 tools/game_checks.py all wall_maps`.
+Left open: at the arrival, the short back wall behind the two braziers (cells mixing Act 2 tomb and Docktown tiles) still
+takes the tomb variant (pillars) in HD.
+
+## Lane hdcombat: hits, damage and procs in HD vs legacy (2026-11-06, slots 1 and 2, background mode, build of lane/hdcombat)
+
+Check `hdcombat` (tools/game_checks.py): Barbarian, one zombie, 30 clicks with a plain sword, 30 with a chance-to-cast
+weapon, and 20 s with the button held, in the order HD, legacy, HD, legacy. Run:
+`MXL_RUN=hdcombat MXL_SLOT=2 MXL_CHAR=HdCombat py -3 tools/game_checks.py --slot 2 all hdcombat`. Runs 1 and 3: hits HD
+217 / legacy 231 of 240 clicks, damage 291 / 302, held damage 350 / 325 in 80 s, 25 server frames/s in both modes. The
+same server results in both modes. Procs: 0 in both modes, a harness set-up gap (harness-made items carry no item events).
+Details, cause and proposal: [hd-combat-research.md](hd-combat-research.md). Evidence: `mxl2012-runs/hdcombat/`.
+
+## Lane arealvl (2026-11-06, slot 1, background input)
+
+Owner request: the area level in the automap's top-right text (plugin part `arealvl`, docs/plugin-plan.md section 34). Check
+`MXL_RUN=<lock> MXL_CHAR=<throwaway> py -3 tools/game_checks.py --slot N all arealvl`: Blood Moor with the automap open in HD and
+legacy graphics in Normal, then Nightmare (nmh_checks save edit); the `mxl2012 arealvl` line must equal levels.txt MonLvlEx of
+the difficulty, the text is judged from the shots. Evidence in the lane's run folder (`mxl2012-runs/arealvl`).
+
+| Step | Result | Evidence |
+|-|-|-|
+| Normal, HD | PASS: "Area Level 1" (purple, D2R's terror-zone line colour) under "Blood Moor / mxl2012"; plugin line level 2, area level 1, difficulty 0 = MonLvlEx 1 | `checks-20261106-185353-s1/arealvl_normal_hd.png` |
+| Normal, legacy | PASS: the same line in the classic font | `checks-20261106-185353-s1/arealvl_normal_legacy.png` |
+| Nightmare | not run: the default character `Mxl2Barb` has no save on slot 1 (the check needs `MXL_CHAR`); the rerun with `MXL_CHAR=AreaLvl` did not reach the menu (startup line timeout while d2rgs bench games ran) | `checks-20261106-185844-s1` |
+
+Engine logs of the Normal run: 0 ERROR / ASSERT lines, no crash file.
+
+## Lane beltmatch: Auto Belt Refill follows each column's first slot, counts on the belt (2026-11-06, slot 2, background input)
+
+Build: `tools/build_beltrefill.ps1` (v0.35.9 at `a3b6805` + `0001` + `0002` + `0003-mxl2012-match-first-slot.patch`; `BeltMatchTests`
+pass) with the shipped `auto-belt-refill.toml`, both put into `mods\mxl2012\d2rloader\` for the run and removed afterwards (both
+`d2rloader\config` folders snapshotted and restored, the plugin's log moved to the evidence). Driver
+`mxl2012-runs/beltmatch/scripts/belt_match.py` (not in git), character `BeltShip`, girdle `859` (4 rows). Per mode: belt emptied,
+then 4 x `hp3`, `mp5`, `hp5`, `mp3` picked up (the game's auto-belt gives columns 0-3 in that order), inventory 3 `hp3`, 3 `mp5`,
+2 `hp5`, 2 `mp3` plus `hp4` x 2, `mp4`, `hp1`, `ey2`, `b@b`; results from the harness `items` and the plugin's `belt-counts`.
+
+| Step | HD | Legacy |
+|-|-|-|
+| Counts before drinking (code / count per column) | hp3 7, mp5 7, hp5 6, mp3 6 | same |
+| Keys 1-4 drunk: every column refilled with its own code only | PASS (4 x 4, `hp4` / `mp4` / `hp1` / `ey2` / `b@b` still in the inventory) | PASS |
+| Counts after | 6 / 6 / 5 / 5 | same |
+| Column 3 emptied (`remove mp3`), 2 `mp3` back in the inventory, key 2 drunk, `belt-fill` | column 3 stays empty (the game offered it `mp5` / `mp3`: refused), column 1 refilled, no count on column 3 | same |
+| `hp4` picked up (lands in the empty column 3), `belt-fill` | column 3 = `hp4` x 3 (one picked up + the two in the inventory), count 3 | same |
+| `ey2` at column 3's bottom, one more `ey2` in the inventory, `belt-fill` | not refilled, no count | same |
+| INFO: `hp3` column short with no `hp3` left, `hp5` column short with one `hp5` | the `hp5` stays in the inventory: the game offers the first `hpot` column (known limit, docs/bundled-plugins.md) | same |
+
+Runs: `run2` (`checks-20261106-192112-s2`) and `run3` (`checks-20261106-192714-s2`), both PASS in both modes; `run1` had the same
+results but the driver read an empty code (`....`) as a code. Logscan: only the exit-time pool asserts (`m_allocated == 0` and
+the like), 0 crash files.
+
+**The counts are not in the screenshots.** `belt-counts` reports the overlay live (about 2,000 callbacks and 3 counts drawn per
+frame, every `drawText` Success) at the cells HD (909, 847) + 52 per column, 41 square, and legacy (833, 843) + 46.5, 43.5
+square, at 1600 x 900; the belt in the shots sits exactly there. But neither PrintWindow (the harness `shot`) nor Windows
+Graphics Capture (`probe1`, a lane venv with `windows-capture`) shows any D2RLoader overlay of a background window: a probe build
+that also filled the top 80 pixels magenta gave 0 magenta pixels in both captures. A desktop grab is not possible either (the
+window is covered on this machine). **By hand** (window in front): enter a game with potions in the belt; each column's first
+cell shows a small white number top right (red at 0), in HD and after G in legacy. Tell me whether it is readable and where it
+sits at your resolution. Evidence: `mxl2012-runs/beltmatch/run2`, `run3` (`run.txt`, shots, `auto-belt-refill-*.log`), `probe1`.
+
+## Lane wallscan: HD walls of the other Median maps (2026-11-06, slot 2, background input)
+
+Owner request after lane tawalls: scan Median's own maps for HD wall problems. Check `wall_maps` with the new
+`MXL_WALL_SPOTS` (`<level>[@<origin x>,<origin y>]:<cell x>,<cell y>;...|...`: .ds1 cells from the level's origin, which
+`presets rooms` gives; the harness hops there with `place` steps of 15 sub-tiles, `wall_hop`). Run:
+`MXL_RUN=wallscan MXL_SLOT=2 MXL_CHAR=WallScan MXL_WALL_LEVELS=59,84,18,127,95,90,13,60,116 MXL_WALL_SPOTS="59:52,60;60,68|84:4,4;36,12|18@10000,5000:220,140;36,28|127:28,36;52,12|95:52,60;4,52|90:28,36;20,36|13:84,36;52,108|60:12,52|116:28,44" py -3 tools/game_checks.py --slot 2 all wall_maps`
+(`checks-20261106-224456-s2`, all 9 levels reached in HD and classic, no assert in the visits; main's lifted scenes of
+desertpeak, cypherpunk, moskvich and excelsior3 copied over the slot for the run and restored byte-equal after). Findings:
+[maps-hd.md "HD wall scan 2026-11-06"](maps-hd.md#hd-wall-scan-2026-11-06-lane-wallscan). Evidence:
+`mxl2012-runs/wallscan/` (`static/`, `shots2/`, `pairs/`).
+
+
+## Lane statranges2: Ctrl stat ranges back on (#528, 2026-11-07)
+
+Release config explicitly ships `[d2rcore.items] item_stat_ranges = true`. Both the Python installer
+and downloader migrate an older kept false to true once, recording the same comment
+`# mxl2012 migration: ctrl-stat-ranges-on-v1`; later player edits (including false or removing the key)
+stay. Other kept-config rules are unchanged. Tests cover missing / commented / dotted keys,
+idempotence, later false, unrelated tables, BOM, CRLF, indentation, comments and no final newline.
+Downloader Release rebuilt: `launcher_tests` 388 checks, 0 failures. Full package rebuilt using the
+unchanged main data and existing release DLLs; no plugin changes or version bump.
+
+Slot 1, background input, Assassin RangeLane, Median Blade Talons `j25` quality 4, generated by the
+harness in the backpack (not a drop-path check): **PASS by screenshot**. Holding Ctrl shows the
+modifier ranges and "Possible base rolls" again; "Current Dexterity Damage Bonus: 10%" repeats twice,
+as expected until D2RLoader/PluginSDK issue 6 is fixed. ASCII bullets remain readable.
+Game closed; shared config restored and verified (6 files); watchdog did not abort.
+Evidence: `mxl2012-runs/statranges2/game/hd_j25_q4_plain.png`, `hd_j25_q4_ctrl.png`, `lab.json`,
+`game.log`. Build, package verification and both required Python suites are recorded under
+`mxl2012-runs/statranges2/`. Initial local checks needed the built excel tables copied from main;
+no source fix was needed for that missing-fixture error. The package data snapshot also needed
+install_mod's normal `global/dataversionbuild.txt` marker (93847), absent from raw work/mod data;
+final package verification uses that staged snapshot (`package-final/`, `verify-final/`). No new legacy screenshot in this lane.
+
+Required validation: both Python discovery suites PASS (1080 and 541 tests respectively);
+`check_public.py`: 0 hits; `check_docs_links.py`: 0 findings.
+
+## Lane downtownhd: HD walls of the Crypt (downtown, level 18) (2026-11-07, slot 2, background input)
+
+Follow-up of lane wallscan's downtown row: `walls_hd.STAND_INS` (hand picks for downtown only) and generic picks stood on the
+floor ([maps-hd.md](maps-hd.md#downtown-the-crypt-level-18-hand-picks-lane-downtownhd-2026-11-07)). Static: all 17 maps built
+from one library; only downtown changes (267 stand-in cells, 68 fence cells grounded; the 16 others: no stand-in, no grounded
+piece, same entity counts). In game: the slot's downtown scene swapped for the new one for the run and restored byte-equal
+after (`mxl2012-runs/downtownhd/slot2-backup/`). Run:
+`MXL_RUN=downtownhd MXL_SLOT=2 MXL_CHAR=WallScan MXL_WALL_LEVELS=18 MXL_WALL_SPOTS="18@10000,5000:36,28;44,36" py -3 tools/game_checks.py --slot 2 all wall_maps`
+(`checks-20261107-012707-s2`, level reached in HD and classic, no assert). By hand from the pairs
+(`mxl2012-runs/downtownhd/pairs/wall_downtown_pair_<n>.jpg`, HD left, classic right; 0 arrival, 1 cell 36,28, 2 cell 44,36):
+the arrival's crypt arch stands as an arch between two pillars (before: two shelf-like walls), the low rock barricades are low
+rubble walls on the floor (before: the tall town wall and iron fences 9 units up), the tall skull wall stays D2R's own
+Harrogath wall. Evidence `mxl2012-runs/downtownhd/` (`shots/`, `pairs/`, `static/`, `tiles/`).
+
+## Lane tawalls2: Tran Athulua's hollow wall cells in HD (2026-11-07, slot 2, background input)
+
+Follow-up of lane wallscan (docs/maps-hd.md "HD wall scan 2026-11-06", desertpeak rows). Fix: `HOLLOW_MAPS` fill in
+`tools/walls_hd.py` (docs/maps-hd.md item 17), tests `HollowTest` in `tools/tests/test_walls_hd.py`. Scenes: `walls_hd.py
+docs` rebuilt all 17; against HEAD's `build_scene` on the same library only desertpeak differs (2,926 -> 4,008 pieces).
+For each run the slot's desertpeak scene was swapped and restored byte-equal after (sha256 checked); the before scene is
+the lane's build minus the filled cells (2,926 pieces, main's count). Character `WallScan`, god mode.
+
+| Run | Scene | Result | Evidence (`mxl2012-runs/tawalls2/`) |
+|-|-|-|-|
+| `checks-20261107-015409-s2` | before (no fill) | level 60 reached in HD and classic, 0 asserts | `shots/before/` |
+| `checks-20261107-014406-s2` | after (fill) | level 60 reached in HD and classic, 0 asserts; west wall line (8,30) gets its missing pieces, one more segment at 12,52, arrival unchanged | `shots/after/`, `pairs/wall_desertpeak_pair_{0,1,2}.jpg` (before HD / after HD / classic) |
+
+Command: `MXL_RUN=tawalls2 MXL_SLOT=2 MXL_CHAR=WallScan MXL_CACHE_POLL=3 MXL_WALL_LEVELS=60 MXL_WALL_SPOTS="60:12,52;8,30" py -3
+tools/game_checks.py --slot 2 all wall_maps`. Left: classic's jungle trees on those walls (496 tree-tile cells) and the
+arrival's back wall between the pillars.
+
+## Lane elevwalls: retaining walls and stairs in HD (2026-11-07, slot 2, background input)
+
+`walls_hd.py` `Library.seat` and cap tier 3 (docs/maps-hd.md "Retaining walls and stairs"). Unit tests `SeatTest`,
+`CapTest.test_cap_keeps_stairs_before_walls` (tools/tests/test_walls_hd.py). Scenes built with `walls_hd.py build` into
+`mxl2012-runs/elevwalls/build_new2` (main's in `build_main`, per-map diff `diff.py`). In game: `gamerun.sh` there locks
+slot 2, backs up the slot's scenes of excelsior3, cypherpunk, desertpeak, glados and moskvich, copies this lane's over,
+runs `MXL_RUN=elevwalls MXL_SLOT=2 MXL_CHAR=ElevWalls MXL_WALL_LEVELS=59,84,60,95,98
+MXL_WALL_SPOTS="59:52,60;60,68|84:4,4;36,12|60:12,52|95:52,60;4,52" py -3 tools/game_checks.py --slot 2 all wall_maps`,
+restores the scenes (checked byte-equal) and unlocks, also on failure. Run `checks-20261107-022822-s2`: all 5 levels
+reached in HD and classic, 0 asserts, no crash file; pairs (HD left, classic right) in `mxl2012-runs/elevwalls/pairs/`.
+Judged by eye: cypherpunk's walkways and excelsior3's courtyard as classic (no back-side slabs), cypherpunk's arrival stair
+still flat floor (floor tiles without a D2R model, open), nothing missing or floating at the desertpeak, glados and
+moskvich spots.
+
+## Lane orbtab: whole item tooltips on the advanced stash slots (#551, 2026-11-07)
+
+Plugin part `stashtip` (`plugin/src/stash_tip.cpp`, call and addresses in `stash_tip_logic.h`, test `stashtip_tests`; off word
+`stashtip`). D2R's advanced stash slot (0x2ce716) asks the item tooltip builder (thunk 0x3e2b826, through D2RLoader's
+stat-range wrapper to D2R's 0x2bd480) for the short tooltip: 7th argument 1, the name alone. The backpack's grid passes 0. The
+part takes over the thunk's import slot and clears that byte for the stash slot's call only (return address 0x2ce71b). Any other
+caller is passed through unchanged, and on any byte difference at 0x2ce6e1 / 0x3e2b826 nothing is written.
+
+Cause, first seen with a probe build (slot 1, run `checks-20261107-023645-s1`): the slot call passes 5th 0, 6th 1,
+7th 1. With D2R's arguments the slot shows "Mystic Orb" and the hints only (HD and legacy, as in the player's shot). With the
+7th cleared it shows the backpack's text. Clearing the 6th adds "Socket info unavailable in item link" and stays short, and the
+5th changes nothing.
+
+Check `stashtip` (tools/stashtip_checks.py): `MXL_RUN=<lock> MXL_SLOT=2 MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mxl2012 stashtip`.
+It makes each item in the backpack with the harness (SHORTCUT), then uses background input to hover it, Ctrl-click it into its
+slot and hover the slot. HD: orbs `&01 &50 &a1 &95`, elixir `eo7`, rune `r01`, gem `gcw`, oil `6o^`. Legacy: orbs `&02 &60`, rune
+`r02`, gem `gcg`. The text is judged on the shot pairs `stashtip_<hd|legacy>_<inv|slot>_<code>.png`. Run
+`checks-20261107-024912-s2` (slot 2, new RotW character OrbTipB):
+- `mxl2012` PASS (`stashtip on: ... loader patch`). Slot tooltips went through the part: HD 0 -> 793, legacy 793 -> 1226.
+- On the shots, each orb slot shows its own effect (Mystic Orb, "Cube with any armor to add bonus", "2% Faster Block Rate",
+  "+2 Required Level") and then the move hints. The gem (Chipped Diamond) and rune (Eld) slots show their socket lines and
+  required level as in the backpack. Nothing is doubled, in HD and in legacy.
+- The check reports FAIL for two reasons, neither caused by the part. First, `r01` did not go into its slot because the
+  stash's El stack in this save was already at 99, so the Ctrl-click left it in the backpack. Second, the engine assert burst of
+  #548 came at the first stash page click. The same burst was seen in the probe run with the part passing D2R's own arguments.
+- Shutdown pool asserts at game exit, as in other lanes.
+
+Evidence: `mxl2012-runs/orbtab/`: `report.png` (the player's shot), `before_short_tooltip.png`, `before_legacy_o02.png`,
+`probe_seventh_cleared.png`, `after_hd_slot_o50.png`, `stashtip_hd_slot_*.png`, `stashtip_legacy_slot_*.png`, `report.md`.
+
+## Lane rel0115: release 0.1.15 package smoke (2026-11-07, slot 2, background input)
+
+Package `D2R-XL-2012-0.1.15.7z` (150,132,251 bytes, sha256 `f9e03569357d4949ab002db7d6acc2701e9b7559ec341ce47847c1efc202f330`),
+`verify_package.py` OK; installed with `release_install.py install --slot 2 --package` (dev DLL of the same PluginVersion),
+restored afterwards. Evidence `mxl2012-runs/rel0115/` (`game/checks-*`, `run*.log`, driver `scripts/smoke_extra.py`, not in git).
+
+| Item | Result | Run |
+|-|-|-|
+| `mxl` line: all parts incl. mapreveal, arealvl, stashtip; bundled plugins listed | PASS by hand (the check FAILs on `other plugins`: it expects none, the release ships three) | `checks-20261107-040716-s2` |
+| `mapreveal` HD + legacy, outdoor + dungeon; "Area Level N" next to it | PASS | same |
+| `arealvl` Normal + Nightmare, HD + legacy | PASS | `checks-20261107-043815-s2` |
+| Orbs tab hover shows the orb's effect (`stashtip`) | PASS by shot (HD); the check FAILs on hover detection and legacy positions | `checks-20261107-040716-s2` |
+| Tran Athulua (`wall_maps`, level 60) HD walls, classic | PASS by shot, 0 asserts | same |
+| Ctrl stat ranges | PASS by shot (known #528 duplicate line) | `checks-20261107-044324-s2` |
+| Send to stash, stash closed (`sendstash`) HD | PASS | `checks-20261107-040716-s2` |
+| Send to stash, stash OPEN, HD | PASS: button visible, 4 / 4 sent, "Sent 4 items." | `checks-20261107-043604-s2` |
+| Expansion game: `sendstashclassic`, `medtabclassic` | PASS | `checks-20261107-044119-s2` |
+| Auto Belt Refill: loads (its log), refill after seeding the bottom slots | PASS (columns 0 / 1 filled to 4 rows by the auto pass) | `checks-20261107-043055-s2` |
+| `medtab` HD | PASS rows; #548 burst once | `checks-20261107-040716-s2` |
+
+Not judged by the harness on a release install: everything in 16:9 legacy graphics that needs a click (the bundled legacy169
+moves the panels; the checks' legacy positions are 4:3): `sendstash` legacy click, `medtab` legacy deposits, `stashtip`
+legacy hovers, the open-stash send in legacy (the harness walk to the stash misses in 16:9). Belt column counts (D2RLoader
+overlay) do not show in background captures: the owner checks them by hand.

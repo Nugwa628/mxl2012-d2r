@@ -7,6 +7,58 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.15 (2026-11-07)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+- Ctrl stat ranges are back. On some items with automagic mods a few range lines show twice (a D2RLoader issue).
+- The downloader updates itself to 0.1.3 first. It turns the Ctrl stat ranges back on once (older downloaders turned
+  them off); after that, your own `item_stat_ranges` setting is kept.
+
+**New:**
+
+- The mod now comes with **Auto Belt Refill** by **jaycachou-svg** (<https://github.com/jaycachou-svg/auto-belt-refill>,
+  v0.35.9, shipped and adapted with the author's permission). It refills your potion belt from the inventory: by itself a
+  moment after you drink, and in one go on a key you bind under Options > Controls (Refill Belt; no key is set by default).
+  Each belt column refills with exactly the potion in its bottom slot (a Healing Potion column gets Healing Potions, a
+  Greater Mana column Greater Mana Potions); to change a column, put another potion at its bottom. A completely empty column
+  gets nothing until you put a potion there yourself. A small number on each column shows how many of its potion you have
+  left (inventory and belt), red at 0, in HD and legacy graphics. Elixirs and the Goodberry are never moved.
+  It knows the belt sizes of Median XL 2012's own belts (2, 3 or 4 rows by grade). Set fixed columns, or turn it off with
+  `enabled = false`, in `mods\mxl2012\d2rloader\config\auto-belt-refill.toml`; updates keep your changes. Thanks to
+  jaycachou-svg for the plugin and the permission.
+
+- Map: once you have explored 70% of a level, press **L** (Options > Controls: "Reveal Level Map") to reveal the rest of
+  that level's map. A chat line tells you when it is available. Not in towns. The share is set in
+  `d2rloader/config/mxl2012-core.toml` (0 = always, 101 = off).
+
+- The automap (Tab) shows the area level, e.g. "Area Level 75", under the area name at the top right: the
+  monster level of the current area in the current difficulty (HD and legacy graphics).
+
+**Fixed:**
+
+- HD graphics, the Crypt: the low rock barricades are low rubble walls again instead of tall town walls, the stone arch
+  near the entrance is an arch instead of two shelf-like walls, and the iron fences no longer float above the floor.
+
+- Stash: hovering an item on the Gems, Materials, Runes, Median and Orbs tabs now shows its whole description, as in
+  the inventory. Each Mystic Orb shows what it adds, so the orbs can be told apart.
+
+- Fixed multiline skill descriptions and flavor text reading backwards (including Batstrike, Dark Summoning and Bloodbath), keeping each line’s color.
+
+- HD graphics: Celerity no longer draws fiery streaks across the screen, and Mephisto's Lightning Arena, Mythal and
+  Countdown use lighter effects (no white screen flash, far fewer explosions).
+
+- HD: Tran Athulua's walls are back. Its ruin walls were drawn sunk into the floor, so the area showed floor only; the
+  same fix brings up a few sunk walls in Kurast 3000 BA, Fauztinville and Rathma Square. The corridors west of the Tran
+  Athulua arrival, which still showed open floor with a few broken wall stubs, are now closed by walls as in legacy. The
+  short wall behind the braziers at the arrival still shows as pillars.
+
+- HD: Fauztinville's walkways no longer have walls standing on both sides: the back sides of terrace walls are gone, as in
+  classic, and many of its stairs are back. Kurast 3000 BA's sunken courtyard at the arrival is no longer fenced by those
+  walls either. Still open: the wide staircase at the Fauztinville arrival is drawn as flat floor.
+
 ### 0.1.14 (2026-11-06)
 
 D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its

@@ -7,13 +7,16 @@ here unless --plugin is given) it writes into dist/:
                                  <D2R>\\mods:
                                    mxl2012.mpq/modinfo.json   {"name": "mxl2012", "savepath": "mxl2012/"}
                                    mxl2012.mpq/data/...       install_mod.build_data (work/mod/data + the install-time merges)
-                                   d2rloader/plugins/mxl2012-core.dll, d2rloader/config/d2rloader.toml, d2rloader/patches/,
+                                   d2rloader/plugins/mxl2012-core.dll, d2rloader/config/d2rloader.toml + mxl2012-core.toml, d2rloader/patches/,
                                    d2rloader/metadata.json     (modVersion = <version>, website = the GitHub repo)
                                    d2rloader/plugins/legacy169.dll, d2rloader/config/legacy169.toml (D2R Legacy 16:9 at
                                    the pinned commit, tools/build_legacy169.ps1 unless --legacy169 is given)
                                    d2rloader/plugins/d2rl-buff-panel.dll + .mpq + licences, d2rloader/config/buff-panel.toml
                                    (Buff HUD, our fork of Lukaszpg's plugin at the pinned commit, tools/build_buffhud.ps1
                                    unless --buffhud is given)
+                                   d2rloader/plugins/d2rl-auto-belt-refill.dll, d2rloader/config/auto-belt-refill.toml
+                                   (Auto Belt Refill by jaycachou-svg at the pinned commit + our patches,
+                                   tools/build_beltrefill.ps1 unless --beltrefill is given)
                                  The manual download for players, and where tools/publish_release.py reads the file bytes
                                  from. There is no zip (owner decision 2026-10-26). Needs 7-Zip: the run stops without it.
   release-manifest.json          schemaVersion 2: version, required D2R build, required D2RLoader + sha256, every file of
@@ -28,7 +31,7 @@ files: D2R reads those from its own install). Without a baseline that check cann
 The release plugin is built by tools/build_plugin.ps1 -Release (CMake on PATH or Visual Studio's, the PluginSDK of
 .mxl-local.json; nothing is downloaded). tools/verify_package.py checks the finished 7z; tools/cut_alpha.ps1 runs it all.
 
-  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--legacy169 DLL] [--buffhud DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
+  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
   py -3 tools/package_release.py --no-data --plugin build/mxl2012-core.dll   (CI: no game files there; plugin + config only)
 Version: PluginVersion of plugin/src/mxl2012_core.cpp; --version must equal it (only --no-data builds may differ).
 """
@@ -84,8 +87,21 @@ BUFFHUD = {"name": "Buff HUD", "version": "1.1.0", "repo": "https://github.com/N
            "sdk_licence": "d2rloader/plugins/d2rl-buff-panel-PluginSDK-LICENSE.txt"}
 BUFFHUD_BUILD = ROOT / "build" / "buffhud"
 BUFFHUD_FILES = ("dll", "mpq", "config", "licence", "sdk_licence")
+# Auto Belt Refill by jaycachou-svg, shipped with the author's permission (2026-11-06; the repository has no licence file),
+# docs/bundled-plugins.md. Built from the author's source at the commit the gitlink third_party/auto-belt-refill pins, with our
+# patches (third_party/auto-belt-refill-mxl2012/*.patch: PluginSDK renames, Median belt rows, first-slot
+# matching and belt counts) applied at build time (tools/build_beltrefill.ps1), unless --beltrefill is given. Its config is ours
+# (columns follow their first slot, elixirs never refilled, keys unbound) and a
+# `preserve` file, as legacy169's. The author's prebuilt DLL is for an older D2RLoader ABI and is refused.
+BELTREFILL = {"name": "Auto Belt Refill", "version": "0.35.9", "repo": "https://github.com/jaycachou-svg/auto-belt-refill",
+              "author": "jaycachou-svg", "dll": "d2rloader/plugins/d2rl-auto-belt-refill.dll",
+              "config": "d2rloader/config/auto-belt-refill.toml"}
+BELTREFILL_BUILD = ROOT / "build" / "beltrefill"
+BELTREFILL_OURS = ROOT / "third_party" / "auto-belt-refill-mxl2012"  # the patches, our CMakeLists.txt and the config
+BELTREFILL_FILES = ("dll", "config")
+BELTREFILL_AUTHOR_DLL = "77c7d1b9068c8cacc2fded62ff1120b441001d601ad65a8ee3043e3b61c650db"  # its plugins/ at the pinned commit
 # The player's own settings: the downloader writes these only when they are missing (docs/release.md).
-PRESERVE = ["d2rloader/config/d2rloader.toml"]
+PRESERVE = ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml"]
 SCHEMA = 2  # 2: the 7z ("archive") replaced the zip; the downloader installs from it or from objects (docs/release.md)
 STAMP = (2026, 1, 1, 0, 0, 0)  # the staged files' mtime
 # 7z: LZMA2, one solid block, multithreaded. No time stamps go in the archive (-mtm/-mtc/-mta off) and the staged files get
@@ -132,6 +148,16 @@ def legacy169_commit() -> str:
 def buffhud_commit() -> str:
     """The d2rl-buff-hud fork commit this repo pins: the gitlink third_party/d2rl-buff-hud."""
     return pinned_commit("third_party/d2rl-buff-hud")
+
+
+def beltrefill_commit() -> str:
+    """The auto-belt-refill commit this repo pins: the gitlink third_party/auto-belt-refill."""
+    return pinned_commit("third_party/auto-belt-refill")
+
+
+def beltrefill_patches(ours: Path = BELTREFILL_OURS) -> list:
+    """Our patches as tools/build_beltrefill.ps1 records them in PATCHES: "<sha256>  <name>", in name order."""
+    return [f"{sha256(p)}  {p.name}" for p in sorted(ours.glob("*.patch"), key=lambda p: p.name)]
 
 
 def build_legacy169() -> Path:
@@ -182,6 +208,28 @@ def check_buffhud(dll: Path) -> list:
     return problems
 
 
+def build_beltrefill() -> Path:
+    """tools/build_beltrefill.ps1: d2rl-auto-belt-refill.dll from the pinned commit's source with our patches."""
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        raise SystemExit("no PowerShell to run tools/build_beltrefill.ps1: build Auto Belt Refill there and pass --beltrefill DLL")
+    subprocess.check_call([shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_beltrefill.ps1")], cwd=ROOT)
+    return BELTREFILL_BUILD / "Release" / "d2rl-auto-belt-refill.dll"
+
+
+def check_beltrefill(dll: Path) -> list:
+    """Problems of an Auto Belt Refill build for a release: the pinned version, and not the author's prebuilt DLL (written for
+    an older D2RLoader ABI, without the Median belt rows)."""
+    b = dll.read_bytes()
+    problems = []
+    if b"auto-belt-refill\0" not in b or BELTREFILL["version"].encode() + b"\0" not in b:
+        problems.append(f"{dll} does not carry Auto Belt Refill version {BELTREFILL['version']}")
+    if hashlib.sha256(b).hexdigest() == BELTREFILL_AUTHOR_DLL:
+        problems.append(f"{dll} is the author's prebuilt DLL (older D2RLoader ABI): build it with tools/build_beltrefill.ps1")
+    return problems
+
+
 def check_release_plugin(dll: Path, version: str) -> list:
     """Problems of a plugin DLL for a release: the test harness must be compiled out, and the version must be the release's."""
     b = dll.read_bytes()
@@ -202,7 +250,7 @@ def sha256(path: Path) -> str:
 
 
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
-          legacy169: Path = None, buffhud: Path = None) -> None:
+          legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None) -> None:
     if mod.exists():
         shutil.rmtree(mod)
     data = mod / f"{NAME}.mpq" / "data"
@@ -217,6 +265,8 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
         stage_legacy169(mod, legacy169)
     if buffhud is not None:
         stage_buffhud(mod, buffhud)
+    if beltrefill is not None:
+        stage_beltrefill(mod, beltrefill)
 
 
 def stage_legacy169(mod: Path, dll: Path, src: Path = ROOT / "build" / "legacy169-src") -> None:
@@ -244,12 +294,26 @@ def stage_buffhud(mod: Path, dll: Path, src: Path = ROOT / "build" / "buffhud-sr
     shutil.copy2(src / "buff-panel.toml", mod / BUFFHUD["config"])
 
 
+def stage_beltrefill(mod: Path, dll: Path, src: Path = ROOT / "build" / "beltrefill-src", ours: Path = BELTREFILL_OURS) -> None:
+    """d2rl-auto-belt-refill.dll into d2rloader/plugins/ (mod-scoped) and our auto-belt-refill.toml (the locked Median columns)
+    into d2rloader/config/. The build must come from the pinned commit with this repo's patches (tools/build_beltrefill.ps1
+    records both in build/beltrefill-src)."""
+    pinned = (src / "PINNED_COMMIT").read_text("ascii").strip() if (src / "PINNED_COMMIT").is_file() else None
+    if pinned != beltrefill_commit():
+        raise SystemExit(f"{src} is not the pinned commit {beltrefill_commit()[:9]} (it is {pinned}): run tools/build_beltrefill.ps1")
+    applied = (src / "PATCHES").read_text("ascii").splitlines() if (src / "PATCHES").is_file() else []
+    if [ln.strip() for ln in applied if ln.strip()] != beltrefill_patches(ours):
+        raise SystemExit(f"{src} was not built with the patches in {ours}: run tools/build_beltrefill.ps1")
+    shutil.copy2(dll, mod / BELTREFILL["dll"])
+    shutil.copy2(ours / "auto-belt-refill.toml", mod / BELTREFILL["config"])
+
+
 def preserve_list(mod: Path) -> list:
     """PRESERVE plus the bundled plugins' configs the package holds."""
-    return PRESERVE + [c for c in (LEGACY169["config"], BUFFHUD["config"]) if (mod / c).is_file()]
+    return PRESERVE + [c for c in (LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"]) if (mod / c).is_file()]
 
 
-def bundled_plugins(legacy169: bool, buffhud: bool) -> list:
+def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False) -> list:
     """The manifest's bundledPlugins: name, version, repository, source commit and files of each plugin the package holds."""
     out = []
     if legacy169:
@@ -259,6 +323,10 @@ def bundled_plugins(legacy169: bool, buffhud: bool) -> list:
         out.append({"name": BUFFHUD["name"], "version": BUFFHUD["version"], "repo": BUFFHUD["repo"],
                     "upstream": BUFFHUD["upstream"], "author": BUFFHUD["author"], "commit": buffhud_commit(),
                     "files": [BUFFHUD[k] for k in BUFFHUD_FILES]})
+    if beltrefill:
+        out.append({"name": BELTREFILL["name"], "version": BELTREFILL["version"], "repo": BELTREFILL["repo"],
+                    "author": BELTREFILL["author"], "commit": beltrefill_commit(), "patches": beltrefill_patches(),
+                    "files": [BELTREFILL[k] for k in BELTREFILL_FILES]})
     return out
 
 
@@ -452,7 +520,10 @@ def main() -> int:
                     "tools/build_legacy169.ps1; --no-data builds leave it out unless given)")
     ap.add_argument("--buffhud", type=Path, help="a release d2rl-buff-panel.dll of the pinned fork commit, its .mpq next to it "
                     "(default: build both with tools/build_buffhud.ps1; --no-data builds leave it out unless given)")
-    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169 and Buff HUD unless given (unit tests; "
+    ap.add_argument("--beltrefill", type=Path, help="a release d2rl-auto-belt-refill.dll of the pinned commit with our patches "
+                    "(default: build it with tools/build_beltrefill.ps1; --no-data builds leave it out unless given)")
+    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD and Auto Belt Refill unless given "
+                    "(unit tests; "
                     "tools/verify_package.py refuses such a package)")
     ap.add_argument("--data-from", type=Path, help="copy this finished mxl2012.mpq/data instead of building it")
     ap.add_argument("--no-data", action="store_true", help="no mxl2012.mpq/data (CI): manifest says complete=false")
@@ -499,13 +570,16 @@ def main() -> int:
     buffhud = a.buffhud or (None if a.no_data or a.no_bundled else build_buffhud())
     if buffhud is not None:
         problems += check_buffhud(buffhud) if buffhud.is_file() else [f"no d2rl-buff-panel.dll at {buffhud}"]
+    beltrefill = a.beltrefill or (None if a.no_data or a.no_bundled else build_beltrefill())
+    if beltrefill is not None:
+        problems += check_beltrefill(beltrefill) if beltrefill.is_file() else [f"no d2rl-auto-belt-refill.dll at {beltrefill}"]
     if problems:
         print("\n".join(problems))
         return 1
 
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
-    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud)
+    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
@@ -526,7 +600,7 @@ def main() -> int:
     t7 = time.time() - t7
     files = file_list(mod)
     man_path = a.out / "release-manifest.json"
-    bundled = bundled_plugins(legacy169 is not None, buffhud is not None)
+    bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None)
     man_path.write_text(json.dumps(manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod),
                                             bundled), indent=1) + "\n", encoding="utf-8")
     notes = a.out / f"RELEASE_NOTES-{version}.md"

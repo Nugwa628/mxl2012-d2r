@@ -2,7 +2,7 @@
 # every row of the art that D2R does not draw itself (class "hand"; an `exact` row keeps D2R's own effect). Picked from
 # offline side-by-sides: Median's classic frames against the classic art each D2R effect stands for.
 # Optional (lane picktint): tint = a colour ramp of tools/hd_recolour.py RAMPS (gold, green, red, fire, violet) mapped onto the
-# effect's colourful gradients, or `<ramp>:<gradient stem>+<stem>` for named (grey-ish) ones; rows = the only missile rows
+# effect's colourful gradients, or `<ramp>:<gradient stem>+<stem>` for named (grey-ish) ones; rows = the only missile or overlay rows
 # (comma list) the line is for, which then wins even where D2R draws the art itself.
 # kind	art (as in data/hd-effects-map.tsv)	effect (missile model / overlay folder/name)	scale (auto = by art size)	confidence	reason	tint	rows
 kind	art	effect	scale	confidence	reason	tint	rows
@@ -26,7 +26,7 @@ missile	littleredball	expansion_imp_fireball	auto	medium	small red glowing ball;
 missile	lorenado	expansion_tornado	auto	high	the art is Tornado's frames in green (Lorenado); was a green orb. Its brown dust ramp is mapped onto green (bug #482)	green:T_FX_Brown_Dust_Gradient_03
 missile	flipbook	yellow_ball_glow_2	2	medium	Lorenado's 80 flying books: classic shows each as a green glow (the row's green light, bug #482); a glow ball in a green ramp. Was a lightning column, then a few debris bits	green
 missile	scimitar6	expansion_bladefury	auto	medium	small spinning blade (Bladestorm); was a lightning column
-missile	sparklez1	dopplezon_explode	auto	medium	scattered red sparkles (Mythal); was a big red Diablo lightning bolt
+missile	sparklez1	explosion_spark_small	1	medium	scattered red sparkles (Mythal, Mephisto); Dopplezon's burst flashed white with a light per sparkle, dozens a second (lane hdfx). Orange, no red gradient to tint. Was a big red Diablo lightning bolt
 missile	sparklez2	expansion_impmissile_01	auto	medium	red star burst; was a blue lightning strike
 missile	tinyflame	ground_fire_small	auto	high	small flame on the ground (Colosseum); was a flat lava puddle
 missile	discoball	yellow_ball_glow_2	auto	medium	small glowing orb (its colour cycles in classic); was a flying skull (weak stand-in)
@@ -63,3 +63,7 @@ overlay	extra/shiversoverlay	common/shrine_resist_cold	auto	medium	looping pale 
 overlay	extra/chillbloodinitialpoof	common/shrine_resist_cold	auto	medium	looping pale blue sparkle cluster (Amazing Grace aura state, a blue sparkle puff that repeats in classic; bug #507). Tried in game first: common/ice_explode (a one-shot burst) and sorceress/frozenarmor (a distortion, hardly visible); was common/chillblood, an empty D2R stub (drew nothing)
 overlay	extra/fistofares_front	common/burning	auto	medium	flames on the unit (War Spirit state zeraesavengerstate, a flaming swipe in classic; bug #507). Tried in game first: sorceress/srfirehit (a one-shot hit) and sorceress/enchant (drawn on the weapon), neither seen on an Amazon; was amazon/cast_fistofares, an empty D2R stub (drew nothing)
 missile	extra/poisongas	poison_nova	auto	high	Batstrike's nova (knocknova, bug #526): D2R's Poison Nova gas ring, which flies its whole range like the classic cloud (PoisonGas frames 15-20 looped); was the one-shot poison puff at 1.2, smaller than the classic cloud and gone before the missile ended. Classic draws it orange-red; a fire tint made no change in game (Poison Nova's colours are baked into its particle program, lane batstrike)
+missile	coldfuse	expansion_iceglint	auto	medium	small blue sparkles closing in (Countdown, Mephisto); was a tornado per trail missile (lane hdfx)
+missile	lightningboltbig	lightningbolt_big	1	medium	Lightning Arena's ring of looping bolts (Mephisto): the Thunder Storm bolt; Cairn Stones' flashing bolt flickered the screen for 5 s (lane hdfx)		thunderringmakerflame
+overlay	expansion/catadeathovereast	sorceress/fire_cast_1	auto	medium	fire burst on the unit as Celerity starts / ends; D2R's catapult death drew fire streaks across the whole screen (lane hdfx)		catapult_death_e
+overlay	expansion/catadeathoversouth	common/fire_hit	auto	medium	fire burst on the unit as Celerity ends; D2R's catapult death drew fire streaks across the whole screen (lane hdfx)		catapult_death_s

@@ -41,6 +41,12 @@ class VerifyPackageTests(unittest.TestCase):
         (self.tmp / "d2rl-buff-panel.dll").write_bytes(b"MZ buff-panel\0 1.1.0\0 [buff_panel]")
         (self.tmp / "d2rl-buff-panel.mpq").write_bytes(b"MPQ\x1a")
         pr.stage_buffhud(self.mod, self.tmp / "d2rl-buff-panel.dll", buff)
+        belt = self.tmp / "beltrefill-src"  # what tools/build_beltrefill.ps1 exports
+        belt.mkdir()
+        (belt / "PINNED_COMMIT").write_text(pr.beltrefill_commit(), encoding="ascii")
+        (belt / "PATCHES").write_text("\n".join(pr.beltrefill_patches()), encoding="ascii")
+        (self.tmp / "d2rl-auto-belt-refill.dll").write_bytes(b"MZ auto-belt-refill\0 0.35.9\0")
+        pr.stage_beltrefill(self.mod, self.tmp / "d2rl-auto-belt-refill.dll", belt)
 
     def test_a_staged_package_is_a_player_mod_folder(self):
         self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
@@ -53,11 +59,14 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / pr.LEGACY169["config"]).unlink()
         (self.mod / pr.BUFFHUD["mpq"]).write_bytes(b"PK")
         (self.mod / pr.BUFFHUD["licence"]).unlink()
+        (self.mod / pr.BELTREFILL["dll"]).write_bytes(b"MZ auto-belt-refill\0 0.35.8\0")
+        (self.mod / pr.BELTREFILL["config"]).unlink()
         problems = vp.check_mod_folder(self.mod, "9.9.9")
         text = "\n".join(problems)
         for want in ("modinfo.json", "modVersion", "test harness", "PluginVersion", "Hero.d2s", "legacy169 test build",
                      "legacy169.toml is missing",
-                     "not a packed MPQ", "d2rl-buff-panel-LICENSE.txt is missing"):
+                     "not a packed MPQ", "d2rl-buff-panel-LICENSE.txt is missing",
+                     "Auto Belt Refill version 0.35.9", "auto-belt-refill.toml is missing"):
             self.assertIn(want, text)
 
     def test_archive_paths_must_stay_in_the_mod_folder(self):

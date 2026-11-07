@@ -25,6 +25,7 @@
 #include "server_frame.h"
 #include "testharness.h"
 #include "send_stash.h"
+#include "map_reveal.h"
 
 #include <D2RLPlugin/api.h>
 
@@ -2997,6 +2998,27 @@ auto CmdSendStash(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `mapreveal [press | threshold N]` (UI thread): the map reveal part's numbers for the current level; `press` does what the key
+// does, at once; `threshold N` sets another threshold until the next start (a test shortcut: the settings file stays).
+auto CmdMapReveal(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const bool press = t.n > 1 && hcmd::LowerEq(t.tok[1], "press");
+	long long threshold = 0;
+	if (t.n > 2 && hcmd::LowerEq(t.tok[1], "threshold")) {
+		if (!hcmd::ParseInt(t.tok[2], &threshold)) {
+			return Fail(c, "usage: mapreveal threshold <0-101>");
+		}
+		MapRevealSetThreshold(static_cast<int>(threshold));
+	}
+	if (press && !MapRevealPress()) {
+		return Fail(c, "mapreveal: the part is off");
+	}
+	char status[640];
+	MapRevealStatus(status, sizeof(status));
+	Out("mapreveal %s%s", status, press ? " (pressed)" : "");
+	Out("mapreveal last=\"%s\"", MapRevealLastLine());
+	return true;
+}
+
 using VerbFn = bool (*)(Ctx*, const hcmd::Tokens&) noexcept;
 struct Verb {
 	const char* name;
@@ -3025,6 +3047,7 @@ const Verb Verbs[] = {
     {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"cstat", CmdClientStat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
     {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true},
+    {"mapreveal", CmdMapReveal, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {

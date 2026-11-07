@@ -84,16 +84,30 @@ class SaveFormatKeyTests(unittest.TestCase):
         self.assertIn('[d2rcore.save_format]\nmode = "extended"\n', out)
 
     def test_installed_file_unchanged(self):
-        text = ('[d2rcore.save_format]\nmode = "extended"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n'
-                '\n[d2rcore.items]\nitem_stat_ranges = false\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n')
+        text = ('# mxl2012 migration: ctrl-stat-ranges-on-v1\n[d2rcore.save_format]\nmode = "extended"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n'
+                '\n[d2rcore.items]\nitem_stat_ranges = true\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n')
         self.assertEqual(self.ensure_all(text), text)
 
-    def test_stat_ranges_off(self):
-        """docs/bugs.md #528 (owner decision 2026-11-03): D2RLoader's Ctrl stat ranges are off in the mod's config."""
+    def test_stat_ranges_on(self):
+        """docs/bugs.md #528 (owner decision 2026-11-07): D2RLoader's Ctrl stat ranges are on in the mod's config."""
         out = self.ensure_all('[d2rcore.save_format]\nmode = "extended"\n')
-        self.assertIn("[d2rcore.items]\nitem_stat_ranges = false\n", out)
+        self.assertIn("[d2rcore.items]\nitem_stat_ranges = true\n", out)
         out = self.ensure_all("[d2rcore.items]\n# item_stat_ranges = true\nmaximum_sockets = true\n")
-        self.assertIn("[d2rcore.items]\nitem_stat_ranges = false\nmaximum_sockets = true\n", out)
+        self.assertIn("[d2rcore.items]\nitem_stat_ranges = true\nmaximum_sockets = true\n", out)
+
+    def test_ranges_migration_then_player_choice(self):
+        marker = "# mxl2012 migration: ctrl-stat-ranges-on-v1"
+        for text in ("[d2rcore.items]\n  item_stat_ranges = false # mine",
+                     "d2rcore.items.item_stat_ranges = false # mine\n[x]\nitem_stat_ranges = false\n",
+                     "\ufeff[d2rcore.items]\r\n  item_stat_ranges = false # mine"):
+            out = install_mod.apply_toml_key(text, "d2rcore.items", "item_stat_ranges", "true", "once")
+            bom = "\ufeff" if text.startswith("\ufeff") else ""
+            nl = "\r\n" if "\r\n" in text else "\n"
+            self.assertEqual(out, bom + marker + nl + text[len(bom):].replace("false", "true", 1))
+            self.assertEqual(install_mod.apply_toml_key(out, "d2rcore.items", "item_stat_ranges", "true", "once"), out)
+            edited = out.replace("item_stat_ranges = true", "item_stat_ranges = false", 1)
+            self.assertEqual(install_mod.apply_toml_key(edited, "d2rcore.items", "item_stat_ranges", "true", "once"), edited)
+        self.assertEqual(install_mod.apply_toml_key(marker + "\n", "d2rcore.items", "item_stat_ranges", "true", "once"), marker + "\n")
 
     ROTW = "always_enable_rotw_legacy_graphics_keybind"
 
@@ -142,9 +156,10 @@ class SaveFormatKeyTests(unittest.TestCase):
                          "[d2rcore.other]\nadd_shared_tabs = 9\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n")
 
     def test_forced_keys(self):
-        """Owner decision 2026-11-04 (#498): the G toggle is forced like the save format and the stat ranges."""
+        """Owner decision 2026-11-04 (#498): the G toggle and save format stay forced; ranges migrate once."""
         forced = {key: f for _, key, _, f, _ in install_mod.TOML_KEYS}
-        self.assertTrue(forced["mode"] and forced["item_stat_ranges"] and forced[self.ROTW])
+        self.assertEqual(forced["item_stat_ranges"], "once")
+        self.assertTrue(forced["mode"] and forced[self.ROTW])
 
     def test_rotw_legacy_toggle_set_by_hand_becomes_true(self):
         """Owner decision 2026-11-04 (#498): a hand-set or template false ends as true; indent and comment stay."""

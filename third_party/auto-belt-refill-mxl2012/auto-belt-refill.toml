@@ -1,0 +1,35 @@
+# Auto Belt Refill by jaycachou-svg (https://github.com/jaycachou-svg/auto-belt-refill), shipped with D2R-XL 2012.
+# Restart the game after any change. Set enabled = false to turn the plugin off; the mod updates keep this file.
+#
+# Hotkeys: none by default. Bind "Refill Belt" and "Snapshot Belt Columns" in the game under Options > Controls, or set
+# fill_key / snapshot_key below (for example "F9"); the in-game binding wins. The console command belt-fill fills too.
+#
+# match_first_slot = true: each belt column refills from the inventory with exactly the potion in its first (bottom) slot,
+# hp3 with hp3, mp5 with mp5. To change a column, put another potion at its bottom. A completely empty column gets nothing
+# until you put a potion there yourself.
+# belt_counts = true: a small number on each column shows how many of its potion you have (inventory and belt together); it
+# turns red at 0.
+# never_refill: the elixirs and the Goodberry are buffs, not refills: the plugin never moves them, also from a column's bottom.
+# Keep each value on one line (the plugin reads the file line by line).
+#
+# Median XL 2012 belt potions (item codes):
+#   hp5 Greater, hp4 Strong, hp3 Healing, hp2 Light, hp1 Lesser Healing Potion
+#   mp5 Greater, mp4 Strong, mp3 Mana, mp2 Light, mp1 Lesser Mana Potion
+#   vps Stamina, yps Antidote, wms Thawing Potion
+#
+# Fixed columns instead: set match_first_slot = false and add, for example,
+#   [column1]
+#   consumables = ["hp5", "hp4"]
+#   locked = true
+
+[general]
+enabled = true
+fill_key = ""
+snapshot_key = ""
+auto_refill = true
+auto_poll_frames = 15
+debug_logs = false
+prefer_large = true
+match_first_slot = true
+belt_counts = true
+never_refill = ["ey1", "ey2", "ey3", "ey4", "ey5", "ey6", "ey7", "ey8", "ey9", "eo7", "eo8", "eo9", "et1", "0g0", "0g1", "0g2", "0g3", "0g4", "0g5", "0g6", "0g7", "0g8", "b@b"]

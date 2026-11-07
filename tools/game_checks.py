@@ -9111,6 +9111,44 @@ WALL_MAPS = {60: "desertpeak", 59: "cypherpunk", 95: "glados", 18: "downtown", 9
 WALL_OFFSETS = ((0, 0), (12, 12), (-12, 12))   # subtiles from the arrival: three views per map (`place`, travel help)
 
 
+def wall_spots(env=None):
+    """MXL_WALL_SPOTS="84:20,30;40,12|18@10000,5000:64,64" -> {level: [(cell x, cell y)]}: .ds1 cells wall_visit shows instead
+    of WALL_OFFSETS; `@x,y` gives the level's origin where `presets rooms` (400 rooms at most) does not reach it. The origins
+    are under the key (level, "origin")."""
+    out = {}
+    for part in (os.environ if env is None else env).get("MXL_WALL_SPOTS", "").split("|"):
+        lv, _, cells = part.partition(":")
+        lv, _, origin = lv.partition("@")
+        if lv.strip().isdigit():
+            out[int(lv)] = [tuple(int(v) for v in c.split(",")) for c in cells.split(";") if c.count(",") == 1]
+            if origin.count(",") == 1:
+                out[(int(lv), "origin")] = tuple(int(v) for v in origin.split(","))
+    return out
+
+
+def wall_hop(x, y, step=15, hops=40):
+    """Move the player toward (x, y) by `place` hops of at most `step` sub-tiles (a far `place` fails: its room is not loaded),
+    sideways around what blocks the way. -> where the player ended."""
+    p = hstate()["player"]
+    cx, cy = p.get("x"), p.get("y")
+    for _ in range(hops):
+        dx, dy = x - cx, y - cy
+        if abs(dx) <= 2 and abs(dy) <= 2:
+            break
+        sx, sy = max(-step, min(step, dx)), max(-step, min(step, dy))
+        for ox, oy in ((sx, sy), (sx, 0), (0, sy), (sx // 2 - 5, sy // 2 + 5), (sx // 2 + 5, sy // 2 - 5)):
+            if (ox or oy) and H("place %d %d" % (cx + ox, cy + oy))[0]:
+                break
+        else:
+            break
+        p = hstate()["player"]
+        if (p.get("x"), p.get("y")) == (cx, cy):
+            break
+        cx, cy = p.get("x"), p.get("y")
+    time.sleep(3)
+    return cx, cy
+
+
 def wall_visit(mode, log, shots):
     """Every map of WALL_MAPS in the current graphics mode: travel by `h level`, three screenshots, the asserts per map.
     -> {level: 'reached' | 'not reached'}."""
@@ -9129,10 +9167,20 @@ def wall_visit(mode, log, shots):
             continue
         time.sleep(5)  # the scene and its models stream in
         x0, y0 = p.get("x"), p.get("y")
-        for n, (dx, dy) in enumerate(WALL_OFFSETS):
-            if n and x0 is not None:
+        views = WALL_OFFSETS
+        if wall_spots().get(lv) and x0 is not None:   # MXL_WALL_SPOTS: map cells to look at, from the level's origin
+            rooms = [(int(r["x"]), int(r["y"])) for r in (kv(ln) for ln in H("presets rooms")[1] if ln.startswith("room x="))]
+            if rooms:
+                ox, oy = wall_spots().get((lv, "origin")) or (min(x for x, _ in rooms), min(y for _, y in rooms))
+                views = [(0, 0)] + [(ox + 5 * cx + 2 - x0, oy + 5 * cy + 2 - y0) for cx, cy in wall_spots()[lv]]
+                log.append("%s %d %s: origin %d,%d, spots %s" % (mode, lv, name, ox, oy, wall_spots()[lv]))
+        for n, (dx, dy) in enumerate(views):
+            if n and x0 is not None and views is WALL_OFFSETS:
                 H("place %d %d" % (x0 + dx, y0 + dy))
                 time.sleep(3)
+            elif n and x0 is not None:   # a far spot: hop there, the rooms ahead load as the player nears them
+                at = wall_hop(x0 + dx, y0 + dy)
+                log.append("%s %d %s: spot %d -> %s,%s (wanted %d,%d)" % (mode, lv, name, n, at[0], at[1], x0 + dx, y0 + dy))
             shots.append(sh("wall_%s_%s_%d" % (name, mode, n)))
         bad, known = engine_issues(mark)
         caches = ["AssetCache DefaultCapacity %s capacity %s path %s" % (a["default"], a["capacity"], a["path"])
@@ -9144,7 +9192,7 @@ def wall_visit(mode, log, shots):
 
 def wall_maps():
     """Median's own maps (the 8 it retextured and the 9 on stock tiles), in HD (wall scenes of tools/walls_hd.py: D2R's own
-    wall models on the map's wall cells) and in classic graphics (Median's own tiles); MXL_WALL_LEVELS=90,96 for some only. SHORTCUT: the harness travels there (`h level`, `place`);
+    wall models on the map's wall cells) and in classic graphics (Median's own tiles); MXL_WALL_LEVELS=90,96 for some only, MXL_WALL_SPOTS for map cells (wall_spots). SHORTCUT: the harness travels there (`h level`, `place`);
     this is a graphics check, not a player path. What is judged by hand from the screenshots: walls drawn where the classic
     view has them, nothing floating or blocking a walkable floor, no black holes. FAIL on an engine assert or crash.
     SET-UP: D2R's `god 1` cheat, so the level-1 test character lives through the screenshots (Amazon Warriors kill it on
@@ -15299,6 +15347,223 @@ def check_medtabclassic():
 
 
 CHECKS += [("medtab", check_medtab), ("medtabclassic", check_medtabclassic)]
+
+
+def check_stashtip():
+    """Bug #551: the RotW stash's advanced slots show the item's whole tooltip (the orbs' effect text), HD and legacy
+    (MXL_CHAR=<a RotW character>; tools/stashtip_checks.py)."""
+    import stashtip_checks
+    stashtip_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("stashtip", check_stashtip)]
+
+def check_mapreveal():
+    """The pity map reveal: refused below the threshold and in town, the "available" line, the key that reveals the rest of the
+    level, HD and legacy, an outdoor level and a dungeon each (tools/mapreveal_checks.py)."""
+    import mapreveal_checks
+    mapreveal_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("mapreveal", check_mapreveal)]
+
+# lane hdcombat: player report "damage, hits and chance-to-cast procs work less well in HD than in legacy graphics". The same
+# Barbarian, sword and zombie in each graphics mode: HC_ATTACKS left clicks without procs (hits = clicks after which the zombie
+# lost life, damage = its life lost), then HC_ATTACKS clicks with Addertongue (25 % Venomous Spirit 841 on attack; procs = the
+# missiles the server made, a plain melee attack makes none), then the button held for HC_HOLD_S; server frames and wall time.
+# A harness `equip` item never procs (raw stats or a unique row): it is placed without the item events; see hc_wear_ctc.
+HC_WEAPON = "104"  # Broad Sword (Grade 1)
+HC_CTC_WEAPON = ("110", 327)  # Addertongue (2hsd, uniqueitems row 327, lvl 9): att-skill 841, 25 %
+HC_ATTACKS = int(os.environ.get("MXL_HC_ATTACKS", "30"))
+HC_HOLD_S = 20
+
+
+def hc_frame():
+    _ok, ln = H("state")
+    return first(ln, r"frame=(\d+)")
+
+
+def hc_clicks(mid, log, n):
+    """n left clicks on the zombie: (hits, life lost, server frames, seconds)."""
+    hits = lost = 0
+    f0, t0 = hc_frame(), time.time()
+    for _ in range(n):
+        before = rd("mon:%d" % mid, 6)
+        if before is None or not click_unit(mid):
+            log.append("zombie %d gone" % mid)
+            break
+        time.sleep(1.0)
+        after = rd("mon:%d" % mid, 6)
+        if after is not None and after < before:
+            hits += 1
+            lost += (before - after) >> 8
+            setstat("mon:%d" % mid, 6, before)  # life back: the zombie never dies
+    return hits, lost, (hc_frame() or 0) - (f0 or 0), round(time.time() - t0, 1)
+
+
+def hc_hold(mid, log, secs):
+    """The left button held on the zombie for secs (continuous attacks): (0, life lost, server frames)."""
+    st = hstate()
+    p, m = st["player"], next((m for m in st["mons"] if m.get("id") == mid), None)
+    if m is None:
+        return 0, 0, 0
+    dx, dy = m["mx"] - p["x"], m["my"] - p["y"]
+    fx, fy = (800 + (dx - dy) * 27) / 1600, (405 + (dx + dy) * 13.5) / 900
+    g.click(fx, fy, move_only=True)
+    h, v = g.need_window(), g.vinput()
+    cr = wt.RECT()
+    g.user32.GetClientRect(h, ctypes.byref(cr))
+    lp = ((int(fy * cr.bottom) & 0xFFFF) << 16) | (int(fx * cr.right) & 0xFFFF)
+    before, f0 = rd("mon:%d" % mid, 6), hc_frame()
+    v[4] |= 1
+    g.user32.PostMessageW(h, g.WM_LBUTTONDOWN, 1, lp)
+    try:
+        time.sleep(secs)
+    finally:
+        v[4] &= ~1
+        g.user32.PostMessageW(h, g.WM_LBUTTONUP, 0, lp)
+    after = rd("mon:%d" % mid, 6)
+    lost = ((before or 0) - (after or 0)) >> 8
+    if before is not None:
+        setstat("mon:%d" % mid, 6, before)
+    return 0, lost, (hc_frame() or 0) - (f0 or 0)
+
+
+def hc_wear_ctc(log):
+    """Addertongue made in the backpack and worn by the client's packets 0x19 / 0x1a (the player path: the harness `equip`
+    places the item without the item events, so its chance to cast never fires)."""
+    _ok, ln = Hl("item %s uniq=%d inv" % HC_CTC_WEAPON, log)
+    iid, x, y = first(ln, r"item id=(\d+)"), first(ln, r" x=(\d+)"), first(ln, r" y=(\d+)")
+    if iid is None:
+        return False
+    Hl("unequip rhand", log)
+    Hl("unequip lhand", log)
+    Hl("pkt 19 " + _le(iid, x, y, 0), log)
+    time.sleep(0.4)
+    Hl("pkt 1a " + _le(iid, 4), log)
+    time.sleep(0.8)
+    return True
+
+
+def hc_round(mode, log, rows):
+    goto(1)
+    if not set_graphics(mode):
+        rows.append("%s: graphics not set" % mode)
+        return None
+    goto(2)
+    kill_all_near()
+    bs_wear(log, HC_WEAPON)
+    ids = bs_targets(log, 1)
+    if not ids:
+        rows.append("%s: no zombie" % mode)
+        return None
+    plain = hc_clicks(ids[0], log, HC_ATTACKS)
+    Hl("unequip rhand", log)
+    hc_wear_ctc(log)
+    Hl("missiles reset", log)
+    ctc = hc_clicks(ids[0], log, HC_ATTACKS)
+    time.sleep(1.0)
+    _ok, ms = Hl("missiles", log)
+    procs = (sum(missiles_seen(ms).values()), sorted(missiles_seen(ms).items()))
+    rows.append("%s: plain %d clicks -> hits %d, damage %d, %d frames, %ss; ctc %d clicks -> hits %d, damage %d, proc missiles "
+                "%d %s, %d frames, %ss" % ((mode, HC_ATTACKS) + plain + (HC_ATTACKS,) + ctc[:2] + procs + ctc[2:]))
+    Hl("missiles reset", log)
+    held = hc_hold(ids[0], log, HC_HOLD_S)
+    time.sleep(1.0)
+    seen = missiles_seen(Hl("missiles", log)[1])
+    rows.append("%s: held %ss -> damage %d, %d frames, proc missiles %d" % ((mode, HC_HOLD_S) + held[1:] + (sum(seen.values()),)))
+    kill_all_near()
+    return plain, ctc, procs, held
+
+
+def check_hdcombat():
+    """Lane hdcombat: hits, damage and chance-to-cast procs of the same attacks in HD and in legacy graphics (hc_round). PASS:
+    both modes have hits and procs. The numbers are compared by hand (rows)."""
+    mark = engine_mark()
+    log, rows, bad = [], [], []
+    if not be_class(4):
+        return finish("hdcombat", False, "could not play a barbarian", mark)
+    enable_debug()
+    with Mana(), Level(30), Tank():
+        for mode in ("hd", "legacy", "hd", "legacy"):
+            got = hc_round(mode, log, rows)
+            if not got:
+                bad.append("%s: no round" % mode)
+            elif not got[0][0] or not got[2][0]:
+                bad.append("%s: no hits or no procs" % mode)
+        set_graphics("hd")
+        goto(1)
+    finish("hdcombat", not bad, "; ".join(rows + bad), mark, (), log)
+
+
+CHECKS += [("hdcombat", check_hdcombat)]
+
+
+def arealvl_status():
+    """(last level id, area level, difficulty) from the `arealvl` line of `mxl2012`, or None."""
+    m = re.search(r"last level (-?\d+) area level (-?\d+), difficulty (-?\d+)", mxl_text())
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def arealvl_look(label, want, log, shots):
+    """Automap (Tab) open in the current area: the plugin's last level / area level against levels.txt, a screenshot."""
+    close_right_panel()
+    g.press("tab")
+    time.sleep(1.5)
+    shots.append(sh("arealvl_%s" % label))
+    got = arealvl_status()
+    g.press("tab")
+    ok = got is not None and got[1] == want
+    log.append("%s: status %s, want area level %d -> %s" % (label, got, want, "ok" if ok else "WRONG"))
+    return ok
+
+
+def check_arealvl():
+    """Owner request 2026-11-06: the automap's top-right text shows "Area Level N" (levels.txt MonLvlEx of the difficulty) under
+    the area name (mxl2012-core part arealvl). Blood Moor (2) in Normal in HD and legacy graphics, then Nightmare (save edit of
+    nmh_checks: Normal's act bosses done) in HD; the plugin's line must equal levels.txt, the text is judged from the shots."""
+    import nmh_checks
+    mark = engine_mark()
+    log, shots, rows = [], [], []
+    if not need_game():
+        return add("arealvl", "BLOCKED", "not in a game")
+    row = row_of("levels", "Id", 2)
+    want = {d: int(row.get("MonLvlEx" + sfx) or 0) for d, sfx in ((0, ""), (1, "(N)"), (2, "(H)"))}
+    log.append("levels.txt Blood Moor MonLvlEx: %s" % want)
+    ok = True
+    for mode in ("hd", "legacy"):
+        goto(1)
+        if not set_graphics(mode):
+            rows.append("%s: graphics not set" % mode)
+            ok = False
+            continue
+        goto(2)
+        good = arealvl_look("normal_%s" % mode, want[0], log, shots)
+        rows.append("Normal %s %s" % (mode, "ok" if good else "WRONG"))
+        ok = ok and good
+    goto(1)
+    set_graphics("hd")
+    try:
+        nmh_checks.closed_edit_and_enter(sys.modules[__name__], nmh_checks.unlock_edit("nightmare"), "nightmare", log, shots)
+        goto(2)
+        good = arealvl_look("nightmare_hd", want[1], log, shots)
+        rows.append("Nightmare hd %s" % ("ok" if good else "WRONG"))
+        ok = ok and good
+        goto(1)
+        set_graphics("legacy")
+        goto(2)
+        good = arealvl_look("nightmare_legacy", want[1], log, shots)
+        rows.append("Nightmare legacy %s" % ("ok" if good else "WRONG"))
+        ok = ok and good
+        goto(1)
+        set_graphics("hd")
+    except Exception as e:  # noqa: BLE001 - the Normal rows still count
+        rows.append("Nightmare not reached: %s" % e)
+        ok = False
+    finish("arealvl", ok, "; ".join(rows) + " (want %s)" % want, mark, shots, log)
+
+
+CHECKS += [("arealvl", check_arealvl)]
 
 if __name__ == "__main__":
     main()

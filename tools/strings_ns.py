@@ -22,6 +22,7 @@ record in `strings/mxl2012/overrides.json`); group 2 = Median-only keys (namespa
   bad_colours(text)      the colour code characters of a text that D2R cannot draw (text_audit kind `colour-code`)
   map_colours also moves a code that ends a line behind the line break (D2R drops it there)
 """
+import csv
 import json
 import os
 import re
@@ -61,6 +62,40 @@ COLOUR_MAP = {"/": "0"}
 def map_colours(text: str) -> str:
     text = COLOUR_CODE.sub(lambda m: "ÿc" + COLOUR_MAP.get(m.group(1), m.group(1)), text)
     return EOL_COLOUR.sub(lambda m: m.group(2) + m.group(1), text)
+
+
+def skill_tooltip_keys(excel_dir) -> set[str]:
+    """References drawn top-down by the skill prose drawer (both graphics modes).
+    desctext / dsc2text / dsc3text still use the bottom-up stat-line builder.
+    """
+    if excel_dir is None:
+        raise ValueError("skill tooltip conversion requires --excel-dir (Median source tables)")
+    path = Path(excel_dir) / "skilldesc.txt"
+    with path.open(encoding="cp1252", newline="") as f:
+        return {value for row in csv.DictReader(f, delimiter="\t")
+                for column, value in row.items()
+                if column and column.lower() in {"str long", "str short", "str alt"} and value}
+
+
+def top_down_tooltip(text: str) -> str:
+    """Classic tooltip strings are stored bottom line first. Preserve source colour state
+    while reversing lines: a leading code colours subsequent stored lines, too.
+    Run before map_colours, which moves EOL colour changes to the following line.
+    """
+    if "\n" not in text:
+        return text
+    colour = "0"
+    coloured = bool(COLOUR_CODE.search(text))
+    lines = []
+    for line in text.split("\n"):
+        start = colour
+        codes = list(COLOUR_CODE.finditer(line))
+        if codes:
+            colour = codes[-1].group(1)
+        # Codes after the final glyph affect the next stored line, not this line.
+        line = re.sub(r"(?:ÿc.)+$", "", line)
+        lines.append(("ÿc" + start if coloured and line and not line.startswith("ÿc") else "") + line)
+    return "\n".join(reversed(lines))
 
 
 def bad_colours(text: str) -> list[str]:

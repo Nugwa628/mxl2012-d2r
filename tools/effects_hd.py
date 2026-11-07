@@ -967,7 +967,8 @@ def main() -> int:
         if only and name not in only:
             continue
         v = do.get(name)
-        if v is not None and v.art_name == m.art_name:
+        hpl = pick_line(picks, "overlay", m)
+        if v is not None and v.art_name == m.art_name and not (hpl and hpl["rows"]):  # a pick for the row wins
             n_own_o += 1  # D2R's own overlay: D2R's own HD folder is the Character
             if f"{v.folder}/{norm_key(v.name)}".lower() in hdo_files:
                 chars[name] = v.folder
@@ -980,7 +981,7 @@ def main() -> int:
             res("overlay", m, "no-art", "", 1.0, "", no_art_why(fixes, "overlay", m), art_in="missing")
             continue
         src = by_file.get(m.art_name)
-        hpl, ptint = pick_line(picks, "overlay", m), None
+        ptint = None
         if src and not (hpl and hpl["rows"]):
             c, sc, margin, _ = pick(m, src, True)
             cls, scale, conf = "exact", 1.0, confidence("exact", sc, margin, len(src), m, c)

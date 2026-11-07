@@ -204,6 +204,7 @@ class SceneTest(unittest.TestCase):
 PROP = "data/hd/env/model/act3/kurast/props/book02.model"
 BUTTRESS = "data/hd/env/model/act3/kurast/walls/wall_stone_buttress01.model"
 ELEVATION = "data/hd/env/model/act3/kurast/walls/wall_elevation_stone01.model"
+KURAST_STAIRS = "data/hd/env/model/act3/kurast/act3_kurast_stairs/stairs_b01.model"
 
 
 class CapTest(unittest.TestCase):
@@ -214,7 +215,8 @@ class CapTest(unittest.TestCase):
         return out
 
     def test_tiers(self):
-        self.assertEqual([walls_hd.tier(m) for m in (PROP, BUTTRESS, PILLAR, ELEVATION, WALL)], [0, 1, 1, 2, 2])
+        self.assertEqual([walls_hd.tier(m) for m in (PROP, BUTTRESS, PILLAR, ELEVATION, WALL, KURAST_STAIRS)], [0, 1, 1, 2, 2, 3])
+        self.assertEqual(walls_hd.tier("x/expansion_town_steps01.model"), 3)
         self.assertEqual(walls_hd.tier("x/expansion_town_walls/wall_segment_short.model"), 2)
         self.assertEqual(walls_hd.tier("x/cliff_inside_corner02.model"), 2)
 
@@ -233,6 +235,12 @@ class CapTest(unittest.TestCase):
         self.assertEqual([e["name"] for e in kept], [e["name"] for e in ents if e in kept])   # order kept
         xs = sorted(walls_hd.transform(e)["position"]["x"] for e in kept if walls_hd.model_of(e) == BUTTRESS)
         self.assertGreaterEqual(xs[1] - xs[0], 30)            # spread over the map, not two neighbours
+
+    def test_cap_keeps_stairs_before_walls(self):
+        """Lane elevwalls: cypherpunk's arrival stair was dropped as a detail; stairs are the last tier now."""
+        kept = walls_hd.cap(self.ents([(KURAST_STAIRS, 5), (ELEVATION, 5), (BUTTRESS, 5), (PROP, 5)]), 7)
+        c = collections.Counter(walls_hd.model_of(e) for e in kept)
+        self.assertEqual(c, {KURAST_STAIRS: 5, ELEVATION: 2})
 
     def test_cap_thins_every_model_of_a_tier_alike(self):
         kept = walls_hd.cap(self.ents([(BUTTRESS, 40), (PILLAR, 20)]), 30)
@@ -287,6 +295,69 @@ class GenericTest(unittest.TestCase):
         lib = walls_hd.Library()
         lib.learn("m", {(0, 0): (("act3/kurast", 1, 5, 0),)}, {"entities": [entity(WALL, 2, 2)]})   # 1 cell: set piece
         self.assertEqual(lib.pick((("act3/kurast", 1, 3, 0),)), (None, None))
+
+
+FENCE = "data/hd/env/model/global/prop/expansion/town/expansion_town_fences/fence_wroughtiron01.model"
+RUBBLE = "data/hd/env/model/expansion/siege/expansion_siege_debris/rubble_wall01.model"
+DOORWAY = "data/hd/env/model/act1/crypt/act1_crypt_doorways/doorway01.model"
+
+
+class StandInTest(unittest.TestCase):
+    """Lane downtownhd: hand picks per map (STAND_INS) and generic picks stood on the floor."""
+
+    def lib(self):
+        lib = walls_hd.Library()
+        for m in ("m1", "m2", "m3"):
+            fence = entity(FENCE, 9, 9)
+            fence["components"][0]["position"]["y"] = 8.9                   # on a terrace in D2R
+            lib.learn(m, {(0, 0): (("expansion/town", 5, 1, 0),), (1, 0): (("expansion/ruins", 1, 22, 23),),
+                          (2, 0): (("act1/crypt", 9, 0, 1),), (3, 0): (("expansion/town", 1, 1, 0),)},
+                      {"entities": [fence, entity(RUBBLE, 12, 8), entity(DOORWAY, 22, 2), entity(WALL, 32, 3)]})
+        return lib
+
+    def ys(self, text):
+        return {walls_hd.model_of(e): walls_hd.transform(e) for e in json.loads(text)["entities"]}
+
+    def test_generic_wall_pieces_stand_on_the_floor(self):
+        lib = self.lib()
+        cells = {(0, 0): (("expansion/town", 5, 3, 0),), (1, 0): (("expansion/town", 5, 1, 0),)}
+        self.assertEqual(lib.pick(cells[(0, 0)])[1], "generic")
+        text, _st = walls_hd.build_scene({(0, 0): cells[(0, 0)]}, lib, "b")
+        self.assertEqual(self.ys(text)[FENCE]["position"]["y"], 0.0)
+        text, _st = walls_hd.build_scene({(1, 0): cells[(1, 0)]}, lib, "b")   # the tile D2R has: as learnt
+        self.assertEqual(self.ys(text)[FENCE]["position"]["y"], 8.9)
+
+    def test_learnt_key_stand_in(self):
+        lib = self.lib()
+        table = {("expansion/town", 5, 3): (("expansion/ruins", 1, 22, 23),)}
+        key = (("expansion/town", 5, 3, 0), ("expansion/town", 1, 1, 0))       # the other tile is still picked
+        self.assertEqual(sorted(walls_hd.model_of(e) for e, _dx, _dz in lib.stand_in(key, table)), sorted([RUBBLE, WALL]))
+        self.assertIsNone(lib.stand_in((("expansion/town", 1, 1, 0),), table))
+        self.assertIsNone(lib.stand_in(key, None))
+        text, st = walls_hd.build_scene({(4, 4): key}, lib, "b", stand_ins=table)
+        self.assertEqual(st["stand_in"], 1)
+        self.assertEqual(self.ys(text)[RUBBLE]["position"]["x"], 42.0)
+        self.assertNotIn(FENCE, self.ys(text))
+
+    def test_pieces_with_yaw_and_sequence(self):
+        lib = self.lib()
+        table = {("act1/crypt", 10, 1): (), ("act1/crypt", 10, 1, 0): [(DOORWAY, 2.0, 2.0, 90), (PILLAR, 3.0, 3.0, 0)]}
+        got = lib.stand_in((("act1/crypt", 10, 1, 0),), table)
+        self.assertEqual(len(got), 1)                                         # PILLAR was never learnt: left out
+        e, dx, dz = got[0]
+        q = walls_hd.transform(e)["orientation"]
+        self.assertEqual((walls_hd.model_of(e), dx, dz, walls_hd.transform(e)["position"]["y"]), (DOORWAY, 2.0, 2.0, 0.0))
+        self.assertAlmostEqual(q["y"], math.sqrt(0.5))
+        self.assertAlmostEqual(q["w"], math.sqrt(0.5))
+        self.assertEqual(lib.stand_in((("act1/crypt", 10, 1, 1),), table), [])   # style match: drawn bare
+        self.assertEqual(walls_hd.transform(lib.variants[lib.pick((("act1/crypt", 9, 0, 1),))[0]][0][0])["orientation"]["y"], 0.0)
+
+    def test_table_names_known_maps(self):
+        self.assertTrue(set(walls_hd.STAND_INS) <= set(walls_hd.MAPS))
+        for table in walls_hd.STAND_INS.values():
+            for k, v in table.items():
+                self.assertIn(len(k), (3, 4))
+                self.assertTrue(isinstance(v, (tuple, list)))
 
 
 class LearnLibraryTest(unittest.TestCase):
@@ -725,6 +796,164 @@ class PieceTest(unittest.TestCase):
         self.assertEqual(lib.fit({(10 + n, 7): k for n, k in enumerate(self.KEYS[:3])}), [])
         self.assertEqual(lib.fit({(10 + n % 3, 7 + n // 3): self.KEYS[0] for n in range(6)}), [])
         self.assertEqual(walls_hd.learn_library.__defaults__[-1], None)                  # no boxes: no set pieces by layout
+
+
+class LiftTest(unittest.TestCase):
+    """Lane tawalls: walls learnt at a terrace foot (under D2R's measured ground) stand on Median's flat floor."""
+    DOCK = "data/hd/env/model/act3/docktown/act3_docktown_walls_lower/wall_mid01.model"
+    TALL = "data/hd/env/model/act3/docktown/act3_docktown_walls_upper/stone_ruin03.model"
+    BOXES = {DOCK: ((-20.0, -2.0, -2.0), (0.0, 4.6, 0.4)), TALL: ((-8.0, 0.0, -3.0), (0.0, 7.5, 0.3)),
+             PILLAR: ((-3.0, 0.0, -3.0), (3.0, 4.0, 3.0))}
+
+    def test_sunk_walls_stand_on_the_floor(self):
+        lib = walls_hd.Library()
+        keys = [(("act3/docktown", 2, 4, 26),), (("act3/docktown", 1, 4, 16),), (("act3/kurast", 1, 1, 1),)]
+        models = [self.DOCK, self.TALL, PILLAR]
+        cells, ents = {}, []
+        for row in range(3):                                   # three cells each: not set pieces
+            for n, (k, m) in enumerate(zip(keys, models)):
+                cells[(n + 1, row + 1)] = k
+                e = entity(m, (n + 1) * 10 + 2, (row + 1) * 10 + 3)
+                e["components"][0]["position"]["y"] = -2.0 if m == self.TALL else -4.24   # TALL's top ends 5.5 over: stays
+                ents.append(e)
+        lib.learn("docktown", cells, {"entities": ents})
+        self.assertEqual(lib.lift(self.BOXES.get), 1)          # one variant (DOCK's, shared by its three cells)
+        text, _st = walls_hd.build_scene({(1, 1): keys[0], (2, 1): keys[1], (3, 1): keys[2]}, lib, "act3_docktown")
+        ys = {walls_hd.model_of(e): walls_hd.transform(e)["position"] for e in json.loads(text)["entities"]}
+        self.assertEqual((ys[self.DOCK]["x"], ys[self.DOCK]["y"], ys[self.DOCK]["z"]), (12.0, 0.0, 13.0))
+        self.assertEqual(ys[self.TALL]["y"], -2.0)
+        self.assertEqual(ys[PILLAR]["y"], -4.24)                # a detail (pillar) is never lifted
+        self.assertEqual(lib.lift(lambda m: None), 0)          # no box: left as learnt
+
+
+class HollowTest(unittest.TestCase):
+    """Lane tawalls2: wall cells whose D2R key is empty (drawn in D2R's terrain) get the map's own wall of their orientation,
+    unless a neighbour's long wall already runs through them; only the folders HOLLOW_MAPS names."""
+    SHORT = "data/hd/env/model/act3/docktown/act3_docktown_walls_upper/stone_ruin01.model"
+    LONG = "data/hd/env/model/act3/docktown/act3_docktown_walls_lower/wall_mid01.model"
+    CRATE = "data/hd/env/model/global/prop/act3/docktown/act3_docktown_crates/crate01.model"   # a prop (tier 0)
+    BOXES = {SHORT: ((-8.0, 0.0, -0.5), (0.0, 5.0, 0.3)), LONG: ((-20.0, 0.0, -2.0), (0.0, 4.6, 0.4))}
+    K1 = (("act3/docktown", 1, 4, 10),)            # orientation 1: SHORT plus a prop
+    K2 = (("act3/docktown", 2, 4, 26),)            # orientation 2: LONG, two cells long
+    J1 = (("act3/jungle", 1, 10, 3),)              # empty in D2R
+    J5 = (("act3/jungle", 5, 10, 0),)              # a wall end, empty in D2R
+
+    def lib(self):
+        lib = walls_hd.Library()
+        cells, ents = {}, []
+        for row in range(3):
+            cells[(1, row * 2)], cells[(4, row * 2)] = self.K1, self.K2
+            cells[(7, row * 2)], cells[(8, row * 2)] = self.J1, self.J5
+            ents += [entity(self.SHORT, 19, row * 20 + 1), entity(self.CRATE, 15, row * 20 + 5), entity(self.LONG, 49, row * 20 + 2)]
+        lib.learn("docktown", cells, {"entities": ents})
+        lib.box_of = self.BOXES.get
+        return lib
+
+    def owners(self, text):
+        out = collections.defaultdict(list)
+        for e in json.loads(text)["entities"]:
+            out[tuple(int(v) for v in e["name"].split("_")[1:3])].append(walls_hd.model_of(e))
+        return out
+
+    def test_hollow_cells_get_the_maps_wall_unless_spanned(self):
+        lib = self.lib()
+        cells = {(0, 0): self.K1, (0, 1): self.K1, (0, 3): self.J1, (0, 4): self.J5, (3, 6): self.K2, (2, 6): self.J1}
+        text, st = walls_hd.build_scene(cells, lib, "act3_docktown")
+        self.assertEqual(st["empty"], 3)
+        self.assertNotIn((0, 3), self.owners(text))
+        text, st = walls_hd.build_scene(cells, lib, "act3_docktown", fill={"act3/jungle"})
+        got = self.owners(text)
+        self.assertEqual(got[(0, 3)], [self.SHORT])     # the map's orientation-1 wall, without its prop
+        self.assertEqual(got[(0, 4)], [self.SHORT])     # a wall end borrows its side's wall (END_WALL)
+        self.assertNotIn((2, 6), got)                   # LONG on (3, 6) runs through it: not doubled
+        self.assertEqual((st["hollow"], st["filled"], st["hollow_covered"]), (3, 2, 1))
+        self.assertEqual(got[(0, 0)], [self.SHORT, self.CRATE])   # the map's own cells as before
+        _text, st = walls_hd.build_scene(cells, lib, "act3_docktown", fill={"act2/tomb"})
+        self.assertEqual(st["filled"], 0)               # other folders stay empty
+
+    def test_a_filled_wall_covers_the_hollow_cell_behind_it(self):
+        lib = walls_hd.Library()
+        cells = {**{(1, n * 2): self.K1 for n in range(3)}, **{(7, n * 2): self.J1 for n in range(3)}}
+        lib.learn("docktown", cells, {"entities": [entity(self.LONG, 19, n * 20 + 2) for n in range(3)]})
+        lib.box_of = self.BOXES.get
+        row = {(5, 5): self.J1, (6, 5): self.J1, (7, 5): self.J1}
+        text, st = walls_hd.build_scene({**row, (0, 0): self.K1, (0, 1): self.K1}, lib, "act3_docktown", fill={"act3/jungle"})
+        got = self.owners(text)
+        self.assertEqual(got[(7, 5)], [self.LONG])      # x 59..79: runs through (6, 5) ...
+        self.assertNotIn((6, 5), got)                   # ... which stays empty
+        self.assertEqual(got[(5, 5)], [self.LONG])
+        self.assertEqual((st["filled"], st["hollow_covered"]), (2, 1))
+        # no wall of that orientation in the map: generic_pick (the tile set's, else the act's)
+        _text, st = walls_hd.build_scene(row, lib, "act3_docktown", fill={"act3/jungle"})
+        self.assertEqual((st["hollow"], st["filled"]), (3, 2))   # generic: the act's orientation-1 wall (LONG, act3)
+        self.assertIsNone(lib.fill((("act3/jungle", 3, 10, 0),), {}))
+        self.assertEqual(lib.fill((("act3/jungle", 5, 10, 0),), {1: "w"}), "w")
+
+    def test_cover_follows_the_yaw_and_the_tier(self):
+        lib = self.lib()
+        e = entity(self.LONG, 29, 5)
+        self.assertEqual(lib.cover(e, 29, 5), {(1, 0), (2, 0)})            # x 9..29: 1 unit in cell 0 is not enough
+        q = walls_hd.transform(e)["orientation"]
+        q["y"], q["w"] = math.sin(math.pi / 4), math.cos(math.pi / 4)        # yaw 90 degrees: the wall runs along z
+        self.assertEqual(lib.cover(e, 5, 29), {(0, 3), (0, 4)})
+        self.assertEqual(lib.cover(entity(self.CRATE, 5, 5), 5, 5), set())          # props never cover
+        lib.box_of = None
+        self.assertEqual(lib.cover(e, 5, 29), set())
+
+    def test_only_desertpeak_jungle(self):
+        self.assertEqual(walls_hd.HOLLOW_MAPS, {"expansion/dystopic/desertpeak.ds1": {"act3/jungle"}})
+        self.assertFalse(walls_hd.hollow((("act2/tomb", 1, 16, 1),), (), {"act3/jungle"}))
+        self.assertFalse(walls_hd.hollow((("act3/jungle", 14, 0, 22),), (), {"act3/jungle"}))   # a tree tile
+        self.assertFalse(walls_hd.hollow((("act3/jungle", 1, 10, 3), ("act2/tomb", 1, 16, 1)), (), {"act3/jungle"}))
+        self.assertTrue(walls_hd.hollow(self.J1, (), {"act3/jungle"}))
+        self.assertFalse(walls_hd.hollow(self.J1, None, {"act3/jungle"}))
+
+def turned(e, yaw, y=0.0):
+    """e turned by `yaw` degrees about y, at height y."""
+    t = e["components"][0]
+    t["orientation"] = {"x": 0.0, "y": math.sin(math.radians(yaw) / 2), "z": 0.0, "w": math.cos(math.radians(yaw) / 2)}
+    t["position"]["y"] = y
+    return e
+
+
+class SeatTest(unittest.TestCase):
+    """Lane elevwalls: retaining walls whose face looks away from the camera are left out, facing ones and sunk stairs are
+    moved along the view axis onto the floor."""
+    CORNER = "data/hd/env/model/act3/kurast/act3_kurast_walls/wall_stone_buttress_corner01.model"
+    def lib(self, pieces):
+        """pieces: [(model, yaw, y)], each learnt on its own key over three cells (not set pieces), the n-th at x offset
+        1 + n (a variant's signature has no yaw or height)."""
+        lib = walls_hd.Library()
+        cells, ents = {}, []
+        for n, (m, yaw, y) in enumerate(pieces):
+            for row in range(3):
+                cells[(n + 1, row + 1)] = (("act3/kurast", 1, 1, n),)
+                ents.append(turned(entity(m, (n + 1) * 10 + 1 + n, (row + 1) * 10 + 3), yaw, y))
+        lib.learn("kurast", cells, {"entities": ents})
+        return lib
+
+    def test_facing(self):
+        e = entity(ELEVATION, 0, 0)
+        self.assertEqual([walls_hd.facing(turned(e, a)) for a in (0, 90, 180, 270)], [True, False, False, True])
+        self.assertTrue(walls_hd.facing(turned(e, 90), corner=True))    # a corner's second face (+z) turns to +x
+        self.assertFalse(walls_hd.facing(turned(e, 180), corner=True))
+
+    def test_seat(self):
+        pieces = [(ELEVATION, 0, 0.0), (ELEVATION, 90, 0.0), (ELEVATION, 180, 3.27), (ELEVATION, 270, 3.27),
+                  (self.CORNER, 90, 0.0), (ELEVATION, 90, -4.9), (KURAST_STAIRS, 0, -7.0), (KURAST_STAIRS, 0, 0.0)]
+        lib = self.lib(pieces)
+        self.assertEqual(lib.seat(), 4)    # two away-facing left out, one facing and one stair moved
+        keys = [(("act3/kurast", 1, 1, n),) for n in range(len(pieces))]
+        text, _st = walls_hd.build_scene({(n + 1, 1): k for n, k in enumerate(keys)}, lib, "act3_kurast")
+        got = sorted((walls_hd.model_of(e).rsplit("/", 1)[-1], walls_hd.transform(e)["position"]["x"],
+                      walls_hd.transform(e)["position"]["y"], walls_hd.transform(e)["position"]["z"])
+                     for e in json.loads(text)["entities"])
+        self.assertEqual(got, [("stairs_b01.model", 77.0 + 7.0, 0.0, 13.0 + 7.0), ("stairs_b01.model", 88.0, 0.0, 13.0),
+                               ("wall_elevation_stone01.model", 11.0, 0.0, 13.0),
+                               ("wall_elevation_stone01.model", 44.0 - 3.27, 0.0, 13.0 - 3.27),
+                               ("wall_elevation_stone01.model", 66.0, -4.9, 13.0),   # under SUNK_BASE: lift()'s
+                               ("wall_stone_buttress_corner01.model", 55.0, 0.0, 13.0)])
+        self.assertEqual(self.lib([(KURAST_STAIRS, 0, -0.4), (ELEVATION, 0, 0.0)]).seat(), 0)   # a stair at y -0.4 stays
 
 
 def quads(cells, y=0.0):

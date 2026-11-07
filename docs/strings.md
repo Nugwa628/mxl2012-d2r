@@ -49,6 +49,27 @@ replaces a whole file) should that change. The seven `lng/<lang>/patchstring.tbl
 patch strings each) are vanilla translations, not Median text; Median is English only, so the English text fills
 all 13 languages (`--english-only` writes enUS alone).
 
+## Multiline skill tooltips (bug skilldesc)
+
+Classic skill prose consumes stored lines bottom-up; D2R's prose drawer draws them top-down,
+including in legacy graphics. Median's source already stores Batstrike's charges third / second / first,
+Dark Summoning's sentence ending before its beginning, and Bloodbath's requirement before its prose.
+The old converter preserved that order. `strings_ns.top_down_tooltip` now reverses the stored lines
+before `map_colours`, carrying each line's source colour state with it (including inherited colours,
+inline changes and end-of-line resets). Blank lines are preserved. Both output banks and all 13
+languages receive the converted text, as do aliases and D2R overrides.
+
+Selection uses localization references in the source `skilldesc.txt`, in `str long`,
+`str short` and `str alt` (the top-down prose drawer); no key-name heuristic.
+The v005 tables reference **311 distinct multiline keys**: 301 long and 143 short (311 combined). Another 153 stat/flavor keys (`desctext` / `dsc2text` / `dsc3text`) still use the bottom-up builder
+and stay unchanged (verified with Bloodbath in both graphics modes). The per-column counts overlap.
+The generated `strings_report.md`
+lists every converted key. `--excel-dir` selects the source tables; when omitted, the converter
+uses `data/global/excel` beside the source `data/local/lng/eng` directory.
+
+Item names, misc item descriptions and dialogue use different rendering paths and are not selected
+merely because their strings contain newlines. Single-line strings remain unchanged.
+
 ## Output (work/mod)
 
 | File | Content |

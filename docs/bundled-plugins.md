@@ -1,6 +1,7 @@
 # Third-party D2RLoader plugins planned to ship with D2R-XL 2012
 
-Planned 2026-11-04. Not shipped yet; add new candidates to the tables below. The compatibility work (which plugins
+Planned 2026-11-04. Shipped so far: D2R Legacy 16:9 and Buff HUD (0.1.12), Auto Belt Refill (0.1.15); add new candidates to
+the tables below. The compatibility work (which plugins
 need changes for Median XL 2012's data)
 starts after release 0.1.11. Each plugin keeps its author's credit in the release notes, the README credits and this file.
 
@@ -45,7 +46,7 @@ owner, 2026-11-04). Their READMEs state no licence, so the permission is the bas
 | [controller-qol](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/controller-qol/README.md) | Controller shortcuts for item actions, direct ground looting, menu navigation, optional right-stick skill aiming | Skill behaviour is keyed to numeric skill ids with per-mod profiles: needs an mxl2012 profile for our skills |
 | [pyre-lootfilter](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/pyre-lootfilter/README.md) | Ground loot filter from `filter.json`, minimap icons, pickup guard | Reads weapons.txt, armor.txt, itemtypes.txt, item codes and stat ids: needs a filter written for Median's items |
 | [pyre-stashsearch](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/pyre-stashsearch/README.md) | Search across the Personal and Shared stash pages, boolean stat filters, highlighted matches, renamable side tabs | Check with the mod's 5 / 7 shared pages (`add_shared_tabs`, bug #535) and Median's stat names |
-| [item-roll-ranges](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/item-roll-ranges/README.md) | Shows each modifier's possible roll range and source while Ctrl / RT is held | Reads the active game's affixes, uniques and runewords; check against Median's tables and D2RLoader's own Ctrl stat ranges, which the mod turns off (`item_stat_ranges = false`, bug #528): make sure only one draws |
+| [item-roll-ranges](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/item-roll-ranges/README.md) | Shows each modifier's possible roll range and source while Ctrl / RT is held | Reads the active game's affixes, uniques and runewords; check against Median's tables and D2RLoader's own Ctrl stat ranges, which the mod enables (`item_stat_ranges = true`, bug #528; some automagic range lines repeat): make sure only one draws |
 | [inventory-deposit](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/inventory-deposit/README.md) | "Deposit all gems, materials and runes" button by the inventory gold | Needs the HD advanced stash and its item-type rules; Median items with no slot on the open page stay put (bug #535 side note: such an item logged item asserts) |
 
 All five target D2RLoader 1.3.1 and plugin ABI 4 on Windows x64, the same loader the port uses.
@@ -103,15 +104,73 @@ HD, `ScreenSizeX` x `ScreenSizeY` in legacy), also while the game window is in t
   Stamina Potion (271, item picture) and Cow Disguise (301). docs/testing.md "Lane bufficons".
 - **Test runs:** a dev install (`tools/install_mod.py`) does not install it; a release install does.
 
-## Auto Belt Refill by jaycachou-svg
+## Auto Belt Refill by jaycachou-svg (shipped from 0.1.15)
 
-[Auto Belt Refill](https://github.com/jaycachou-svg/auto-belt-refill/tree/main/Auto-belt-refill-v0.35.8-EN) (v0.35.8) by
-**jaycachou-svg**: refills the potion belt from the inventory, by hand (a key or the `belt-fill` console command) or
-automatically, with a per-column memory of potion codes. Candidate for 0.1.12 (owner, 2026-11-05). The repository states
-no licence: ask jaycachou-svg before shipping it.
+[Auto Belt Refill](https://github.com/jaycachou-svg/auto-belt-refill) (v0.35.9) by **jaycachou-svg**: refills the potion belt
+from the inventory, automatically after a drink and in one go on a key (`belt-fill` console command), with a per-column list
+of potion codes. **Licence:** the repository has no licence file; jaycachou-svg gave permission on 2026-11-06 to use and
+customise it. Credit: README, CHANGELOG / release notes, NOTICE.md and this file (lane beltship, docs/testing.md
+"Lane beltship"; the research was lane beltrefill).
 
-**Result (lane beltrefill, 2026-11-05): works with a locked Median column config; needs a rebuild for our SDK, and
-waits on bug #541 for elixir columns.** Details in docs/testing.md "Lane beltrefill".
+- **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-auto-belt-refill.dll` (mod-scoped) and our config
+  `mods\mxl2012\d2rloader\config\auto-belt-refill.toml`, a `preserve` file like legacy169's (a player's changes survive Update
+  and Repair). The manifest's `bundledPlugins` names it with version, repository, author, commit and the patch checksums.
+- **Reproducible build, no fork:** the gitlink `third_party/auto-belt-refill` pins the author's repository at `a3b6805` ("Add
+  Auto-belt-refill-v0.35.9"). `tools/build_beltrefill.ps1` exports folder `Auto-belt-refill-v0.35.9-EN` of that commit (`git
+  archive`, from the submodule or `MXL_BELTREFILL_DIR`), applies `third_party/auto-belt-refill-mxl2012/*.patch` in name order and
+  builds it with our `CMakeLists.txt` there (the author's lists the sources next to it, the repo keeps them in `src/`) against
+  the PluginSDK of `tools/build_plugin.ps1`. It records `PINNED_COMMIT` and `PATCHES` (sha256 + name) in `build/beltrefill-src`;
+  `tools/package_release.py` runs it (or takes `--beltrefill DLL`), refuses a build of another commit or patch set, another
+  version and the author's prebuilt DLL (older D2RLoader ABI); `tools/verify_package.py` checks both files in a player package.
+  The upstream plugin has no unit tests; our additions' pure logic (`belt_match_logic.h`) has `BeltMatchTests`
+  (`third_party/auto-belt-refill-mxl2012/tests/`), built and run by `tools/build_beltrefill.ps1`. To move to a new upstream version: update the gitlink, refresh the patches, run the in-game
+  check below.
+- **Patches:** `0001-pluginsdk-1.3.1.patch`, API renames for D2RLoader 1.3.1 / ABI 4 (`abiVersion`, `InventoryService`,
+  `ThreadService`, `InputService`, `LifecycleService`, the one-argument `QueryService`), no behaviour change.
+  `0002-mxl2012-belt-rows.patch`, the Median belt sizes (next point). `0003-mxl2012-match-first-slot.patch`, our behaviour
+  for D2R-XL 2012 (lane beltmatch, owner request 2026-11-06), each part off unless the config turns it on:
+  - `match_first_slot`: each column refills with exactly the item code in its first (bottom) slot; no families, no
+    `prefer_large`, and no "follow the game" extension of a column's list. Upstream has no such mode: an unlocked column learns
+    the whole family of its first-row potion (hp5 > hp4 > ... with `prefer_large`), and the fill adds any code the game routes
+    into a non-empty column. A **completely empty column refills nothing** until the player puts a potion there (owner decision
+    2026-11-06; no remembered type). An empty first slot under items still in the column keeps the code.
+  - `never_refill`: codes never learned or refilled, also from a column's bottom: Median's elixirs (`ey1`-`ey9`, `eo7`-`eo9`,
+    `et1`, `0g0`-`0g8`) and the Goodberry `b@b` (#541).
+  - `belt_counts`: a count on the top right of each column's first cell, how many items of that column's code the inventory and
+    the belt hold together (white, red at 0; none on an empty or elixir column), drawn with D2RLoader's `OverlayService`.
+    The cells come from D2R's own layouts (`hudpanelhd.json`: HUD anchored bottom centre in a 2160-high UI space, belt cell 98,
+    pitch 125; `hudpanel.json`: the classic screen letterboxed, belt at the centred middle part, cell 29, pitch 31); HD or legacy
+    from D2R's getter `0x846210` (bytes checked), the classic screen size from `0x22a0d68` / `0x22a0d6c`. The watcher refreshes
+    the counts every `auto_poll_frames`; out of a game they are hidden. Console `belt-counts` logs them, the cells and the
+    overlay's frame / draw counters.
+  - **Known limit (D2R):** the game routes a potion by item type, not by code. Two columns of one kind (say `hp3` and `hp5`)
+    both short: the game offers the first of them to either code; the plugin never puts the wrong potion there, so while that
+    column has room and no potion of its own is left, the other column waits (in game: `hp5` in the inventory, `hp3` column
+    short and no `hp3` left, the `hp5` column stayed one short).
+- **Belt rows (the author's caveat).** The plugin takes the rows per column from the worn belt's code (`RowsForBeltCode`: D2R's
+  `lbl` / `vbl` 2, `mbl` / `tbl` 3, anything else 4). Median XL 2012 keeps D2R's `belts.txt` (same 14 rows and box counts), but
+  none of its 35 belts uses a D2R code, and the size goes by grade, not by name (`armor.txt` `belt`): grades 1-3 (`627`-`631`,
+  `673`-`677`, `719`-`723`) belts.txt sash / light belt, 8 slots; grades 4-5 (`765`-`769`, `811`-`815`) belt / heavy belt, 12;
+  grade 6 (`857`-`861`) and Sacred (`@28`-`@32`) girdle / uber belt, 16. Uniques and sets use these bases. Unpatched, every
+  Median belt read as 4 rows (in game with `627`: "rows per column = 4"); the moves still came out right only because the
+  game refuses slots the belt lacks. `0002` lists the 2- and 3-row codes. The note for the author (and a mod-independent
+  fix: the worn item's `belt` column into `belts.txt` `numboxes`) is in `third_party/auto-belt-refill-mxl2012/README.md`.
+- **Config:** `match_first_slot = true`, `belt_counts = true`, the elixirs and the Goodberry in `never_refill`, no
+  `[columnN]` sections (fixed columns are still possible with `match_first_slot = false`, as the file's comment shows),
+  `fill_key` / `snapshot_key` unbound (players bind Refill Belt / Snapshot Belt Columns under Options > Controls),
+  `debug_logs = false`. Lane beltship's locked life / mana columns are gone (owner, 2026-11-06).
+- **In game (lane beltship, slot 2, HD and legacy):** belts `627` (2 rows), `767` (3), `859` (4) and none (1): `belt-fill`
+  filled exactly the belt's slots (life in columns 1 / 3, mana in 2 / 4), auto-refill topped up after drinking keys 1 and 2,
+  the plugin reported the right rows, `ey2` / `b@b` / `0g1` never left the inventory, and the game's own slot search refused an
+  `ey2` for a life column with a free slot (#541 fixed). No hook refused, no new engine assert, no crash file.
+- **In game (lane beltmatch, slot 2, HD and legacy, docs/testing.md "Lane beltmatch"):** columns `hp3` / `mp5` / `hp5` / `mp3`
+  refilled with exactly their codes, `hp4` / `mp4` / `hp1` / `ey2` / `b@b` never moved, an emptied column stayed empty with its
+  potion back in the inventory, an `hp4` put there made it an `hp4` column, an `ey2` at a column's bottom was not refilled;
+  counts 7 / 7 / 6 / 6 and 6 / 6 / 5 / 5 after drinking. The counts are drawn (overlay counters) at cells that match the
+  belt in the screenshots, but **no capture of a background window shows the loader's overlay** (PrintWindow and Windows
+  Graphics Capture; a full-width test bar was missing too), so the look is still to be checked by hand.
+
+Research of lane beltrefill (2026-11-05, v0.35.8 / v0.35.9):
 
 - **Addresses.** v0.35.8 inline-hooks GetFreeBeltSlot `0x3862d0`, CanPutInBelt `0x15a110`, BeltTransfer `0x15f660` and
   Pickup `0x471950`, each behind a 32-byte entry check, and calls eight more game functions directly (`0x8b2d0`,
@@ -127,7 +186,7 @@ waits on bug #541 for elixir columns.** Details in docs/testing.md "Lane beltref
   1.3.1, ABI 4) needs renames only: `abiVersion` / `D2RL_PLUGIN_ABI_VERSION`, `InventoryService`, `ThreadService`,
   `InputService`, `LifecycleService` and the one-argument `QueryService`. With them both versions build with no warning.
   We tested our build, not the author's DLL.
-- **In game (slot 2).** With the column config below, the manual fill (`belt-fill`) filled all 16 slots per column
+- **In game (slot 2).** With a test column config (columns 1-3 as shipped, column 4 `ey2`), the manual fill (`belt-fill`) filled all 16 slots per column
   (life, mana, life, Elixir of Experience). Auto-refill topped up a drunk slot from the inventory within one poll. Median
   items that no column lists (Elixir of Greed, Greater Elixir of Experience) were never moved.
 - **Median-only potions.** Every Median elixir (`ey1`-`ey9`, `eo7`-`eo9`, `et1`, `0g0`-`0g8`) and the Goodberry `b@b`
@@ -137,18 +196,11 @@ waits on bug #541 for elixir columns.** Details in docs/testing.md "Lane beltref
   column learned `hp5`. With `locked = true` the plugin refuses such routes, so columns keep their exact lists (checked in game with v0.35.9).
   `rvs` / `rvl` are not spawnable in Median. The #541 fix planned in lane beltstack is data only (each non-classic belt
   potion gets its own item type), and the plugin matches item codes, never item types, so it needs no change for it.
-- **Median XL 2012 column config** (`auto-belt-refill.toml`, mod `d2rloader\config\`): columns 1 and 3
-  `["hp5","hp4","hp3","hp2","hp1"]`, columns 2 and 4 `["mp5","mp4","mp3","mp2","mp1"]`, all `locked = true`, keys
-  unbound (players bind them under Options > Controls), `debug_logs = false`. Elixirs stay out of the lists.
-
-**Shipping needs:** jaycachou-svg's permission (no licence); v0.35.9 built with the SDK renames above (the patch is a
-rename script, kept outside the repo); the locked config above; a check after the #541 fix that elixirs no longer reach
-life columns; and credit to jaycachou-svg in the release notes and the README.
 
 ## Checks before shipping (after 0.1.11)
 
 - Each plugin loads next to mxl2012-core without hook conflicts, in HD and in legacy graphics.
 - The mod-specific data (controller skill profile, loot filter, deposit item types) is written for Median XL 2012.
-- Item-roll-ranges vs D2RLoader's stat ranges (off in the mod, #528): only one may draw.
+- Item-roll-ranges vs D2RLoader's stat ranges (on in the mod, #528; some automagic range lines repeat): only one may draw.
 - The installer and the Downloader install them into `mods\mxl2012\d2rloader\plugins\`, pinned by checksum like D2RLoader.
-- Release notes and README credit PyreFly and Lukaszpg (Buff HUD: done in 0.1.12).
+- Release notes and README credit PyreFly, Lukaszpg (Buff HUD: done in 0.1.12) and jaycachou-svg (Auto Belt Refill: done for 0.1.15).

@@ -75,8 +75,36 @@ PIECE_CANDIDATES = 50            # entities kept per possible set piece while le
 # (4,989 entities, 4,423 of them with a model, 679 distinct models, 4,651,080 bytes). cap() drops pieces past these.
 MAX_PLACED = 4423
 MAX_BYTES = 4_651_080
+# Sunk walls (lane tawalls, Library.lift): a wall piece whose base is this far under D2R's ground and whose top ends below
+# SUNK_TOP over it stands at a terrace foot in D2R (the ground measured is the terrace top); on Median's flat map it is
+# stood on the floor.
+SUNK_BASE = -0.5
+SUNK_TOP = 1.0
+# Hollow wall cells (lane tawalls2, build_scene `fill`): a wall cell whose key D2R learns as empty (D2R draws that wall in its
+# terrain mesh, which Median's scenes do not have) gets the wall of its orientation that the same map uses most (Library.fill),
+# unless a wall piece of a neighbouring cell already runs HOLLOW_COVER units through it (Library.cover): D2R's long walls
+# stand on one tile and span the next. Tran Athulua's corridors are Act 3 jungle walls of style 10 (994 cells, 66 keys, 4% of
+# their D2R cells with a model): HD had floor and short ruin stubs where classic has closed corridors. Only the maps of
+# HOLLOW_MAPS and of their tile set folders there: on the other maps the empty keys are drawn as classic already (caves,
+# temples) or not checked in game; desertpeak's Act 2 tomb cells are the arrival's platform edge (Tyrael's cliff tiles), where a
+# wall stood on the floor.
+HOLLOW_MAPS = {"expansion/dystopic/desertpeak.ds1": {"act3/jungle"}}
+HOLLOW_COVER = 5
+END_WALL = {5: 1, 6: 2}          # a wall end without a wall of its own orientation in the map borrows its side's wall
+# Retaining walls (lane elevwalls, Library.seat): D2R's terrace walls (wall_elevation_*, with their wall_stone_buttress_*
+# pieces) have one face, on the low side (local +x; corner pieces also local +z), and their body inside the upper terrace.
+# D2R's HD camera looks along (-1, -1, -1) (wall_entities), so a face whose normal points away from it (nx + nz <= 0) is
+# hidden by the terrace in D2R and classic draws only the terrace edge there; on Median's flat floor the piece stood as a
+# free wall showing its back (Fauztinville's walkways, Kurast 3000's sunken courtyard). Those are left out; a facing one
+# learnt over D2R's ground (the ground measured on a sloped triangle at the terrace edge: cypherpunk's 918 at y 3.27) is
+# moved down the view axis onto the floor, which keeps it on the same screen spot. Stairs learnt under the floor (glados'
+# Kurast stairs at y -1.3, excelsior3's sewer stair at -7.7) are moved up the same axis to y 0. (The Reimagined level
+# editor (MIT) also files stairs apart from walls and samples the terrain on both sides of a retaining wall; no code taken.)
+RETAINING = re.compile(r"wall_elevation|wall_stone_buttress", re.I)
+STAIRS = re.compile(r"stair|step", re.I)
 # cap() tiers, dropped lowest first: 0 props (books, gold, mud piles), 1 details on a wall (buttresses, pillars, arches,
-# beams, stairs, gargoyles), 2 the walls, cliffs and fences that close rooms and block the view.
+# beams, gargoyles), 2 the walls, cliffs and fences that close rooms and block the view, 3 stairs (STAIRS: the walkable way
+# between levels; lane elevwalls: as details, cypherpunk kept 169 of its 1,406 stair pieces).
 DETAIL = re.compile(r"buttress|pillar|arch|column|support|beam|cap_|trim|roof|lip|stair|step|gargoyle|statue|mural|crenel|"
                     r"banner|torch|lamp|chain|ornament|post", re.I)
 SIGHT = re.compile(r"wall|cliff|elevation|fence|treeline|gate|rock|ruin|segment|corner|end_", re.I)
@@ -91,6 +119,31 @@ STOCK = ["act3/jungle/dungrm6a.ds1", "act3/temple/temple5.ds1", "act3/temple/tem
          "act3/kurast/excelsior3.ds1", "act2/arcane/belial.ds1", "expansion/morework/epicwhiners.ds1",
          "act1/cathedrl/inarius.ds1", "expansion/icecave/rockisdead.ds1"]
 MAPS = RETEXTURED + STOCK   # every map tools/maps_hd.py gives a minimal scene (17): each gets a wall scene from stock models
+# Hand picks per map (Library.stand_in, lane downtownhd): (tile set folder, orientation, style[, sequence]) -> the pieces drawn
+# for every tile of it on that map instead of pick()'s (a key with the sequence wins): a learnt D2R cell key (its choose() variant), or [(model, dx, dz, yaw degrees)]
+# (the model's learnt entity, moved and turned; y 0). For tiles D2R draws nowhere like Median does: in downtown (Harrogath's
+# tile sets, wall scan 2026-11-06) the low rock barricades of Harrogath's walls2.dt1 (style 3) got the tall
+# crenellated town wall and an iron fence 9 units over the floor (generic_pick), the keep wall (keepwall.dt1 style 16) a
+# bookshelf set, and the free-standing crypt arch at the arrival (crypt corner 7/0 at both ends, the 10/1 passage tiles
+# between) two shelf-like crypt corner walls.
+RUIN_LOW_Y, RUIN_LOW_X, RUIN_CORNER, RUIN_RUBBLE = (("expansion/ruins", 1, 22, 2),), (("expansion/ruins", 6, 22, 2),), \
+    (("expansion/ruins", 3, 22, 2),), (("expansion/ruins", 1, 22, 23),)
+CRYPT_ARCH = "data/hd/env/model/act1/crypt/act1_crypt_doorways/doorway01.model"
+CRYPT_PILLAR = "data/hd/env/model/act1/crypt/act1_crypt_pillars/pillar_outer01.model"
+STAND_INS = {
+    "expansion/neonmile/downtown.ds1": {
+        ("expansion/town", 1, 3): RUIN_LOW_Y, ("expansion/town", 2, 3): RUIN_LOW_X, ("expansion/town", 3, 3): RUIN_CORNER,
+        ("expansion/town", 4, 3): (), ("expansion/town", 5, 3): RUIN_RUBBLE, ("expansion/town", 6, 3): RUIN_LOW_X,
+        ("expansion/town", 7, 3): RUIN_RUBBLE,
+        ("expansion/town", 5, 1): (("expansion/town", 1, 1, 0),),    # the tall wall's end: the wall, not a fence
+        ("expansion/town", 2, 16): (("expansion/town", 2, 1, 0),),   # the keep's wall along x: the tall town wall
+        ("act1/crypt", 7, 0): [(CRYPT_PILLAR, 3.2, 3.2, 0)],
+        ("act1/crypt", 10, 1, 0): [(CRYPT_ARCH, 2.0, 2.0, 90)], ("act1/crypt", 10, 1, 1): (),
+    },
+}
+# A generic pick's wall piece learnt this far over D2R's floor (fence_wroughtiron01 on Harrogath's terraces at y 9) stands
+# on Median's floor (Library.generic_pick): the tile D2R never draws has no terrace to measure.
+FLOAT_Y = 3.0
 # Maps whose HD scene gets its own terrain mesh over its floor and wall cells only (lane walls3): -> the D2R map whose terrain
 # model is the template. Without a terrain entity the engine paints the biome's floor over the whole map rectangle; in the
 # Arcane Sanctuary that put floor where classic has the starry void, and hid the arches that hang under the platform edges.
@@ -657,6 +710,9 @@ class Library:
         self.pieces = []                                           # [(entity, dx, dz, footprint)] (learn_pieces, fit)
         self.pixels_of = None                                      # folder -> {(o, s, q): [(x, y, index)]} (trunks, masks)
         self._pixels, self._lookalike = {}, {}
+        self.grounded = {}                                         # generic signature -> its variant stood on the floor (_ground)
+        self._templates = None                                     # model -> a learnt entity of it (_stand_in_pieces)
+        self.box_of, self._boxes = None, {}                        # model -> bounding box (learn_library; cover)
 
     def learn(self, name: str, cells: dict, scene: dict, ground=None):
         """cells: wall_cells() of a D2R map; scene: its preset json; ground: its Ground (wall_entities)."""
@@ -784,9 +840,68 @@ class Library:
                     ok = [(n, sig) for sig, n in self.generic.get(g, {}).items()
                           if not any(self.set_piece(m) or tier(m) == 0 for m, _dx, _dz in sig)]
                     self._generic[g] = max(ok, key=lambda t: t[0])[1] if ok else None
+                    self._ground(self._generic[g])
                 if self._generic[g] is not None:
                     return self._generic[g]
         return None
+
+    def _ground(self, sig):
+        """For a generic signature with a wall piece (tier 2) learnt over FLOAT_Y: its variant with those pieces at y 0, in
+        `grounded` (build_scene places it for generic cells; the learnt variant stays as it is for the cells D2R has)."""
+        ents = self.variants.get(sig) or []
+        if not any(tier(model_of(e)) == 2 and float(transform(e).get("position", {}).get("y", 0.0)) > FLOAT_Y for e, _dx, _dz in ents):
+            return
+        out = []
+        for e, dx, dz in ents:
+            if tier(model_of(e)) == 2 and float(transform(e).get("position", {}).get("y", 0.0)) > FLOAT_Y:
+                e = copy.deepcopy(e)
+                transform(e)["position"]["y"] = 0.0
+            out.append((e, dx, dz))
+        self.grounded[sig] = out
+
+    def stand_in(self, key, table):
+        """[(entity, dx, dz)] for a cell with a tile in `table` (STAND_INS of its map): each such tile's stand-in pieces, plus
+        pick() of the cell's other tiles together (set pieces left out); None when no tile of the cell is in the table."""
+        if not table:
+            return None
+        hits, rest = [], []
+        for tile in key:
+            spec = None if tile[0] is None else table.get(tuple(tile[:4]), table.get(tuple(tile[:3])))
+            if spec is None:
+                rest.append(tile)
+            else:
+                hits.append(spec)
+        if not hits:
+            return None
+        out = [p for spec in hits for p in self._stand_in_pieces(spec)]
+        if rest:
+            sig, how = self.pick(tuple(rest))
+            ents = (self.grounded.get(sig) if how == "generic" else None) or self.variants.get(sig, [])
+            out += [v for v in ents if not self.set_piece(model_of(v[0]))]
+        return out
+
+    def _stand_in_pieces(self, spec):
+        """A STAND_INS value: a learnt cell key -> its choose() variant (set pieces left out); [(model, dx, dz, yaw)] -> the
+        model's learnt entity at that offset and yaw, on the floor (a model never learnt is left out)."""
+        if isinstance(spec, tuple):
+            sig = choose(self.seen[spec]) if spec in self.seen else ()
+            return [v for v in self.variants.get(sig, []) if not self.set_piece(model_of(v[0]))]
+        if self._templates is None:
+            self._templates = {}
+            for ents in self.variants.values():
+                for e, _dx, _dz in ents:
+                    self._templates.setdefault(model_of(e), e)
+        out = []
+        for model, dx, dz, yaw in spec:
+            if model not in self._templates:
+                continue
+            e = copy.deepcopy(self._templates[model])
+            t = transform(e)
+            t["position"]["y"] = 0.0
+            a = math.radians(yaw) / 2
+            t["orientation"] = {"x": 0.0, "y": round(math.sin(a), 9), "z": 0.0, "w": round(math.cos(a), 9)}
+            out.append((e, dx, dz))
+        return out
 
     # ---- lane walls4: look-alike tiles, trees, set pieces by layout --------------------------------------------------------
     def pixels(self, folder):
@@ -900,6 +1015,95 @@ class Library:
                     self.pieces.append((strip_entity(e), piece[1], piece[2], foot))
         self._cands = {}
 
+    def lift(self, box_of) -> int:
+        """Stand the sunk walls on the floor: a wall piece (tier 2: wall, ruin, elevation, ...) whose y is under SUNK_BASE and
+        whose top (y + box height, scaled) under SUNK_TOP. D2R puts Kurast's dock walls (act3_docktown_walls_lower, the
+        stone_ruin pieces of ruinwall style 4) and its elevation walls at the foot of a terrace, and Ground measures the
+        terrace top on their cell: learnt 4-5 units under the floor, they showed only their tops on Median's flat maps, and
+        Tran Athulua (desertpeak, 1,023 of its 2,926 pieces) had floor only where classic has walls. y becomes 0, x and z
+        stay (the tile the piece was learnt on). -> pieces lifted (variants and anchored pieces)."""
+        boxes, n = {}, 0
+        for ents in list(self.variants.values()) + list(self.anchored.values()):
+            for i, (e, dx, dz) in enumerate(ents):
+                m, t = model_of(e), transform(e)
+                if not m or not t or tier(m) != 2:
+                    continue
+                y = float(t.get("position", {}).get("y", 0.0))
+                if y >= SUNK_BASE:
+                    continue
+                if m not in boxes:
+                    boxes[m] = box_of(m)
+                if boxes[m] is None or y + boxes[m][1][1] * float(t.get("scale", {}).get("y", 1.0)) >= SUNK_TOP:
+                    continue
+                e = copy.deepcopy(e)
+                transform(e)["position"]["y"] = 0.0
+                ents[i] = (e, dx, dz)
+                n += 1
+        return n
+
+    def cover(self, e, x: float, z: float) -> set:
+        """The cells a wall piece (tier 2) placed at world (x, z) runs through: its bounding box (box_of) turned by the yaw and
+        scaled, sampled per unit along its long side through the middle of its short side; a cell counts with HOLLOW_COVER
+        samples. set() without box_of, a box or for other tiers."""
+        m = model_of(e)
+        if self.box_of is None or not m or tier(m) != 2:
+            return set()
+        if m not in self._boxes:
+            self._boxes[m] = self.box_of(m)
+        box, t = self._boxes[m], transform(e)
+        if not box or not t:
+            return set()
+        q, sc = t.get("orientation") or {}, t.get("scale") or {}
+        a = 2 * math.atan2(float(q.get("y", 0.0)), float(q.get("w", 1.0)))
+        sx, sz = float(sc.get("x", 1.0)), float(sc.get("z", 1.0))
+        (x0, _y0, z0), (x1, _y1, z1) = box
+        if (x1 - x0) * abs(sx) >= (z1 - z0) * abs(sz):
+            pts = [(x0 + i, (z0 + z1) / 2) for i in range(int(x1 - x0) + 1)]
+        else:
+            pts = [((x0 + x1) / 2, z0 + i) for i in range(int(z1 - z0) + 1)]
+        n = collections.Counter((int((x + sx * bx * math.cos(a) + sz * bz * math.sin(a)) // TILE),
+                                 int((z - sx * bx * math.sin(a) + sz * bz * math.cos(a)) // TILE)) for bx, bz in pts)
+        return {c for c, k in n.items() if k >= HOLLOW_COVER}
+
+    def fill(self, key, local: dict):
+        """The signature for a hollow wall cell: per wall tile of the key, the variant `local` holds for its orientation (the
+        map's most used one, local_walls) or for the side of a wall end (END_WALL), else generic_pick(key); None without."""
+        for _d, o, _s, _q in key:
+            if o in WALL_ORIENTATIONS:
+                for o2 in (o, END_WALL.get(o)):
+                    if local.get(o2):
+                        return local[o2]
+        return self.generic_pick(key)
+
+    def seat(self) -> int:
+        """Retaining walls and stairs on Median's flat floor (RETAINING, STAIRS): a retaining piece whose face looks away from
+        the camera is left out, a facing one over the floor and a stair under it (y under SUNK_BASE; D2R's cave stairs at y 0
+        reach under the floor by design and stay) are moved along the view axis (x, y, z all by the same amount) to y 0.
+        Retaining pieces under SUNK_BASE are lift()'s. -> pieces changed or left out (variants and anchored pieces)."""
+        n = 0
+        for ents in list(self.variants.values()) + list(self.anchored.values()):
+            out = []
+            for e, dx, dz in ents:
+                m, t = model_of(e), transform(e)
+                name = (m or "").rsplit("/", 1)[-1]
+                y = float(t.get("position", {}).get("y", 0.0)) if t else 0.0
+                d = 0.0
+                if t and RETAINING.search(name) and y >= SUNK_BASE:
+                    if not facing(e, corner="corner" in name):
+                        n += 1
+                        continue
+                    d = -y
+                elif t and STAIRS.search(name) and y < SUNK_BASE:
+                    d = -y
+                if abs(d) >= 0.01:
+                    e = copy.deepcopy(e)
+                    transform(e)["position"]["y"] = round(y + d, 3)
+                    dx, dz = round(dx + d, 3), round(dz + d, 3)
+                    n += 1
+                out.append((e, dx, dz))
+            ents[:] = out
+        return n
+
     def fit(self, cells: dict):
         """[(entity, cell x, cell y, dx, dz)]: every learnt set piece placed where the Median map's wall cells repeat its footprint (PIECE_SHARE
         of it, at least PIECE_MIN_CELLS cells with as many distinct keys), once per model and spot."""
@@ -922,6 +1126,14 @@ class Library:
                     done.add(spot)
                     out.append((e, ax, az, dx, dz))
         return out
+
+
+def facing(e, corner=False) -> bool:
+    """Whether a retaining piece's face (local +x; a corner's also local +z) turns toward D2R's camera (RETAINING)."""
+    q = transform(e).get("orientation") or {}
+    a = 2 * math.atan2(float(q.get("y", 0.0)), float(q.get("w", 1.0)))
+    normals = [(math.cos(a), -math.sin(a))] + ([(math.sin(a), math.cos(a))] if corner else [])
+    return any(nx + nz > 0.01 for nx, nz in normals)
 
 
 def footprint(e, x: float, z: float, box, walls: dict):
@@ -992,9 +1204,10 @@ def act_of(folder: str) -> str:
 
 
 def tier(model: str) -> int:
-    """cap() order: 0 props, 1 details on a wall, 2 walls that close rooms (DETAIL / SIGHT, on the file name)."""
+    """cap() order: 0 props, 1 details on a wall, 2 walls that close rooms, 3 stairs (DETAIL / SIGHT / STAIRS, on the file
+    name)."""
     name = (model or "").rsplit("/", 1)[-1]
-    return 1 if DETAIL.search(name) else 2 if SIGHT.search(name) else 0
+    return 3 if STAIRS.search(name) else 1 if DETAIL.search(name) else 2 if SIGHT.search(name) else 0
 
 
 def spread(i: int) -> float:
@@ -1008,8 +1221,8 @@ def spread(i: int) -> float:
 
 
 def cap(ents: list, limit: int) -> list:
-    """At most `limit` entities: props go first, then details on walls, then walls; within a tier every model loses the
-    same share, spread over the map, the most repeated model first on a tie. Order kept."""
+    """At most `limit` entities: props go first, then details on walls, then walls, stairs last; within a tier every model
+    loses the same share, spread over the map, the most repeated model first on a tie. Order kept."""
     if len(ents) <= limit:
         return ents
     count, seen, rank = collections.Counter(model_of(e) for e in ents), collections.Counter(), []
@@ -1021,10 +1234,37 @@ def cap(ents: list, limit: int) -> list:
     return [e for n, e in enumerate(ents) if n not in drop]
 
 
-def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_bytes=MAX_BYTES):
-    """-> (scene json text, stats). The scene keeps at most `limit` entities and `max_bytes` bytes (cap())."""
-    ents, stats = [], collections.Counter()
+def hollow(key, sig, folders) -> bool:
+    """A wall cell (not floor) with a wall tile, all of its wall tiles from `folders`, whose variant has no model
+    (build_scene `fill`)."""
+    walls = [d for d, o, _s, _q in key if o in WALL_ORIENTATIONS]
+    return sig == () and not is_floor(key) and bool(walls) and all(d in folders for d in walls)
+
+
+def local_walls(cells: dict, lib: Library) -> dict:
+    """{orientation: signature}: per wall orientation the variant the map's single-tile wall cells get most often (exact,
+    with a wall piece (tier 2), no set piece)."""
+    seen = collections.defaultdict(collections.Counter)
+    for key in cells.values():
+        if len(key) != 1 or key[0][1] not in WALL_ORIENTATIONS:
+            continue
+        sig, how = lib.pick(key)
+        if how == "exact" and sig and any(tier(m) == 2 for m, _dx, _dz in sig) and not any(lib.set_piece(m) for m, _dx, _dz in sig):
+            seen[key[0][1]][sig] += 1
+    return {o: max(c.items(), key=lambda t: t[1])[0] for o, c in seen.items()}
+
+
+def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_bytes=MAX_BYTES, fill=(), stand_ins=None):
+    """-> (scene json text, stats). The scene keeps at most `limit` entities and `max_bytes` bytes (cap()). fill: tile set
+    folders whose hollow wall cells get a wall (HOLLOW_MAPS), placed after the other cells so that the walls already spanning
+    them are known. stand_ins: the map's STAND_INS (Library.stand_in)."""
+    ents, stats, hollows = [], collections.Counter(), []
     for serial, (xy, key) in enumerate(sorted(cells.items(), key=lambda t: (t[0][1], t[0][0]))):
+        sub = lib.stand_in(key, stand_ins)
+        if sub is not None:
+            stats["stand_in"] += 1
+            ents += place(sub, xy[0], xy[1], serial)
+            continue
         sig, how = lib.pick(key)
         extra = list(lib.anchored.get(key, ())) if how == "exact" else []
         stats["anchored"] += len(extra)
@@ -1051,10 +1291,31 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
             stats[how] += 1
             if not sig:
                 stats["empty"] += 1     # D2R draws this tile without an entity (baked into its terrain, or nothing)
-        variant = lib.variants.get(sig, [])
+        if fill and hollow(key, sig, fill):
+            hollows.append((serial, xy, key, extra))
+            continue
+        variant = (lib.grounded.get(sig) if how == "generic" else None) or lib.variants.get(sig, [])
         keep = [v for v in variant if not lib.set_piece(model_of(v[0]))]
         stats["set_pieces"] += len(variant) - len(keep)
         ents += place(keep + extra, xy[0], xy[1], serial)
+    if hollows:
+        local, covered = local_walls(cells, lib), set()
+        for e in ents:
+            p = transform(e).get("position", {})
+            covered |= lib.cover(e, float(p.get("x", 0.0)), float(p.get("z", 0.0)))
+        for serial, xy, key, extra in reversed(hollows):   # D2R's walls run from their cell back (-x, -z): see the far end first
+            stats["hollow"] += 1
+            keep = []
+            if xy in covered:
+                stats["hollow_covered"] += 1
+            else:   # walls and their details only: the props of the borrowed variant (rock piles) stay with their own tiles
+                keep = [v for v in lib.variants.get(lib.fill(key, local), []) if tier(model_of(v[0])) and not lib.set_piece(model_of(v[0]))]
+                stats["filled"] += bool(keep)
+            placed = place(keep + extra, xy[0], xy[1], serial)
+            for e in placed[:len(keep)]:
+                p = transform(e)["position"]
+                covered |= lib.cover(e, p["x"], p["z"])
+            ents += placed
     for n, (e, x, y, dx, dz) in enumerate(lib.fit(cells)):    # set pieces by layout (lane walls4)
         ents += place([(e, dx, dz)], x, y, len(cells) + n, "mxp")
         stats["pieces"] += 1
@@ -1141,7 +1402,10 @@ def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=No
         lib.learn(key, map_cells(ds, files, tiles.get), scene, ground_of(key, scene))
     lib.anchor()
     if box_of is not None:
+        lib.box_of = box_of
         lib.learn_pieces(box_of)
+        lib.seat()
+        lib.lift(box_of)
     return lib
 
 
@@ -1249,7 +1513,8 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
         biome = map_tint.apply(data_dir, e["map"], map_tint.base_biome(data_dir, biome, e["biome"]), read)   # the 8 retextured maps: a biome with the map's own light
-        text, st = build_scene(cells[e["map"]], lib, biome)
+        text, st = build_scene(cells[e["map"]], lib, biome, fill=HOLLOW_MAPS.get(e["map"], ()),
+                               stand_ins=STAND_INS.get(e["map"]))
         dest = Path(data_dir) / "hd" / "env" / "preset" / (e["map"][:-4] + ".json")
         dest.parent.mkdir(parents=True, exist_ok=True)
         if e["map"] in terrain:

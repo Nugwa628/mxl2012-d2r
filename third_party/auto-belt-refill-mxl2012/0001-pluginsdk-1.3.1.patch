@@ -1,0 +1,78 @@
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+index a6a5794..1605a51 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
++++ b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+@@ -74,7 +74,7 @@ namespace {
+ 
+ constexpr D2RL::PluginInfo AutoBeltRefillInfo {
+ 	.infoSize    = D2RL::PluginInfoSize,
+-	.apiVersion  = D2RL_PLUGIN_API_VERSION,
++	.abiVersion  = D2RL_PLUGIN_ABI_VERSION,
+ 	.id          = "auto-belt-refill",
+ 	.name        = "Auto Belt Refill",
+ 	.version     = "0.35.9",
+@@ -85,9 +85,9 @@ constexpr D2RL::PluginInfo AutoBeltRefillInfo {
+ 
+ // ------------------------------------------------------------------- services
+ 
+-const D2RL::InventoryServiceV1* g_inventory = nullptr;
+-const D2RL::ThreadServiceV1*    g_threads   = nullptr;
+-const D2RL::InputServiceV1*     g_input     = nullptr;
++const D2RL::InventoryService* g_inventory = nullptr;
++const D2RL::ThreadService*    g_threads   = nullptr;
++const D2RL::InputService*     g_input     = nullptr;
+ 
+ // v0.35.7: the LIVE action bindings as the game's control settings hold them.
+ // The toml key is only the factory default handed to registerAction; once the
+@@ -3227,13 +3227,13 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context)
+ 		return true;
+ 	}
+ 
+-	if (context->QueryService(D2RL::ServiceId::Inventory, D2RL::InventoryServiceV1Version, &g_inventory) != D2RL::ServiceQueryResult::Success
+-	    || !D2RL::HasInventoryServiceV1Field(g_inventory, D2RL::InventoryServiceV1RequiredSize)) {
++	if (context->QueryService(&g_inventory) != D2RL::ServiceQueryResult::Success
++	    || !D2RL::HasInventoryServiceField(g_inventory, D2RL::InventoryServiceRequiredSize)) {
+ 		return false;
+ 	}
+ 
+-	if (context->QueryService(D2RL::ServiceId::Thread, D2RL::ThreadServiceV1Version, &g_threads) != D2RL::ServiceQueryResult::Success
+-	    || !D2RL::HasThreadServiceV1Field(g_threads, D2RL::ThreadServiceV1RequiredSize)) {
++	if (context->QueryService(&g_threads) != D2RL::ServiceQueryResult::Success
++	    || !D2RL::HasThreadServiceField(g_threads, D2RL::ThreadServiceRequiredSize)) {
+ 		return false;
+ 	}
+ 
+@@ -3273,8 +3273,8 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context)
+ 		return false;
+ 	}
+ 
+-	if (context->QueryService(D2RL::ServiceId::Input, D2RL::InputServiceV1Version, &g_input) == D2RL::ServiceQueryResult::Success
+-	    && D2RL::HasInputServiceV1Field(g_input, D2RL::InputServiceV1RequiredSize)) {
++	if (context->QueryService(&g_input) == D2RL::ServiceQueryResult::Success
++	    && D2RL::HasInputServiceField(g_input, D2RL::InputServiceRequiredSize)) {
+ 		// v0.35.6: the actions are ALWAYS registered. fill_key = "" (or a
+ 		// missing key) registers them with no default binding - they show up
+ 		// as "无" in the game's control settings under the Auto Belt Refill
+@@ -3377,9 +3377,9 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context)
+ 			.callback   = OnAutoGameplayEvent,
+ 			.userData   = nullptr,
+ 		};
+-		const D2RL::LifecycleServiceV1* lifecycle = nullptr;
+-		if (context->QueryService(D2RL::ServiceId::Lifecycle, D2RL::LifecycleServiceV1Version, &lifecycle) == D2RL::ServiceQueryResult::Success
+-		    && D2RL::HasLifecycleServiceV1Field(lifecycle, D2RL::LifecycleServiceV1RequiredSize)) {
++		const D2RL::LifecycleService* lifecycle = nullptr;
++		if (context->QueryService(&lifecycle) == D2RL::ServiceQueryResult::Success
++		    && D2RL::HasLifecycleServiceField(lifecycle, D2RL::LifecycleServiceRequiredSize)) {
+ 			D2RL::Lifecycle::ListenerHandle listenerHandle = D2RL::Lifecycle::InvalidHandle;
+ 			if (lifecycle->registerGameplayEventListener(context, &autoListener, &listenerHandle) == D2RL::Lifecycle::Result::Success) {
+ 				EnsureAutoWatch(context);
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.rc b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.rc
+index 02c5670..15ffa8c 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.rc
++++ b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.rc
+@@ -1,4 +1,4 @@
+ #include <D2RLPlugin/resource.h>
+ #include <D2RLPlugin/version.h>
+ 
+-D2RL_PLUGIN_MANIFEST_RESOURCE_ID RCDATA { D2RL_PLUGIN_RESOURCE_DWORD(D2RL_PLUGIN_API_VERSION) }
++D2RL_PLUGIN_MANIFEST_RESOURCE_ID RCDATA { D2RL_PLUGIN_RESOURCE_DWORD(D2RL_PLUGIN_ABI_VERSION) }

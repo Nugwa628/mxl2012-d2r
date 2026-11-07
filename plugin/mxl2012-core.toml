@@ -1,0 +1,8 @@
+# D2R-XL 2012 core plugin settings. D2RLoader writes this file once from the plugin's copy; your changes stay.
+
+[mapreveal]
+# Reveal the rest of the current level's map (Options > Controls: "Reveal Level Map", default L) once this share of the level
+# is explored, in %. 0 = always, 101 = off.
+threshold = 70
+# Level ids with no reveal besides the towns, e.g. exclude = [73, 74]
+exclude = []

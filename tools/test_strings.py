@@ -39,6 +39,39 @@ class ReadTbl(unittest.TestCase):
         self.assertEqual(tbl2json.placeholders("%+d%% to %s"), ["d", "s"])
 
 
+class TooltipOrder(unittest.TestCase):
+    def test_plain_and_blank_lines(self):
+        self.assertEqual(ns.top_down_tooltip("last\n\nfirst"), "first\n\nlast")
+        self.assertEqual(ns.top_down_tooltip("single"), "single")
+        self.assertEqual(ns.top_down_tooltip("line\n"), "\nline")
+
+    def test_inherited_colours_and_end_of_line_reset(self):
+        source = "ÿc4unleash\nÿc1dual claws\nrequires claw\nÿc5third\nsecond\nfirst\nÿc/melee"
+        result = ns.map_colours(ns.top_down_tooltip(source))
+        # Each stored line's colour follows it, including implicit inherited colours.
+        self.assertEqual(result, "ÿc0melee\nÿc5first\nÿc5second\nÿc5third\nÿc1requires claw\nÿc1dual claws\nÿc4unleash")
+        self.assertEqual(ns.map_colours(ns.top_down_tooltip("ÿc1redÿc/\nwhite")),
+                         "ÿc0white\nÿc1red")
+        self.assertEqual(ns.bad_colours(result), [])
+        self.assertFalse(ns.EOL_COLOUR.search(result))
+
+    def test_reported_skills(self):
+        dark = "ÿc3have some quite surprising results...\nusing this skill in certain places may\n\nÿc/summon a random monster from the current area"
+        self.assertEqual(ns.map_colours(ns.top_down_tooltip(dark)),
+                         "ÿc0summon a random monster from the current area\n\nÿc3using this skill in certain places may\nÿc3have some quite surprising results...")
+        blood = "ÿc1requires dual claws\nÿc/heal on subsequent kills and block attacks with dual claws\npowerful melee attack that enrages you, granting the ability to"
+        self.assertEqual(ns.map_colours(ns.top_down_tooltip(blood)),
+                         "ÿc0powerful melee attack that enrages you, granting the ability to\nÿc0heal on subsequent kills and block attacks with dual claws\nÿc1requires dual claws")
+
+    def test_reference_scope(self):
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "skilldesc.txt").write_text("skilldesc\tstr long\tstr short\tdsc2texta1\tdesccalca1\nfoo\tprose\tprose\tflavour\tnot_text\n")
+            # Generated stat/flavor lines still draw bottom-up in D2R; only prose reverses.
+            self.assertEqual(ns.skill_tooltip_keys(d), {"prose"})
+        with self.assertRaises(ValueError):
+            ns.skill_tooltip_keys(None)
+
+
 class Cells(unittest.TestCase):
     G2 = {"Short", "Armor of the Old Religion", "To The Island of the Sunless Sea", "115"}
 

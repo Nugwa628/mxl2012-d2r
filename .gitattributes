@@ -1,2 +1,4 @@
 # Shell scripts run under Git Bash on Windows: LF, whatever core.autocrlf says.
 *.sh text eol=lf
+# Patches applied to third-party source at build time: LF, as the exported source.
+*.patch text eol=lf

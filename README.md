@@ -17,6 +17,13 @@ and licence notice in `mods\mxl2012\d2rloader\plugins\d2rl-buff-panel-LICENSE.tx
 `enabled = false` in `mods\mxl2012\d2rloader\config\buff-panel.toml`. Planned: PyreFly's plugins by **PyreFly**
 (<https://github.com/Pyre-Flies/D2R-Mods>, by permission). See [docs/bundled-plugins.md](docs/bundled-plugins.md).
 
+Shipped with the mod from 0.1.15: **Auto Belt Refill** by **jaycachou-svg** (<https://github.com/jaycachou-svg/auto-belt-refill>,
+shipped and adapted with the author's permission; the repository has no licence file): refills the potion belt from your
+inventory, by itself after you drink and on a key you bind (Options > Controls: Refill Belt). Each column refills with
+exactly the potion at its bottom, a completely empty column stays empty until you put a potion there, and a small number on
+each column shows how many of that potion you have left; elixirs are never moved. Set fixed columns, or turn it off with
+`enabled = false`, in `mods\mxl2012\d2rloader\config\auto-belt-refill.toml`.
+
 Shipped with the mod: our own plugin **D2R Legacy 16:9** (`legacy169.dll`, <https://github.com/Nugwa628/D2R-Legacy169>, MIT), the
 classic graphics in 16:9 (1066x600 / 853x480). Turn it off with `enabled = false` in
 `mods\mxl2012\d2rloader\config\legacy169.toml`.

@@ -100,8 +100,10 @@ entities made of D2R's own wall models**:
 6. **Cap** (bug #360 open, asset cache overflow). No generated scene goes above D2R's largest map scene, `act3/docktown/
    docktown3` (4,989 entities, 4,423 of them with a model, 679 distinct models, 4,651,080 bytes): `cap()` keeps at most 4,423
    placed models and 4,651,080 bytes. It drops props first, then details on walls (buttresses, pillars, arches, beams,
-   stairs, gargoyles: `DETAIL`), the walls, cliffs and fences that close rooms (`SIGHT`) last; inside a tier every model
-   loses the same share, thinned evenly over the map (`spread`), not cut by region. Only cypherpunk reaches it (5,825 placed:
+   gargoyles: `DETAIL`), then the walls, cliffs and fences that close rooms (`SIGHT`), stairs (`STAIRS`, lane elevwalls)
+   last; inside a tier every model loses the same share, thinned evenly over the map (`spread`), not cut by region. The
+   cap is our own policy, not a measured engine limit: bug #360's overflow was the monster variant table cache, and no
+   entity or byte limit of D2R's scenes is known (lane reimref read the Reimagined level editor: none there either). Only cypherpunk reaches it (5,825 placed:
    1,402 dropped, all 1,802 elevation walls kept).
 
 Size: the 8 scenes are 10.2 MB of JSON together (before wallsfix 10.9 MB); the largest is cypherpunk, 4,423 placed models,
@@ -246,6 +248,31 @@ models (any act's tile sets), placed with this pipeline; a cell with no fitting 
    map that repeats at least 4 of those cells with 4 distinct keys, and 60% of the footprint, gets the piece at the same
    offset. D2R's Fortress huts are walls and slate roof in one model: `hut_blacksmith01` matches charismatic 5 times and
    `hut_merchant01` twice, the roofed buildings of the classic map. No other map gets one.
+16. **Sunk walls** (lane tawalls, 2026-11-06, `Library.lift`, `SUNK_BASE`, `SUNK_TOP`). D2R puts Kurast's dock walls
+   (`act3_docktown_walls_lower/wall_*`, `walls_upper/stone_ruin01/02`: the pieces of `ruinwall.dt1` style 4) and its
+   `wall_elevation_stone01` at the foot of a terrace; `Ground` measures the terrace top on their cell (highest triangle), so
+   they were learnt 4-5 units under the floor with their top at floor level. On Median's flat maps they were drawn inside
+   the floor: Tran Athulua (desertpeak, level 60) had 1,016 of its 2,926 pieces sunk and showed floor only in its corridors
+   (player report, docs/bugs.md "tawalls"). A wall piece (cap tier 2, not a `DETAIL`) whose y is under -0.5 and whose top
+   (model box) ends under 1.0 now stands on the floor (y 0, same tile). Lifted: desertpeak 1,016, excelsior3 22,
+   cypherpunk 7, moskvich 1 placed pieces; no generated scene keeps a sunk wall. Details (cliff supports, stairs,
+   gargoyles under belial's platform, hanging roots) stay as learnt.
+17. **Hollow wall cells** (lane tawalls2, 2026-11-07, `HOLLOW_MAPS`, `Library.fill`, `Library.cover`). Tran Athulua's
+   corridors west of the arrival are Median's copy of the Act 3 jungle walls of style 10. D2R draws those in its terrain
+   mesh (66 keys, models on 4% of their D2R cells), so the library learns them empty; Median's scenes have no D2R terrain,
+   so HD had floor there. Of the 994 empty cells, 496 are tree tiles (orientation 14, no wall) and 556 hold a jungle wall
+   tile. Those now get the wall of their orientation that the same map uses most (desertpeak: the Docktown ruin walls;
+   a wall end takes its side's wall), with props left out. A cell is skipped when a wall piece of another cell already runs
+   5 units through it (model box turned by the yaw), so D2R's long walls are not doubled; cells are filled from the far
+   end, because D2R's wall models run back from their cell. Result: 480 cells filled, 76 skipped as spanned, 1,082 more
+   pieces (4,008, under the cap). Only desertpeak and only its `act3/jungle` cells: the Act 2 tomb cells at the arrival are
+   Tyrael's cliff tiles (the platform edge), where a wall would stand on the floor. The 16 other scenes are byte-equal to
+   before. In game (slot 2, `checks-20261107-015409-s2` before, `checks-20261107-014406-s2` after, sheets
+   `mxl2012-runs/tawalls2/pairs/`, before HD / after HD / classic): the west wall line at cell 8,30 has its wall pieces
+   where it had gaps; at 12,52 one more segment closes the corridor end; the arrival is unchanged. Still not like classic:
+   classic's corridors are tall walls overgrown with jungle trees, HD has low Docktown ruin walls and no trees (the tree
+   tiles have no D2R tree on most of their cells, `Library.tree_pick`). Checked for the reimref notes on .ds1 decoding:
+   desertpeak has no cell with sequence bits 14-15 set and no flags-only dword, so neither explains the empty keys.
 
 **Left as is** (no fitting D2R model, by the owner rule): charismatic's tall pointed arch (foregate 8/3/0-1, 16 cells each;
 D2R draws it with `gate01`, whose footprint matches 1 cell only), the long roofed building walls (1/2/6-13, 2/2/7-9) and
@@ -289,7 +316,7 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 
 | map | biome | wall cells | exact | partial | look-alike | generic | no D2R model | uncovered | tree cells (trees) | floor cells (with models) | set pieces left out (placed by layout) | placed | capped | models in scene | distinct models | scene size |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 292 | 2 | 14 | 994 | 0 | 0 (0) | 13435 (46) | 17 (0) | 2926 | 0 | 2926 | 42 | 2248 KB |
+| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 292 | 2 | 14 | 994 | 0 | 0 (0) | 13435 (46) | 17 (0) | 4008 | 0 | 4008 | 42 | 3115 KB |
 | expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 677 | 83 | 5 | 867 | 0 | 0 (0) | 9039 (836) | 11 (0) | 11083 | 6660 | 4423 | 62 | 3675 KB |
 | expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 275 | 78 | 42 | 320 | 1 | 0 (0) | 6911 (1322) | 109 (0) | 4175 | 0 | 4175 | 50 | 3527 KB |
 | expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2085 | 355 | 4 | 422 | 396 | 0 | 412 (286) | 32292 (0) | 3 (0) | 2838 | 0 | 2838 | 28 | 2109 KB |
@@ -297,16 +324,16 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 | expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 278 | 34 | 3 | 18 | 1 | 0 (0) | 774 (57) | 1 (0) | 1193 | 0 | 1193 | 54 | 959 KB |
 | expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 355 | 20 | 18 | 10 | 18 | 1 | 1 (1) | 1128 (0) | 30 (0) | 569 | 0 | 569 | 20 | 438 KB |
 | expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 193 | 177 | 54 | 81 | 1 | 0 (0) | 1173 (21) | 47 (7) | 1097 | 0 | 1097 | 24 | 823 KB |
-| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 0 | 209 | 5 | 0 (0) | 572 (87) | 0 (0) | 533 | 0 | 533 | 66 | 1049 KB |
+| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 0 | 209 | 5 | 0 (0) | 572 (87) | 0 (1) | 534 | 0 | 534 | 66 | 1049 KB |
 | act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 352 | 0 | 352 | 30 | 321 KB |
 | act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 352 | 0 | 352 | 30 | 321 KB |
 | act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 0 | 1 | 0 (0) | 84 (17) | 0 (0) | 20 | 0 | 20 | 15 | 17 KB |
-| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 0 | 330 | 68 | 0 (0) | 1709 (112) | 5 (0) | 1823 | 0 | 1823 | 90 | 1410 KB |
-| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 0 | 3 | 0 (0) | 96 (96) | 0 (0) | 679 | 0 | 679 | 17 | 560 KB |
-| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 423 | 19 | 14 | 423 | 1 | 0 (0) | 4412 (189) | 546 (0) | 4000 | 0 | 4000 | 86 | 3039 KB |
+| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 0 | 330 | 68 | 0 (0) | 1709 (112) | 5 (2) | 1825 | 0 | 1825 | 92 | 1411 KB |
+| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 0 | 3 | 0 (0) | 96 (96) | 0 (0) | 679 | 0 | 679 | 17 | 568 KB |
+| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 423 | 19 | 14 | 423 | 1 | 0 (0) | 4412 (189) | 546 (6) | 4006 | 0 | 4006 | 91 | 3044 KB |
 | act1/cathedrl/inarius.ds1 | act1_cathedral | 110 | 110 | 0 | 0 | 0 | 16 | 0 | 0 (0) | 145 (0) | 1 (0) | 245 | 0 | 245 | 35 | 202 KB |
 | expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 0 | 3 | 0 | 0 (0) | 3556 (481) | 0 (0) | 532 | 0 | 532 | 45 | 748 KB |
-| all | | 15842 | 11702 | 2636 | 442 | 566 | 3718 | 83 | 413 (287) | 75996 (3323) | 772 (7) | 32945 | 6660 | 26285 | | 21923 KB |
+| all | | 15842 | 11702 | 2636 | 442 | 566 | 3718 | 83 | 413 (287) | 75996 (3323) | 772 (16) | 34036 | 6660 | 27376 | | 22806 KB |
 
 Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 44298 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *look-alike*: a wall tile D2R never has borrows the variant of the learnt tile of its set and orientation that has the same silhouette (Library.lookalike); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *tree cells*: cells with only tree pieces (orientation 14), in brackets the trees placed on trunk tiles (Library.tree_pick); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece), in brackets those placed where the map repeats the wall tiles under them (Library.fit); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
 
@@ -340,6 +367,100 @@ the tall pointed arch and the long roofed walls) and all 17 show D2R's stock wal
 walls3 (2026-10-30, slot 2, runs `checks-20261030-120504-s2` and `checks-20261030-121747-s2`, docs/testing.md "Lane walls3")
 re-checked caveroom4, belial, charismatic, glados and downtown in HD and classic. Lane walls4 (slot 3, run
 `checks-20261030-175423-s3`, docs/testing.md "Lane walls4") re-checked charismatic, downtown and macumba.
+
+## HD wall scan 2026-11-06 (lane wallscan)
+
+Owner request after lane tawalls (item 16): look at the other 16 Median maps for HD wall problems. Static pass: the scenes of
+main's `walls_hd.py` (with `Library.lift`) per cell category, the cap, and wall pieces left far over the floor
+(scripts and output in `mxl2012-runs/wallscan/static/`). In game: slot 2, check `wall_maps` with `MXL_WALL_SPOTS` (the map
+cells of the static pass; the harness hops there), the slot's 17:40 install with main's lifted scenes of desertpeak,
+cypherpunk, moskvich and excelsior3 copied over for the run and restored byte-equal after. Run
+`checks-20261106-224456-s2`, all 9 levels reached in both modes, no assert in the visits. Shots
+`mxl2012-runs/wallscan/shots2/`, HD left / classic right in `mxl2012-runs/wallscan/pairs/wall_<map>_pair_<n>.jpg`
+(0 = arrival, 1-2 = the spots).
+
+All 17 maps have their scene in the install. dungrm6a, temple5, temple6 and caveroom4 are not missing: since lane hole2
+they sit at `hd/env/preset/mxl2012/<path>.json` (ds1_paths). The other 17 .ds1 of the mod use D2R's own scene.
+
+| map / area | problem | seen | severity | suggested fix |
+|-|-|-|-|-|
+| desertpeak (60 Tran Athulua), corridors west of the arrival (cell 12,52) | 994 wall cells take a D2R variant with no model (D2R draws them in its terrain); HD shows open floor and short ruin stubs where classic has a closed corridor | yes, `wall_desertpeak_pair_1` | high | done (lane tawalls2, item 17): the map's own wall of the cell's orientation on its jungle wall cells, not where a neighbour's wall spans the cell |
+| desertpeak, arrival | the short back wall takes the tomb pillars (tawalls note); a low ruin wall stands on the floor south of the player where classic has the platform edge | yes, `pair_0` | low | left (lane tawalls2): classic also has tall carved pillars behind the braziers, HD's tomb pillars stand there without the wall between them; the platform edge needs a terrain step (item 12), a wall is the nearest D2R piece |
+| cypherpunk (59 Fauztinville) | cap: 11,083 pieces placed, 6,660 dropped: all 363 props and 6,297 of 7,142 details (stairs, buttresses, gargoyles, caps) | arrival: HD flat floor with slab walls where classic has a wide stair (`pair_0`); spots: walls roughly as classic (`pair_1`, `pair_2`) | medium | keep `stair`/`step` pieces in the walls tier of `cap()`, or a per-map cap once bug #360's cache limit is measured |
+| cypherpunk, excelsior3 | `wall_elevation_stone01` learnt at y 3 (cypherpunk 884, excelsior3 54, plus 38 at 5-10): retaining walls of D2R's terraces stand as free walls on the flat floor | excelsior3 arrival: classic's sunken courtyard with stairs is a flat yard fenced by slabs in HD (`wall_excelsior3_pair_0`) | medium | the mirror of item 16 (pieces above a terrace); a terrain mesh is not possible (item 12), so at most drop the raised ones or stand them at y 0 |
+
+| desertpeak (60 Tran Athulua), corridors west of the arrival (cell 12,52) | 994 wall cells take a D2R variant with no model (D2R draws them in its terrain); HD shows open floor and short ruin stubs where classic has a closed corridor | yes, `wall_desertpeak_pair_1` | high | for wall cells whose learnt variant is empty, place `generic_pick` (needs a check that it does not double D2R's own terrain walls on the stock maps) |
+| desertpeak, arrival | the short back wall takes the tomb pillars (tawalls note); a low ruin wall stands on the floor south of the player where classic has the platform edge | yes, `pair_0` | low | prefer the variant of the cell's main tile set on mixed cells |
+| cypherpunk (59 Fauztinville) | cap: 11,083 pieces placed, 6,660 dropped: all 363 props and 6,297 of 7,142 details (stairs, buttresses, gargoyles, caps) | arrival: HD flat floor with slab walls where classic has a wide stair (`pair_0`); spots: walls roughly as classic (`pair_1`, `pair_2`) | medium | stairs kept since lane elevwalls (cap tier 3, all 1,406); the arrival stair is floor tiles with no D2R model, open ([below](#retaining-walls-and-stairs-lane-elevwalls-2026-11-07)) |
+| cypherpunk, excelsior3 | `wall_elevation_stone01` learnt at y 3 (cypherpunk 884, excelsior3 54, plus 38 at 5-10): retaining walls of D2R's terraces stand as free walls on the flat floor | excelsior3 arrival: classic's sunken courtyard with stairs is a flat yard fenced by slabs in HD (`wall_excelsior3_pair_0`) | medium | done (lane elevwalls): walls facing away from the camera left out, facing ones moved onto the floor ([below](#retaining-walls-and-stairs-lane-elevwalls-2026-11-07)) |
+| downtown (18), arrival and Harrogath walls | 422 generic cells: low crenellated `wall_segment_short` (288) where classic has a tall skull wall; shelf-like pieces stand where classic has a stone arch; 71 wrought-iron fences learnt at y 9 | yes, `pair_0`, `pair_2` | medium (look only, layout right) | needs art or a taller D2R wall as the generic pick for style 3; fences: drop or stand at y 0 |
+| glados (95) | 42 generic and 78 look-alike cells: walls and gargoyle pillars match; classic's big trees are missing in HD | yes, `pair_1`, `pair_2` | low | trees: object or tile layer not in the scene (not walls) |
+| charismatic (127) | 177 look-alike, 54 generic | walls, arches, huts follow classic (`pair_1`, `pair_2`) | low (known: item 10, tall pointed arch) | none |
+| excelsior3 (84), cell 36,12 | 68 uncovered cells (known, 43 tiles without a file of the level type, 25 corner halves) | ruins as classic (`pair_2`) | low | none |
+| dungrm6a (90) | 209 cells with no D2R model | walls and arches follow the classic layout, a few near-side walls thinner (`pair_1`) | low | none |
+| epicwhiners (13) | 423 no-model cells, 546 set pieces left out | arrival as classic (`pair_0`); the hop stopped short of both spots | low | look again by walking |
+| rockisdead (116) | 153 ledge corners at y 8 | HD dark where classic shows the lower ledges (`pair_1`); not conclusive | low | none now |
+| moskvich, borgir, macumba, inarius, belial, temple5/6, caveroom4 | nothing beyond the known items in the static pass (a few ornate walls at y 12-17 in moskvich and borgir: upper floors) | not visited (tawalls and hdwalls2 shots) | OK | none |
+
+The `downtown` origin (10000, 5000) is given in `MXL_WALL_SPOTS` because `presets rooms` lists 400 rooms at most.
+
+### downtown (the Crypt, level 18): hand picks (lane downtownhd, 2026-11-07)
+
+The wall scan's downtown row, read again from the tiles (Median's neonmile files are Harrogath's with the same keys and
+shapes, other colours): the tall skull wall of classic is Harrogath's `walls.dt1` style 1 (416 px tiles), which D2R itself
+draws with `wall_segment_short` and `wall_crenelation` (exact cells; kept). What did not match was the generic pick for the
+tiles D2R never draws: `walls2.dt1` style 3 is a **low** rock barricade (124 px tiles) and got the tall town wall (orientation
+1-3) or an iron fence learnt at y 9 on Harrogath's terraces (5/3/0, 61 cells; 5/1/0, the tall wall's end, 6 more); the keep
+wall (`keepwall.dt1` 2/16) a bookshelf and fence set; the free-standing crypt arch at the arrival (crypt corner 7/0/0 at both
+ends, the passage tiles 10/1/0-1 between, cells 6,11-13) the crypt corner's pillar and a wall turned across the arch.
+
+`walls_hd.STAND_INS` (per map; only downtown has one, other maps' scenes are unchanged) gives those tiles fixed pieces:
+style 3 the low ruin wall and rubble of D2R's Harrogath ruins (`expansion/ruins` 1/22/2, 6/22/2, 3/22/2, 1/22/23: wall_low02,
+rubble_wall01), 5/1 the tall wall, 2/16 the tall wall along x, crypt 7/0 the end pillar only and 10/1/0 the crypt's doorway
+arch (`doorway01`, turned 90 degrees as on D2R's left-wall door cells). 267 cells take a stand-in; generic cells 422 -> 162
+(the building walls 2/14 and the main gate 8/3 stay generic). Generic picks now stand a wall piece learnt over 3 units
+(`FLOAT_Y`) on the floor (`Library._ground`): a tile D2R never draws has no terrace to measure, and that left the fences at y 9.
+Tests `tools/tests/test_walls_hd.py` `StandInTest`. Evidence `mxl2012-runs/downtownhd/` (tile renders `tiles/`, `sheet*.png`,
+static scripts and the scene in `static/`, in-game pairs in `pairs/`).
+
+### Retaining walls and stairs (lane elevwalls, 2026-11-07)
+
+Fixes for the cypherpunk and excelsior3 rows above, in `walls_hd.py` (`Library.seat`, `facing`, `tier`; tests
+`SeatTest`, `CapTest`):
+
+- **Retaining walls.** D2R's terrace walls (`wall_elevation_*` with their `wall_stone_buttress_*` pieces) have one face, on
+  the low side of the step (local +x, corners also +z; measured on D2R's Kurast scenes: the terrain is 4.9 lower on that
+  side), and their body sits inside the upper terrace. In D2R's own maps the four turns are equally common. D2R's camera
+  looks along (-1, -1, -1), so a face turned away from it (normal nx + nz <= 0) is hidden by the terrace in D2R and classic
+  draws only the terrace edge there. On Median's flat floor (no terrain, item 12) these stood as free walls showing their
+  backs: cypherpunk's walkways had 2,780 of them (of 2,800 elevation walls), excelsior3's courtyard 212. `seat` leaves them
+  out. A facing one learnt over the floor (the ground measured on a sloped triangle at the terrace edge: 918 at y 3.27 in
+  cypherpunk) is moved along the view axis to y 0: same place on screen, standing on the floor. Retaining pieces learnt
+  under the floor (under `SUNK_BASE`) stay `lift()`'s.
+- **Stairs** are the last cap tier (3), so cypherpunk keeps all its 1,406 stair pieces (before: 169;
+  the arrival's wide stair was gone). Stairs learnt under the floor (y < `SUNK_BASE`: glados' 312
+  Kurast stairs at -1.3, excelsior3's sewer stair at -7.7) are moved up the view axis to y 0; D2R's cave stairs at y 0 that
+  reach under the floor by design are not touched.
+- **Props**: cypherpunk now places 5,611 pieces (was 11,083); the cap still drops 1,188: all props and part of the
+  details. The budget does not allow props there; raising it needs a game test of a larger scene first.
+
+- **Cypherpunk's arrival stair is not fixed**: those cells are floor tiles of Kurast style 31, sequences 12-15 (1,838 cells
+  in cypherpunk: 515, 513, 392, 418), and D2R's scenes have models on sequences 7, 10 and 12 only (stairs), never on 13-15,
+  so they get bare floor (`pick` 'floor'), not capped models. A mapping of 13-15 to D2R's stair variants would place about
+  1,800 more pieces (past the cap) and needs their art compared first (palette render), open.
+
+In game (slot 2, run `checks-20261107-022822-s2`, this lane's scenes of excelsior3, cypherpunk, desertpeak, glados and
+moskvich copied over the slot's for the run and restored byte-equal after; all 5 levels reached in both modes, 0 asserts,
+no crash file): cypherpunk's walkways show their near faces and no slabs on the far side, as classic (`pair_1`;
+wallscan's had slabs on both sides); the arrival's slabs are gone, the stair is still floor (`pair_0`). excelsior3's
+courtyard: the front slabs are gone, the back walls (faces toward the camera), torches and stairs stay where classic has
+them; the floor stays flat (`pair_0`). desertpeak, glados and moskvich: nothing missing or floating at the spots.
+Evidence `mxl2012-runs/elevwalls/` (`pairs/`, `shots/`, `run1.log`, scripts).
+
+Scene changes against main (all 17 rebuilt): cypherpunk (2,681 elevation walls out, stairs and details in), excelsior3
+(-382 pieces), desertpeak (-36: 15 away-facing elevation walls with their buttresses, Kurast donor pieces on its corridors),
+moskvich (-28), borgir (-22), macumba (-6), glados (-3, 373 stairs moved up); the other 10 maps unchanged (caveroom4's and
+epicwhiners' stairs included).
 
 ## Edited D2R maps (lane hole2, bug #525, 2026-11-03)
 

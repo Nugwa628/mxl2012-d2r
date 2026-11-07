@@ -255,25 +255,18 @@ std::string ItemStatRanges(const std::string& text) {
 	return keyLine < 0 ? "" : TomlUnquote(value);
 }
 
-std::string SetItemStatRangesOff(const std::string& text) {
-	if (ItemStatRanges(text) == "false")
-		return text;
+std::string MigrateItemStatRanges(const std::string& text) {
+	const std::string marker = "# mxl2012 migration: ctrl-stat-ranges-on-v1";
 	bool bom = text.rfind("\xEF\xBB\xBF", 0) == 0;
 	std::string t = bom ? text.substr(3) : text;
-	auto lines = Lines(t);
-	int keyLine = 0, headerLine = 0;
-	FindTableKey(lines, ItemsSection, StatRangesKey, keyLine, headerLine, nullptr);
-	std::string out;
-	if (keyLine < 0) {
-		out = SetTomlKey(t, ItemsSection, StatRangesKey, "false");  // a commented template line, else under the header, else a new table
-	} else {
-		lines[size_t(keyLine)] = ReplaceKeyValue(lines[size_t(keyLine)], ItemsSection, StatRangesKey, "false");
-		for (const auto& l : lines)
-			out += l + "\n";
-		if (!t.empty() && t.back() != '\n')
-			out.pop_back();  // keep a missing final newline missing
+	for (auto line : Lines(t)) {
+		if (!line.empty() && line.back() == '\r')
+			line.pop_back();
+		if (line == marker)
+			return text;  // already migrated: respect player edits
 	}
-	return bom ? "\xEF\xBB\xBF" + out : out;
+	return (bom ? "\xEF\xBB\xBF" : "") + marker + (t.find("\r\n") != std::string::npos ? "\r\n" : "\n") +
+	       ForceTomlKey(t, ItemsSection, StatRangesKey, "true");
 }
 
 std::string TableKeyValue(const std::string& text, const std::string& section, const std::string& key) {
@@ -326,7 +319,7 @@ std::string ForceTomlKey(const std::string& text, const std::string& section, co
 
 const ModConfigKey ModConfigKeys[4] = {
 	{SaveFormatSection, "mode", "\"extended\"", false, "D2R-XL 2012 saves need it"},
-	{ItemsSection, StatRangesKey, "false", false, "D2RLoader's Ctrl stat ranges show repeated lines for D2R-XL 2012 items"},
+	{ItemsSection, StatRangesKey, "true", true, "Ctrl stat ranges restored once; some automagic range lines may repeat"},
 	{"d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true", false,
 	 "G switches to legacy graphics in a RotW game; without it D2RLoader's game-wide false applies"},
 	{"d2rcore.stash", "add_shared_tabs", "2", false, "5 shared stash pages in every game, as a RotW game has", true},
@@ -336,6 +329,8 @@ std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, st
 	std::string old = TableKeyValue(text, k.section, k.key);
 	if (was)
 		*was = old;
+	if (std::string(k.section) == ItemsSection && std::string(k.key) == StatRangesKey)
+		return MigrateItemStatRanges(text);
 	if (k.keepHandSet)
 		return EnsureTomlKey(text, k.section, k.key, k.value);
 	if (k.atLeast) {
@@ -346,8 +341,6 @@ std::string ApplyModConfigKey(const std::string& text, const ModConfigKey& k, st
 	}
 	if (std::string(k.section) == SaveFormatSection && std::string(k.key) == "mode")
 		return SetExtendedSaveFormat(text);
-	if (std::string(k.section) == ItemsSection && std::string(k.key) == StatRangesKey)
-		return SetItemStatRangesOff(text);
 	return ForceTomlKey(text, k.section, k.key, k.value);
 }
 

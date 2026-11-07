@@ -16,7 +16,7 @@ using FrameFn = void (*)(d2r::Game*);
 FrameFn g_original = nullptr;
 bool g_tried = false;
 bool g_hooked = false;
-constexpr int MaxCallbacks = 4;
+constexpr int MaxCallbacks = 8;
 ServerFrameCallback g_callbacks[MaxCallbacks] = {};
 volatile long g_count = 0;
 

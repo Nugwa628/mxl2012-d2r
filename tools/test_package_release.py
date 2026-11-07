@@ -43,7 +43,7 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn('[d2rcore.save_format]\nmode = "extended"', toml)
         self.assertIn("[d2rcore.stash]\nadd_shared_tabs = 2", toml)  # bugs.md #535
         self.assertIn("[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true", toml)  # bugs.md #498
-        self.assertIn("[d2rcore.items]\nitem_stat_ranges = false", toml)  # bugs.md #528
+        self.assertIn("[d2rcore.items]\nitem_stat_ranges = true", toml)  # bugs.md #528
         self.assertTrue((mod / "d2rloader" / "plugins" / "mxl2012-core.dll").is_file())
         self.assertTrue((mod / "d2rloader" / "patches").is_dir())
 
@@ -101,9 +101,9 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn("enabled = true", (mod / pr.LEGACY169["config"]).read_text())
         files = pr.file_list(mod)
         m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod))
-        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/legacy169.toml"])
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml", "d2rloader/config/legacy169.toml"])
         self.assertTrue(set(m["preserve"]) <= {f["path"] for f in files})
-        self.assertEqual(pr.preserve_list(self.staged()), pr.PRESERVE)  # a package without it: only d2rloader.toml
+        self.assertEqual(pr.preserve_list(self.staged()), pr.PRESERVE)  # a package without it: only our own two configs
 
     def test_legacy169_source_of_another_commit_is_refused(self):
         mod = self.staged()
@@ -143,7 +143,7 @@ class PackageReleaseTests(unittest.TestCase):
         files = pr.file_list(mod)
         m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
                         pr.bundled_plugins(False, True))
-        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/buff-panel.toml"])
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml", "d2rloader/config/buff-panel.toml"])
         paths = {f["path"] for f in files}
         (entry,) = m["bundledPlugins"]
         self.assertEqual((entry["name"], entry["author"], entry["commit"]), ("Buff HUD", "Lukaszpg", pr.buffhud_commit()))
@@ -169,6 +169,76 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertTrue(any("not a packed MPQ" in p for p in pr.check_buffhud(dll)))
         dll.with_suffix(".mpq").unlink()
         self.assertTrue(any("d2rl-buff-panel.mpq" in p for p in pr.check_buffhud(dll)))
+
+    def beltrefill_src(self, commit=None, patches=None):
+        """A fake build/beltrefill-src (tools/build_beltrefill.ps1's export: PINNED_COMMIT and PATCHES) and a DLL."""
+        src = self.tmp / "beltrefill-src"
+        src.mkdir(exist_ok=True)
+        (src / "PINNED_COMMIT").write_text((commit or pr.beltrefill_commit()) + "\n", encoding="ascii")
+        lines = pr.beltrefill_patches() if patches is None else patches
+        (src / "PATCHES").write_text("".join(ln + "\r\n" for ln in lines), encoding="ascii")
+        dll = self.tmp / "d2rl-auto-belt-refill.dll"
+        dll.write_bytes(b"MZ...auto-belt-refill\0...Auto Belt Refill\0...0.35.9\0...")
+        return src, dll
+
+    def test_beltrefill_is_pinned_with_our_patches(self):
+        self.assertRegex(pr.beltrefill_commit(), r"^[0-9a-f]{40}$")
+        self.assertEqual(pr.BELTREFILL["dll"], "d2rloader/plugins/d2rl-auto-belt-refill.dll")
+        self.assertEqual(pr.BELTREFILL["config"], "d2rloader/config/auto-belt-refill.toml")
+        names = [ln.split("  ")[1] for ln in pr.beltrefill_patches()]
+        self.assertEqual(names, ["0001-pluginsdk-1.3.1.patch", "0002-mxl2012-belt-rows.patch",
+                                 "0003-mxl2012-match-first-slot.patch"])
+
+    def test_beltrefill_config_matches_the_first_slot(self):
+        import tomllib
+        text = (pr.BELTREFILL_OURS / "auto-belt-refill.toml").read_text("utf-8")
+        cfg = tomllib.loads(text)
+        g = cfg["general"]
+        self.assertEqual((g["enabled"], g["fill_key"], g["snapshot_key"], g["auto_refill"], g["debug_logs"],
+                          g["match_first_slot"], g["belt_counts"]), (True, "", "", True, False, True, True))
+        # no fixed columns: every column follows its first slot
+        self.assertEqual([k for k in cfg if k.startswith("column")], [])
+        # the elixirs and the Goodberry (#541) are never refilled
+        elixirs = [f"ey{n}" for n in range(1, 10)] + ["eo7", "eo8", "eo9", "et1"] + [f"0g{n}" for n in range(9)]
+        self.assertEqual(sorted(g["never_refill"]), sorted(elixirs + ["b@b"]))
+        # the plugin's parser reads one line per value
+        self.assertEqual([ln for ln in text.splitlines() if ln.startswith("never_refill")][0].count('"'), 2 * 23)
+
+    def test_beltrefill_staged_with_its_config_preserved(self):
+        mod = self.staged()
+        src, dll = self.beltrefill_src()
+        pr.stage_beltrefill(mod, dll, src)
+        self.assertEqual((mod / pr.BELTREFILL["dll"]).read_bytes(), dll.read_bytes())
+        self.assertIn("match_first_slot = true", (mod / pr.BELTREFILL["config"]).read_text("utf-8"))
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, True))
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml",
+                                         "d2rloader/config/auto-belt-refill.toml"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["author"], entry["repo"], entry["commit"]),
+                         ("Auto Belt Refill", "jaycachou-svg", "https://github.com/jaycachou-svg/auto-belt-refill",
+                          pr.beltrefill_commit()))
+        self.assertEqual(entry["patches"], pr.beltrefill_patches())
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+        self.assertEqual([b["name"] for b in pr.bundled_plugins(True, True, True)],
+                         ["D2R Legacy 16:9", "Buff HUD", "Auto Belt Refill"])
+
+    def test_beltrefill_source_of_another_commit_or_patch_set_is_refused(self):
+        mod = self.staged()
+        for commit, patches in (("0" * 40, None), (None, pr.beltrefill_patches()[:1]), (None, ["0" * 64 + "  0001-x.patch"])):
+            src, dll = self.beltrefill_src(commit, patches)
+            with self.assertRaises(SystemExit):
+                pr.stage_beltrefill(mod, dll, src)
+            self.assertFalse((mod / pr.BELTREFILL["dll"]).exists())
+
+    def test_beltrefill_builds_that_are_not_ours_are_refused(self):
+        _src, dll = self.beltrefill_src()
+        self.assertEqual(pr.check_beltrefill(dll), [])
+        dll.write_bytes(b"MZ auto-belt-refill\0 0.35.8\0")
+        self.assertTrue(any("version 0.35.9" in p for p in pr.check_beltrefill(dll)))
+        with mock.patch.object(pr, "BELTREFILL_AUTHOR_DLL", pr.sha256(dll)):
+            self.assertTrue(any("author's prebuilt" in p for p in pr.check_beltrefill(dll)))
 
     def test_legacy169_test_builds_are_refused(self):
         _src, dll = self.legacy169_src()

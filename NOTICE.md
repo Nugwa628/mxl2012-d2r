@@ -60,6 +60,12 @@ The release package also ships **Buff HUD** by Lukaszpg (<https://github.com/Luk
 Lukaszpg), built from our fork (`third_party/d2rl-buff-hud`, <https://github.com/Nugwa628/d2rl-buff-hud>), with its licence
 text and its PluginSDK's in `mods\mxl2012\d2rloader\plugins\` (docs/bundled-plugins.md).
 
+From 0.1.15 it also ships **Auto Belt Refill** by jaycachou-svg (<https://github.com/jaycachou-svg/auto-belt-refill>), built
+from the author's source (the submodule `third_party/auto-belt-refill` at a fixed commit) with our patches
+(`third_party/auto-belt-refill-mxl2012/`: the PluginSDK renames for D2RLoader 1.3.1 and the Median XL 2012 belt rows). The
+author's repository has no licence file; jaycachou-svg gave permission to use and customise it on 2026-11-06. It is
+credited to the author in the README, the release notes and docs/bundled-plugins.md.
+
 ## The downloader's 7z decoder (`launcher/third_party/lzma`)
 
 `D2R-XL-2012-Downloader.exe` unpacks the release's `.7z` with the C 7z decoder of the

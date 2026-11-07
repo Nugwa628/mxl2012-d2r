@@ -576,30 +576,23 @@ void TestSaveFormat() {
 	Check(mxl::SaveFormatMode("[d2rcore.save_format]\n# mode = \"extended\"\n").empty(), "a commented key does not count");
 }
 
-// docs/bugs.md #528: the kept mod d2rloader.toml gets [d2rcore.items] item_stat_ranges = false, nothing else changes.
-void TestStatRangesOff() {
-	// The 0.1.10 release file: save format and player tables, no items table.
-	std::string shipped = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\nalways_enable_rotw_legacy_graphics_keybind = true\n";
-	Check(mxl::ItemStatRanges(shipped).empty(), "0.1.10 file: no stat ranges key");
-	std::string fixed = mxl::SetItemStatRangesOff(shipped);
-	Check(fixed == shipped + "\n[d2rcore.items]\nitem_stat_ranges = false\n", "0.1.10 file: table appended, the rest as it was");
-	Check(mxl::ItemStatRanges(fixed) == "false" && mxl::SaveFormatMode(fixed) == "extended", "0.1.10 file: off, saves still extended");
-	Check(mxl::SetItemStatRangesOff(fixed) == fixed, "already off: unchanged");
-	// D2RLoader's own template: the key is true with its comment; another table's key of the same name is not touched.
-	std::string tmpl = "[d2rcore.items]\n# Hold Ctrl ...\n  item_stat_ranges = true  # default\nmaximum_sockets = true\n[x]\nitem_stat_ranges = true\n";
-	Check(mxl::ItemStatRanges(tmpl) == "true", "template read");
-	Check(mxl::SetItemStatRangesOff(tmpl) ==
-	          "[d2rcore.items]\n# Hold Ctrl ...\n  item_stat_ranges = false # default\nmaximum_sockets = true\n[x]\nitem_stat_ranges = true\n",
-	      "true replaced in place, indent and comment kept, other table untouched");
-	Check(mxl::SetItemStatRangesOff("[d2rcore.items]\n# item_stat_ranges = true\n[b]\n") == "[d2rcore.items]\nitem_stat_ranges = false\n[b]\n",
-	      "commented template replaced");
-	Check(mxl::SetItemStatRangesOff("[d2rcore.items]\nshow_ground_sockets = true") == "[d2rcore.items]\nitem_stat_ranges = false\nshow_ground_sockets = true",
-	      "table without key: under the header, no final newline stays without one");
-	Check(mxl::SetItemStatRangesOff("d2rcore.items.item_stat_ranges = true\n[b]\n") == "d2rcore.items.item_stat_ranges = false\n[b]\n",
-	      "top-level dotted key replaced (no second key)");
-	std::string crlf = "\xEF\xBB\xBF[d2rcore.save_format]\r\nmode = \"extended\"\r\n";
-	Check(mxl::SetItemStatRangesOff(crlf) == crlf + "\r\n[d2rcore.items]\r\nitem_stat_ranges = false\r\n", "BOM and CRLF kept");
-	Check(mxl::ItemStatRanges(mxl::SetItemStatRangesOff("")) == "false", "an empty file gets the table");
+// #528: one migration, followed by player choice. Same marker as the Python installer.
+void TestStatRangesMigration() {
+	const std::string marker = "# mxl2012 migration: ctrl-stat-ranges-on-v1\n";
+	for (const std::string& text : {std::string(""), std::string("[d2rcore.items]\n# item_stat_ranges = false\n"),
+	     std::string("d2rcore.items.item_stat_ranges = false # mine\n[x]\nitem_stat_ranges = false\n"),
+	     std::string("[d2rcore.items]\n  item_stat_ranges = false # mine")}) {
+		auto out = mxl::MigrateItemStatRanges(text);
+		Check(mxl::ItemStatRanges(out) == "true", "old config migrated to true");
+		Check(mxl::MigrateItemStatRanges(out) == out, "migration is idempotent");
+		auto edited = mxl::ForceTomlKey(out, "d2rcore.items", "item_stat_ranges", "false");
+		Check(mxl::MigrateItemStatRanges(edited) == edited, "later false stays byte for byte");
+	}
+	std::string dotted = "d2rcore.items.item_stat_ranges = false # mine\n[x]\nitem_stat_ranges = false\n";
+	Check(mxl::MigrateItemStatRanges(dotted) == marker + "d2rcore.items.item_stat_ranges = true # mine\n[x]\nitem_stat_ranges = false\n", "dotted key, comment and unrelated table kept");
+	std::string crlf = "\xEF\xBB\xBF[d2rcore.items]\r\n  item_stat_ranges = false # mine";
+	Check(mxl::MigrateItemStatRanges(crlf) == "\xEF\xBB\xBF# mxl2012 migration: ctrl-stat-ranges-on-v1\r\n[d2rcore.items]\r\n  item_stat_ranges = true # mine", "BOM, CRLF, indent, comment and no final newline kept");
+	Check(mxl::MigrateItemStatRanges(marker) == marker, "removed key stays removed");
 }
 
 // docs/bugs.md #498: the mod's d2rloader.toml keys (ModConfigKeys) with tools/install_mod.py ensure_toml_key's rules.
@@ -612,7 +605,7 @@ void TestModConfigKeys() {
 	Check(rotw && !rotw->keepHandSet && std::string(rotw->section) == "d2rcore.player" && std::string(rotw->value) == "true",
 	      "the RotW legacy toggle is a forced mod config key (owner decision 2026-11-04)");
 	for (const auto& k : mxl::ModConfigKeys)
-		Check(!k.keepHandSet, ("every mod config key is forced: " + std::string(k.key)).c_str());
+		Check(k.keepHandSet == (std::string(k.key) == "item_stat_ranges"), "only ranges respect edits after migration");
 	if (!rotw)
 		return;
 	auto apply = [](std::string text) {  // what EnsureExtendedSaves + EnsureModConfigKeys leave in the mod's file
@@ -623,8 +616,8 @@ void TestModConfigKeys() {
 	// The owner's kept mod file (2026-10-30, template layout): only the commented line. D2RLoader's game-wide file says false;
 	// the mod's own file wins, so the mod's file must say true. The game-wide text is never handed to these functions.
 	const std::string global = "[d2rcore.player]\nenable_respec = false\nalways_enable_rotw_legacy_graphics_keybind = false\n";
-	std::string kept = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n# Keep the Toggle Renderer keybind available while "
-	                   "playing a RotW character.\n# " + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n";
+	std::string kept = "# mxl2012 migration: ctrl-stat-ranges-on-v1\n[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n# Keep the Toggle Renderer keybind available while "
+	                   "playing a RotW character.\n# " + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = true\n\n[d2rcore.stash]\nadd_shared_tabs = 2\n";
 	std::string was = "x", fixed = mxl::ApplyModConfigKey(kept, *rotw, &was);
 	Check(was.empty() && fixed == Without(kept, "# " + R + " = true\n").insert(kept.find("# " + R), R + " = true\n"),
 	      "commented template line in the kept mod file becomes the key, nothing else changes");
@@ -637,7 +630,7 @@ void TestModConfigKeys() {
 		      ("commented line with other spacing replaced: " + line).c_str());
 	}
 	// A fresh install: the release's file (0.1.10 layout) has it; a file without it gets it under the header or a new table.
-	std::string shipped = "[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n" + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = false\n"
+	std::string shipped = "# mxl2012 migration: ctrl-stat-ranges-on-v1\n[d2rcore.save_format]\nmode = \"extended\"\n\n[d2rcore.player]\n" + R + " = true\n\n[d2rcore.items]\nitem_stat_ranges = true\n"
 	                      "\n[d2rcore.stash]\nadd_shared_tabs = 2\n";
 	Check(apply(shipped) == shipped, "the shipped file is left as it is");
 	Check(mxl::ApplyModConfigKey("[d2rcore.player]\nenable_respec = false\n", *rotw) == "[d2rcore.player]\n" + R + " = true\nenable_respec = false\n",
@@ -646,7 +639,7 @@ void TestModConfigKeys() {
 	      "the table appended after one blank line");
 	Check(mxl::ApplyModConfigKey("", *rotw) == "[d2rcore.player]\n" + R + " = true\n", "an empty file");
 	Check(mxl::TableKeyValue(apply(""), "d2rcore.player", R) == "true" && mxl::SaveFormatMode(apply("")) == "extended" &&
-	          mxl::ItemStatRanges(apply("")) == "false",
+	          mxl::ItemStatRanges(apply("")) == "true",
 	      "every key in an empty file");
 	// Set by hand or left by D2RLoader 1.3.1's template (uncommented false): forced to true in place, also the dotted key and a
 	// header with a comment (owner decision 2026-11-04); the comment and indent stay. The game-wide text stays false.
@@ -662,12 +655,12 @@ void TestModConfigKeys() {
 		      ("hand-set value forced to true: " + t).c_str());
 	std::string tmpl = "[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n" + R + " = false\nenable_respec = false\n";
 	std::string fromTmpl = apply(tmpl);
-	Check(fromTmpl.rfind("[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n" + R + " = true\nenable_respec = false\n", 0) == 0 &&
+	Check(fromTmpl.rfind("# mxl2012 migration: ctrl-stat-ranges-on-v1\n[d2rcore.player]\n# Keep the Toggle Renderer keybind ...\n" + R + " = true\nenable_respec = false\n", 0) == 0 &&
 	          fromTmpl.find(R + " = false") == std::string::npos,
 	      "D2RLoader's template false becomes true in place");
 	Check(mxl::ApplyModConfigKey(fixed, *rotw) == fixed, "a forced file comes back unchanged");
-	// The forced keys stay forced (owner decisions #512, #528).
-	Check(mxl::ItemStatRanges(apply("[d2rcore.items]\nitem_stat_ranges = true\n")) == "false", "stat ranges forced off");
+	// Saves stay forced; ranges now migrate once (#528).
+	Check(mxl::ItemStatRanges(apply("[d2rcore.items]\nitem_stat_ranges = true\n")) == "true", "stat ranges migrated on");
 	Check(mxl::SaveFormatMode(apply("[d2rcore.save_format]\nmode = \"retail\"\n")) == "extended", "save format forced extended");
 	std::string crlf = "\xEF\xBB\xBF[d2rcore.player]\r\n# " + R + " = true\r\nenable_respec = false\r\n";
 	Check(mxl::ApplyModConfigKey(crlf, *rotw) == "\xEF\xBB\xBF[d2rcore.player]\r\n" + R + " = true\r\nenable_respec = false\r\n", "BOM and CRLF kept");
@@ -1065,7 +1058,7 @@ int main() {
 	TestGameProcessName();
 	TestToml();
 	TestSaveFormat();
-	TestStatRangesOff();
+	TestStatRangesMigration();
 	TestModConfigKeys();
 	TestSharedTabsMin();
 	TestSaveCopies();

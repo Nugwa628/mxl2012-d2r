@@ -139,6 +139,8 @@ def main() -> int:
     ap.add_argument("--excel-dir", type=Path, help="the mod's data/global/excel: short aliases are planned only for keys the limited "
                     "columns (uniqueitems / setitems index, levels LevelWarp) really use; without it every long key gets one")
     args = ap.parse_args()
+    tooltip_excel = args.excel_dir or (
+        (args.tbl_dir[-1] if args.tbl_dir else TBL_DEFAULT).parents[2] / "global" / "excel")
     d2r_lng = args.d2r_lng
     out_dir = OUT
 
@@ -195,6 +197,12 @@ def main() -> int:
     if absent:
         raise SystemExit(f"tbl2json: string_gaps `fix` rows name keys Median's tbl does not define (or D2R owns): {absent}")
     texts.update(fixed)
+    tooltip_keys = strings_ns.skill_tooltip_keys(tooltip_excel)
+    reordered = sorted(k for k in tooltip_keys if "\n" in texts.get(k, ""))
+    for k in reordered:
+        texts[k] = strings_ns.top_down_tooltip(texts[k])
+    report += [f"- {len(reordered)} multiline skill tooltip keys reordered bottom-up -> top-down (colours retained)",
+               "  - keys: " + ", ".join(reordered)]
     # colour codes D2R cannot draw -> the colour it draws (strings_ns.COLOUR_MAP, bug #398: Median's `ÿc/` printed as "*/")
     colour_mapped = Counter(m.group(1) for t in texts.values() for m in strings_ns.COLOUR_CODE.finditer(t)
                             if m.group(1) in strings_ns.COLOUR_MAP)

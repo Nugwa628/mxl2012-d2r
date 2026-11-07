@@ -448,3 +448,21 @@ reaches it. The bolt drawn below the target is the missile's own path (classic d
 other target it flies its full range straight down-screen, in both modes, and the HD effect follows it correctly. Two ways
 to turn the core gold failed, and neither ships. The grey float4 constants in the program are random ranges, not colours. A gold
 texture in place of `default/White.texture` left the core white in game.
+
+## 9b. Celerity and Mephisto's skills (lane hdfx, 2026-11-06, bug "hdfx")
+
+A player saw Celerity draw fiery beams across the whole HD screen, and Mephisto's spells flash and lower the FPS in HD only.
+`data/hd-effects-picks.tsv` lines of this lane:
+
+| Art (rows) | Skill | Was | Pick | Why |
+|-|-|-|-|-|
+| `expansion/catadeathovereast` (`catapult_death_e`), `expansion/catadeathoversouth` (`catapult_death_s`) | Celerity, Gift of Celerity (state `celerity` cast / remove overlay) | D2R's own catapult death | `sorceress/fire_cast_1`, `common/fire_hit` | its fire arcs stay in the world and stretch into screen-wide streaks behind a fast unit |
+| `lightningboltbig` (`thunderringmakerflame` only) | Lightning Arena | `cairn_stones_bolt` (exact) | `lightningbolt_big` (Thunder Storm) | a ring of looping Cairn bolts whose light turned the screen white |
+| `sparklez1` | Mythal | `dopplezon_explode` (lane hdfx2) | `explosion_spark_small`, scale 1 | a white flash and light per sparkle |
+| `coldfuse` | Countdown | `expansion_tornado` (prior) | `expansion_iceglint` | a tornado per trail missile for small blue sparkles |
+
+`tools/effects_hd.py`: a pick line with `rows` now also replaces an overlay row D2R draws itself (before, only missile rows). The
+definition is written under the picked effect's folder, and that folder becomes the row's `Character`. Re-running into an existing
+`work/mod` leaves the old row's file in its former folder (seen here: `sorceress/catapult_death_s.json`), which is harmless because
+`Character` names the folder D2R reads. Not fixed: in HD Lightning Arena shows a ring of ground glows without legacy's tall bolts.
+In game: docs/testing.md "Lane hdfx".

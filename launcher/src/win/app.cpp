@@ -1474,7 +1474,7 @@ bool Launcher::EnsureExtendedSaves(const std::wstring& mod, std::string& error) 
 
 // The other keys of the mod's d2rloader.toml (ModConfigKeys, paths.h; the save format above has its own backup and is fatal):
 // a kept file of an older release gets them too, with the rules of tools/install_mod.py ensure_toml_key. docs/bugs.md #528
-// (owner decision 2026-11-03): item_stat_ranges is always false. #498: always_enable_rotw_legacy_graphics_keybind = true
+// (owner decision 2026-11-07): item_stat_ranges migrates to true once, then respects player edits. #498: always_enable_rotw_legacy_graphics_keybind = true
 // unless the player set it; a commented template line does not count. Only those keys change; D2RLoader's game-wide
 // config is never written. Not fatal: the game runs either way.
 void Launcher::EnsureModConfigKeys(const std::wstring& mod) {
