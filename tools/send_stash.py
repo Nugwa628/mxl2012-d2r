@@ -12,8 +12,11 @@ Three buttons on the same spot; the layouts show the first, the plugin shows the
 
   MxlSendStash         the button (its click sends PanelManager:OpenPanel:mxl2012-core/SendStash, which the plugin's UI message
                        listener takes: D2R passes only known targets to plugin listeners, docs/bugs.md #543)
-  MxlSendStashNoSlots  greyed, no click: a game without the RotW stash pages (classic / expansion games)
-  MxlSendStashJoined   greyed, no click: joined to another player's game (the round trip of a joiner's stash is not tested)
+  MxlSendStashNoSlots  greyed: a game without the RotW stash pages (classic / expansion games)
+  MxlSendStashJoined   greyed: joined to another player's game (the round trip of a joiner's stash is not tested)
+
+The greyed buttons send the same message; the plugin answers a click on one with a chat line saying why (bug #554: before,
+the hidden live button on top took the click and the hover, so a greyed click only clicked and its tooltip never showed).
 
 Places: HD, the empty square under the backpack grid on the bottom left of the mod's inventory picture (Median's old close
 square); legacy (classic layouts, G), on the stone between the close button and the gold box at the bottom of the panel. Both are
@@ -123,12 +126,13 @@ def widgets(hd: bool) -> list[dict]:
             f.update(normalFrame=frames["normal"], pressedFrame=frames["pressed"], onClickMessage=MESSAGE)
             if hd:
                 f.update(hoveredFrame=frames["hovered"])
-        else:  # hidden until the plugin shows it
-            f.update(normalFrame=frames["greyed"], pressedFrame=frames["greyed"], visible=False)
+        else:  # hidden until the plugin shows it; its click asks the plugin for the reason line (bug #554)
+            f.update(normalFrame=frames["greyed"], pressedFrame=frames["greyed"], onClickMessage=MESSAGE, visible=False)
             if hd:
                 f.update(hoveredFrame=frames["greyed"])
         return {"type": "ButtonWidget", "name": name, "fields": f}
-    # the live button last: D2R hit-tests a hidden widget too, so a greyed one drawn over it would take its clicks
+    # the live button last: D2R hit-tests a hidden widget too, so a greyed one drawn over it would take its clicks; the plugin also
+    # disables the hidden ones, so the greyed one gets its hover (tooltip) and click when it shows (bug #554)
     return [button(NO_SLOTS, TIP_NO_SLOTS, False), button(JOINED, TIP_JOINED, False), button(BUTTON, TIP, True)]
 
 

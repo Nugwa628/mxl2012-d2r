@@ -75,6 +75,10 @@ PIECE_CANDIDATES = 50            # entities kept per possible set piece while le
 # (4,989 entities, 4,423 of them with a model, 679 distinct models, 4,651,080 bytes). cap() drops pieces past these.
 MAX_PLACED = 4423
 MAX_BYTES = 4_651_080
+# Per-map budget over the cap (lane stairs): (placed models, bytes). cypherpunk with its stairs places 5,779 pieces (5.05 MB),
+# 1,356 over the cap, all props and details; the largest scene measured in game (6,255 pieces, 5,417,732 bytes, slot 2) loaded
+# with no assert or crash file, frame time and memory as with the capped scene (docs/maps-hd.md "Stairs at Fauztinville").
+MAP_LIMITS = {"expansion/ghetto/cypherpunk.ds1": (6255, 5_417_732)}
 # Sunk walls (lane tawalls, Library.lift): a wall piece whose base is this far under D2R's ground and whose top ends below
 # SUNK_TOP over it stands at a terrace foot in D2R (the ground measured is the terrace top); on Median's flat map it is
 # stood on the floor.
@@ -130,6 +134,15 @@ RUIN_LOW_Y, RUIN_LOW_X, RUIN_CORNER, RUIN_RUBBLE = (("expansion/ruins", 1, 22, 2
     (("expansion/ruins", 3, 22, 2),), (("expansion/ruins", 1, 22, 23),)
 CRYPT_ARCH = "data/hd/env/model/act1/crypt/act1_crypt_doorways/doorway01.model"
 CRYPT_PILLAR = "data/hd/env/model/act1/crypt/act1_crypt_pillars/pillar_outer01.model"
+# Kurast's stair tiles (terraces.dt1 style 31: steps of a terrace, lane stairs): D2R draws them with its terrain mesh and puts
+# stairs_a01 on a third of their cells at most, so pick() leaves them bare floor (cypherpunk: 476 cells, the wide stairs at the
+# arrival and in every walkway junction). The same art in two turns, as D2R places them (yaw 270 on 6/7/22/23: steps along x,
+# rising along z; yaw 0 on 10/11/26/27). One piece per cell, stretched to span it (a piece is 7.2 long and 4 deep) and flattened
+# to 1.8 units: D2R's own 4 per cell (each a 5-unit flight up a terrace) stood as rows of blocks on Median's flat floor and
+# would add 1,900 pieces; two per cell at full height looked like a saw (in game, lane stairs).
+KURAST_STAIR = "data/hd/env/model/act3/kurast/act3_kurast_stairs/stairs_a01.model"
+KURAST_STAIR_TILES = {270: [("act3/kurast", 0, 31, q) for q in (6, 7, 22, 23)], 0: [("act3/kurast", 0, 31, q) for q in (10, 11, 26, 27)]}
+KURAST_STAIRS = {270: [(KURAST_STAIR, 8.58, 9.4, 270, (2.4, 0.35, 1.39))], 0: [(KURAST_STAIR, 9.4, 1.43, 0, (2.4, 0.35, 1.39))]}
 STAND_INS = {
     "expansion/neonmile/downtown.ds1": {
         ("expansion/town", 1, 3): RUIN_LOW_Y, ("expansion/town", 2, 3): RUIN_LOW_X, ("expansion/town", 3, 3): RUIN_CORNER,
@@ -140,6 +153,7 @@ STAND_INS = {
         ("act1/crypt", 7, 0): [(CRYPT_PILLAR, 3.2, 3.2, 0)],
         ("act1/crypt", 10, 1, 0): [(CRYPT_ARCH, 2.0, 2.0, 90)], ("act1/crypt", 10, 1, 1): (),
     },
+    "expansion/ghetto/cypherpunk.ds1": {tile: KURAST_STAIRS[yaw] for yaw, seqs in KURAST_STAIR_TILES.items() for tile in seqs},
 }
 # A generic pick's wall piece learnt this far over D2R's floor (fence_wroughtiron01 on Harrogath's terraces at y 9) stands
 # on Median's floor (Library.generic_pick): the tile D2R never draws has no terrace to measure.
@@ -882,7 +896,8 @@ class Library:
 
     def _stand_in_pieces(self, spec):
         """A STAND_INS value: a learnt cell key -> its choose() variant (set pieces left out); [(model, dx, dz, yaw)] -> the
-        model's learnt entity at that offset and yaw, on the floor (a model never learnt is left out)."""
+        model's learnt entity at that offset and yaw, on the floor (a model never learnt is left out); a fifth item scales it
+        (x, y, z)."""
         if isinstance(spec, tuple):
             sig = choose(self.seen[spec]) if spec in self.seen else ()
             return [v for v in self.variants.get(sig, []) if not self.set_piece(model_of(v[0]))]
@@ -892,7 +907,7 @@ class Library:
                 for e, _dx, _dz in ents:
                     self._templates.setdefault(model_of(e), e)
         out = []
-        for model, dx, dz, yaw in spec:
+        for model, dx, dz, yaw, *scale in spec:
             if model not in self._templates:
                 continue
             e = copy.deepcopy(self._templates[model])
@@ -900,6 +915,8 @@ class Library:
             t["position"]["y"] = 0.0
             a = math.radians(yaw) / 2
             t["orientation"] = {"x": 0.0, "y": round(math.sin(a), 9), "z": 0.0, "w": round(math.cos(a), 9)}
+            if scale:
+                t["scale"] = dict(zip("xyz", scale[0]))
             out.append((e, dx, dz))
         return out
 
@@ -1513,7 +1530,8 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
         biome = map_tint.apply(data_dir, e["map"], map_tint.base_biome(data_dir, biome, e["biome"]), read)   # the 8 retextured maps: a biome with the map's own light
-        text, st = build_scene(cells[e["map"]], lib, biome, fill=HOLLOW_MAPS.get(e["map"], ()),
+        limit, max_bytes = MAP_LIMITS.get(e["map"], (MAX_PLACED, MAX_BYTES))
+        text, st = build_scene(cells[e["map"]], lib, biome, limit, max_bytes, fill=HOLLOW_MAPS.get(e["map"], ()),
                                stand_ins=STAND_INS.get(e["map"]))
         dest = Path(data_dir) / "hd" / "env" / "preset" / (e["map"][:-4] + ".json")
         dest.parent.mkdir(parents=True, exist_ok=True)

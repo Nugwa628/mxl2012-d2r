@@ -257,3 +257,12 @@ void MedianTabsStatus(char* out, size_t outSize) noexcept {
 	              g_bounces.load(), g_cubeHidden.load(), g_toggles.load(), g_applies.load(), g_missing.load(), g_noPanel.load(),
 	              g_codesRestored.load(), g_panel.load(), static_cast<unsigned long long>(g_handle.load()));
 }
+
+auto MedianTabsLive() noexcept -> bool {
+	return g_live.load();
+}
+
+auto MedianTabsRealTab(void* panel) noexcept -> int {
+	const int* tab = g_child != nullptr ? RealTab(panel) : nullptr;
+	return tab != nullptr ? *tab : -1;
+}

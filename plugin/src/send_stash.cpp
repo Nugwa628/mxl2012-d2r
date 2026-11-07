@@ -16,7 +16,8 @@
 //
 // A timer thread asks the UI thread every 250 ms (50 ms during a run) which of the three buttons shows: the button; greyed in a
 // game without the RotW stash unit (classic / expansion games); greyed for a joiner of another player's game (send_stash_logic.h
-// JoinersOn). A joiner is a client whose local player no server game of this process has (the server frame callback records the
+// JoinersOn). The two others are hidden and disabled (D2R hit-tests a hidden widget), and the greyed ones send the same message:
+// a click on one puts the reason into the message log (bug #554). A joiner is a client whose local player no server game of this process has (the server frame callback records the
 // local player when it finds it).
 #include "send_stash.h"
 
@@ -90,7 +91,7 @@ std::atomic<bool> g_tickQueued{false};
 std::atomic<bool> g_clickQueued{false};
 std::atomic<int> g_show{-1};              // the last Show set on a panel
 std::atomic<bool> g_running{false};
-std::atomic<long> g_frames{0}, g_clicks{0}, g_runs{0}, g_sent{0}, g_full{0}, g_notTaken{0}, g_lines{0}, g_lineFails{0}, g_faults{0}, g_busy{0};
+std::atomic<long> g_frames{0}, g_clicks{0}, g_runs{0}, g_sent{0}, g_full{0}, g_notTaken{0}, g_lines{0}, g_lineFails{0}, g_faults{0}, g_busy{0}, g_refused{0};
 
 // the run (UI thread only)
 struct Run {
@@ -246,7 +247,12 @@ void StartRun() noexcept {
 	void* player = LocalPlayer();
 	void* stash = player != nullptr ? StashUnit(player) : nullptr;
 	const bool joined = player != nullptr && g_hostPlayer.load() != g_clientPlayer.load();
-	if (Decide(player != nullptr, joined, stash != nullptr) != Show::Button) {
+	const Show show = Decide(player != nullptr, joined, stash != nullptr);
+	if (show != Show::Button) {
+		if (const char* why = RefusalLine(show)) {  // a click on the greyed button: one line saying why
+			g_refused.fetch_add(1);
+			QueueLine(why);
+		}
 		return;
 	}
 	g_runs.fetch_add(1);
@@ -299,7 +305,8 @@ void SetShown(D2RL::Widgets::WidgetHandle panel, Show show) noexcept {
 	for (const auto& b : buttons) {
 		D2RL::Widgets::WidgetHandle w = 0;
 		if (g_widgets->findWidget(g_context, panel, b.name, &w) == D2RL::Widgets::Result::Success) {
-			(void)g_widgets->setWidgetVisible(g_context, w, b.when == show);
+			(void)g_widgets->setWidgetVisible(g_context, w, ButtonActive(b.when, show));
+			(void)g_widgets->setWidgetEnabled(g_context, w, ButtonActive(b.when, show));
 		}
 	}
 }
@@ -503,9 +510,9 @@ auto InstallSendStash(const D2RL::PluginContext* context, char* report, size_t r
 void SendStashStatus(char* out, size_t size) noexcept {
 	static const char* const shows[] = {"none", "button", "noslots", "joined"};
 	const int show = g_show.load();
-	std::snprintf(out, size, "show=%s host=%u local=%u frames=%ld running=%d clicks=%ld runs=%ld sent=%ld full=%ld nottaken=%ld busy=%ld lines=%ld linefails=%ld faults=%ld",
+	std::snprintf(out, size, "show=%s host=%u local=%u frames=%ld running=%d clicks=%ld runs=%ld sent=%ld full=%ld nottaken=%ld busy=%ld refused=%ld lines=%ld linefails=%ld faults=%ld",
 	              show >= 0 && show < 4 ? shows[show] : "-", g_hostPlayer.load(), g_ready ? g_localId() : 0u, g_frames.load(), g_running.load() ? 1 : 0, g_clicks.load(), g_runs.load(),
-	              g_sent.load(), g_full.load(), g_notTaken.load(), g_busy.load(), g_lines.load(), g_lineFails.load(), g_faults.load());
+	              g_sent.load(), g_full.load(), g_notTaken.load(), g_busy.load(), g_refused.load(), g_lines.load(), g_lineFails.load(), g_faults.load());
 }
 
 auto SendStashLastLine() noexcept -> const char* {

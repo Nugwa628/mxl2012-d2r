@@ -126,6 +126,24 @@ constexpr auto Decide(bool hasPlayer, bool joined, bool hasStash, bool joinersOn
 	return hasStash ? Show::Button : Show::NoSlots;
 }
 
+// The chat line for a click while the button is greyed (bug #554: the greyed button gave no answer at all); null for the others.
+constexpr auto RefusalLine(Show show) noexcept -> const char* {
+	switch (show) {
+	case Show::NoSlots:
+		return "Send to stash works in Reign of the Warlock games only (its Gems, Materials, Runes, Median and Orbs stash pages).";
+	case Show::Joined:
+		return "Send to stash is not available when joined to another player's game.";
+	default:
+		return nullptr;
+	}
+}
+
+// Every button but the one that shows is hidden and disabled: D2R hit-tests a hidden widget, so a hidden button on top took the
+// clicks and the hover (tooltip) of the greyed one under it (bug #554).
+constexpr auto ButtonActive(Show button, Show shown) noexcept -> bool {
+	return button == shown;
+}
+
 // A backpack item with a slot code; `stack` = what its slot holds now when known (0: not read; the server refuses past 99).
 struct Candidate {
 	uint32_t id;

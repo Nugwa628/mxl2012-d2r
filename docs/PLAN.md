@@ -121,6 +121,8 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
     Pick: port into mxl2012-core server side with a stricter window and a toggle (about 2 days)
 - [x] Release 0.1.15 (2026-11-07): Auto Belt Refill bundled, pity map reveal (L after 70 %), area level on the automap,
   Ctrl stat ranges back, whole tooltips in the advanced stash tabs (#551), HD wall fixes (Tran Athulua, Crypt, Fauztinville)
+- [x] Release 0.1.16 (2026-11-07): clear legacy fonts (Ctrl+F), Ctrl+click flashes the right stash tab, Send to stash
+  with the stash open and in classic games (#554), Fauztinville arrival stairs in HD
 - [ ] Later (owner 2026-11-06):
   - [x] Ship jaycachou-svg's Auto Belt Refill plugin (author's permission 2026-11-06; v0.35.9 with the Median belt rows, for
     0.1.15; docs/bundled-plugins.md; lanes beltrefill, beltship)

@@ -9167,7 +9167,7 @@ def wall_visit(mode, log, shots):
             continue
         time.sleep(5)  # the scene and its models stream in
         x0, y0 = p.get("x"), p.get("y")
-        views = WALL_OFFSETS
+        views, mems = WALL_OFFSETS, []
         if wall_spots().get(lv) and x0 is not None:   # MXL_WALL_SPOTS: map cells to look at, from the level's origin
             rooms = [(int(r["x"]), int(r["y"])) for r in (kv(ln) for ln in H("presets rooms")[1] if ln.startswith("room x="))]
             if rooms:
@@ -9182,11 +9182,13 @@ def wall_visit(mode, log, shots):
                 at = wall_hop(x0 + dx, y0 + dy)
                 log.append("%s %d %s: spot %d -> %s,%s (wanted %d,%d)" % (mode, lv, name, n, at[0], at[1], x0 + dx, y0 + dy))
             shots.append(sh("wall_%s_%s_%d" % (name, mode, n)))
+            mems.append(game_private_mb())   # lane stairs: the game's memory with a larger scene
         bad, known = engine_issues(mark)
         caches = ["AssetCache DefaultCapacity %s capacity %s path %s" % (a["default"], a["capacity"], a["path"])
                   for a in cache_new_asserts(mark)]  # which cache overflowed (bug #360)
         seen[lv] = "reached"
-        log.append("%s %d %s: reached at %s,%s; asserts: %s" % (mode, lv, name, x0, y0, "; ".join(bad + known + caches) or "none"))
+        log.append("%s %d %s: reached at %s,%s; asserts: %s; private MB per view %s" % (
+            mode, lv, name, x0, y0, "; ".join(bad + known + caches) or "none", mems))
     return seen
 
 
@@ -15357,6 +15359,16 @@ def check_stashtip():
 
 
 CHECKS += [("stashtip", check_stashtip)]
+
+
+def check_tabflash():
+    """Bug #550: a Ctrl-click deposit flashes the stash tab the item went to (MEDIAN, ORBS, not RUNES), HD and legacy
+    (MXL_CHAR=<a RotW character>; tools/tabhl_checks.py)."""
+    import tabhl_checks
+    tabhl_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("tabflash", check_tabflash)]
 
 def check_mapreveal():
     """The pity map reveal: refused below the threshold and in town, the "available" line, the key that reveals the rest of the

@@ -52,6 +52,12 @@ int main() {
 	Check(Decide(true, true, false) == Show::Joined, "a joiner of a classic game: the joiner reason");
 	Check(Decide(true, true, true, true) == Show::Button, "joiners switched on: the button");
 	Check(!JoinersOn, "joiners stay off until a two-instance game test (owner, 2026-11-05)");
+	Check(RefusalLine(Show::Button) == nullptr && RefusalLine(Show::None) == nullptr, "no refusal line when the button works");
+	Check(std::strstr(RefusalLine(Show::NoSlots), "Reign of the Warlock") != nullptr, "#554: a greyed click says why (classic / expansion)");
+	Check(std::strstr(RefusalLine(Show::Joined), "joined") != nullptr, "#554: a greyed click says why (joiner)");
+	Check(std::strlen(RefusalLine(Show::NoSlots)) < ChatTextSize && std::strlen(RefusalLine(Show::Joined)) < ChatTextSize, "refusal lines fit the chat record");
+	Check(ButtonActive(Show::NoSlots, Show::NoSlots) && !ButtonActive(Show::Button, Show::NoSlots), "#554: greyed shown, the live button hidden and disabled");
+	Check(ButtonActive(Show::Button, Show::Button) && !ButtonActive(Show::Joined, Show::Button), "the live button shown, the greyed ones disabled");
 
 	// the plan: the slot's count plus the items planned for it stay under 99
 	{

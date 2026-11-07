@@ -25,6 +25,7 @@
 #include "server_frame.h"
 #include "testharness.h"
 #include "send_stash.h"
+#include "clear_fonts.h"
 #include "map_reveal.h"
 
 #include <D2RLPlugin/api.h>
@@ -3019,6 +3020,22 @@ auto CmdMapReveal(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `clearfonts [on | off | toggle]` (UI thread): the clear legacy fonts setting and the fonts' state; `toggle` does what the key
+// does, `on` / `off` set it; each writes mxl2012-core.toml as the key does.
+auto CmdClearFonts(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const int set = t.n < 2 ? 2 : hcmd::LowerEq(t.tok[1], "on") ? 1 : hcmd::LowerEq(t.tok[1], "off") ? 0 : hcmd::LowerEq(t.tok[1], "toggle") ? -1 : 3;
+	if (set == 3) {
+		return Fail(c, "usage: clearfonts [on | off | toggle]");
+	}
+	if (set != 2 && !ClearFontsSet(set)) {
+		return Fail(c, "clearfonts: the part is off");
+	}
+	char status[512];
+	ClearFontsStatus(status, sizeof(status));
+	Out("clearfonts %s", status);
+	return true;
+}
+
 using VerbFn = bool (*)(Ctx*, const hcmd::Tokens&) noexcept;
 struct Verb {
 	const char* name;
@@ -3047,7 +3064,7 @@ const Verb Verbs[] = {
     {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"cstat", CmdClientStat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
     {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true},
-    {"mapreveal", CmdMapReveal, true},
+    {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {

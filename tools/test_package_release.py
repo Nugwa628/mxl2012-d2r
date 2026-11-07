@@ -13,6 +13,21 @@ import package_release as pr
 
 
 HERE = Path(__file__).resolve().parent
+
+
+def clear_fonts(data: Path) -> None:
+    """A valid clear legacy font set (synthetic glyphs): a full package refuses data without it."""
+    import struct
+    import dc6
+    import legacy_fonts
+    tbl = b"Woo!" + struct.pack("<IHBB", 1, 256, 11, 1)
+    tbl += b"".join(struct.pack("<HBBBBHHI", i, 0, 1, 1, 1, 0, i, 0) for i in range(256))
+    picture = dc6.build_dc6([(1, 1, 0, 0, bytes((1, 1, 0x80)))] * 256)
+    folder = data / legacy_fonts.CLEAR
+    folder.mkdir(parents=True, exist_ok=True)
+    for name in legacy_fonts.SHIPPED:
+        (folder / (name + ".tbl")).write_bytes(tbl)
+        (folder / (name + ".dc6")).write_bytes(picture)
 SEVEN = pr.find_7z()
 
 
@@ -349,6 +364,7 @@ class PackageReleaseTests(unittest.TestCase):
         data = self.tmp / "d"
         (data / "global" / "excel").mkdir(parents=True)
         (data / "global" / "excel" / "armor.txt").write_bytes(b"Median armor\n" * 1000)
+        clear_fonts(data)
         out = self.tmp / "dist"
         out.mkdir()
         (out / "D2R-XL-2012-1.2.2.zip").write_bytes(b"an earlier packager's zip")
@@ -395,6 +411,7 @@ class PackageReleaseTests(unittest.TestCase):
         data = self.tmp / "d"
         (data / "global" / "excel").mkdir(parents=True)
         (data / "global" / "excel" / "armor.txt").write_bytes(b"Median armor\n")
+        clear_fonts(data)
         out = self.tmp / "dist"
         args = [sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll), "--data-from", str(data),
                 "--out", str(out), "--no-bundled"]

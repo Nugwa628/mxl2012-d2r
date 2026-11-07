@@ -57,6 +57,10 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
                      MXL2012_ROTW_LEGACY=0 stages it in work/rotw_stash_legacy instead
   median_tabs.py apply  the stash's MEDIAN / ORBS tabs and the Materials tab's Median page (docs/median-stash-tab.md): 7 tabs in
                      both stash layouts, the slots, the pages' art; needs the plugin part medtab
+  legacy_fonts.py    the clearer classic Latin fonts in data/local/font/latin/clear/ for the in-game setting (plugin part
+                     clearfonts), from the local repack archive (MXL2012_LEGACY_FONT_ARCHIVE, default under
+                     <MXL2012_RUNS>/extract-merged; MXL2012_LEGACY_FONTS=0 leaves them out); stock dialogue/chat pairs
+                     retained; checks classic line-height divisors (docs/legacy-font-research.md)
   merge_string_overrides.py, strings_check.py   as above, after the writers
   validate.py        D2R schema checks        -> work/mod/validate_report.md
 
@@ -140,7 +144,8 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["rotw_stash_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data"), "--out",
               str(MOD / "data" if os.environ.get("MXL2012_ROTW_LEGACY", "1") != "0" else ROOT / "work" / "rotw_stash_legacy" / "data")],
              # after rotw_stash_legacy: the 7 stash tabs and the Median pages into both stash layouts (they need the plugin's medtab)
-             ["median_tabs.py", "apply", str(MOD / "data")]]
+             ["median_tabs.py", "apply", str(MOD / "data")],
+             ["legacy_fonts.py", "--mod", str(MOD)]]  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
 STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["validate.py"]]
 LOGS = ROOT / "work" / "build-logs"
 

@@ -43,7 +43,7 @@ class SendStashTest(unittest.TestCase):
             self.assertEqual(live["fields"]["tooltipString"], "Send storable/stackable items to stash")  # owner's wording
             self.assertNotIn("visible", live["fields"])
             for w in greyed:
-                self.assertNotIn("onClickMessage", w["fields"])
+                self.assertEqual(w["fields"]["onClickMessage"], live["fields"]["onClickMessage"])  # #554: the reason line
                 self.assertIs(w["fields"]["visible"], False)  # the plugin shows the one that fits
                 self.assertTrue(w["fields"]["tooltipString"].startswith(ss.TIP + "\n"))
                 self.assertEqual(w["fields"]["rect"], live["fields"]["rect"])
@@ -127,6 +127,48 @@ class ParseTest(unittest.TestCase):
     def test_backpack(self):
         items = [{"code": "r01", "page": 0}, {"code": "box", "page": 0}, {"code": "gcr", "page": 4}]
         self.assertEqual(sc.backpack(items), ["r01"])
+
+    def test_stash_open_items(self):
+        """#554: the stash-open round sends Mystic Orbs and Elixirs too: every item it makes has a slot code."""
+        codes = ss.mod_stash_layout_codes() if have_baseline() else None
+        for c in sc.OPEN_ITEMS:
+            self.assertIn(c, median_tabs.CODES + ["r04", "gcb"])
+            if codes is not None:
+                self.assertIn(c, codes)
+        self.assertTrue(any(c in median_tabs.ORBS for c in sc.OPEN_ITEMS))
+        self.assertTrue(any(c in median_tabs.ELIXIRS for c in sc.OPEN_ITEMS))
+
+    def test_legacy_click(self):
+        """The legacy click place: 4:3 with side bars, 16:9 (legacy169) without; MXL_SS_LEGACY_XY wins."""
+        import numpy as np
+        import os
+
+        class Gc:
+            def __init__(self, a):
+                self.a = a
+
+            def grab(self):
+                return self.a
+        bars = np.full((900, 1600, 3), 80, np.uint8)
+        bars[:, :200] = 0
+        bars[:, 1400:] = 0
+        wide = np.full((900, 1600, 3), 80, np.uint8)
+        old = os.environ.pop("MXL_SS_LEGACY_XY", None)
+        try:
+            self.assertEqual(sc.legacy_xy(Gc(bars)), sc.LEGACY_CLICK)
+            self.assertEqual(sc.legacy_xy(Gc(wide)), sc.LEGACY169_CLICK)
+            self.assertEqual(sc.legacy_xy(), sc.LEGACY_CLICK)
+            os.environ["MXL_SS_LEGACY_XY"] = "10,20"
+            self.assertEqual(sc.legacy_xy(Gc(wide)), (10, 20))
+        finally:
+            os.environ.pop("MXL_SS_LEGACY_XY", None)
+            if old is not None:
+                os.environ["MXL_SS_LEGACY_XY"] = old
+
+    def test_reason_line(self):
+        """The check's expected reason line is the plugin's (send_stash_logic.h RefusalLine)."""
+        src = (Path(__file__).resolve().parents[2] / "plugin" / "src" / "send_stash_logic.h").read_text(encoding="utf-8")
+        self.assertIn('"%s' % sc.NOSLOTS_LINE, src)
 
 
 if __name__ == "__main__":

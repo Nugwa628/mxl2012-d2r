@@ -6064,6 +6064,29 @@ Judged by eye: cypherpunk's walkways and excelsior3's courtyard as classic (no b
 still flat floor (floor tiles without a D2R model, open), nothing missing or floating at the desertpeak, glados and
 moskvich spots.
 
+## Lane stairs: Fauztinville's stairs in HD and a larger scene budget (2026-11-07, slot 2, background input)
+
+`walls_hd.py` stair stand-ins for cypherpunk and `MAP_LIMITS` (docs/maps-hd.md "Stairs at Fauztinville"). Unit tests
+`StandInTest.test_scaled_pieces`, `test_cypherpunk_stairs`, `CapTest.test_map_limit_over_the_cap`
+(tools/tests/test_walls_hd.py). `wall_maps` now logs the game's private memory per view (`private MB per view`).
+Scenes built with `walls_hd.py build` (this lane and main, full builds; 16 of 17 byte-equal) and, for variants of
+cypherpunk alone, from the pickled library (`mxl2012-runs/stairs/fast.py`, equal to the full build). In game:
+`mxl2012-runs/stairs/gamerun.sh` (SLOT, SCENE, TAG) locks the slot, backs up its `cypherpunk.json`, copies the scene in,
+runs `MXL_RUN=stairs MXL_SLOT=2 MXL_CHAR=StairsTest MXL_WALL_LEVELS=59 MXL_WALL_SPOTS="59:70,49;38,57" py -3
+tools/game_checks.py --slot 2 all wall_maps`, restores the scene (checked byte-equal) and unlocks, also on failure.
+
+| Run | Scene | Result |
+|-|-|-|
+| `checks-20261107-150324-s2` | 2 pieces per stair cell, uncapped (6,255 pieces, 5.42 MB) | loads, no assert in the map, no crash file; saw-tooth look |
+| `checks-20261107-150801-s2` | 1 flat piece per cell, uncapped (5,779, 5.05 MB) | same; slower frames (another game ran on slot 1) |
+| `checks-20261107-151446-s2` | the same, again (shipped) | 59.9 / 59.9 / 53.7 fps, 9.70-9.83 GB |
+| `checks-20261107-151146-s2`, `-151648-s2` | main's (4,423, 3.85 MB) | 60 / 59.9 / 58.6-58.8 fps, 9.54-9.77 GB |
+
+All runs: HD and classic reached, `wall_maps` PARTIAL (the shots are judged by hand), only the shutdown pool asserts at game
+exit. The d2rgs3 / d2rgs4 bench games ran during all runs (CPU 20-40%). Evidence `mxl2012-runs/stairs/`: `pairs/` (HD left,
+classic right; `before_after_classic`: main HD, this lane HD, classic), `shots/`, `fps_sheet.png`, `tiles_all31.png`,
+`layouts.png`, `run-*.log`.
+
 ## Lane orbtab: whole item tooltips on the advanced stash slots (#551, 2026-11-07)
 
 Plugin part `stashtip` (`plugin/src/stash_tip.cpp`, call and addresses in `stash_tip_logic.h`, test `stashtip_tests`; off word
@@ -6118,3 +6141,208 @@ Not judged by the harness on a release install: everything in 16:9 legacy graphi
 moves the panels; the checks' legacy positions are 4:3): `sendstash` legacy click, `medtab` legacy deposits, `stashtip`
 legacy hovers, the open-stash send in legacy (the harness walk to the stash misses in 16:9). Belt column counts (D2RLoader
 overlay) do not show in background captures: the owner checks them by hand.
+
+
+## Lane rel0116: release 0.1.16 package smoke (2026-11-07, slot 2, background input)
+
+Package `D2R-XL-2012-0.1.16.7z` (3,756 files, 151,453,729 bytes, sha256 `61220d95973991dd49e45c3576e2a364eeda6ad6526a7fd35aeb5bb7eef30a7a`),
+`verify_package.py` OK; installed with `release_install.py install --slot 2 --package` (dev DLL of the same PluginVersion),
+restored afterwards. The packager took the bundled plugins' pinned commits from a local clone (`MXL_LEGACY169_DIR`,
+`MXL_BUFFHUD_DIR`, `MXL_BELTREFILL_DIR`): the lane worktree's submodules were not checked out. Evidence
+`mxl2012-runs/rel0116/` (`game/checks-*`, `run*.log`, driver `scripts/smoke.py` with a `fonts` check, not in git).
+
+| Item | Result | Run |
+|-|-|-|
+| Game starts, character enters, `mxl` line 0.1.16 | PASS (the check FAILs on `other plugins` only: the release ships three) | `checks-20261107-204946-s2` |
+| Ctrl-click into the stash flashes the item's tab, HD (`tabflash`) | PASS: all 8 HD items incl. orb -> ORBS, elixir -> MEDIAN | same |
+| Send to stash with the stash open, HD and legacy 16:9 (`sendstash`) | PASS: every row | same |
+| Fauztinville arrival, HD and classic (`wall_maps`, level 59) | PASS by shot: the arrival stairs drawn as stairs; no assert in the map | same |
+| Ctrl+F clear fonts in legacy 16:9: on, Warriv's menu and Talk menu, quest log, off | PASS: `live` 0 -> 1 -> 0, file written; no crash | `checks-20261107-210139-s2` |
+
+Asserts: only the known shutdown pool asserts, plus in the first run the item asserts at the start-state clean-up after
+`tabflash` that rel0115's run had too. 0 crash files. Not judged on a release install: `tabflash` in legacy (the check's
+legacy places are 4:3, the release's Legacy 16:9 moves the panels; the classic tab bar draws no flash anyway, lane tabhl),
+NPC speech text with the clear fonts (the Talk menu was shown, not a speech).
+
+## Lane legfont: legacy font copy investigation
+
+Target 0.1.16, slot 2, English, background input, throwaway Barbarian `LegFont`.
+[Font paths and override audit](legacy-font-research.md). Evidence: `mxl2012-runs/legfont/` (outside git).
+`run.py` registers a temporary `legfont` check with game_checks and retains the slot lock until the copied
+experiment files are restored. Each run closes the game, restores shared config byte for byte and releases the lock.
+The after runs copy the 37 Latin classic files and 11 HD font faces from the same build's CASC into the mod;
+the 16:9 runs temporarily add the existing Legacy 16:9 DLL and config. No global plugin is installed.
+
+Set-up: `packclear`, generated ring in the backpack, life/mana reset with harness stat writes, travel to the
+Den of Evil by its server warp; nearby monsters killed for the entrance capture. These are font rendering checks,
+not a player-path gameplay verification. Shots cover life/mana labels, character panel (T and numbers), ring
+stats, the entrance hover label, and the brief area-entry title; HD shots are the control. All runs use the same
+1600x900 client. The classic canvas is 800x600 in 4:3 and 1066x600 with Legacy 16:9.
+
+
+Stock-copy controls (folders under the evidence `runs/` directory):
+
+| Canvas | Before | Stock font copy | Result |
+|---|---|---|---|
+| 4:3 | checks-20261107-132740-s2 | checks-20261107-132940-s2 | No sharpening; life/mana bright glyph masks identical |
+| Legacy 16:9 | checks-20261107-133355-s2 | checks-20261107-133552-s2 | Same classic letter/digit shapes; no sharpening |
+
+Pairs: `43_life_pair.png`, `43_mana_pair.png`, `43_character_T_pair.png`, `43_item_stats_pair.png`,
+`169_character_T_pair.png`, `169_item_stats_pair.png`, `169_red_title_pair.png`. Ring affixes and player values vary
+(harness kills award experience); compare glyph shapes. Red title brightness changes with the fade animation.
+Full HD controls are in each run; no visible typeface change. All four controls: no new crash files or watchdog aborts.
+
+The player's later screenshots show a different 22-file set. Local D2SE/D2GL repack candidate, **not confirmed as the
+player's exact bytes**: `checks-20261107-133933-s2`, 4:3, 22 DC6/TBL files from its existing `data/local/font.zip`.
+Legacy text visibly changes: thinner digits, labels and red title (`43_repack_life_pair.png`,
+`43_repack_item_stats_pair.png`, `43_repack_red_title_pair.png`). HD's typeface is unchanged. Not tested with this
+custom candidate in 16:9; not shipped. Glyph coverage, metrics/clipping, redistribution provenance and the exact
+player-file match remain open. No Median v005 font is removed or replaced in the build.
+
+Validation: tools/tests suite 1091 tests (25 skipped); tools/test_*.py suite 541 tests (12 skipped);
+`check_public.py` 0 hits; `check_docs_links.py` 0 findings. The second suite initially needed generated tables:
+`py -3 tools/build.py --data-only` completed with 0 validation errors, then the suite passed.
+No production code changed; the runner and manifests are in the lane evidence directory.
+
+## Lane legfont: repack crash and stock dialogue fallback
+
+2026-11-07, D2R 3.3 build 93847, slot 2, 1600x900, English. This follow-up supersedes the earlier research-only
+release decision. [Font analysis and build option](legacy-font-research.md#crash-follow-up-repack-metrics-and-a-conservative-optional-set),
+bug #555. All evidence below is under `mxl2012-runs/legfont/`.
+
+- `metrics.json` contains every header and all 256 glyph records of all 11 repack fonts and their stock counterparts;
+  `metrics.csv` summarizes sizes, line heights, frame ranges and zero-field counts. `player22-stock-repack.json`
+  retains exact stock/repack SHA256 values. The repack's formal11 header height alone is zero; no repack glyph
+  advance, glyph height or DC6 frame dimension is zero. Stock exocet8 has five legal zero advances.
+- Full repack: `runs/checks-20261107-135454-s2` crashes on opening the legacy quest log;
+  `runs/checks-20261107-140823-s2` crashes on interacting with the real Warriv (155) at distance 4.
+  Both are `0xC0000094` at D2R+`0x90DD16`, with the formal11 path on the stack:
+  `reproduced-crash.log`, `npc-reproduced-crash.log`. `divide-disassembly.txt` shows the header byte read and divide.
+- One-byte proof: `runs/checks-20261107-135556-s2` uses the repack with only formal11 TBL offset `0x0A`
+  changed 0 -> 11. The quest panel renders (`legacy_quest_log.png`), no new crash. This is a cause check,
+  not the build's chosen font set.
+- The build keeps formal10/11/12 and chat entirely stock, by omitting both files of each pair. Its 14 custom
+  files are font6/8/16/30, exocet8, formal8 and ReallyTheLastSucker, each DC6 + TBL. `shipping-candidate/`
+  contains the exact opt-in output, and `build-toggle.json` records the on/off file lists. No HD asset changes.
+
+Mixed-set broad runs: `runs/checks-20261107-141452-s2` (4:3) and
+`runs/checks-20261107-142354-s2` (Legacy 16:9). Both survive the quest log and scrolling quest speech,
+inventory/character panels, skills, stash, cube, waypoint, automap in town and dungeon, pause menu,
+life/mana hovers, chat messages and Den of Evil red entrance titles. The character-selection/main menu
+is HD, including after G; `main_menu_character_select_hd.png` and `menu_after_G.png` record it.
+The first 4:3 run also captures Warriv's first greeting and Talk menu. The later 16:9 run sees his menu
+because the same character has heard the greeting already; a fresh-character speech supplement is separate.
+Fresh greetings: `runs/checks-20261107-143230-s2` (stock 4:3, `LegFontStock`) and
+`runs/checks-20261107-143405-s2` (mixed 16:9, `LegFontWide`). Both show the full first speech,
+survive the Talk menu and quest panels, and have no crash or ERROR/ASSERT lines, including shutdown.
+`43_safe_npc_warriv_dialogue_pair.png` compares the fresh stock greeting with the mixed 4:3 greeting;
+the stock dialogue face and wrapping are retained. The 16:9 speech is separately visible in its full capture.
+
+The unique Catechumen Aerin Shield (I), row 229, and Fool's Gold charm, row 1782, exercise long Median
+tooltip lines and many properties. Both fit the captured 900-pixel client in both legacy canvases,
+including the shield's final socket line; no new wrapping, clipping or overflow is visible in these samples.
+Digits and the T in panel labels are thinner and clearer, and the red title uses the custom face.
+The HD counterparts retain their original typeface. These are English samples, not a certification of
+every language, online/BNet screen or every possible tooltip. The unusually tall ReallyTheLastSucker
+DC6 frames were audited but its BNet use is not covered by this offline pass.
+
+`safe43_review.png` and `safe169_review.png` index the full legacy screenshots. Before/after pairs:
+`43_safe_life_pair.png`, `43_safe_mana_pair.png`, `43_safe_character_T_pair.png`,
+`43_safe_item_stats_pair.png`, `43_safe_red_title_pair.png`, and corresponding `169_safe_*_pair.png`.
+Compare letter shapes rather than generated affix values or the title's fade brightness.
+The chat-input captures do not show the input widget; sent messages are visible and provide the chat
+rendering evidence. No claim about input-widget clipping is based on those empty captures.
+
+Stock broad control: `runs/checks-20261107-142807-s2`, same scripted actions with no font overrides.
+It has the same five shutdown pool assertions as the 4:3 mixed run (`s_StatsPool.IsEmpty()`,
+`m_allocated == 0`, `m_sortedBlockCount == 0`, `_bcObjectPoolBlockListIsEmpty(m_usableBlocks)`,
+`m_freed == 0`), after the completed play check and during WM_CLOSE. They are not a new custom-font
+failure. Neither 4:3 run crashes during play. The mixed 16:9 run has zero ERROR/ASSERT lines,
+including shutdown. The automated play PASS alone does not certify the visible layouts; the captures
+were separately reviewed. HD pair `hd_safe_item_229_pair.png` retains the same face while the
+legacy pair `43_safe_item_229_pair.png` shows the replacement.
+
+The temporary runner retains the lock until all experimental mod files and the Legacy 16:9 DLL/config are restored;
+the game's five shared files are separately restored and verified by the slot tools. Input stays in the background.
+
+Validation: `tools/tests` 1095 tests (19 skipped), `tools/test_*.py` 541 tests (12 skipped), both pass.
+Four new regression tests cover the zero divisor, frame bounds, hash drift, stock fallback, reversible staging,
+and packager rejection of a hand-copied crashing font before overwriting existing package output.
+The optional set is disabled by default: input-widget, online and other-locale coverage remains incomplete,
+and the player's exact input bytes are still unconfirmed. There are no plugin changes and no PluginVersion bump.
+
+## Lane tabhl: the stash tab that flashes after a Ctrl-click deposit (#550, 2026-11-07, slot 2, background input)
+
+Plugin part `tabflash` (`plugin/src/tab_flash.cpp`, addresses and rules in `tab_flash_logic.h`, test `tabflash_tests`; off word
+`tabflash`; docs/plugin-plan.md section 33). Check `tabflash` (tools/tabhl_checks.py):
+`MXL_RUN=<lock> MXL_SLOT=2 MXL_CHAR=<throwaway RotW character> py -3 tools/game_checks.py --slot 2 all mxl2012 tabflash`.
+It makes each item in the backpack with the harness (SHORTCUT), shows the tab of the row with a tab click, Ctrl-clicks the item and
+grabs the tab row for 1.5 s; the tab whose box changed most is the flashed one, and the part's status (`mxl2012 tabflash`:
+flashes, last tab) must agree. HD: gem `gcr`, D2R material `rvs`, oil `6o^`, rune `r09`, orb `&04`, elixir `ey1` from PERSONAL,
+rune `r10` and elixir `ey2` with MEDIAN shown. Legacy: `gcb`, `7o^`, `r11`, `&05`, `ey3` from PERSONAL.
+
+- Control run `checks-20261107-144748-s2` (`MXL_CONTROL=tabflash`, D2R's flash; character TabFlashA): HD gem -> GEMS, both
+  materials -> MATERIALS, rune -> RUNES, but orb and elixir -> RUNES (#550), and the rune put in with MEDIAN shown flashed
+  nothing (D2R's shown-tab test reads the getter, which medtab caps at Runes). Legacy: no tab box changed for any item, D2R's own
+  included: the classic tab bar draws no flash, so the bug is HD only.
+- Fixed run `checks-20261107-145249-s2`: `mxl2012` PASS, `tabflash` PASS: orb -> ORBS, elixir -> MEDIAN, rune from MEDIAN ->
+  RUNES, the others as D2R, no flash for the elixir with MEDIAN shown; one flash per deposit with the right tab in the part's
+  status, HD and legacy. mxl2012-core.log without errors.
+- Load: two d2rgs bench games (since 12:33) ran during both runs, CPU 54% at the start; both runs went through.
+
+Evidence: `mxl2012-runs/tabhl/` (`control-checks-*`, `fixed-checks-*`: `tabflash_<hd|legacy>_<code>.png`, the frame with the
+strongest tab change).
+
+## Lane sendopen: "Send to stash" with the stash open, legacy 16:9, expansion games (bug #554, 2026-11-07, slot 1, background input)
+
+Dev install of `lane/sendopen` in slot 1 (`mods\mxl2012-s1`), the release build of legacy169 (`tools/build_legacy169.ps1`)
+placed in the mod's plugin folder for the runs (enabled / `enabled = false`) and removed afterwards. Characters `Sendopen`
+(new RotW Barbarian) and `StashTab` (expansion). Evidence and scratch: `mxl2012-runs/sendopen/` (outside git): `drive.py`
+(lock, install, legacy169, posted keys / clicks, a shot while the button is held), `run-*.log`, `evidence/runs/` (the run
+folders and the hand session `sendopen`).
+
+| Case | Run | Result |
+|-|-|-|
+| RotW, legacy 16:9, stash closed, click at 1096,690 | hand session `sendopen` | PASS: 4 / 4 sent |
+| RotW, legacy 16:9, stash open (panel message; then the chest clicked, Runes tab) | same | PASS: 4 / 4, then 2 / 2 |
+| RotW, legacy 16:9, Orbs tab open: 2 Mystic Orbs, 2 Elixirs, a gem, a rune | same (`l169_orbs_after.png`) | PASS: 6 / 6, the orbs in their ORBS slots |
+| RotW, HD, stash open (chest), runes, gem, orb, elixir | same | PASS: 4 / 4 |
+| pressed frame, legacy (button held) | same (`cmp_press.png`) | PASS: the pressed frame draws (darker, the glyph one pixel down-right) |
+| expansion game, before the fix | same (`exp_hd_*`) | REPRODUCED #554: greyed button, a click counted by the part (`clicks=1`, `runs=0`), nothing moves, no pressed look, the greyed tooltip never shows |
+| `sendstashclassic` (expansion, HD + legacy 4:3), after the fix | `checks-20261107-150325-s1` | PASS: greyed; the greyed tooltip with its reason shows on hover; a click moves nothing and writes "Send to stash works in Reign of the Warlock games only ..." (`refused` +1) |
+| `sendstash` (RotW), legacy169 off (4:3) | `checks-20261107-150652-s1` | FAIL only on the legacy stash-open row (the check's panel test reads HD pixels; fixed in the check, the stash had opened); every other row PASS incl. HD stash open 5 / 5 |
+| `sendstash` (RotW), legacy169 on (16:9) | `checks-20261107-151208-s1` | PASS: all rows; legacy click at 1096,690 (picked by the side-bar test), legacy stash open 5 / 5 incl. a Mystic Orb and two Elixirs |
+
+Check changes (`tools/sendstash_checks.py`): HD and legacy stash-open rounds (`OPEN_ITEMS`: a rune, a gem, a Mystic Orb, two
+Elixirs, and a potion that stays); the legacy click place by the picture (side bars: 4:3 at 897,690, none: legacy169 16:9 at
+1096,690; `MXL_SS_LEGACY_XY` still wins); `sendstashclassic` shoots the greyed tooltip and needs the reason line. The legacy
+stash opens with D2R's panel message (`stashpage uia PanelManager OpenPanel BankExpansionLayout`): the harness walk misses in
+16:9 and `right_panel_open` reads HD pixels. Not tested: a joiner (two game instances); the 4:3 legacy greyed tooltip only by
+the `sendstash_classic_legacy` shot.
+
+## Lane fonttoggle: in-game clear fonts setting
+
+2026-11-07, D2R 3.3 build 93847, slot 2, 1600x900, English, background input, dev build of lane/fonttoggle installed with
+`install_mod.py --slot 2` (the build staged the 12 files of `data/local/font/latin/clear/`). [Design and limits](legacy-font-research.md#in-game-setting-lane-fonttoggle).
+Evidence: `mxl2012-runs/fonttoggle/` (outside git): `run.py` (holds the lock through install, game and restore; restores the
+slot's `mxl2012-core.toml` and the Legacy 16:9 files), `run*.log`, `notes_*.txt` (harness `clearfonts` state at each step),
+`cfg_after_*.toml` (the file the key wrote), screenshots under `runs/`.
+
+| Run | Canvas | Start | Result |
+|-|-|-|-|
+| `checks-20261107-180341-s2` | 4:3 | off (no `[fonts]` in the file) | PASS: Ctrl+F (background key) flipped it on and back off, the file gained `[fonts] legacy_clear_fonts`; 0 ERROR/ASSERT, 0 crash files. Font16 stayed stock while on (it is the current font between frames: fixed below) |
+| `checks-20261107-183010-s2` | Legacy 16:9 | on (file true before start) | PASS: clear from the first frame (font16 handed over at the language set-up), Ctrl+F off and on again live, every font switched (`pending=0x00`); the only asserts are the five known shutdown pool asserts at WM_CLOSE |
+| `checks-20261107-185154-s1` | 4:3, slot 1 | off | PASS with the final DLL: Ctrl+F on and off, all six fonts switched both ways (`pending=0x00`, 4 handovers); only the five known shutdown asserts; 0 crash files; slot 1's shared files restored |
+| `checks-20261107-192705-s1` | HD menus | - | Options (Video, Audio, Gameplay, Controls: no plugin settings page) and Options > Controls, category D2R-XL 2012: "Clear Legacy Fonts Ctrl + F" under "Reveal Level Map L" (`menu_controls_clear_legacy_fonts.png`) |
+
+- Pairs in the evidence folder: `43_off_*` / `43_on_*` (slot 1 run) and `169_off_*` / `169_on_*`: character panel labels,
+  name/class, values, life/mana, ring tooltip. The stock classic "5" reads like a "6" (Mana 5 shows "6"); the clear set draws
+  "5". The switch shows on the next frame, no restart.
+- With the clear set live: Warriv's first greeting and Talk menu (`43_on_npc_dialogue.png`, `on_npc_talk`), the quest log
+  (`on_quest_log`), Den of Evil red title (`on_red_title_*`), in both canvases: no crash, dialogue keeps the stock formal
+  font. The fresh characters had no quest to select, so quest details and quest speech were not shown in these runs (the
+  formal fonts they use are stock in both states, as in lane legfont's speech runs).
+- HD unaffected: `hd_on_town`, `hd_on_inventory.png` (HD text with the setting on).
+- `end_off_town`: switched off at the end, stock again.
+
+Not covered: the input widget of chat, online/BNet screens, other locales (the part keeps D2R's names outside `latin\`; not run).

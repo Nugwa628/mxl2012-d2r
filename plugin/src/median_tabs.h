@@ -10,3 +10,7 @@
 // hooks not to crash). On any byte difference nothing is written. The report gets one entry.
 auto InstallMedianTabs(const D2RL::PluginContext* context, bool tabsOn, char* report, size_t reportSize) noexcept -> bool;
 void MedianTabsStatus(char* out, size_t outSize) noexcept;
+// True while the last tab update's panel had the 7-tab layout in a game that shows tabs 6 and 7 (part tabflash).
+auto MedianTabsLive() noexcept -> bool;
+// The stash panel's real tab (its tab bar +0x16c4, not D2R's getter, which shows tabs 6 and 7 as Runes); -1 without a tab bar.
+auto MedianTabsRealTab(void* panel) noexcept -> int;

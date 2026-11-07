@@ -6,3 +6,9 @@
 threshold = 70
 # Level ids with no reveal besides the towns, e.g. exclude = [73, 74]
 exclude = []
+
+[fonts]
+# Clearer legacy (classic graphics) fonts: thinner digits and letters in panels, item text and titles. Dialogue, quest and
+# chat text stay D2R's. Options > Controls: "Clear Legacy Fonts" (default Ctrl+F) switches it in game and saves it here;
+# it takes effect at once. English (Latin) text only; HD text is not affected.
+legacy_clear_fonts = false

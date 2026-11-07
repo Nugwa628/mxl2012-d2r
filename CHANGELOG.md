@@ -7,6 +7,32 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.16 (2026-11-07)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+- Clearer text in legacy graphics: **press Ctrl+F in legacy graphics** to turn on the clear fonts (thinner, sharper
+  digits and letters in panels, item text and titles); press it again to turn them off. The key is under Options >
+  Controls > "Clear Legacy Fonts". It applies at once and is saved in `mxl2012-core.toml` (`[fonts] legacy_clear_fonts`,
+  off by default). Dialogue, quest and chat text keep the original fonts to avoid the reported crash. Thanks to GeorgiaBoy
+  for finding and testing the fix.
+
+**Fixed:**
+
+- Ctrl-clicking an item from the inventory into the stash now flashes the tab it went to (HD graphics). Orbs flash the ORBS tab and elixirs,
+  signets, trophies and shrines the MEDIAN tab, where before every one of them flashed RUNES.
+
+- "Send storable/stackable items to stash": in a classic or expansion game the button is greyed (those games have no
+  Gems / Materials / Runes / Median / Orbs stash pages to send to), but clicking it only clicked and its tooltip never
+  showed, so it looked broken. Now its tooltip shows, and a click says in the chat why it cannot send. In a Reign of the
+  Warlock game the button works with the stash open or closed, on any tab, in HD and legacy graphics (also 16:9), and
+  sends Mystic Orbs and Elixirs into their Median / Orbs slots (#554).
+
+- HD graphics, Fauztinville: the wide stone stairs at the arrival and at the walkway crossings are drawn as stairs again
+  instead of flat floor, and more of the small wall details (buttresses, gargoyles, caps) are back.
+
 ### 0.1.15 (2026-11-07)
 
 D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its

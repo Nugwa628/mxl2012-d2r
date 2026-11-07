@@ -39,6 +39,8 @@ with mouse and keyboard stay in the save). The "Send storable/stackable items to
 - The plugin part **medtab** (`plugin/src/median_tabs.cpp`, docs/plugin-plan.md section 33) runs tabs 6 and 7 as the Runes page
   (D2R's panel knows 5 pages), shows the slot group of the active tab and of the selector, hides the cube on MEDIAN / ORBS, and
   hides tabs 6 and 7 outside RotW. `medtab_names.h` (its widget names) is written by `py -3 tools/median_tabs.py header`.
+- The plugin part **tabflash** (`plugin/src/tab_flash.cpp`, #550) makes the tab flash after a Ctrl-click deposit point at the
+  item's own tab: D2R's flash knows 5 tabs and flashed RUNES for every MEDIAN / ORBS item (HD only: legacy draws no flash).
 
 ## The 9 codes with "@"
 

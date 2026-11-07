@@ -51,6 +51,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import install_mod  # noqa: E402
+import legacy_fonts  # noqa: E402  (classic font checks, the clear set the setting needs)
 import fxpaths  # noqa: E402  (the D2R baseline and the shared D2R cache, .mxl-local.json)
 
 ROOT = install_mod.ROOT
@@ -251,6 +252,8 @@ def sha256(path: Path) -> str:
 
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
           legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None) -> None:
+    if data_from is not None:
+        legacy_fonts.check_tree(data_from)
     if mod.exists():
         shutil.rmtree(mod)
     data = mod / f"{NAME}.mpq" / "data"
@@ -258,6 +261,7 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
         shutil.copytree(data_from, data)
     elif not no_data:
         install_mod.build_data(data, game)
+    legacy_fonts.check_tree(data)
     install_mod.write_mod_files(mod, NAME, f"{NAME}/", plugin, {
         "modVersion": version, "website": REPO_URL,
         "description": "D2R-XL 2012: Median XL 2012 (v005) for Diablo II: Resurrected (build %s) through D2RLoader." % install_mod.D2R_BUILD})
@@ -583,6 +587,11 @@ def main() -> int:
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
+    missing = [] if a.no_data else legacy_fonts.missing_clear(mod / f"{NAME}.mpq" / "data")
+    if missing:
+        print("error: the clear legacy fonts (the in-game setting's files) are missing, run tools/build.py with the repack "
+              "archive (MXL2012_LEGACY_FONT_ARCHIVE): " + ", ".join(missing))
+        return 1
     bad = forbidden_files(mod)
     if bad:
         print("refusing to package test or player files: " + ", ".join(bad[:20]))

@@ -1110,6 +1110,17 @@ Part `medtab` (`plugin/src/median_tabs.cpp`, rules in `median_tabs_logic.h`, tes
   toggles, '@' codes restored).
 - **Ships with its layout:** `tools/install_mod.py` / `tools/package_release.py` refuse a 7-tab layout without a DLL that names
   the layout mark.
+- **Tab flash after a deposit (part `tabflash`, bug #550, lane tabhl;** `plugin/src/tab_flash.cpp`, rules in `tab_flash_logic.h`,
+  test `tabflash_tests`**):** a Ctrl-click from the backpack (InventoryItemManager `0x159a30` / `0x15f8b0`) asks `0x15ef70(class
+  id)` for the page kind of the item's slot (1 Gems, 2 Materials, 3 Runes: the stash init's map of each page's direct-child slot
+  codes) and passes it to the BankPanel's flash `0x23bb50`, which maps 1 / 2 / 3 to tab 2 / 3 / 4, skips the tab its getter shows
+  and the tab already flashing (`panel + 0x260`, "none" = 5), and lights the tab bar's highlight `0x879470` for tabs 0-4. The
+  MEDIAN / ORBS slots are Runes-page children, so their items flashed RUNES. The part hooks `0x15ef70` (kind 4 / 5 for a MEDIAN /
+  ORBS code while medtab is live; the code from the items record `0x314110` with the local player's data flag), rewrites the
+  flash's switch at `0x23bbb0` to kind 1-5 -> tab 2-6, sets the "none" value to 7 at `0x23aa17`, `0x23c1c2`, `0x23e2fe`,
+  `0x23e379` and the highlight loop's bound at `0x23bcd7` (TabBarWidget keeps 8 entries; a tab without a highlight widget is
+  skipped), and replaces the flash's shown-tab test at `0x23bbd2` (the getter, capped at Runes) with the hook of `0x23bb50`,
+  which compares the tab bar's real tab. Off word `tabflash`: left as D2R (RUNES flashes for MEDIAN / ORBS items).
 
 ## 34. Pity map reveal (lane mapreveal, 2026-11-06; owner request)
 
@@ -1164,3 +1175,25 @@ rules in `area_level_logic.h`, test `arealvl_tests`):
   mod's other texts).
 - **Off word `arealvl`:** no hook, D2R's text. `mxl2012 arealvl` prints the report, lines filled, the last level and area level
   and the difficulty seen.
+
+## 36. Clear legacy fonts setting (lane fonttoggle, 2026-11-07; owner request)
+
+The clearer classic fonts (docs/legacy-font-research.md) become a player setting instead of a build option. Part `clearfonts`
+(`plugin/src/clear_fonts.cpp`, rules in `clear_fonts_logic.h`, test `clearfonts_tests`; addresses in docs/d2r-addresses.md
+"Classic font loading"):
+
+- **Files:** the build always stages the six safe pairs (font6/8/16/30, fontexocet8, ReallyTheLastSucker) in
+  `data/local/font/latin/clear/` (`tools/legacy_fonts.py`), never under D2R's names; the packager refuses a release without them.
+- **Redirect:** the six ids' entries of D2R's font name table point at the part's own name buffers (written once). The setting
+  swaps their text between D2R's name and `clear\<name>`, then frees those fonts' DC6s as D2R's idle unload does (UI thread,
+  the current font is first swapped for fontformal10 with D2R's SetFont and selected again); each font's next SetFont loads DC6 and TBL from the same set. D2R loads fonts
+  per id on first use, so the switch takes effect at once, no restart. HD text never loads these files.
+- **Guards:** only for the language dir `latin\` (the call `0x902ff4` goes through the pad `0x903002` to the part, which puts
+  D2R's names back around the language set-up); only when all six TBLs on disk pass the header and line-height check (the
+  repack's formal11 crash); every byte read is compared first.
+- **Settings:** `d2rloader/config/mxl2012-core.toml` `[fonts] legacy_clear_fonts = false` (default off: the player's exact
+  files, other locales, online/BNet screens and the chat input widget are unverified). The Controls action "Clear Legacy Fonts"
+  (`mxl_clear_fonts`, default Ctrl+F, category D2R-XL 2012) flips it and writes the file (a missing `[fonts]` table is added).
+  D2RLoader 1.3.1's own settings menu has no page for plugin settings (General, Startup, Locale, Advanced, Extensions list),
+  so Options > Controls is the in-game place.
+- **Off word `clearfonts`.** `mxl2012 clearfonts` prints the report and state; harness `clearfonts [on | off | toggle]`.

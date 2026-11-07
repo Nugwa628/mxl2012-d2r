@@ -9,6 +9,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -268,6 +269,19 @@ class CapTest(unittest.TestCase):
     def test_docktown3_is_the_cap(self):
         self.assertEqual((walls_hd.MAX_PLACED, walls_hd.MAX_BYTES), (4423, 4651080))
 
+    def test_map_limit_over_the_cap(self):
+        """Lane stairs: only cypherpunk has its own budget, the scene measured in game; build() passes it to build_scene."""
+        self.assertEqual(walls_hd.MAP_LIMITS, {"expansion/ghetto/cypherpunk.ds1": (6255, 5417732)})
+        lib = walls_hd.Library()
+        k = (("d", 1, 2, 0),)
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): k}, {"entities": [entity(WALL, 5, 5)]})
+        cells = {(x, 0): k for x in range(5)}
+        with tempfile.TemporaryDirectory() as td, mock.patch.dict(walls_hd.MAP_LIMITS, {"expansion/x/y.ds1": (3, 10 ** 9)}):
+            st = walls_hd.build(Path(td), [{"map": "expansion/x/y.ds1", "biome": "b"}, {"map": "expansion/x/z.ds1", "biome": "b"}],
+                                {"expansion/x/y.ds1": cells, "expansion/x/z.ds1": cells}, lib, biomes={})
+        self.assertEqual((st["expansion/x/y.ds1"]["entities"], st["expansion/x/z.ds1"]["entities"]), (3, 5))
+
 
 class GenericTest(unittest.TestCase):
     def lib(self):
@@ -351,6 +365,25 @@ class StandInTest(unittest.TestCase):
         self.assertAlmostEqual(q["w"], math.sqrt(0.5))
         self.assertEqual(lib.stand_in((("act1/crypt", 10, 1, 1),), table), [])   # style match: drawn bare
         self.assertEqual(walls_hd.transform(lib.variants[lib.pick((("act1/crypt", 9, 0, 1),))[0]][0][0])["orientation"]["y"], 0.0)
+
+    def test_scaled_pieces(self):
+        lib = self.lib()
+        table = {("act1/crypt", 10, 1, 0): [(DOORWAY, 8.5, 4.5, 270, (1.2, 1.0, 1.4))]}
+        (e, dx, dz), = lib.stand_in((("act1/crypt", 10, 1, 0),), table)
+        self.assertEqual((dx, dz), (8.5, 4.5))
+        self.assertEqual(walls_hd.transform(e)["scale"], {"x": 1.2, "y": 1.0, "z": 1.4})
+        q = walls_hd.transform(e)["orientation"]                              # -q of D2R's (y -0.707, w 0.707): the same turn
+        self.assertAlmostEqual(q["y"] * q["w"], -0.5)
+
+    def test_cypherpunk_stairs(self):
+        """Lane stairs: Kurast's stair tiles (terraces.dt1 style 31) get one stairs_a01 each, the flagstones (12-15) none."""
+        table = walls_hd.STAND_INS["expansion/ghetto/cypherpunk.ds1"]
+        for q, yaw in ((23, 270), (7, 270), (26, 0), (10, 0)):
+            pieces = table[("act3/kurast", 0, 31, q)]
+            self.assertEqual([(m, y) for m, _dx, _dz, y, _s in pieces], [(walls_hd.KURAST_STAIR, yaw)])
+        for q in (12, 13, 14, 15):
+            self.assertNotIn(("act3/kurast", 0, 31, q), table)
+        self.assertEqual(walls_hd.tier(walls_hd.KURAST_STAIR), 3)
 
     def test_table_names_known_maps(self):
         self.assertTrue(set(walls_hd.STAND_INS) <= set(walls_hd.MAPS))

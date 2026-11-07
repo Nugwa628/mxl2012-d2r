@@ -13,12 +13,16 @@ shown by its refusal: El runes are sent until one stays.
 
 `sendstash` (a RotW character): outside town, HD: slot items and other items, the click; El runes until the slot is full (the
 rest stay: "stack full (El Rune ...)"); 99 and one more; Save and Exit, one more El still stays (the full slot was kept) and a
-shot of the stash's Runes page; legacy graphics: the button's shot and a click. `sendstashclassic` (an expansion character, MXL_CHAR=StashTab): the greyed button and its reason.
+shot of the stash's Runes page; legacy graphics: the button's shot and a click; the stash OPEN (bug #554), HD and legacy: a
+click sends slot items, Mystic Orbs and Elixirs (MEDIAN / ORBS slots) too. `sendstashclassic` (an expansion character,
+MXL_CHAR=StashTab): the greyed button, its tooltip on hover (shot) and a click that moves nothing but answers with the reason
+line (bug #554: the hidden live button used to take the greyed one's click and hover).
 """
 import os
 import re
 import time
 
+OPEN_ITEMS = ["r04", "gcb", "&01", "0g7", "eo7"]  # Nef, Chipped Sapphire, a Mystic Orb, two Elixirs (ORBS / MEDIAN slots)
 SLOT_ITEMS = ["r01", "r02", "gcr", "gcr", "gfv", "r03"]  # El, Eld, 2 Chipped Ruby, Flawed Amethyst, Tir: all have a RotW slot
 OTHER_ITEMS = ["hp1", "key"]  # a potion and a key: no slot, they stay
 NAMES = {"r01": "El Rune", "gcr": "Chipped Ruby"}
@@ -28,6 +32,8 @@ OUTSIDE = 2  # Blood Moor
 # the sendstash_legacy_inventory shot; MXL_SS_LEGACY_XY=x,y overrides it (another legacy aspect).
 HD_CLICK = (1071, 669)
 LEGACY_CLICK = (897, 690)  # 4:3 legacy (pillarboxed 1200 x 900), run checks-20261106-014339-s2
+LEGACY169_CLICK = (1096, 690)  # 16:9 legacy (the bundled legacy169 puts the inventory at the right edge), lane sendopen
+NOSLOTS_LINE = "Send to stash works in Reign of the Warlock games only"
 
 
 def parse_state(lines):
@@ -96,12 +102,51 @@ def open_inventory(gc):
     time.sleep(1.2)
 
 
-def legacy_xy():
+def pillarboxed(gc):
+    """Legacy graphics drawn 4:3 with black side bars (legacy169 off or missing); in 16:9 (legacy169 on) the picture has none.
+    Reliable in a lit place (the town)."""
+    a = gc.grab()
+    w = a.shape[1]
+    return float(a[:, : w // 10].mean()) < 6.0 and float(a[:, w - w // 10:].mean()) < 6.0
+
+
+def legacy_xy(gc=None):
     env = os.environ.get("MXL_SS_LEGACY_XY")
     if env:
         x, y = env.split(",")
         return int(x), int(y)
+    if gc is not None and not pillarboxed(gc):
+        return LEGACY169_CLICK
     return LEGACY_CLICK
+
+
+def open_stash(gc, log, legacy=False):
+    """The stash and the inventory open: HD, the Act 1 chest clicked as a player does; legacy, D2R's own panel message (the
+    harness's walk misses in 16:9 legacy, and its panel test reads HD pixels: the round's shots show the stash)."""
+    if not legacy and gc.sp2_open_stash(log):
+        return True
+    _ok, lines = gc.Hl("stashpage uia PanelManager OpenPanel BankExpansionLayout", log)
+    time.sleep(1.5)
+    return gc.right_panel_open() or (legacy and "= 0" in " ".join(lines))
+
+
+def stash_open_round(gc, log, shots, row, mode, xy):
+    """Bug #554: the stash open, the button clicked: slot items, orbs and elixirs go into their slots."""
+    gc.close_right_panel()
+    gc.H("packclear")
+    if not open_stash(gc, log, legacy=mode == "legacy"):
+        row("%s stash open" % mode, False, "the stash did not open")
+        return
+    make(gc, log, OPEN_ITEMS + ["hp1"])
+    shots.append(gc.sh("sendstash_%s_stashopen_before" % mode))
+    d, s1 = send(gc, log, shots, "%s_stashopen" % mode, click(gc, xy), len(OPEN_ITEMS))
+    left = backpack(gc.rc_items(log))
+    stayed = [c for c in left if c in OPEN_ITEMS]  # a slot already at 99 from an earlier run keeps its item
+    row("%s stash open" % mode, d.get("clicks") == 1 and d.get("sent", 0) == len(OPEN_ITEMS) - len(stayed)
+        and d.get("full", 0) == len(stayed) and [c for c in left if c not in OPEN_ITEMS] == ["hp1"],
+        "click at %s: counters %s, backpack %s, line %r" % (xy, d, left, s1.get("last")))
+    gc.close_right_panel()
+    gc.H("packclear")
 
 
 def run(gc):
@@ -189,12 +234,15 @@ def run(gc):
     else:
         row("reload keeps the items", False, "Save and Exit did not leave the game")
 
-    # 4. legacy graphics (town): the button's place, a click when it is measured
+    # 4. HD, the stash open (bug #554)
     gc.goto(1, timeout=60)
+    stash_open_round(gc, log, shots, row, "hd", HD_CLICK)
+
+    # 5. legacy graphics (town): the button's place (4:3, or 16:9 with the bundled legacy169), a click, the stash open
     if gc.set_graphics("legacy"):
         open_inventory(gc)
         shots.append(gc.sh("sendstash_legacy_inventory"))
-        xy = legacy_xy()
+        xy = legacy_xy(gc)
         if xy is not None:
             make(gc, log, ["gcr", "r02"])
             d, s1 = send(gc, log, shots, "legacy_click", click(gc, xy), 2)
@@ -203,6 +251,7 @@ def run(gc):
                 "click at %s: counters %s, backpack %s, line %r" % (xy, d, left, s1.get("last")))
         else:
             row("legacy click", None, "skipped: the legacy place is not measured yet (shot sendstash_legacy_inventory)")
+        stash_open_round(gc, log, shots, row, "legacy", xy)
         gc.close_right_panel()
         gc.set_graphics("hd")
     else:
@@ -237,12 +286,18 @@ def run_classic(gc):
     make(gc, log, ["r01"])
     s0 = state(gc, log)
     open_inventory(gc)
+    gc.g.click(HD_CLICK[0] / 1600, HD_CLICK[1] / 900, move_only=True)  # the greyed button's own tooltip (bug #554)
+    time.sleep(1.5)
+    shots.append(gc.sh("sendstash_classic_hd_hover"))
     gc.g.click(HD_CLICK[0] / 1600, HD_CLICK[1] / 900)
     time.sleep(1.5)
     s1 = state(gc, log)
     left = backpack(gc.rc_items(log))
-    rows.append(("click does nothing", s1.get("runs") == s0.get("runs") and left == ["r01"],
+    rows.append(("click moves nothing", s1.get("runs") == s0.get("runs") and left == ["r01"],
                  "runs %s -> %s, backpack %s" % (s0.get("runs"), s1.get("runs"), left)))
+    rows.append(("click says why", s1.get("refused", 0) == s0.get("refused", 0) + 1 and (s1.get("last") or "").startswith(NOSLOTS_LINE),
+                 "refused %s -> %s, line %r" % (s0.get("refused"), s1.get("refused"), s1.get("last"))))
+    shots.append(gc.sh("sendstash_classic_reason"))
     gc.close_right_panel()
     gc.H("packclear")
     for r in rows:

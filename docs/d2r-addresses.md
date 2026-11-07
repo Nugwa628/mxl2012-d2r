@@ -1290,3 +1290,18 @@ Button (D2RLoader widgets on the inventory panel): D2R forwards a button's click
 registered panel, so the part registers an empty panel `SendStash` (layouts `SendStash.json` / `SendStashhd.json`) through the
 resource and panel services. D2R also hit-tests hidden widgets: a hidden greyed button placed over the live one took its clicks,
 so the live button is the last widget of the list.
+
+## Classic font loading (lane fonttoggle, 2026-11-07; plugin/src/clear_fonts.cpp)
+
+Read from the Ghidra project (decompiles `0x90e230`, `0x90da90`, `0x90ca60` in `mxl2012-runs/fonttoggle/`), *verified*.
+
+| What | Address | Notes |
+|-|-|-|
+| font name table | `0x1d84a00` | 14 `char*`, read only by `0x90eae0` and `0x90f070`: 0 font8, 1 font16, 2 font30, 3 font42, 4 fontformal10, 5 fontformal12, 6 font6, 7 font24, 8 fontformal11, 9 fontexocet10, 10 fontridiculous, 11 fontexocet8, 12 ReallyTheLastSucker, 13 fontingamechat. No `fontformal8` anywhere in the image |
+| SetFont | `0x90e230` | `(id)`: same id as current (`0x2672400`) only stamps the use time; else loads DC6 (`0x90eae0` path, `0x145f320`) and TBL (`0x90f070`) when the slot holds no DC6 and the HD flag `0x846210` is off. Every 600 s frees the DC6 of other fonts unused for 240 s |
+| font slots | `0x34b2a30`, 0x28 each | `+0` DC6 handle, `+8` TBL buffer, `+0x10` TBL, `+0x18` glyphs (`TBL + 0xc`), `+0x20` last use (s) |
+| DC6 path | `0x90eae0` | `(id, out, size)`: `"data\local" "\font\"` + language (`0x34b2c78`, `"latin\"`; `"KOR\"` for font 13 in language 12) + name |
+| TBL load | `0x90f070` | `(id)`: `"%s%s%s.tbl"`, frees the old TBL (`0x7e63c0`), a missing file asserts (`0x90c8d0`) |
+| free DC6 | `0x79d200` | `(handle)` |
+| free all fonts | `0x90ca60` | called by the text shutdown `0x902ac0` |
+| text language set-up | `0x90da90` | only caller `0x902ff0` (the call at `0x902ff4`; `0x903002`-`0x90300f` are int3): language dir, scale `0x2672404`, then loads font 1 |

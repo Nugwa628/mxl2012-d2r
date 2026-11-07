@@ -1,0 +1,100 @@
+{
+  "origin": "2023 D2SE_Median XL 2012-005 D2GL repack, data/local.zip (also data/local/font.zip); old-game fonts, not original Median v005 assets",
+  "files": {
+    "font16.tbl": {
+      "size": 3596,
+      "sha256": "75d8483b6694ca0e1178dec94643cd0469e391caed726def38e18561565899a0"
+    },
+    "font16.dc6": {
+      "size": 26461,
+      "sha256": "7f128517a713651e6ac42e6b548549a9c33b291fcefc0d3c240ac35c277f32ab"
+    },
+    "font30.tbl": {
+      "size": 3596,
+      "sha256": "beb6040d6abdda4a382799af77ac29369e762b9df6a06646ce6cb672760221ca"
+    },
+    "font30.dc6": {
+      "size": 41743,
+      "sha256": "e17c7d94321163ddc8a2cf3973a6aa46f3cb6ed8ccba74b6ebc54093ec141261"
+    },
+    "font6.tbl": {
+      "size": 3596,
+      "sha256": "b7ccfd0a9bd89c99e4c11ee991fe9f6f3289a3f481c9f18623ce5021bb1db1cc"
+    },
+    "font6.dc6": {
+      "size": 19202,
+      "sha256": "60d6d64b71dee5df99fe989f122829fdcae2aae83a1eab62a1ec1d3d9bde1294"
+    },
+    "font8.tbl": {
+      "size": 3596,
+      "sha256": "03718b6ea4e22f83c12d9bbad2c1ebf68d7b2afaf27289fc9a178c282bd72c12"
+    },
+    "font8.dc6": {
+      "size": 21668,
+      "sha256": "325761bb601117a3691964b31717f1b08be4d7a0468609bdfa937393aed17130"
+    },
+    "fontexocet8.tbl": {
+      "size": 3596,
+      "sha256": "03718b6ea4e22f83c12d9bbad2c1ebf68d7b2afaf27289fc9a178c282bd72c12"
+    },
+    "fontexocet8.dc6": {
+      "size": 21997,
+      "sha256": "d37be2910fc50e3f8faa2437c344981b7ef8a196f5fceabb5092ea3a52af1037"
+    },
+    "fontformal10.tbl": {
+      "size": 3596,
+      "sha256": "a305ac430f7d004cbf70254aa14d31e7b967a355a0860a66f080edbdec7c569a"
+    },
+    "fontformal10.dc6": {
+      "size": 20237,
+      "sha256": "f6e0320aad6bc77ac1dd8a161c63e7d1e881e8685d46bbf088f8ece6c91d26ab"
+    },
+    "fontformal11.tbl": {
+      "size": 3596,
+      "sha256": "8da16621bf5526112461da93dde3fa775499464beff9598c9d27d9f6ef7ae8a7"
+    },
+    "fontformal11.dc6": {
+      "size": 24334,
+      "sha256": "319284373d0d173d06cc8126bf555ca839ec0d2196056f6bfaefd1043910748d"
+    },
+    "fontformal12.tbl": {
+      "size": 3596,
+      "sha256": "4712558ead7f5680889e0df798a99b72acbbe685101b537c1c74616cf332e620"
+    },
+    "fontformal12.dc6": {
+      "size": 22608,
+      "sha256": "3d7baeed774bbab26861ea3c8910995038e3ea3a06b1e1f3c3a275c3dc1f9903"
+    },
+    "fontformal8.tbl": {
+      "size": 3596,
+      "sha256": "03718b6ea4e22f83c12d9bbad2c1ebf68d7b2afaf27289fc9a178c282bd72c12"
+    },
+    "fontformal8.dc6": {
+      "size": 21997,
+      "sha256": "d37be2910fc50e3f8faa2437c344981b7ef8a196f5fceabb5092ea3a52af1037"
+    },
+    "fontingamechat.tbl": {
+      "size": 3596,
+      "sha256": "4712558ead7f5680889e0df798a99b72acbbe685101b537c1c74616cf332e620"
+    },
+    "fontingamechat.dc6": {
+      "size": 22608,
+      "sha256": "3d7baeed774bbab26861ea3c8910995038e3ea3a06b1e1f3c3a275c3dc1f9903"
+    },
+    "reallythelastsucker.tbl": {
+      "size": 3596,
+      "sha256": "60e5944c0b84d1d5b127352a13f88538b1a786ff1d85a59175594b5094d0786f"
+    },
+    "reallythelastsucker.dc6": {
+      "size": 68312,
+      "sha256": "5d5918725b195ec43d8d6ea55692ffe6fb4f44911b2b32c6fedb345429dc9830"
+    }
+  },
+  "stock_fallback_pairs": [
+    "fontformal10",
+    "fontformal11",
+    "fontformal12",
+    "fontingamechat"
+  ],
+  "output": "Seven custom pairs; omit formal10/11/12 and chat so D2R supplies both stock files of each pair"
+}

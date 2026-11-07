@@ -104,7 +104,8 @@ entities made of D2R's own wall models**:
    last; inside a tier every model loses the same share, thinned evenly over the map (`spread`), not cut by region. The
    cap is our own policy, not a measured engine limit: bug #360's overflow was the monster variant table cache, and no
    entity or byte limit of D2R's scenes is known (lane reimref read the Reimagined level editor: none there either). Only cypherpunk reaches it (5,825 placed:
-   1,402 dropped, all 1,802 elevation walls kept).
+   1,402 dropped, all 1,802 elevation walls kept). Since lane stairs cypherpunk has its own larger budget (`MAP_LIMITS`, measured in game:
+   [below](#stairs-at-fauztinville-lane-stairs-2026-11-07)); the other 16 maps keep the cap.
 
 Size: the 8 scenes are 10.2 MB of JSON together (before wallsfix 10.9 MB); the largest is cypherpunk, 4,423 placed models,
 3.29 MB, 33 distinct models (before: 5,820, 4.31 MB, 42). They name only D2R's own models, no new textures.
@@ -391,7 +392,7 @@ they sit at `hd/env/preset/mxl2012/<path>.json` (ds1_paths). The other 17 .ds1 o
 
 | desertpeak (60 Tran Athulua), corridors west of the arrival (cell 12,52) | 994 wall cells take a D2R variant with no model (D2R draws them in its terrain); HD shows open floor and short ruin stubs where classic has a closed corridor | yes, `wall_desertpeak_pair_1` | high | for wall cells whose learnt variant is empty, place `generic_pick` (needs a check that it does not double D2R's own terrain walls on the stock maps) |
 | desertpeak, arrival | the short back wall takes the tomb pillars (tawalls note); a low ruin wall stands on the floor south of the player where classic has the platform edge | yes, `pair_0` | low | prefer the variant of the cell's main tile set on mixed cells |
-| cypherpunk (59 Fauztinville) | cap: 11,083 pieces placed, 6,660 dropped: all 363 props and 6,297 of 7,142 details (stairs, buttresses, gargoyles, caps) | arrival: HD flat floor with slab walls where classic has a wide stair (`pair_0`); spots: walls roughly as classic (`pair_1`, `pair_2`) | medium | stairs kept since lane elevwalls (cap tier 3, all 1,406); the arrival stair is floor tiles with no D2R model, open ([below](#retaining-walls-and-stairs-lane-elevwalls-2026-11-07)) |
+| cypherpunk (59 Fauztinville) | cap: 11,083 pieces placed, 6,660 dropped: all 363 props and 6,297 of 7,142 details (stairs, buttresses, gargoyles, caps) | arrival: HD flat floor with slab walls where classic has a wide stair (`pair_0`); spots: walls roughly as classic (`pair_1`, `pair_2`) | medium | stairs kept since lane elevwalls (cap tier 3, all 1,406); the arrival stair: done (lane stairs, [below](#stairs-at-fauztinville-lane-stairs-2026-11-07)) |
 | cypherpunk, excelsior3 | `wall_elevation_stone01` learnt at y 3 (cypherpunk 884, excelsior3 54, plus 38 at 5-10): retaining walls of D2R's terraces stand as free walls on the flat floor | excelsior3 arrival: classic's sunken courtyard with stairs is a flat yard fenced by slabs in HD (`wall_excelsior3_pair_0`) | medium | done (lane elevwalls): walls facing away from the camera left out, facing ones moved onto the floor ([below](#retaining-walls-and-stairs-lane-elevwalls-2026-11-07)) |
 | downtown (18), arrival and Harrogath walls | 422 generic cells: low crenellated `wall_segment_short` (288) where classic has a tall skull wall; shelf-like pieces stand where classic has a stone arch; 71 wrought-iron fences learnt at y 9 | yes, `pair_0`, `pair_2` | medium (look only, layout right) | needs art or a taller D2R wall as the generic pick for style 3; fences: drop or stand at y 0 |
 | glados (95) | 42 generic and 78 look-alike cells: walls and gargoyle pillars match; classic's big trees are missing in HD | yes, `pair_1`, `pair_2` | low | trees: object or tile layer not in the scene (not walls) |
@@ -444,10 +445,8 @@ Fixes for the cypherpunk and excelsior3 rows above, in `walls_hd.py` (`Library.s
 - **Props**: cypherpunk now places 5,611 pieces (was 11,083); the cap still drops 1,188: all props and part of the
   details. The budget does not allow props there; raising it needs a game test of a larger scene first.
 
-- **Cypherpunk's arrival stair is not fixed**: those cells are floor tiles of Kurast style 31, sequences 12-15 (1,838 cells
-  in cypherpunk: 515, 513, 392, 418), and D2R's scenes have models on sequences 7, 10 and 12 only (stairs), never on 13-15,
-  so they get bare floor (`pick` 'floor'), not capped models. A mapping of 13-15 to D2R's stair variants would place about
-  1,800 more pieces (past the cap) and needs their art compared first (palette render), open.
+- **Cypherpunk's arrival stair is not fixed** here. (Lane stairs: the stair is not sequences 12-15, which are kerbed
+  flagstone walkway floor; it is sequences 23 and 26, fixed [below](#stairs-at-fauztinville-lane-stairs-2026-11-07).)
 
 In game (slot 2, run `checks-20261107-022822-s2`, this lane's scenes of excelsior3, cypherpunk, desertpeak, glados and
 moskvich copied over the slot's for the run and restored byte-equal after; all 5 levels reached in both modes, 0 asserts,
@@ -461,6 +460,37 @@ Scene changes against main (all 17 rebuilt): cypherpunk (2,681 elevation walls o
 (-382 pieces), desertpeak (-36: 15 away-facing elevation walls with their buttresses, Kurast donor pieces on its corridors),
 moskvich (-28), borgir (-22), macumba (-6), glados (-3, 373 stairs moved up); the other 10 maps unchanged (caveroom4's and
 epicwhiners' stairs included).
+
+### Stairs at Fauztinville (lane stairs, 2026-11-07)
+
+Cypherpunk's (59 Fauztinville) wide stairs, at the arrival and at every walkway crossing, were flat floor in HD.
+
+- **Which tiles.** A colour render of Median's `expansion/dystopic/terraces.dt1` (a retexture of D2R's
+  `act3/kurast/terraces.dt1`, style 31, all 28 sequences; sheet `mxl2012-runs/stairs/tiles_all31.png`) shows that
+  sequences 12-15 (1,838 cells) are flagstone floor with a kerb on one edge, the walkways themselves: bare floor is right
+  for them. The steps are sequences 7, 10, 23 and 26 (6, 11, 22 and 27 are steps with a terrace edge): cypherpunk has 476
+  such cells (23: 186, 26: 272, 10: 12, 6: 3, 7: 3), 2 by 3 cells at the ends of each walkway and 5 by 2 or 3 across each
+  corridor. D2R draws these with its terrain mesh and puts `act3_kurast_stairs/stairs_a01` (and b01, b02) on a third of
+  their cells at most, so `choose()` learnt them bare (23) or with a trim (26).
+- **Fix** (`KURAST_STAIR`, `KURAST_STAIR_TILES`, `KURAST_STAIRS`, a `STAND_INS` table for cypherpunk; a stand-in piece
+  may now carry a scale). Every such cell gets one `stairs_a01`, turned as D2R turns it on these tiles (yaw 270 on 6/7/22/23,
+  0 on 10/11/26/27), stretched to span the cell (x 2.4, z 1.39: the piece is 4 deep and 7.2 long) and flattened to 1.8
+  units (y 0.35). D2R's own layout (2 by 2 pieces per cell, each a 5-unit flight up a terrace) would add about 1,900 pieces
+  and stand as rows of blocks on Median's flat floor; two pieces per cell at full height looked like a saw in game (run
+  `checks-20261107-150324-s2`); one flat flight per cell reads like classic's stair (`pairs/stairs_cypherpunk_pair_0`).
+  The flights stop at each cell's edge, so a 2 by 3 stair shows six small flights, not one.
+- **Budget** (`MAP_LIMITS`). With the stairs cypherpunk places 5,779 pieces (5.05 MB, 99 models); under the common cap
+  1,356 of them (all props and details) would go, against 1,188 before. Measured in game, slot 2, `wall_maps` of level
+  59 at the arrival and two busy spots (cells 70,49 and 38,57), HD and classic, each scene swapped into the slot for the
+  run and restored byte-equal: a 6,255-piece scene (5,417,732 bytes, two pieces per cell) and the 5,779-piece one both
+  loaded with no assert while in the map (only the usual pool asserts at game exit) and no crash file; load screen
+  2.65-3.1 s against 2.6-3.0 s; private memory 9.70-9.83 GB against 9.54-9.77 GB with main's scene; frame rate at arrival / spot 1 / spot 2
+  59.9 / 59.9 / 53.7 against 60.0 / 59.9 / 58.8 (spot 2 has monster packs fighting; one run of each was slower while
+  another game ran on the GPU). cypherpunk's budget is therefore that tested scene, 6,255 pieces and 5,417,732 bytes; the
+  other 16 maps keep the common cap. D2R's largest scene has 679 distinct models, cypherpunk 99.
+- The other 16 scenes are byte-equal to main's (full builds of both). Not done: the walkways' kerb edges (sequences
+  12-15) have no model; the stairs' rise is drawn, not walked (the floor stays flat). Testing: docs/testing.md
+  "Lane stairs".
 
 ## Edited D2R maps (lane hole2, bug #525, 2026-11-03)
 
