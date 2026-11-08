@@ -1090,9 +1090,11 @@ Part `medtab` (`plugin/src/median_tabs.cpp`, rules in `median_tabs_logic.h`, tes
 5 pages (table `panel + 0x278 + tab * 8`, bounds-checked against 5 in the tab update `0x23e630`; `0x23af50` returns the tab bar's
 `+0x16c4` to 22 callers). The part, all sites checked with `memcmp` first:
 
-- **Tab getter:** the read `mov ebx, [rdi+0x16c4]` at `0x23af9f` becomes a call to a stub in the int3 pad `0x23afd2` that caps
-  the low byte at 4, so tabs 5 (MEDIAN) and 6 (ORBS) run as Runes for every caller (slot clicks, cube visibility, notification
-  mark).
+- **Tab getter:** its 21 direct calls (all but tabflash's `0x23bbd2`) go to a stub in the int3 pad `0x23afd2` (`push rax` /
+  `call 0x23af50` / `pop rcx` / cap `al` at 4 / `ret`), so tabs 5 (MEDIAN) and 6 (ORBS) run as Runes for every D2R caller (slot
+  clicks, cube visibility, notification mark). Stub and calls go in as one MutationService transaction. The getter itself stays
+  as D2R (lane cqol, 2026-11-08): the bundled controller-qol checks its first 128 bytes and reads the real tab through it. Until
+  then the read `mov ebx, [rdi+0x16c4]` at `0x23af9f` inside the getter called a capping stub.
 - **Tab update `0x23e630`** (inline hook): a panel without the layout mark `medtab_sel_vanilla` (an older or D2R layout) is left
   as D2R. Otherwise a tab of 5 or more outside a live game goes back to Personal *before* D2R's update; after it the active
   tab's slot group is shown (Runes' own / MEDIAN / ORBS; Materials Vanilla / Median by the selector) through the widgets' own
@@ -1122,33 +1124,34 @@ Part `medtab` (`plugin/src/median_tabs.cpp`, rules in `median_tabs_logic.h`, tes
   skipped), and replaces the flash's shown-tab test at `0x23bbd2` (the getter, capped at Runes) with the hook of `0x23bb50`,
   which compares the tab bar's real tab. Off word `tabflash`: left as D2R (RUNES flashes for MEDIAN / ORBS items).
 
-## 34. Pity map reveal (lane mapreveal, 2026-11-06; owner request)
+## 34. Level map reveal (lane mapreveal, 2026-11-06; owner request; no explored share since lane reveal, 2026-11-08)
 
 Part `mapreveal` (`plugin/src/map_reveal.cpp`, rules in `map_reveal_logic.h`, test `mapreveal_tests`; research and probe in
 [map-reveal-research.md](map-reveal-research.md)). Client side only, per player, no hook and no patch, so it cannot clash
 with other parts or plugins (the hook clash report has nothing to list for it).
 
-- **Measure:** every 250 ms (a timer thread hands the work to the UI thread with `runOnUiThread`) the part walks the rooms of
-  the player's current level: player `0x9a480(0x8b2d0())`, path `+0x38`, room `0x341c30(path)`, DRLG room `+0x18`, level
-  `+0x90`, first room `level + 0x10`, next `+0x48`, size `+0x68` / `+0x6c`. A room whose active room `+0x58` is set now is
-  marked seen (one bit per place in the list, at most 4096). Explored = tile area of the seen rooms / area of all rooms of the
-  level, per level id, until the game ends (a new DRLG or map seed resets all levels; a level built again resets that level).
-- **Gate:** `seen * 100 >= threshold * total` (exact, the line shows the whole percent rounded down). Towns (1, 40, 75, 103,
-  109) never; an exclusion list (empty by default) for levels that should never be revealed (uber and boss levels may be
-  added later, owner 2026-11-06).
+- **No explored share (bug #559, owner 2026-11-08).** Until 0.1.16 the key worked only once 70 % of the level was "explored",
+  counted as the tile area of the level's rooms that had been active once. That followed what D2R had loaded round the player
+  (the player's room and its neighbours), not what the automap drew, so small levels were "70 %" at the arrival. Now every
+  press reveals the current level, from the arrival on, in every level including towns. No timer walks the rooms any more.
+- **Level:** player `0x9a480(0x8b2d0())`, path `+0x38`, room `0x341c30(path)`, DRLG room `+0x18`, level `+0x90`, first room
+  `level + 0x10`, next `+0x48` (at most 4096 rooms). An exclusion list (`exclude`, empty by default) refuses listed level ids
+  (uber and boss levels could go there later, owner 2026-11-06).
 - **Key:** a D2RLoader InputService action `mxl_map_level`, "Reveal Level Map" in Options > Controls (category D2R-XL 2012),
   default **L** (free in D2R's key file and Median's own map reveal key; the first port's `mxl_map_reveal` id is not reused).
 - **Reveal:** for every room of the level, `CreateActiveRoom 0x3289a0(flag, room)` and the level's automap callback (DRLG
   `+0x838`, checked to be `0xd2240`) on what it returns. `flag` is the player's data-table byte `0x34a0e0(player)` (unit
   `+0x1bd`): the probe passed 0, the server's byte, and the game closed. Rooms that are active already come back unchanged.
-- **Chat:** one yellow line when the reveal becomes available on a level ("Map: 71% of this level explored. Press L to reveal
-  the rest."), one line per press (refused with the percent, "no reveal in this area" in towns, "already revealed", "off", or
-  "rest of the level revealed"). The line goes to the client's own chat handler `0x12c190` (packet 0x26 type 4), so it works
-  in a joined game too; while an NPC talks (`0x2a48760`) the line waits (at most 60 s), as a line then freezes the speech.
-- **Settings:** `d2rloader/config/mxl2012-core.toml` (`[mapreveal] threshold = 70`, 0 = always, 101 = off; `exclude = []`),
-  embedded in the DLL (`d2rlplugin_embed_config`), installed by `tools/install_mod.py` when missing and kept on updates
-  (`preserve` in the release manifest).
-- **Off word `mapreveal`.** `mxl2012 mapreveal` prints the report and the counters; harness `mapreveal [press | threshold N]`.
+- **Chat:** one line per press: "Map: level revealed." ("revealed in part (N of M rooms)" when a room activation returned
+  nothing), or "Map: no reveal in this area." in an excluded level. The line goes to the client's own chat handler `0x12c190` (packet 0x26 type 4), so it works
+  in a joined game too; while an NPC talks (`0x2a48760`) the line waits (at most 60 s; a timer thread runs only while a line
+  waits), as a line then freezes the speech.
+- **Settings:** `d2rloader/config/mxl2012-core.toml` (`[mapreveal] exclude = []`), embedded in the DLL
+  (`d2rlplugin_embed_config`), installed by `tools/install_mod.py` when missing and kept on updates (`preserve` in the release
+  manifest). Players who had 0.1.15 / 0.1.16 keep their file with `threshold = 70`: the key is read and ignored, and the
+  plugin's report line says "its old threshold ignored".
+- **Off word `mapreveal`.** `mxl2012 mapreveal` prints the report and the counters; harness `mapreveal [press]` (with the
+  automap cell count of the current layer).
 - **Later (owner 2026-11-06):** a popup button like the legacy level-up buttons (section 24), next to the key.
 
 ## 35. Area level on the automap (lane arealvl, 2026-11-06; owner request)

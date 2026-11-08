@@ -41,7 +41,7 @@ import fxpaths  # noqa: E402  (Median's files: MXL_EXTRACT / assets/median / ext
 
 MXL_GLOBAL = fxpaths.MXL
 PLUGIN = Path(os.environ.get("MXL_PLUGIN") or ROOT / "build" / "plugin" / "Release" / "mxl2012-core.dll")
-# The plugin's own settings ([mapreveal] threshold, ...): installed when missing, never overwritten (the player's changes stay).
+# The plugin's own settings ([mapreveal] exclude, [fonts], ...): installed when missing, never overwritten (the player's changes stay).
 CORE_CONFIG = ROOT / "plugin" / "mxl2012-core.toml"
 D2R_FILELIST = fxpaths.D2R_FILELIST
 

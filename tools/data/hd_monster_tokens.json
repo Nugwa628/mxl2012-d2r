@@ -1562,13 +1562,13 @@
    "class": "reused",
    "ids": 2,
    "art_vs_prior": "identical",
-   "donor": "wolf",
-   "scale": 1.0,
-   "colour": "hue -0.00 sat -0.13 val -0.18",
+   "donor": "spiritwolf",
+   "scale": 1.75,
+   "colour": "hue -0.01 sat -0.09 val -0.25",
    "adjust": [
     0.0,
-    -0.15,
-    -0.2,
+    -0.1,
+    -0.25,
     1.0
    ],
    "tint": [
@@ -1577,11 +1577,10 @@
     0.0,
     0.0
    ],
-   "confidence": "high",
-   "source": "reused",
-   "vmap": null,
-   "reason": "same art files; reused donor wolf (3 rows, 100% agree)",
-   "prior_alternatives": {},
+   "confidence": "medium",
+   "source": "pin",
+   "reason": "Fallen Wolf Rider (Kurast Bazaar, Travincal, Act 5 temples): a fallen with a spear on a grey wolf (65x85 px). The reference pick, D2R's `wolf` (the Druid's werewolf form), has no death or dead clip, so the dead riders stood on as werewolves in HD (bugs.md #560); the spirit wolf is the mount's animal and colour and has both (ranking: wolf 4.5, spiritwolf 3.7).",
+   "score": "family canine; body quad; score 3.7, size x1.76",
    "ids_mapped": 2,
    "monsters": [
     "fallenwolf1",
@@ -2667,13 +2666,13 @@
    "class": "new",
    "ids": 1,
    "art_vs_prior": "no prior folder",
-   "donor": "wolf",
-   "scale": 0.9,
-   "colour": "hue -0.00 sat +0.05 val +0.29",
+   "donor": "spiritwolf",
+   "scale": 1.5,
+   "colour": "hue -0.01 sat +0.09 val +0.21",
    "adjust": [
     0.0,
-    0.05,
-    0.3,
+    0.1,
+    0.2,
     1.0
    ],
    "tint": [
@@ -2684,8 +2683,8 @@
    ],
    "confidence": "low",
    "source": "pin",
-   "reason": "Trained Cougar: tan big cat on four legs (94x59 px). D2R has no cat; the wolf is the closest four-legged predator with the same animation set. monstats2 has no cougar row (MonStatsEx points to nothing) and the author's own status column says WERKT NIE (does not work): the stand-in only matters if the row gets fixed.",
-   "score": "body quad; score 1.7, size x0.92",
+   "reason": "Trained Cougar: tan big cat on four legs (94x59 px). D2R has no cat; the spirit wolf is the closest four-legged predator with death clips (D2R's `wolf`, picked first, has none: bugs.md #560). monstats2 has no cougar row (MonStatsEx points to nothing) and the author's own status column says WERKT NIE (does not work): the stand-in only matters if the row gets fixed.",
+   "score": "body quad; score 1.3, size x1.52",
    "ids_mapped": 1,
    "monsters": [
     "cougar"
@@ -3200,13 +3199,13 @@
    "class": "reused",
    "ids": 5,
    "art_vs_prior": "identical",
-   "donor": "wolf",
-   "scale": 0.9,
-   "colour": "hue +0.00 sat +0.02 val +0.13",
+   "donor": "spiritwolf",
+   "scale": 1.5,
+   "colour": "none",
    "adjust": [
     0.0,
     0.0,
-    0.15,
+    0.0,
     1.0
    ],
    "tint": [
@@ -3215,11 +3214,10 @@
     0.0,
     0.0
    ],
-   "confidence": "high",
-   "source": "reused",
-   "vmap": null,
-   "reason": "same art files; reused donor wolf (5 rows, 100% agree)",
-   "prior_alternatives": {},
+   "confidence": "low",
+   "source": "pin",
+   "reason": "Wyrdwolf (Act 3 dungeons, Act 5 temples): tan wolf-headed beast (47x77 px). The reference pick, D2R's `wolf` (the Druid's werewolf form), has no death or dead clip, so dead Wyrdwolves stood on in HD (bugs.md #560); D2R has no werewolf enemy, the spirit wolf is the nearest canine with both clips (ranking: wolf 6.0, spiritwolf 5.7).",
+   "score": "family canine; body quad; score 5.7, size x1.49",
    "ids_mapped": 5,
    "monsters": [
     "sumelite_1316",

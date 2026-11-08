@@ -72,8 +72,8 @@
 //      Materials tab, the 9 item codes with "@" restored in their slots (median_tabs.cpp, off word medtab: tabs 6 and 7 hidden);
 //   +  a Ctrl-click deposit flashes the stash tab the item went to, MEDIAN and ORBS too, not RUNES (tab_flash.cpp, off word
 //      tabflash, #550);
-//   +  the pity map reveal: the Controls action "Reveal Level Map" (default L) reveals the rest of the current level's automap
-//      once 70 % of it is explored (mxl2012-core.toml [mapreveal]); client side, no hook (map_reveal.cpp, off word mapreveal);
+//   +  the level map reveal: the Controls action "Reveal Level Map" (default L) reveals the current level's automap on every
+//      press (mxl2012-core.toml [mapreveal] exclude, bug #559); client side, no hook (map_reveal.cpp, off word mapreveal);
 //   +  the automap's top-right text shows "Area Level N" (levels.txt MonLvlEx of the game's difficulty) on D2R's terror-zone
 //      line (area_level.cpp, off word arealvl);
 //   +  the clear legacy fonts setting: mxl2012-core.toml [fonts] legacy_clear_fonts and the Controls action "Clear Legacy Fonts"
@@ -136,7 +136,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.16";
+constexpr const char* PluginVersion = "0.1.17";
 constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in

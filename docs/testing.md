@@ -912,6 +912,8 @@ for them (the server frames are driven from it). `menu` runs on the UI thread. A
 | `travel` | (client side) the hotkey bindings (key and modifier as D2RLoader reports them), counters (waypoints activated, scans, reveals, key presses, transmutes, cube open / closed) and the distinct UI messages seen (`uimsgs`) |
 | `stashprobe <tab>` / `stashprobe result` | queues, on the game thread, a rune created by ItemService in shared stash tab `<tab>` and destroyed again; `result` answers `1 page=<n> create=0 ...` when the tab took the item, `0` when it refused |
 | `stashpage state\|open\|close\|toggle\|msgs\|uia <target> <command> [text]\|widget <panel> [child]\|vis <panel> <child> <0\|1>\|put <code> [x y]\|fill <1\|2>\|drop <code>\|list\|move <id> <1\|2> [x y]\|result` | (client side; put / fill / drop / list / move queue work on the game thread, `result` has the answer) the personal stash page 2: `state` prints `state=<page 2 panel: 1 closed, 2 open> tab=<n> strip=<0\|1>`, `msgs` the last bank / stash UI messages newest first, a native UI message through WidgetService (`uia PanelManager OpenPanel BankExpansionLayout`), a widget rect, items created / listed / moved between page 1 and page 2 in one ItemService transaction |
+| `padui [on\|off]` | (client side, lane padui) D2R's gamepad UI without a gamepad: hooks PanelManager::RequestInputMethod `0x8a5440` and, while on, answers every input as gamepad input; prints `forced= gamepadUi= pending= device=`. Keys do not open panels in the gamepad UI; use `stashpage uia PanelManager OpenPanel <name>` (docs/controller-support.md) |
+| `pad [on\|off\|press <buttons> [ms]\|hold <buttons>\|release [buttons]\|stick L\|R <x> <y>\|trigger L\|R <0-255>]` | (client side, lane padinput) a scripted gamepad in controller slot 0, no gamepad or driver: the first verb swaps D2R's XInputGetState import (IAT `0x1cb1258`, XINPUT9_1_0.dll) for the harness's own; `off` puts it back. Buttons `a b x y lb rb lt rt ls rs start back up down left right` (`+` joins), sticks in percent (y up); `press` holds for ms (default 120) and at least 3 polls. Prints `on= hooked= polls= packet= buttons= ... gamepadUi= device=`. Scripts: tools/pad_input.py (docs/controller-support.md) |
 
 mxl2012 additions (lane skills, 2026-10-28) to the list above:
 
@@ -6164,6 +6166,30 @@ Asserts: only the known shutdown pool asserts, plus in the first run the item as
 legacy places are 4:3, the release's Legacy 16:9 moves the panels; the classic tab bar draws no flash anyway, lane tabhl),
 NPC speech text with the clear fonts (the Talk menu was shown, not a speech).
 
+## Lane rel0117: release 0.1.17 package smoke (2026-11-08, slot 2, background input)
+
+Package `D2R-XL-2012-0.1.17.7z` (3,776 files, 153,668,224 bytes, sha256 `2cff09ddc305632968b277de519febbfa39c337eb39f250a0fef3c7272b29de0`),
+`verify_package.py` OK. It contains Controller QOL Updates (DLL with the mxl2012 skill seed, `controller-qol-updates.toml` with
+`belt_actions = false`, its licence files). Controller QOL was built from a local clone of PyreFly's repo at the pinned commit
+(`MXL_CONTROLLERQOL_DIR`); the other bundled plugins came from local clones as in lane rel0116. Installed with
+`release_install.py install --slot 2 --package` (dev DLL of the same PluginVersion, so the harness `pad` verb works), restored
+afterwards. Character `MedStashA`. Evidence `mxl2012-runs/rel0117/` (`game/checks-20261108-130218-s2`, `run2.log`, driver
+`scripts/smoke.py`, not in git).
+
+| Item | Result |
+|-|-|
+| Game starts, character enters, `mxl` line 0.1.17 | PASS (the check FAILs on `other plugins` only: the release ships four) |
+| `tabflash`, HD | PASS: all 8 items |
+| `medtab`, HD: Materials Vanilla / Median selector, deposits, routing, MEDIAN take-out and put back, ORBS | PASS, 0 #548 asserts |
+| `sendstash`, HD and legacy 16:9, reload | PASS: every row |
+| Ctrl+F clear fonts in legacy 16:9: on, Warriv's Talk menu, quest log, off | PASS |
+| `cqol`: loaded, belt shortcuts off, profile seeded, ground loot, RT / LT through all 7 tabs (HD and legacy), Deposit All on Gems, Materials, MEDIAN, ORBS, A on Send to stash | PASS |
+| `cqol`: Deposit All on Runes; LB + X / A / Y | FAIL as in lane cqol (Runes partial; the scripted focus does not reach the backpack item) |
+
+Not judged on a release install: `tabflash` and `medtab` in legacy (the checks' legacy places are 4:3; with Legacy 16:9 the
+stash was not open, shot `medtab_legacy_median_deposited.png`), and `medtab`'s reload row, which only finds the legacy items
+that were never deposited. Asserts: only the two shutdown pool asserts. 0 crash files.
+
 ## Lane legfont: legacy font copy investigation
 
 Target 0.1.16, slot 2, English, background input, throwaway Barbarian `LegFont`.
@@ -6346,3 +6372,196 @@ slot's `mxl2012-core.toml` and the Legacy 16:9 files), `run*.log`, `notes_*.txt`
 - `end_off_town`: switched off at the end, stock again.
 
 Not covered: the input widget of chat, online/BNet screens, other locales (the part keeps D2R's names outside `latin\`; not run).
+
+## Lane padui: the gamepad UI without a gamepad, controller-qol audit (2026-11-07, slot 2, background input)
+
+Research lane for 0.1.17 controller support; full write-up docs/controller-support.md, evidence `mxl2012-runs/padui/`
+(`REPORT.md`, shots in `run1-panels/` and `run2-native/`, PyreFly's source in `controller-qol/`).
+
+| Run | Result |
+|-|-|
+| `MXL_CHAR=MedStashA py -3 tools/game_checks.py all padui` (`checks-20261107-192702-s2`) | `padui on` / `off` switch the gamepad UI in HD and legacy (`gamepadUi=1`, then 0); 44 shots, PC UI and gamepad UI side by side. FAIL only on the engine burst of #548 at the first stash open (PC UI, before `padui on`) |
+| `MXL_CHAR=MedStashA py -3 tools/game_checks.py all padui2` (`checks-20261107-194122-s2`) | PARTIAL (look judged on shots): inventory, character sheet, skill tree and cube opened by `OpenPanel` in the gamepad UI; no engine lines |
+
+Seen: the gamepad inventory is D2R's and Median's backpack overflows it, no Send to stash button (#556); the gamepad stash has
+no MEDIAN / ORBS tabs (#557); cube, character sheet and skill tree draw right. Keys are ignored in the gamepad UI, mouse clicks
+land; navigation and tooltips need pad events (not testable here).
+
+
+
+## Lane padskills (2026-11-07)
+
+Static controller-qol profile preparation; no game process or slot used. Built the data pipeline with
+`py -3 tools/build.py --data-only` (validation: 0 errors), then generated 818 entries / 32,873 bytes with
+`tools/controller_skill_profile.py`. Inference, precedence, catalog replacement, name-based corrections,
+ID/capacity rejection and TOML grammar have unit coverage in `tools/tests/test_controller_skill_profile.py`.
+Evidence: `mxl2012-runs/padskills/profile/`, `unittest-tests-final.log`, `unittest-tools-final.log` and `REPORT.md`.
+See [controller-support.md](controller-support.md#5-lane-padskills-generated-skill-seed-2026-11-07-static)
+for field semantics, installation scope, item-code audit and limits. Controller play/aim validation,
+profile seeding at install time, and native item-rule changes remain for the vendor/compatibility/live lanes.
+
+## Lane padlayout: the mod's gamepad inventory and stash (bugs #556 / #557, 2026-11-07, slot 2, background input)
+
+Fix and write-up in docs/controller-support.md section 5; evidence in `mxl2012-runs/padlayout/evidence/` (shots in `shots/`).
+Driven by hand with `MedStashA`: harness `padui on|off`, panels opened with `stashpage uia PanelManager OpenPanel <name>`,
+stash tabs clicked with the mouse. Graphics switched with G, and legacy 16:9 with legacy169 placed for the run and removed
+afterwards.
+
+| Mode | Gamepad UI | Result |
+|-|-|-|
+| HD | on | inventory 10 x 6 inside the frame, send and gold buttons drawn (`pad_hd_inv.png`); the stash with all seven tabs opened by clicks, each with its page; full backpack beside it (`pad_hd_stash_*.png`); cube right (`pad_hd_cube.png`) |
+| HD | off | PC stash and inventory unchanged (`pc_hd_stash.png`) |
+| legacy 4:3 | on | stash right on every tab tried (`pad_legacy_stash*.png`); the standalone inventory draws no frame art, the same with D2R's own art swapped in (`pad_legacy_inv_vanillabg.png`), so this is D2R's behaviour |
+| legacy 4:3 | off | PC stash unchanged (`pc_legacy_stash.png`) |
+| legacy 16:9 | on / off | as legacy 4:3 (`pad_l169_*.png`, `pc_l169_stash_legacy.png`) |
+
+Unit test: `tools/tests/test_pad_ui.py` covers the grid fit, the send button names, the seven tabs and the PC page and
+medtab widgets in the built layout. Not tested: gamepad navigation (focus moves, LT / RT paging into MEDIAN / ORBS, A on
+the send button, tooltips by focus), which needs lane padinput's `pad` verb (not on main yet).
+
+## Lane padinput: scripted gamepad input (2026-11-07, slot 1, background input)
+
+Dev-only harness verb `pad` (table above; docs/controller-support.md section 1a): a fake XInput pad in controller slot 0,
+fed through D2R's own `XInputGetState` import (IAT `0x1cb1258`), no driver or install. Helper tools/pad_input.py (scripts,
+command line); checks `padprobe` and `padinput` (tools/padinput_checks.py). Evidence `mxl2012-runs/padinput/` (`run1-probe/`,
+`run2/`, `run3-final/`, decompiles in `decomp/`). Build of lane/padinput, new level-1 Barbarian `PadInput`, HD.
+
+| Run | Result |
+|-|-|
+| `MXL_SLOT=1 MXL_RUN=padinput MXL_CHAR=PadInput MXL_PAD_PROBE=... py -3 tools/game_checks.py all padprobe` (`checks-20261107-233617-s1`) | the game polls the fake pad (`polls` 1359, about 60 a second once connected); Start opens the gamepad panel menu, B closes it; Back, Y, LS, RS showed nothing in town; the left stick alone does not switch to the gamepad UI (row FAIL, changed to a button in `padinput`); 0 engine lines |
+| `... all padinput` (`checks-20261107-233928-s1`) | PARTIAL (shots judged): every row ok; D-pad focus with tooltips, RB / LB between the menu's panels, RT / LT between stash tabs; 0 engine lines |
+| `... all padinput` (`checks-20261107-234449-s1`, final defaults) | all rows ok: a pad button alone switches to the gamepad UI (`gamepadUi` 0 -> 1); A picks a belt potion up and puts it back; RB Skill Tree, LB Inventory / Character; stash RT Shared (page 1/7, RB 2/7), Gems, Materials, Runes, LT back; D-pad down: Horadric Cube tooltip; `pad off`: import restored. FAIL only on #548's burst (`ptStats` Items.cpp:1839 ...) at the first RT onto the Gems tab, no crash |
+
+Release proof: `build_plugin.ps1 -Release -Tests` (all unit tests pass, `padinput_tests` new); the release DLL has none of the
+verb's strings (`pad on=`, `XINPUT9_1_0`, `padui forced`), the dev DLL has them. Shared slot files restored and verified after
+each run.
+
+## Lane fix548: class -1 placeholders on the vanilla Materials page (bug #548, 2026-11-08, slot 1, background input)
+
+Slot 2 was held by lane cqol, so every run used slot 1 (lock `fix548`, shared files restored and verified after each launch).
+Install `MXL_SLOT=1 MXL_RUN=fix548 py -3 tools/install_mod.py --slot 1`; every run with `MXL_ASSERT_TRACE=1` (harness
+`asserttrace`, which counts every engine assert; D2RLoader's log names only the first of a kind per launch). Evidence
+`mxl2012-runs/fix548/` (`base1/` the baseline, `fixed/` one folder per fixed run, decompiles in `decomp/`).
+
+| Run | Result |
+|-|-|
+| Baseline, main 791e95c: `MXL_CHAR=PadInput ... all padinput` (`checks-20261108-020343-s1`) | FAIL on #548 at the first try. 3,364 asserts: 560 rounds of the six (`ptStats` x2, Items.cpp:1990, `itemTypes.size()`, `UnitGetClassEx`, `ptItemStats`) from 02:06:00.3 to 02:06:05, exactly while RT / LT showed MATS (Vanilla page), none on Gems or Runes; 9 FPS on that page with the trace on (`padin_stash_rt3.png`). Chain: slot draw `0x2ce4d0` -> placeholder draw at `0x2ce61b` / `0x2ce636` (`base1/trace-first12.txt`) |
+| Fixed, `... all padinput` x3 (`checks-20261108-031417-s1`, `-031659-s1`, `-031930-s1`) | every row ok (PARTIAL: shots); 0 gameplay asserts, 0 crash files; the vanilla MATS page looks as before at 59 FPS (`fixed/padinput3_mats_rt3.png`); only the known exit-time pool asserts (`m_allocated == 0` ...) |
+| Fixed, `MXL_CHAR=FixMedA ... all medtab` x3 (`checks-20261108-032201-s1`, `-032626-s1`, `-033051-s1`) | PASS x3 (mouse clicks on the tabs, HD and legacy, reload); 0 #548 asserts, 0 crash files |
+| Fixed, `MXL_CHAR=FixTipA ... all mxl2012 stashtip tabflash` (`checks-20261108-033510-s1`) | `mxl2012` PASS, `tabflash` PASS (#550); `stashtip` FAIL on one row only: the `r01` Ctrl-click did not move because slot 1's shared Runes page already held 99 El runes (`fixed/stashtip_r01_el_99.png`; test state, the Runes page is unchanged); the other 7 HD and 5 legacy slots showed the whole tooltip (#551) |
+
+The gamepad stash (#557) showed its seven tabs in all three padinput runs. Tests: `test_median_tabs.UnknownSlots` (the removal
+and the built HD / classic / gamepad layouts hold only codes of the mod), both Python suites, `build_plugin.ps1 -Release -Tests`,
+check_public 0 hits, check_docs_links 0 findings.
+
+## Lane cqol: Controller QOL Updates with the mod (2026-11-08, slot 2, background input)
+
+Write-up in docs/controller-support.md section 7; evidence in `mxl2012-runs/cqol/` (`runA-*` to `runF-*`, each with its
+report, shots and the plugin's log). Build of lane/cqol (dev plugin with the `pad` verb), `MedStashA`, HD and legacy. For each
+run the controller-qol build (tools/build_controllerqol.ps1 with the mxl2012 seed) and its config were placed in slot 2's
+`mods\mxl2012\d2rloader\`, Auto Belt Refill too where noted, and taken out afterwards.
+
+| Run | Plugins | Result |
+|-|-|-|
+| A `checks-20261108-022900-s2` | mxl2012-core only | mxl2012, tabflash PASS; medtab rows ok, FAIL on #548's burst; stashtip FAIL only on r01 (Ctrl-click, also without controller-qol) |
+| B `checks-20261108-024812-s2` | + controller-qol, ABR | every controller-qol feature admitted, belt shortcuts off, profile seeded; medtab / stashtip / tabflash as run A; Deposit All refused ("Native deposit contract unavailable": spiritsound's hook, patch 0003) |
+| C `checks-20261108-032459-s2` | + controller-qol, ABR | patch 0003 admits Deposit All; LB + L3 in one poll still ran D2R's Open Cube; a player's skill-profile edit kept after the restart |
+| D `checks-20261108-040030-s2` | + controller-qol, ABR | LB held first: Deposit All on Gems, Materials, MEDIAN, ORBS (HD) and ORBS (legacy); Runes 1 of 2; paging, ground loot, focus walk and Send to stash ok; #558 at the stash click |
+| E `checks-20261108-044505-s2` | mxl2012-core only | `padinput` all rows ok, only #548's burst: no #558 |
+| F `checks-20261108-044911-s2` | + controller-qol | as run D; #558 again, so it comes with controller-qol |
+
+LB + X / A / Y were not shown (the scripted focus never reached the backpack item); right-stick aiming was not tried. Both
+need a real gamepad. Shared slot files restored and verified after each run.
+
+
+## Lane shrinecol
+
+Owner request (2026-11-08): each of the twenty crafting shrines has its own colour in the stash, all charge counts.
+`tools/shrine_colours.py` generates twenty legacy DC6 pictures plus twenty HD / twenty lowend sprites;
+`tools/build.py` runs its table and art stages. D2 palette-family fields are not colour numbers, so they stay 0;
+colours are baked using D2's grey.dat transforms instead, which also colours existing saved shrines.
+See [generated item art](hd-icons.md#crafting-shrine-colours-lane-shrinecol) for the mapping and rationale.
+
+Static checks: both Python suites, check_public (0 hits), check_docs_links (0 findings), data validation (0 errors),
+dev plugin build and its tests passed. `tools/tests/test_shrine_colours.py` checks all 200 codes / both banks,
+only invfile changes, idempotency, source DC6 transparency / frame offsets, HD + lowend geometry / alpha and
+per-code mappings using synthetic art. Actual generated outputs: twenty distinct files per format, unchanged HD alpha.
+
+In-game check: `MXL_RUN=shrinecol MXL_SLOT=2 MXL_CHAR=ShrineProbe MXL_RUNS=<lane evidence>
+py -3 tools/game_checks.py all mxl2012 shrinecol`. The harness makes the items (SHORTCUT), then background
+Ctrl-clicks all twenty into the MEDIAN stash page; shots in HD and legacy 4:3, Creepy / Cryptic tooltip hovers,
+and four dropped shrines in both modes. `MXL_SHRINE_REUSE=1` skips creation / deposit for another run on the
+already populated page, proving that existing saved shrines receive the new pictures too.
+Evidence: `mxl2012-runs/shrinecol/`; `checks-20261108-122546-s2` has all twenty colours in HD and legacy 4:3,
+with unchanged Creepy / Cryptic names, ten-charge counts and descriptions. The automatic check is PARTIAL
+because colours / tooltip text require manual image review; both all-twenty pictures and four tooltip pictures
+were reviewed successfully. These are full-charge shrines; lower charges are covered by the 200-code static test.
+No gameplay asserts or crash files; only the five known shutdown pool-assert messages. Shared files restored
+and verified, slot released, watchdog: no cursor or foreground-window changes. CPU before launch 22..28%.
+
+`checks-20261108-122751-s2` repeats that check with extra `shrinecol_hd_ground_art.png` /
+`shrinecol_legacy_ground_art.png` pictures without Alt labels obscuring the ground art. CPU before launch
+averaged 58% over three readings (51 / 70 / 52%). The pictures with Alt labels remain for checking item names.
+Manual review: the original small, dark jewel-bag ground picture remains (flippyfile `flpjbi`, unchanged), and
+all four names / descriptions render on the ground. Both all-twenty / tooltip sets passed visual review.
+Again no gameplay asserts or crashes, only the same five shutdown messages; shared files restored and verified,
+slot released. The watchdog recorded the user's own mouse / foreground changes, abort None; input stayed in
+background mode. `REVIEW.txt` in the evidence folder records the judgement (automatic reports remain PARTIAL).
+
+Control details: `probe_fixture.py` in the evidence folder temporarily selects the original shared icon, Transform 8
+and InvTrans families 1..8 across the twenty types (all valid families). Output is restored immediately after the
+control install, before game start. In `checks-20261108-121501-s2/shrinecol_hd_all20.png`, all twenty remain white:
+InvTrans alone does not give these normal misc items a colour in HD. This does not test affix-driven HD colours.
+The first control (`checks-20261108-121026-s2`) is void for stash pictures: Ctrl-click routed to MEDIAN while the
+check showed Personal. The corrected control has the HD all-twenty and tooltip pictures; its legacy picture was
+missed by the generic HD close-button heuristic. The final check avoids that heuristic and preserves the open
+stash through G. Both controls had no crash files; the first had only the known shutdown pool-assert family.
+
+Final static suites: 1,130 and 545 tests passed. One intermediate second-suite run inherited MXL_SLOT=1 and
+hit two existing nofocus mock-PID JSON errors; rerunning with MXL_SLOT=2 passed (no game is launched by these tests).
+The data pipeline and the shrine / HD item / legacy item / UI / sound / DS1-path art stages completed, validation
+0 errors in both banks. This was not a completed full-art build: the unrelated wall-scene rebuild was deliberately
+stopped after 19 minutes (only this lane's verified process), with no wall-code changes; maps_hd's minimal scenes
+remain in the game fixture. This does not affect item icons. No plugin source changes or version bump.
+
+## Lane werewolf: dead Fallen Wolf Riders standing in HD (bug #560, 2026-11-08, slots 2 and 1, background input)
+
+Check `werewolf` (tools/game_checks.py): in Kurast Bazaar (level 80) `fallenwolf1` (token `0(`), `wyrdwolf1` (`^3`) and `ape2` (a
+D2R-unit corpse to compare) are spawned, shot alive, killed with `kill nearest <class>`, shot 1 s and 6 s later, in HD and then
+legacy (G); `state` gives the dead modes. Fresh characters (`MXL_CHAR=WolfBase`, `WolfFix`). Evidence `mxl2012-runs/werewolf/`.
+
+| Run | Result |
+|-|-|
+| Baseline, main dbe5b59, slot 2 (`checks-20261108-123440-s2`) | PARTIAL (shots): every kill mode 12. HD: both werewolf-looking stand-ins (D2R's `wolf`) keep standing after death, the ape lies down (`before/sheet_before_hd.png`). Legacy: Median's corpses lie down (`before/sheet_before_legacy.png`) |
+| Fixed (pins to `spiritwolf`), slot 1 (`checks-20261108-125905-s1`) | PARTIAL (shots): every kill mode 12. HD: the spirit-wolf stand-ins play their death and fade, nothing stands; the ape lies down (`after/sheet_after_hd.png`). Legacy as before (`after/sheet_after_legacy.png`). 0 crash files, shared slot files restored and verified |
+
+Slot 2 was handed to lane rel0117 (release priority) after the baseline run, so the fixed run used slot 1.
+
+## Lane reveal: L reveals the current level on every press (bug #559, 2026-11-08, slot 1, background input)
+
+Owner ruling for #559: no explored share and no threshold; L (Controls action "Reveal Level Map") reveals the current level
+whenever pressed, towns too (docs/map-reveal-research.md section 7, docs/plugin-plan.md section 34). Unit tests: `mapreveal_tests`
+(exclusions, the old 0.1.16 settings file read with its threshold ignored, lines, chat packet).
+
+In game: `checks-20261108-135531-s1` (`py -3 tools/game_checks.py` checks `mxl2012 mapreveal`, char `RevealLane`, god mode, data
+from rel0117's full 0.1.17 build), all rows PASS, every press by the real background L key, 0 ms per reveal, 0 faults, no crash
+file. Each level: arrival with no step, automap shot, L, automap shot, a second L, three steps. Cells are the automap cell count
+of D2R's current layer (`h mapreveal`).
+
+| Mode | Level | Rooms made | Cells arrival -> after L |
+|-|-|-|-|
+| HD | Rogue Encampment (1) | 35/35 | 747 -> 747 (a town is drawn whole on arrival) |
+| HD | Catacombs Level 1 (34) | 5/5 | 32 -> 219 |
+| HD | Catacombs Level 4 (37, small preset) | 12/12 | 28 -> 144 |
+| HD | Kurast Sewers Level 1 (92) | 34/34 | 45 -> 2544 |
+| legacy | Kurast Docks (75) | 48/48 | 762 -> 762 (town) |
+| legacy | Sewers Level 2 (93, small preset) | 9/9 | 34 -> 97 |
+| legacy | Catacombs Level 2 (35) | 6/6 | 25 -> 265 |
+
+Shots `mapreveal_<mode>_<level>_arrival.png` / `_revealed.png` show the whole level map after L and the line "Map: level
+revealed.". Row "part on": slot 1's settings file still had the old `threshold = 70`; it was read without error and the report
+says "its old threshold ignored". The set-up row `elclear` found no El rune in slot 1's shared stash (nothing to clear).
+
+The first run (`checks-20261108-132834-s1`) crashed at character entry ("Could not add cof file IMghhth.COF"): the
+`build.py --data-only` data skips gfx_placeholders, so bug #3's necromorb fix was missing. Not a mapreveal fault; the run above
+used a full build. Shared slot files restored by the game-slot tools, slot 1 unlocked.

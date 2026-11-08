@@ -5,7 +5,53 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+- Crafting shrines now have a colour of their own in HD and legacy inventory/stash views, at every charge count:
+  Creepy: dark red; Abandoned: light grey; Quiet: light blue; Eerie: dark purple; Weird: crystal red; Gloomy: dark
+  blue; Tainted: dark green; Fascinating: orange; Ornate: light gold; Sacred: crystal blue; Shimmering: white;
+  Mysterious: light purple; Spiritual: light green; Magical: crystal green; Enchanted: light yellow; Divine: bright
+  white; Hidden: light red; Stone: dark grey; Religious: dark gold; Cryptic: dark yellow. Names, tooltips and
+  ground pictures stay the same.
+
+- **Fallen Wolf Riders and Wyrdwolves no longer stay standing after they die in HD** (bug #560). They looked like werewolves in HD and
+  stood on after their death (Kurast Bazaar, Travincal, the Act 3 dungeons and the Act 5 temples). They now look like a grey wolf
+  that dies and fades as the Druid's spirit wolf does. Legacy graphics were not affected.
+- Map: **L** ("Reveal Level Map" in Options > Controls) now reveals the current level's map whenever you press it, right
+  from the start of the level, in every level including the towns. The explored percentage and the 70% you had to explore
+  first are gone: they did not match the map, in the sewers and catacombs and in small levels (bug #559). An old
+  `threshold` line in `d2rloader/config/mxl2012-core.toml` is ignored; `exclude = [...]` there still turns the key off for
+  the levels you list.
+
 ## D2R-XL 2012
+
+### 0.1.17 (2026-11-08)
+
+D2R-XL 2012 is a fan port of **Median XL 2012 (v005) by Brother Laz** to Diablo II: Resurrected. Median XL 2012 and its
+files: <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also makes great Skyrim mods):
+<https://www.nexusmods.com/profile/EnaiSiaion/mods>.
+
+- **Controller support: PyreFly's Controller QOL Updates now ships with the mod** (by **PyreFly**,
+  <https://github.com/Pyre-Flies/D2R-Mods>, shipped and adapted with PyreFly's permission). With a gamepad: hold LB near
+  items on the ground to see their buttons and pick one up with LB + that button; LB + A / X / Y act on the item in focus
+  (identify, move between inventory, stash and Cube); with the stash open, hold LB and click L3 to put your gems, runes, materials and
+  Median's elixirs, signets, trophies, shrines and Mystic Orbs into their stash tabs, including MEDIAN and ORBS; LT / RT page
+  through the stash tabs and LB + LT / RT through the shared pages. The right stick aims skills, with a skill list made for
+  Median XL 2012 (R3 on a skill in the skill tree turns its aiming on or off; your choices are kept across updates). Its
+  belt shortcuts are off, so Auto Belt Refill keeps your belt. Settings: `mods\mxl2012\d2rloader\config\controller-qol-updates.toml`.
+  Mouse and keyboard play is unchanged.
+- Gamepad UI: the inventory now fits Median's 10 x 6 backpack inside its frame (the last rows and the right column no
+  longer spill out) and has the Send to stash button next to the gloves; gold sits next to the boots (bug #556).
+- Gamepad UI: the stash has all seven tabs, including MEDIAN and ORBS, with Median's Gems, Materials and Runes pages,
+  and the backpack beside it shows in full (bug #557). Moving between the tabs with LT / RT has not been tested with a
+  real gamepad yet.
+- Stash: the Materials tab's Vanilla page no longer raises engine errors on every frame while it is open.
+  Its empty slots for D2R-only items (keys, organs, essences, Worldstone shards and the like, none of which exist in Median)
+  are gone; the three slots for items Median has stay (bug #548).
+
+**Known issues:**
+
+- With Controller QOL Updates loaded, opening the stash by clicking the chest can log engine warnings (bug #558). It does
+  not crash the game.
+- The LB + X / A / Y item shortcuts and right-stick aiming are new: feedback is welcome.
 
 ### 0.1.16 (2026-11-07)
 

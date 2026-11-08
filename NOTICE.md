@@ -66,6 +66,14 @@ from the author's source (the submodule `third_party/auto-belt-refill` at a fixe
 author's repository has no licence file; jaycachou-svg gave permission to use and customise it on 2026-11-06. It is
 credited to the author in the README, the release notes and docs/bundled-plugins.md.
 
+From 0.1.17 it also ships **Controller QOL Updates** (controller-qol) by PyreFly (<https://github.com/Pyre-Flies/D2R-Mods>,
+`plugins/controller-qol`), built from PyreFly's source (the submodule `third_party/D2R-Mods` at a fixed commit) with our
+patches (`third_party/controller-qol-mxl2012/`: a switch for its belt shortcuts, off in our config; the D2R-XL 2012 stash tabs
+MEDIAN and ORBS) and a skill profile made from the mod's skill tables. PyreFly's repository reserves all rights (its LICENSE);
+PyreFly gave the project owner permission to ship and adapt it on 2026-11-04. PyreFly's LICENSE and the PluginSDK's licence
+are in `mods\mxl2012\d2rloader\plugins\` next to the DLL. It is credited to PyreFly in the README, the release notes and
+docs/bundled-plugins.md.
+
 ## The downloader's 7z decoder (`launcher/third_party/lzma`)
 
 `D2R-XL-2012-Downloader.exe` unpacks the release's `.7z` with the C 7z decoder of the

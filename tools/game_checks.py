@@ -15371,8 +15371,8 @@ def check_tabflash():
 CHECKS += [("tabflash", check_tabflash)]
 
 def check_mapreveal():
-    """The pity map reveal: refused below the threshold and in town, the "available" line, the key that reveals the rest of the
-    level, HD and legacy, an outdoor level and a dungeon each (tools/mapreveal_checks.py)."""
+    """The level map reveal: the key reveals the current level at the arrival (towns, mazes, small preset levels), a second
+    press too, HD and legacy, the automap cells before and after (tools/mapreveal_checks.py)."""
     import mapreveal_checks
     mapreveal_checks.run(sys.modules[__name__])
 
@@ -15576,6 +15576,107 @@ def check_arealvl():
 
 
 CHECKS += [("arealvl", check_arealvl)]
+
+
+def check_padui():
+    """Lane padui: D2R's gamepad UI forced on without a gamepad (harness `padui on`), shots of the mod's panels in HD and
+    legacy next to the PC UI (MXL_CHAR=<a RotW character with a cube>; tools/padui_checks.py)."""
+    import padui_checks
+    padui_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("padui", check_padui)]
+
+
+def check_padui2():
+    """Lane padui: the gamepad UI's inventory, character sheet, skill tree and cube opened by D2R's own UI message, HD
+    (MXL_CHAR=<a RotW character with a cube>; tools/padui_checks.py)."""
+    import padui_checks
+    padui_checks.run_native(sys.modules[__name__])
+
+
+CHECKS += [("padui2", check_padui2)]
+
+
+def check_padprobe():
+    """Lane padinput: a scripted gamepad (harness `pad`, tools/pad_input.py) runs MXL_PAD_PROBE in town with the gamepad UI on,
+    shots per `shot:<name>` word (tools/padinput_checks.py)."""
+    import padinput_checks
+    padinput_checks.run_probe(sys.modules[__name__])
+
+
+CHECKS += [("padprobe", check_padprobe)]
+
+
+def check_padinput():
+    """Lane padinput: the gamepad UI driven by the scripted gamepad in HD: inventory focus, tooltips, A, LB / RB; stash tabs
+    (MXL_CHAR=<a RotW character with items and the mod's stash tabs>; tools/padinput_checks.py)."""
+    import padinput_checks
+    padinput_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("padinput", check_padinput)]
+
+
+def check_cqol():
+    """Lane cqol: the bundled Controller QOL Updates with the scripted gamepad: loaded, belt shortcuts off, skill profile seeded,
+    ground loot, RT / LT through all seven stash tabs, Deposit All per advanced page, LB + X into MEDIAN, the inventory focus walk,
+    legacy (MXL_CHAR=<a RotW character with the mod's stash tabs>; the plugin placed by the run's driver; tools/cqol_checks.py)."""
+    import cqol_checks
+    cqol_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("cqol", check_cqol)]
+
+def check_shrinecol():
+    """Lane shrinecol: all 20 crafting shrines on MEDIAN, HD / legacy and ground."""
+    import shrine_checks
+    shrine_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("shrinecol", check_shrinecol)]
+
+
+WEREWOLF_MONSTERS = ("fallenwolf1", "wyrdwolf1", "ape2")  # tokens 0( and ^3 (stand-in donor), ape2 a D2R-unit corpse to compare
+
+
+def check_werewolf():
+    """Bug #560: in Kurast Bazaar (level 80) each of WEREWOLF_MONSTERS is spawned next to the player, shot alive, killed, and shot
+    1 s and 6 s later, first in HD then in legacy graphics (G). The dead ones must lie down as corpses (mode 12 in `state`),
+    not stand. The pictures are judged by eye."""
+    mark = engine_mark()
+    log, shots = [], []
+    enable_debug()
+    cheat("god 1")
+    goto(80, timeout=60)
+    ids = {r["Id"]: int(r["*hcIdx"]) for r in table("monstats") if r.get("Id") in WEREWOLF_MONSTERS}
+    modes = []
+    for gfx in ("hd", "legacy"):
+        if not set_graphics(gfx):
+            log.append("graphics: could not switch to %s" % gfx)
+            continue
+        for name in WEREWOLF_MONSTERS:
+            cls = ids.get(name)
+            if cls is None:
+                log.append("%s: not in the built monstats" % name)
+                continue
+            Hl("spawn %d" % cls, log)
+            time.sleep(2.0)
+            shots.append(sh("ww_%s_%s_alive" % (gfx, name)))
+            Hl("kill nearest %d" % cls, log)
+            time.sleep(1.0)
+            shots.append(sh("ww_%s_%s_dead1s" % (gfx, name)))
+            time.sleep(5.0)
+            shots.append(sh("ww_%s_%s_dead6s" % (gfx, name)))
+            st = hstate()
+            dead = [m.get("mode") for m in st["mons"] + st["corpses"] if m.get("class") == cls]
+            modes.append("%s %s modes %s" % (gfx, name, dead))
+    set_graphics("hd")
+    log.extend(modes)
+    finish("werewolf", bool(modes), "; ".join(modes), mark, shots, log, partial="corpse poses are judged by eye")
+
+
+CHECKS += [("werewolf", check_werewolf)]
 
 if __name__ == "__main__":
     main()

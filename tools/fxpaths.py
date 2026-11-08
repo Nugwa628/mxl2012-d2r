@@ -74,6 +74,7 @@ def _listed(path: Path) -> tuple[str, ...]:
 # map_tint.py (the day visual data of those biomes; the act palettes for `measure`), rotw_stash_legacy.py (the classic
 # font of the stash tab names), hd_translvl.py (the act Pal.pl2 colour tables of the state levels, tools/state_translvl.py)
 CACHED_FILES = ("data/global/animdata.d2", "data/hd/missiles/missiles.json", "data/hd/model_lod_desc.bin",
+                "data/global/items/palette/grey.dat",  # shrine_colours: the 21 D2 item colour transforms
                 *(f"data/hd/character/player/{c}/{c}_state_machine.json" for c in PLAYER_CLASSES),
                 *(f"data/hd/env/biome/{b}.json" for b in ("act3_docktown", "act4_fort", "act4_mesa")),
                 "data/hd/env/tilemasks/tile_masks.json", *_listed(VFX_LIST),

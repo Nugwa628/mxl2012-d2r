@@ -14,7 +14,7 @@ from the backpack puts an item in, items of a code stack in their slot (count up
 |-|-|-|-|
 | MEDIAN | 23 elixirs and Goodberry, 18 signets / packs / Moon Symbol / Boom! / Signet of Skill / Apple, 14 uberquest trophies, the 20 full-charge shrines (`?0+`, 1 x 2) | 75 (95 of the 100 cells) | no |
 | ORBS | the 100 Mystic Orbs (`&01`-`&95`, `&a1`-`&a5`) | 100 | no |
-| MATERIALS, Vanilla page | D2R's page unchanged (its 23 codes) | 23 | yes |
+| MATERIALS, Vanilla page | D2R's page with the 3 codes the mod has (`rvs`, `rvl`, `toa`); its 20 D2R-only slots (keys, organs, essences, shards, `ua1`-`ua5`) are removed, they drew a class -1 placeholder that asserted every frame (bug #548); the art keeps their recesses | 3 | yes |
 | MATERIALS, Median page | 10 oils and catalysts, 6 arcane crystals and shards, 13 cube reagents (5 brains, Sacrificial Heart, Meditation Candle, 5 sigils, "I Am Rich" / Poser!) | 29 | yes |
 
 The Materials tab has a **Vanilla / Median** selector (arrows on the left ornament under the plinth band); Ctrl-click routes by

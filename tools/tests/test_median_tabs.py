@@ -138,6 +138,28 @@ class Layout(unittest.TestCase):
                 mt.check_misc(Path(d), [])
 
 
+class UnknownSlots(unittest.TestCase):
+    def test_drop_unknown_slots(self):
+        """Bug #548: a slot whose code is no item of the mod makes a class -1 placeholder; such slots go, the rest stay."""
+        lay = fake_layout()
+        mat = mt.find(lay, "advancedstash_materials")
+        mat["children"] = [{"type": "AdvancedStashSlotWidget", "name": c, "fields": {"itemCode": c}} for c in ("pk1", "rvs", "l_l")]
+        mat["children"].append({"type": "ImageWidget", "name": "art", "fields": {}})
+        self.assertEqual(mt.drop_unknown_slots(lay, {"rvs", "l@l", "r01"}), ["pk1"])
+        self.assertEqual([c["name"] for c in mat["children"]], ["rvs", "l_l", "art"])
+        self.assertEqual(mt.drop_unknown_slots(lay, {"rvs", "l@l", "r01"}), [])
+
+    def test_built_layouts_have_known_codes_only(self):
+        lays = [BUILT / "global" / "ui" / "layouts" / f for f in ("bankexpansionlayouthd.json", "bankexpansionlayout.json",
+                                                                  "controller/bankexpansionlayouthd.json")]
+        if not all(p.exists() for p in lays) or not (BUILT / "global" / "excel" / "misc.txt").exists():
+            self.skipTest("no built mod (tools/build.py)")
+        known = mt.item_codes(BUILT)
+        for p in lays:
+            codes = [s["fields"]["itemCode"] for s in slots(json.loads(p.read_text("utf-8-sig")))]
+            self.assertEqual([c for c in codes if mt.real_code(c) not in known], [], p.name)
+
+
 class Header(unittest.TestCase):
     def test_header_is_current(self):
         lays = [BUILT / "global" / "ui" / "layouts" / f for f in ("bankexpansionlayouthd.json", "bankexpansionlayout.json")]

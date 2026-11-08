@@ -1,9 +1,8 @@
-// Pity map reveal, pure part (map_reveal.cpp; docs/plugin-plan.md section 34, docs/map-reveal-research.md). Unit-tested in
+// Level map reveal, pure part (map_reveal.cpp; docs/plugin-plan.md section 34, docs/map-reveal-research.md). Unit-tested in
 // tests/map_reveal_test.cpp.
 //
-// Explored share of a level = tile area of the level's DRLG rooms that have been active at least once / tile area of all its
-// rooms. A room becomes active exactly when D2R adds it to the automap, so the share follows what the automap shows. The
-// rooms are counted by their place in the level's room list (at most MaxRooms), one bit each.
+// The key reveals the current level's automap on every press, from the arrival on (owner, bug #559, 2026-11-08: no explored
+// share, no threshold). Only the optional exclusion list of mxl2012-core.toml can refuse it.
 #pragma once
 
 #include <cstddef>
@@ -13,45 +12,23 @@
 
 namespace map_reveal {
 
-inline constexpr int DefaultThreshold = 70;  // % explored of the current level before the reveal is offered
-inline constexpr int ThresholdAlways = 0;    // threshold 0: the reveal works at once
-inline constexpr int ThresholdOff = 101;     // threshold 101: never (the part's key does nothing but say so)
-inline constexpr int MaxRooms = 4096;        // rooms of one level that are counted (MapSense's walk limit too)
-inline constexpr int MaxLevels = 256;        // level ids kept per game (Median XL 2012: 1-137)
+inline constexpr int MaxRooms = 4096;  // rooms of one level that are revealed (MapSense's walk limit too)
+inline constexpr int MaxLevels = 256;  // level ids (Median XL 2012: 1-137)
 inline constexpr int MaxExclude = 32;
-// The five towns: always fully drawn, nothing to reveal (levels.txt rows with PreventTownPortal and a town; 136 / 137 are not
-// towns).
-inline constexpr int Towns[] = {1, 40, 75, 103, 109};
 
 struct Settings {
-	int threshold = DefaultThreshold;
-	int exclude[MaxExclude] = {};  // level ids with no reveal (besides the towns); empty by default
+	int exclude[MaxExclude] = {};  // level ids with no reveal; empty by default (towns can be revealed too)
 	int nExclude = 0;
+	bool oldThreshold = false;     // the file still has the retired `threshold` key (0.1.15 / 0.1.16): read and ignored
 };
 
-inline auto IsTown(int levelId) noexcept -> bool {
-	for (const int t : Towns) {
-		if (t == levelId) {
-			return true;
-		}
-	}
-	return false;
-}
-
 inline auto Excluded(int levelId, const Settings& s) noexcept -> bool {
-	if (IsTown(levelId)) {
-		return true;
-	}
 	for (int i = 0; i < s.nExclude; ++i) {
 		if (s.exclude[i] == levelId) {
 			return true;
 		}
 	}
 	return false;
-}
-
-inline auto ClampThreshold(long v) noexcept -> int {
-	return v < ThresholdAlways ? ThresholdAlways : v > ThresholdOff ? ThresholdOff : static_cast<int>(v);
 }
 
 namespace detail {
@@ -84,9 +61,9 @@ inline auto ReadInt(const char** pp, const char* end, long* out) noexcept -> boo
 }  // namespace detail
 
 // The [mapreveal] table of mxl2012-core.toml (D2RLoader's config of the plugin):
-//   threshold = 70        0 = always, 101 = off; clamped to 0-101
 //   exclude = [73, 74]    level ids with no reveal (one line)
-// Other tables and keys, comments (#) and unreadable values are skipped; what is missing keeps its default. True when the
+// `threshold = N` of 0.1.15 / 0.1.16 (the explored share the reveal used to need) is read and ignored: only oldThreshold is
+// set. Other tables and keys, comments (#) and unreadable values are skipped; what is missing keeps its default. True when the
 // table was found.
 inline auto ParseSettings(const char* toml, Settings* out) noexcept -> bool {
 	*out = Settings{};
@@ -114,8 +91,8 @@ inline auto ParseSettings(const char* toml, Settings* out) noexcept -> bool {
 			if (p < stop && *p == '=') {
 				p = detail::SkipSpace(p + 1, stop);
 				long v = 0;
-				if (keyLen == 9 && std::strncmp(key, "threshold", 9) == 0 && detail::ReadInt(&p, stop, &v)) {
-					out->threshold = ClampThreshold(v);
+				if (keyLen == 9 && std::strncmp(key, "threshold", 9) == 0) {
+					out->oldThreshold = true;
 				} else if (keyLen == 7 && std::strncmp(key, "exclude", 7) == 0 && p < stop && *p == '[') {
 					out->nExclude = 0;
 					for (++p; p < stop && *p != ']';) {
@@ -134,62 +111,6 @@ inline auto ParseSettings(const char* toml, Settings* out) noexcept -> bool {
 		line = nl != nullptr ? nl + 1 : end;
 	}
 	return found;
-}
-
-// Whole percent, rounded down (69.9 % is 69): what the player is told.
-inline auto Percent(uint64_t seenArea, uint64_t totalArea) noexcept -> int {
-	return totalArea == 0 ? 0 : static_cast<int>(seenArea * 100 / totalArea);
-}
-
-enum class Gate { Off, Excluded, Below, Ready };
-
-// May the player reveal this level now? The share is compared exactly (seen * 100 >= threshold * total), not after rounding.
-inline auto Decide(int threshold, bool excluded, uint64_t seenArea, uint64_t totalArea) noexcept -> Gate {
-	if (threshold >= ThresholdOff) {
-		return Gate::Off;
-	}
-	if (excluded) {
-		return Gate::Excluded;
-	}
-	if (threshold <= ThresholdAlways) {
-		return Gate::Ready;
-	}
-	return totalArea > 0 && seenArea * 100 >= static_cast<uint64_t>(threshold) * totalArea ? Gate::Ready : Gate::Below;
-}
-
-// What the part keeps per level id in one game.
-struct Level {
-	uint64_t bits[MaxRooms / 64];  // rooms seen active, by place in the level's room list
-	const void* first;             // the level's first room when the bits were started (another one: the level was built again)
-	int rooms;                     // rooms in the list at the last walk
-	uint64_t totalArea;            // tile area of all rooms / of the rooms seen, at the last walk
-	uint64_t seenArea;
-	bool announced;  // the "available" line went out (or the level was revealed)
-	bool revealed;
-};
-
-inline void ResetLevel(Level* l, const void* first) noexcept {
-	std::memset(l, 0, sizeof(*l));
-	l->first = first;
-}
-
-inline void Mark(Level* l, int index) noexcept {
-	if (index >= 0 && index < MaxRooms) {
-		l->bits[index / 64] |= uint64_t{1} << (index % 64);
-	}
-}
-
-inline auto Seen(const Level& l, int index) noexcept -> bool {
-	return index >= 0 && index < MaxRooms && (l.bits[index / 64] >> (index % 64) & 1) != 0;
-}
-
-// True once per level: the first time it is Ready and not revealed yet (threshold 0 is Ready on arrival, so it announces too).
-inline auto ShouldAnnounce(Level* l, Gate g) noexcept -> bool {
-	if (g != Gate::Ready || l->announced || l->revealed) {
-		return false;
-	}
-	l->announced = true;
-	return true;
 }
 
 // The bound key as players read it ("L", "Shift+L", "F5"); "" when the action has no key.
@@ -211,29 +132,13 @@ inline void KeyName(uint32_t vk, uint32_t modifier, char* out, size_t n) noexcep
 }
 
 // The chat lines (message log, bottom left).
-inline void AvailableLine(char* out, size_t n, int percent, const char* key) noexcept {
-	if (key != nullptr && key[0] != '\0') {
-		std::snprintf(out, n, "Map: %d%% of this level explored. Press %s to reveal the rest.", percent, key);
-	} else {
-		std::snprintf(out, n, "Map: %d%% of this level explored. The Reveal Level Map key reveals the rest.", percent);
-	}
+inline void RefusedLine(char* out, size_t n) noexcept {
+	std::snprintf(out, n, "Map: no reveal in this area.");
 }
 
-inline void RefusedLine(char* out, size_t n, Gate g, int percent, int threshold, bool revealed) noexcept {
-	if (g == Gate::Off) {
-		std::snprintf(out, n, "Map: the level reveal is off (mxl2012-core.toml).");
-	} else if (g == Gate::Excluded) {
-		std::snprintf(out, n, "Map: no reveal in this area.");
-	} else if (revealed) {
-		std::snprintf(out, n, "Map: this level is already revealed.");
-	} else {
-		std::snprintf(out, n, "Map: %d%% of this level explored (%d%% needed).", percent, threshold);
-	}
-}
-
-inline void RevealedLine(char* out, size_t n, int percent, int made, int rooms) noexcept {
+inline void RevealedLine(char* out, size_t n, int made, int rooms) noexcept {
 	if (made == rooms) {
-		std::snprintf(out, n, "Map: rest of the level revealed (%d%% explored).", percent);
+		std::snprintf(out, n, "Map: level revealed.");
 	} else {
 		std::snprintf(out, n, "Map: level revealed in part (%d of %d rooms).", made, rooms);
 	}

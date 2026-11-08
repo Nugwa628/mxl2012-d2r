@@ -17,6 +17,10 @@ here unless --plugin is given) it writes into dist/:
                                    d2rloader/plugins/d2rl-auto-belt-refill.dll, d2rloader/config/auto-belt-refill.toml
                                    (Auto Belt Refill by jaycachou-svg at the pinned commit + our patches,
                                    tools/build_beltrefill.ps1 unless --beltrefill is given)
+                                   d2rloader/plugins/Controller QOL Updates.dll + licences,
+                                   d2rloader/config/controller-qol-updates.toml (PyreFly's controller-qol at the pinned
+                                   commit + our patches, the mxl2012 skill seed embedded; tools/build_controllerqol.ps1
+                                   unless --controllerqol is given)
                                  The manual download for players, and where tools/publish_release.py reads the file bytes
                                  from. There is no zip (owner decision 2026-10-26). Needs 7-Zip: the run stops without it.
   release-manifest.json          schemaVersion 2: version, required D2R build, required D2RLoader + sha256, every file of
@@ -31,7 +35,7 @@ files: D2R reads those from its own install). Without a baseline that check cann
 The release plugin is built by tools/build_plugin.ps1 -Release (CMake on PATH or Visual Studio's, the PluginSDK of
 .mxl-local.json; nothing is downloaded). tools/verify_package.py checks the finished 7z; tools/cut_alpha.ps1 runs it all.
 
-  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
+  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
   py -3 tools/package_release.py --no-data --plugin build/mxl2012-core.dll   (CI: no game files there; plugin + config only)
 Version: PluginVersion of plugin/src/mxl2012_core.cpp; --version must equal it (only --no-data builds may differ).
 """
@@ -101,6 +105,23 @@ BELTREFILL_BUILD = ROOT / "build" / "beltrefill"
 BELTREFILL_OURS = ROOT / "third_party" / "auto-belt-refill-mxl2012"  # the patches, our CMakeLists.txt and the config
 BELTREFILL_FILES = ("dll", "config")
 BELTREFILL_AUTHOR_DLL = "77c7d1b9068c8cacc2fded62ff1120b441001d601ad65a8ee3043e3b61c650db"  # its plugins/ at the pinned commit
+# Controller QOL Updates by PyreFly (Pyre-Flies/D2R-Mods plugins/controller-qol), shipped with PyreFly's permission (given to the
+# project owner 2026-11-04; the repository's LICENSE reserves all rights), docs/bundled-plugins.md. Built from PyreFly's source at
+# the commit the gitlink third_party/D2R-Mods pins with our patches (third_party/controller-qol-mxl2012/*.patch: the belt_actions
+# switch, off in our config so Auto Belt Refill keeps the belt; the MEDIAN / ORBS stash tabs) and the mxl2012 skill seed
+# (tools/controller_skill_profile.py from the package's skills.txt) embedded as its skill defaults (tools/build_controllerqol.ps1),
+# unless --controllerqol is given. Its config (the patched controller-qol-updates.toml) is a `preserve` file, as legacy169's;
+# PyreFly's LICENSE and the PluginSDK's go next to the DLL.
+CONTROLLERQOL = {"name": "Controller QOL Updates", "version": "1.3.1+rev.95", "repo": "https://github.com/Pyre-Flies/D2R-Mods",
+                 "path": "plugins/controller-qol", "author": "PyreFly", "dll": "d2rloader/plugins/Controller QOL Updates.dll",
+                 "config": "d2rloader/config/controller-qol-updates.toml",
+                 "licence": "d2rloader/plugins/Controller QOL Updates-LICENSE.txt",
+                 "sdk_licence": "d2rloader/plugins/Controller QOL Updates-PluginSDK-LICENSE.txt"}
+CONTROLLERQOL_BUILD = ROOT / "build" / "controllerqol"
+CONTROLLERQOL_SRC = ROOT / "build" / "controllerqol-src"
+CONTROLLERQOL_OURS = ROOT / "third_party" / "controller-qol-mxl2012"  # the patches
+CONTROLLERQOL_PROFILE = ROOT / "build" / "controllerqol-profile"  # the generated skill seed
+CONTROLLERQOL_FILES = ("dll", "config", "licence", "sdk_licence")
 # The player's own settings: the downloader writes these only when they are missing (docs/release.md).
 PRESERVE = ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml"]
 SCHEMA = 2  # 2: the 7z ("archive") replaced the zip; the downloader installs from it or from objects (docs/release.md)
@@ -159,6 +180,51 @@ def beltrefill_commit() -> str:
 def beltrefill_patches(ours: Path = BELTREFILL_OURS) -> list:
     """Our patches as tools/build_beltrefill.ps1 records them in PATCHES: "<sha256>  <name>", in name order."""
     return [f"{sha256(p)}  {p.name}" for p in sorted(ours.glob("*.patch"), key=lambda p: p.name)]
+
+
+def controllerqol_commit() -> str:
+    """The Pyre-Flies/D2R-Mods commit this repo pins (controller-qol's source): the gitlink third_party/D2R-Mods."""
+    return pinned_commit("third_party/D2R-Mods")
+
+
+def controllerqol_patches(ours: Path = CONTROLLERQOL_OURS) -> list:
+    """Our patches as tools/build_controllerqol.ps1 records them in PATCHES: "<sha256>  <name>", in name order."""
+    return [f"{sha256(p)}  {p.name}" for p in sorted(ours.glob("*.patch"), key=lambda p: p.name)]
+
+
+def controllerqol_profile(excel: Path, out: Path = CONTROLLERQOL_PROFILE) -> Path:
+    """The mxl2012 skill seed for controller-qol from a finished build's skills.txt / skilldesc.txt (docs/controller-support.md
+    section 5): out/mxl2012.overrides.toml."""
+    import controller_skill_profile as csp
+    text, _entries = csp.generate(csp.read_table(excel / "skills.txt"), csp.read_table(excel / "skilldesc.txt"),
+                                  json.loads((csp.DATA / "controller_skill_overrides.json").read_text(encoding="utf-8")))
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / "mxl2012.overrides.toml"
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return path
+
+
+def build_controllerqol(profile: Path) -> Path:
+    """tools/build_controllerqol.ps1: Controller QOL Updates.dll from the pinned commit's source with our patches and `profile`
+    embedded as its skill defaults (its unit tests run)."""
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        raise SystemExit("no PowerShell to run tools/build_controllerqol.ps1: build Controller QOL there and pass --controllerqol DLL")
+    subprocess.check_call([shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_controllerqol.ps1"), "-SkillProfile", str(profile)], cwd=ROOT)
+    return CONTROLLERQOL_BUILD / "Release" / "Controller QOL Updates.dll"
+
+
+def check_controllerqol(dll: Path) -> list:
+    """Problems of a Controller QOL build for a release: the pinned version, and our patched build (its embedded config has
+    the belt_actions switch, off)."""
+    b = dll.read_bytes()
+    problems = []
+    if b"controller-qol-updates\0" not in b or CONTROLLERQOL["version"].encode() + b"\0" not in b:
+        problems.append(f"{dll} does not carry Controller QOL Updates version {CONTROLLERQOL['version']}")
+    if b"belt_actions = false" not in b:
+        problems.append(f"{dll} is not our patched build (no belt_actions switch): build it with tools/build_controllerqol.ps1")
+    return problems
 
 
 def build_legacy169() -> Path:
@@ -251,7 +317,8 @@ def sha256(path: Path) -> str:
 
 
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
-          legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None) -> None:
+          legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None, controllerqol: Path = None,
+          profile: Path = None) -> None:
     if data_from is not None:
         legacy_fonts.check_tree(data_from)
     if mod.exists():
@@ -271,6 +338,8 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
         stage_buffhud(mod, buffhud)
     if beltrefill is not None:
         stage_beltrefill(mod, beltrefill)
+    if controllerqol is not None:
+        stage_controllerqol(mod, controllerqol, profile)
 
 
 def stage_legacy169(mod: Path, dll: Path, src: Path = ROOT / "build" / "legacy169-src") -> None:
@@ -312,12 +381,34 @@ def stage_beltrefill(mod: Path, dll: Path, src: Path = ROOT / "build" / "beltref
     shutil.copy2(ours / "auto-belt-refill.toml", mod / BELTREFILL["config"])
 
 
+def stage_controllerqol(mod: Path, dll: Path, profile: Path, src: Path = CONTROLLERQOL_SRC, ours: Path = CONTROLLERQOL_OURS) -> None:
+    """Controller QOL Updates.dll into d2rloader/plugins/ (mod-scoped) with PyreFly's LICENSE and the PluginSDK's next to it, and
+    its patched controller-qol-updates.toml (belt_actions = false) into d2rloader/config/. The build must come from the pinned
+    commit with this repo's patches and `profile` (this package's skill seed) embedded: tools/build_controllerqol.ps1 records
+    all three in build/controllerqol-src."""
+    pinned = (src / "PINNED_COMMIT").read_text("ascii").strip() if (src / "PINNED_COMMIT").is_file() else None
+    if pinned != controllerqol_commit():
+        raise SystemExit(f"{src} is not the pinned commit {controllerqol_commit()[:9]} (it is {pinned}): run tools/build_controllerqol.ps1")
+    applied = (src / "PATCHES").read_text("ascii").splitlines() if (src / "PATCHES").is_file() else []
+    if [ln.strip() for ln in applied if ln.strip()] != controllerqol_patches(ours):
+        raise SystemExit(f"{src} was not built with the patches in {ours}: run tools/build_controllerqol.ps1")
+    seed = (src / "SKILL_PROFILE").read_text("ascii").strip() if (src / "SKILL_PROFILE").is_file() else None
+    if profile is None or seed != sha256(profile):
+        raise SystemExit(f"{src} was not built with this package's skill seed {profile}: run tools/build_controllerqol.ps1 "
+                         "-SkillProfile (package_release.py does)")
+    shutil.copy2(dll, mod / CONTROLLERQOL["dll"])
+    shutil.copy2(src / "plugins" / "controller-qol" / "controller-qol-updates.toml", mod / CONTROLLERQOL["config"])
+    shutil.copy2(src / "LICENSE", mod / CONTROLLERQOL["licence"])
+    shutil.copy2(src / "PluginSDK-LICENSE", mod / CONTROLLERQOL["sdk_licence"])
+
+
 def preserve_list(mod: Path) -> list:
     """PRESERVE plus the bundled plugins' configs the package holds."""
-    return PRESERVE + [c for c in (LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"]) if (mod / c).is_file()]
+    return PRESERVE + [c for c in (LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"])
+                       if (mod / c).is_file()]
 
 
-def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False) -> list:
+def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, controllerqol: bool = False) -> list:
     """The manifest's bundledPlugins: name, version, repository, source commit and files of each plugin the package holds."""
     out = []
     if legacy169:
@@ -331,6 +422,10 @@ def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False) ->
         out.append({"name": BELTREFILL["name"], "version": BELTREFILL["version"], "repo": BELTREFILL["repo"],
                     "author": BELTREFILL["author"], "commit": beltrefill_commit(), "patches": beltrefill_patches(),
                     "files": [BELTREFILL[k] for k in BELTREFILL_FILES]})
+    if controllerqol:
+        out.append({"name": CONTROLLERQOL["name"], "version": CONTROLLERQOL["version"], "repo": CONTROLLERQOL["repo"],
+                    "path": CONTROLLERQOL["path"], "author": CONTROLLERQOL["author"], "commit": controllerqol_commit(),
+                    "patches": controllerqol_patches(), "files": [CONTROLLERQOL[k] for k in CONTROLLERQOL_FILES]})
     return out
 
 
@@ -526,7 +621,11 @@ def main() -> int:
                     "(default: build both with tools/build_buffhud.ps1; --no-data builds leave it out unless given)")
     ap.add_argument("--beltrefill", type=Path, help="a release d2rl-auto-belt-refill.dll of the pinned commit with our patches "
                     "(default: build it with tools/build_beltrefill.ps1; --no-data builds leave it out unless given)")
-    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD and Auto Belt Refill unless given "
+    ap.add_argument("--controllerqol", type=Path, help="a release 'Controller QOL Updates.dll' of the pinned commit with our "
+                    "patches and this package's skill seed (default: build it with tools/build_controllerqol.ps1; --no-data "
+                    "builds leave it out)")
+    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD, Auto Belt Refill and Controller "
+                    "QOL unless given "
                     "(unit tests; "
                     "tools/verify_package.py refuses such a package)")
     ap.add_argument("--data-from", type=Path, help="copy this finished mxl2012.mpq/data instead of building it")
@@ -577,13 +676,21 @@ def main() -> int:
     beltrefill = a.beltrefill or (None if a.no_data or a.no_bundled else build_beltrefill())
     if beltrefill is not None:
         problems += check_beltrefill(beltrefill) if beltrefill.is_file() else [f"no d2rl-auto-belt-refill.dll at {beltrefill}"]
+    # the skill seed comes from this package's skills.txt, so a package without data has no Controller QOL
+    profile = None
+    if not a.no_data and (a.controllerqol or not a.no_bundled):
+        profile = controllerqol_profile((a.data_from or install_mod.SRC) / "global" / "excel")
+    controllerqol = a.controllerqol or (None if profile is None else build_controllerqol(profile))
+    if controllerqol is not None:
+        problems += (check_controllerqol(controllerqol) if controllerqol.is_file()
+                     else [f"no 'Controller QOL Updates.dll' at {controllerqol}"])
     if problems:
         print("\n".join(problems))
         return 1
 
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
-    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill)
+    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
@@ -609,7 +716,7 @@ def main() -> int:
     t7 = time.time() - t7
     files = file_list(mod)
     man_path = a.out / "release-manifest.json"
-    bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None)
+    bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None, controllerqol is not None)
     man_path.write_text(json.dumps(manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod),
                                             bundled), indent=1) + "\n", encoding="utf-8")
     notes = a.out / f"RELEASE_NOTES-{version}.md"

@@ -1,0 +1,10 @@
+{
+  "Moonbeam": {"aim": true, "targeting": "snap", "reason": "Offensive ranged javelin plus self buff; srvdofunc 18 is not self-only."},
+  "Balefire": {"aim": true, "targeting": "snap", "reason": "Offensive balefireball with a self drain state."},
+  "Wychwind": {"aim": true, "targeting": "snap", "reason": "Thrown wychknife plus vulnerability state."},
+  "Broadside": {"aim": false, "targeting": "ground", "reason": "Automatic firing buff; retain native placement."},
+  "Fortress": {"aim": false, "targeting": "ground", "reason": "Self-centered automatic turret ring; missile columns otherwise suggest directional aim."},
+  "Nova Shot": {"aim": false, "targeting": "ground", "reason": "Radial arrow nova; direction is not a selected target."},
+  "Supernova": {"aim": false, "targeting": "ground", "reason": "Self-centered radial nova despite direct server missile."},
+  "Spin To Win": {"aim": true, "targeting": "ground", "reason": "Median whirlwind movement is ID 27, not vanilla ID 151."}
+}

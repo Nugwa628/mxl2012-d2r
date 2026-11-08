@@ -1,0 +1,165 @@
+diff --git a/plugins/controller-qol/src/bulk_stash.cpp b/plugins/controller-qol/src/bulk_stash.cpp
+index 38d932f..6846f3f 100644
+--- a/plugins/controller-qol/src/bulk_stash.cpp
++++ b/plugins/controller-qol/src/bulk_stash.cpp
+@@ -60,7 +60,7 @@ void Remote(const D2RL::PluginContext* ctx) noexcept {
+         Finish("Remote profile unavailable");return;
+     }
+     const auto currentTab=QolMaterials::SelectedStashTab(ctx);
+-    if(currentTab>4 || reinterpret_cast<bool(__fastcall*)()>(ctx->exeBase+0x23b980)()) {Finish("Remote stash closed or previous season selected");return;}
++    if(currentTab>6 || reinterpret_cast<bool(__fastcall*)()>(ctx->exeBase+0x23b980)()) {Finish("Remote stash closed or previous season selected");return;}
+     const auto selected=currentTab==1?QolSharedSdk::Selected(ctx->exeBase):QolSharedSdk::Selection{};
+     if((collected && currentTab!=tab) || (currentTab==1 && (!selected.valid || selected.previousSeason ||
+        (collected && !QolSharedSdk::SameSelection(selection,selected))))) {Finish("Remote stash page changed");return;}
+diff --git a/plugins/controller-qol/src/client_transfer.cpp b/plugins/controller-qol/src/client_transfer.cpp
+index c41cac3..21d6cec 100644
+--- a/plugins/controller-qol/src/client_transfer.cpp
++++ b/plugins/controller-qol/src/client_transfer.cpp
+@@ -104,7 +104,7 @@ bool StashContext(bool capture) noexcept {
+     if(!Mode(0x18))return false;
+     const auto tab=D2R::Native::GetActiveStashTabIndex(context->exeBase);
+     const auto expected=(work.stashAction || work.cubeInStash)?work.tab:(NeedsShared(work.source.container,work.destination)?1u:0u);
+-    if(tab!=expected || tab>4)return false;
++    if(tab!=expected || tab>6)return false;
+     if(((work.stashAction && work.source.container==C::Inventory) || work.cubeInStash) &&
+        (!DepositGuard() || At<bool(__fastcall*)()>(0x23b980)()))return false;
+     if(capture)work.tab=tab;
+diff --git a/plugins/controller-qol/src/client_transfer_policy.h b/plugins/controller-qol/src/client_transfer_policy.h
+index 2d2e1bb..8c7600f 100644
+--- a/plugins/controller-qol/src/client_transfer_policy.h
++++ b/plugins/controller-qol/src/client_transfer_policy.h
+@@ -5,7 +5,7 @@ namespace QolClientTransfer {
+ using Info=D2RL::Items::ItemInfo;
+ using C=D2RL::Items::ItemContainer;
+ enum class StashRoute { Refuse, Ordinary, Advanced, Cube };
+-inline bool AdvancedTab(uint32_t tab) noexcept {return tab>=2 && tab<=4;}
++inline bool AdvancedTab(uint32_t tab) noexcept {return tab>=2 && tab<=6;}  // D2R-XL 2012: 5 MEDIAN, 6 ORBS
+ inline bool EmbeddedCube(bool stashOpen,uint32_t tab,C source) noexcept {
+     return stashOpen && AdvancedTab(tab) && source==C::Cube;
+ }
+@@ -13,7 +13,7 @@ inline bool CubeView(bool cubeOpen,bool stashOpen,uint32_t tab) noexcept {
+     return cubeOpen || (stashOpen && AdvancedTab(tab));
+ }
+ inline StashRoute ChooseStashRoute(uint32_t tab,C source,bool eligible) noexcept {
+-    if(tab>4)return StashRoute::Refuse;
++    if(tab>6)return StashRoute::Refuse;
+     if(source==C::Cube && AdvancedTab(tab))return eligible?StashRoute::Advanced:StashRoute::Refuse;
+     if(source==C::Inventory) {
+         if(eligible)return StashRoute::Advanced;
+diff --git a/plugins/controller-qol/src/materials_policy.h b/plugins/controller-qol/src/materials_policy.h
+index 4476a33..dca1b2f 100644
+--- a/plugins/controller-qol/src/materials_policy.h
++++ b/plugins/controller-qol/src/materials_policy.h
+@@ -2,12 +2,16 @@
+ #include <D2RLPlugin/item.h>
+ #include <cstdint>
+ namespace QolMaterials {
++// D2R-XL 2012: the stash has two more advanced tabs, MEDIAN (5) and ORBS (6). Their slots are direct children of D2R's Runes
++// page (advancedstash_runes), D2R itself runs them as page 4; the tab getter 0x23af50 answers the real tab to this plugin.
++constexpr uint32_t LastAdvancedTab=6;
++constexpr bool AdvancedStashTab(uint32_t tab) noexcept { return tab>=2 && tab<=LastAdvancedTab; }
+ constexpr bool AdvancedProxyCandidate(D2RL::Items::ItemContainer source) noexcept {
+     using C=D2RL::Items::ItemContainer;
+     return source==C::Cursor || source==C::SharedStash || source==C::CustomPage;
+ }
+ constexpr bool UseMaterialsRoute(uint32_t tab, D2RL::Items::ItemContainer source) noexcept {
+-    return (tab==2 || tab==3 || tab==4) &&
++    return AdvancedStashTab(tab) &&
+         source==D2RL::Items::ItemContainer::Inventory;
+ }
+ constexpr bool UseStashDeposit(D2RL::Items::ItemContainer source, D2RL::Items::ItemContainer destination, bool stashOpen) noexcept {
+@@ -24,7 +28,7 @@ constexpr const char* DestinationName(Destination d) noexcept {
+ }
+ constexpr const char* Category(uint32_t tab) noexcept {
+     return tab == 2 ? "advancedstash_gems" : tab == 3 ? "advancedstash_materials" :
+-           tab == 4 ? "advancedstash_runes" : nullptr;
++           tab == 4 || tab == 5 || tab == 6 ? "advancedstash_runes" : nullptr;
+ }
+ constexpr uint32_t RejuvenationCode(unsigned index) noexcept {
+     return index == 0 ? D2RL::Items::MakeItemCode("rvl") : D2RL::Items::MakeItemCode("rvs");
+@@ -42,8 +46,10 @@ inline bool WidgetName(uint32_t code, char (&name)[5]) noexcept {
+     for (unsigned i=0; i<4; ++i) {
+         const auto c=static_cast<unsigned char>(code >> (8*i));
+         if (c == ' ' || c == 0) break;
+-        if (!((c>='a' && c<='z') || (c>='0' && c<='9'))) return false;
+-        name[length++]=static_cast<char>(c);
++        // D2R-XL 2012 codes also use A-Z ! $ & + ^ and @; the layouts name an '@' slot with '_' (tools/median_tabs.py)
++        if (!((c>='a' && c<='z') || (c>='A' && c<='Z') || (c>='0' && c<='9') || c=='!' || c=='$' || c=='&' || c=='+' ||
++              c=='^' || c=='@')) return false;
++        name[length++]=static_cast<char>(c=='@'?'_':c);
+     }
+     name[length]=0;
+     return length!=0;
+diff --git a/plugins/controller-qol/src/plugin_main.cpp b/plugins/controller-qol/src/plugin_main.cpp
+index 0baa21a..c5a4de1 100644
+--- a/plugins/controller-qol/src/plugin_main.cpp
++++ b/plugins/controller-qol/src/plugin_main.cpp
+@@ -744,7 +744,7 @@ static void TriggerQuickMoveOnFocusedItem() noexcept {
+             }
+         }
+         if (QolMove::CustomRoute(TestUiMode(UI_MODE_STASH),TestUiMode(UI_MODE_CUBE),IsVendorPanelOpen()) && QolCustomPage::Visible(ctx)) return; // Unresolved focus must not target another container.
+-        if (tab>=2 && tab<=4 && source!=D2RL::Items::ItemContainer::Inventory &&
++        if (QolMaterials::AdvancedStashTab(tab) && source!=D2RL::Items::ItemContainer::Inventory &&
+             source!=D2RL::Items::ItemContainer::Cube) {
+             ctx->LogWarn("[QOL/Materials] Advanced focus unresolved; refusing ordinary stash lookup.");
+             return;
+diff --git a/plugins/controller-qol/tests/client_transfer_tests.cpp b/plugins/controller-qol/tests/client_transfer_tests.cpp
+index 6540932..a7fc5b3 100644
+--- a/plugins/controller-qol/tests/client_transfer_tests.cpp
++++ b/plugins/controller-qol/tests/client_transfer_tests.cpp
+@@ -9,7 +9,10 @@ int main() {
+         Check(ChooseStashRoute(tab,C::Inventory,false)==(tab<2?StashRoute::Ordinary:StashRoute::Cube),"ineligible item preserves ordinary stash or materials-tab Cube route");
+     }
+     Check(ChooseStashRoute(UINT32_MAX,C::Inventory,true)==StashRoute::Refuse &&
+-        ChooseStashRoute(5,C::Inventory,true)==StashRoute::Refuse,"unknown tab cannot become a smart deposit");
++        ChooseStashRoute(7,C::Inventory,true)==StashRoute::Refuse,"unknown tab cannot become a smart deposit");
++    Check(ChooseStashRoute(5,C::Inventory,true)==StashRoute::Advanced && ChooseStashRoute(6,C::Inventory,true)==StashRoute::Advanced &&
++        ChooseStashRoute(6,C::Inventory,false)==StashRoute::Cube && AdvancedTab(5) && AdvancedTab(6) && !AdvancedTab(7),
++        "D2R-XL 2012: MEDIAN (5) and ORBS (6) are advanced tabs");
+     Check(ChooseStashRoute(3,C::SharedStash,true)==StashRoute::Refuse,"advanced proxy cannot enter inventory deposit path");
+     Check(ChooseStashRoute(1,C::SharedStash,true)==StashRoute::Ordinary,"ordinary shared withdrawal never becomes a smart deposit");
+     for(uint32_t tab=2;tab<=4;++tab) {
+diff --git a/plugins/controller-qol/tests/materials_focus_tests.cpp b/plugins/controller-qol/tests/materials_focus_tests.cpp
+index cb1e389..97fc96a 100644
+--- a/plugins/controller-qol/tests/materials_focus_tests.cpp
++++ b/plugins/controller-qol/tests/materials_focus_tests.cpp
+@@ -137,7 +137,7 @@ int main() {
+     for(const auto& mutation:std::vector<std::function<void()>>{
+         []{*reinterpret_cast<void**>(focus+0x190)=nullptr;},[]{widget[0x51]=0;},[]{widget[0x50]=0;},
+         []{*reinterpret_cast<void**>(widget+0x608)=nullptr;},[]{bound[2]=0;},[]{bound[0]=1;},
+-        []{wrongSlot=true;},[]{tab=1;},[]{tab=5;},[]{open=false;},[]{guard=false;},
++        []{wrongSlot=true;},[]{tab=1;},[]{tab=7;},[]{open=false;},[]{guard=false;},
+         []{vtable[0xc8/8]=0;},[]{owner=0;}}) {
+         Reset(ctx);mutation();Observe(ctx);Check(!QolMaterials::RequestFocusedCounter(false),"unproven/empty/non-counter focus cannot be captured");
+     }
+diff --git a/plugins/controller-qol/tests/materials_tests.cpp b/plugins/controller-qol/tests/materials_tests.cpp
+index 6439242..7dfe252 100644
+--- a/plugins/controller-qol/tests/materials_tests.cpp
++++ b/plugins/controller-qol/tests/materials_tests.cpp
+@@ -5,6 +5,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <string_view>
+ using namespace QolMaterials;
+ int checks{},calls{},buyCalls{};
+ void Check(bool value,const char* why) { ++checks; if (!value) { std::fprintf(stderr,"FAIL: %s\n",why); std::exit(1); } }
+@@ -81,7 +82,17 @@ int main() {
+     Check(!SubmitCube(nullptr,&item) && !SubmitCube(CubeWidget,nullptr) && calls==3,"invalid Cube request cannot dispatch");
+     Check(DestinationContainer(Destination::Cube)==C::Cube && DestinationContainer(Destination::Belt)==C::Belt &&
+         DestinationContainer(Destination::Inventory)==C::Inventory,"confirm only requested destination, never another container increase");
+-    Check(Category(0)==nullptr && Category(1)==nullptr && Category(5)==nullptr,"ordinary/unknown tabs excluded");
++    Check(Category(0)==nullptr && Category(1)==nullptr && Category(7)==nullptr,"ordinary/unknown tabs excluded");
++    Check(std::string_view(Category(5))=="advancedstash_runes" && std::string_view(Category(6))=="advancedstash_runes" &&
++        UseMaterialsRoute(6,C::Inventory) && !UseMaterialsRoute(7,C::Inventory),"D2R-XL 2012: MEDIAN / ORBS slots live on the Runes page");
++    {
++        char median[5]{};
++        Check(WidgetName(D2RL::Items::MakeItemCode("&01"),median) && std::string_view(median)=="&01" &&
++            WidgetName(D2RL::Items::MakeItemCode("A0+"),median) && std::string_view(median)=="A0+" &&
++            WidgetName(D2RL::Items::MakeItemCode("6o^"),median) && std::string_view(median)=="6o^" &&
++            WidgetName(D2RL::Items::MakeItemCode("b@b"),median) && std::string_view(median)=="b_b" &&
++            !WidgetName(D2RL::Items::MakeItemCode("a-b"),median),"D2R-XL 2012 codes name their slots ('@' as '_')");
++    }
+     Check(std::strcmp(Category(2),"advancedstash_gems")==0,"gems layout mapping");
+     Check(std::strcmp(Category(3),"advancedstash_materials")==0,"materials layout mapping");
+     Check(std::strcmp(Category(4),"advancedstash_runes")==0,"runes layout mapping");

@@ -574,3 +574,26 @@ The tools, what they were built from and what changed:
 
 Not copied: `state_icons.py` (no state icon art in 1.13c, see Gaps), `dcc.py`, `hd-effects.md` / `item-tooltips.md` (no state icons in the mod; DCC art and tooltips are
 other lanes).
+
+
+### Crafting shrine colours (lane shrinecol)
+
+`tools/shrine_colours.py tables` follows table migration in `tools/build.py`; it changes only `misc.txt invfile` for
+`A0+`..`T9+` (200 rows in each bank). The second digit is 0 for ten charges through 9 for one charge.
+`shrine_colours.py art` follows `legacy_art.py` (and `hd_icons.py`): twenty `global/items/mxlshrine00..19.dc6`
+pictures use D2R's `data/global/items/palette/grey.dat` transforms, excluding black for stash visibility. The same
+transforms tint the generated HD source `misc/mxl/jbscross.sprite` and its lowend copy, preserving the alpha channel,
+canvas and centring; nearest source colours carry the palette mapping over the upscaled edges. Twenty HD and twenty
+lowend sprites are `hd/global/ui/items/misc/mxl/shrine00..19`, selected by per-code `hd/items/items.json` entries
+for all charges. No source assets are edited or committed. Generated art is regenerated on every art step.
+
+**Why baked transforms:** misc `Transform` / `InvTrans` are palette-family selectors (valid families 0..8), not
+the 21 colours in colors.txt. A normal misc item has no colour selection; changing those cells alone cannot give
+it one. The colour normally comes from an affix, unique/set row, or socketed gem (see
+[D2MOO item colour selection](https://github.com/ThePhrozenKeep/D2MOO/blob/master/source/D2Common/src/Items/Items.cpp)).
+Adding colour-only automagic would affect item generation and leave already saved shrines uncoloured. Generated
+legacy pictures apply the requested D2 colour transforms to existing saves too; Transform / InvTrans remain 0.
+Ground `flippyfile`, item stats, names, description strings and charge recipes are unchanged. This is an implementation
+departure from assigning colours through the two misc fields; it requires no plugin or save migration.
+
+The colour list is in CHANGELOG.md, Unreleased. In-game evidence and limits: docs/testing.md, Lane shrinecol.

@@ -205,6 +205,23 @@ def sm_clips(sm: dict, index: dict[str, list[str]]) -> set[str] | None:
     return {c.lower() for d in dirs for c in index[d]}   # clip names are matched without case (act5barb1: Fidget01)
 
 
+def death_unplayable(sm: dict, clips: set[str] | None) -> bool:
+    """True when the Death or Dead state of the machine binds no clip the unit has. clip_fill would bind it to knockback or
+    gethit, so a dead monster stays standing: D2R's `wolf` (the Druid's werewolf form) has neither clip, and the Fallen Wolf
+    Riders and Wyrdwolves that stood in for it stood on after their death (bugs.md #560)."""
+    if not clips:
+        return False
+    # a binding names an animation of the machine (bonefetish1: `dead001`), whose file is the clip (`.../animation/dead.animation`)
+    files = {a["name"].lower(): a["filename"].rsplit("/", 1)[-1].split(".")[0].lower()
+             for a in sm.get("animations", []) if a.get("name") and "/animation/" in a.get("filename", "")}
+    for s in sm["states"]:
+        if s.get("modeId") in DEATH_MODES:
+            names = {files.get(n.lower(), n.lower()) for v in s["animationBindings"].values() for n in v}
+            if names and not names & clips:
+                return True
+    return False
+
+
 def clip_fill(sm: dict, clips: set[str] | None) -> dict[str, str]:
     """{missing clip: clip bound instead} for the plain mode states of the machine."""
     out = {}

@@ -46,9 +46,31 @@ int main() {
 	Check(Bounce(5, false) && Bounce(6, false) && !Bounce(4, false) && !Bounce(0, false), "not live: 5 and 6 bounce");
 	Check(!Bounce(5, true) && !Bounce(6, true), "live: 5 and 6 stay");
 
-	// the getter stub: 5 and 6 read as Runes, above 255 left for D2R's own check
+	// the getter stub: 5 and 6 read as Runes
 	Check(GetterTab(0) == 0 && GetterTab(4) == 4 && GetterTab(5) == 4 && GetterTab(6) == 4, "getter: 5 / 6 -> 4");
-	Check(GetterTab(256) == 256, "getter: above 255 unchanged");
+	Check(GetterTab(255) == 4, "getter: any byte above 4 -> 4");
+
+	// the stub and the redirected calls: outside controller-qol's checked 128 bytes of the getter, tabflash's call left out
+	unsigned char stub[14];
+	StubBytes(stub);
+	const unsigned char stubWant[14] = {0x50, 0xe8, 0x78, 0xff, 0xff, 0xff, 0x59, 0x3c, 0x04, 0x76, 0x02, 0xb0, 0x04, 0xc3};
+	Check(std::memcmp(stub, stubWant, sizeof(stub)) == 0, "stub: push rax / call 0x23af50 / pop rcx / cap at 4 / ret");
+	Check(StubRva >= GetterRva + 128 && StubRva + sizeof(stub) <= 0x23afe0, "stub: after the checked bytes, inside the int3 pad");
+	unsigned char call[5];
+	CallBytes(0x23bbd2, GetterRva, call);
+	const unsigned char flashCall[5] = {0xe8, 0x79, 0xf3, 0xff, 0xff};  // tab_flash_logic.h ShownTest
+	Check(std::memcmp(call, flashCall, 5) == 0, "call bytes: the getter call at 0x23bbd2 as D2R has it");
+	bool flashSiteLeft = true;
+	bool outside = true;
+	for (unsigned long long site : GetterCallers) {
+		flashSiteLeft = flashSiteLeft && site != 0x23bbd2;
+		outside = outside && (site + 5 <= GetterRva || site >= GetterRva + 128);
+	}
+	Check(sizeof(GetterCallers) / sizeof(GetterCallers[0]) == 21, "21 direct callers (22 less tabflash's)");
+	Check(flashSiteLeft && outside, "callers: not tabflash's site, none inside the getter");
+	CallBytes(0x23e655, StubRva, call);
+	const unsigned char stubCall[5] = {0xe8, 0x78, 0xc9, 0xff, 0xff};
+	Check(std::memcmp(call, stubCall, 5) == 0, "call bytes: 0x23e655 -> 0x23afd2 (backwards rel32)");
 
 	// "@" codes: the 9 placeholders become the real codes, nothing else changes
 	Check(sizeof(medtab_names::AtCodes) / sizeof(medtab_names::AtCodes[0]) == 9, "9 '@' codes");

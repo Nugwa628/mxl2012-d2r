@@ -1,25 +1,24 @@
-// Pity map reveal (owner idea 2026-11-06; off word mapreveal; docs/plugin-plan.md section 34, docs/map-reveal-research.md).
+// Level map reveal (owner idea 2026-11-06, no explored share since bug #559, owner 2026-11-08; off word mapreveal;
+// docs/plugin-plan.md section 34, docs/map-reveal-research.md).
 //
-// Once the player has explored the threshold share of the current level (mxl2012-core.toml [mapreveal] threshold, default 70;
-// map_reveal_logic.h), the Controls action "Reveal Level Map" (D2RLoader InputService, `mxl_map_level`, default L, rebindable in
-// Options > Controls) reveals the rest of that level's automap. One chat line says when the reveal becomes available for a level,
-// and each press is answered with a short line (revealed, or the percent explored and the percent needed).
+// The Controls action "Reveal Level Map" (D2RLoader InputService, `mxl_map_level`, default L, rebindable in Options > Controls)
+// reveals the current level's automap on every press, from the arrival on, in every level (towns too) except the ones listed
+// in mxl2012-core.toml [mapreveal] exclude (empty by default). Each press is answered with a short chat line. The explored
+// share and its `threshold` (0.1.15 / 0.1.16) are gone: an old `threshold` line in the file is read and ignored.
 //
 // Everything is client side and per player: the automap is the client's own (built from its own copy of the act's DRLG); no
 // packet is sent, so a joiner of another player's game reveals only its own map. The part installs no hook:
-// - every 250 ms a timer thread asks the UI thread to walk the current level's DRLG rooms (local player 0x9a480(0x8b2d0()),
-//   its path's room 0x341c30, active room +0x18 = DRLG room, +0x90 = level; the level's rooms from +0x10, next +0x48, tile w / h
-//   at +0x68 / +0x6c) and marks the rooms that are active (+0x58). A room becomes active exactly when D2R adds it to the automap.
-// - the reveal (UI thread) activates each room of the level with D2R's own room activation 0x3289a0 and hands it to the DRLG's
-//   automap callback (DRLG +0x838, checked to be D2R's 0xd2240), as D2R does for the rooms round the player. The activation
-//   takes the data-table flag of the client (the local player's unit byte +0x1bd, read by 0x34a0e0): the same byte the
-//   client's level code passes to InitLevel 0x3271c0 and the level record getter 0x32c200. (The research probe passed 0, the
-//   server's flag, and the game closed.) D2R frees far rooms again as usual.
+// - the press is handed to the UI thread (ThreadService runOnUiThread). There the part finds the local player's client level
+//   (player 0x9a480(0x8b2d0()), its path's room 0x341c30, active room +0x18 = DRLG room, +0x90 = level; the level's rooms
+//   from +0x10, next +0x48), activates each room with D2R's own room activation 0x3289a0 and hands it to the DRLG's automap
+//   callback (DRLG +0x838, checked to be D2R's 0xd2240), as D2R does for the rooms round the player. The activation takes the
+//   data-table flag of the client (the local player's unit byte +0x1bd, read by 0x34a0e0): the same byte the client's level
+//   code passes to InitLevel 0x3271c0 and the level record getter 0x32c200. (The research probe passed 0, the server's flag,
+//   and the game closed.) D2R frees far rooms again as usual.
 // - the chat line goes straight to the client's chat packet handler 0x12c190 (packet 0x26 type 4, map_reveal_logic.h), so it
 //   works in a joined game too. A line is held while the client talks to an NPC (0x2a48760 non-zero): a chat line during an
-//   NPC's speech freezes the speech (docs/d2r-addresses.md 13); after 60 s it is dropped.
-// The per-level marks live for one game (the client DRLG and its map seed name the game); they reset in a new game, as D2R's
-// automap does.
+//   NPC's speech freezes the speech (docs/d2r-addresses.md 13); a timer thread sends it after the talk, after 60 s it is
+//   dropped.
 #include "map_reveal.h"
 
 #include "d2r.h"
@@ -47,9 +46,8 @@ constexpr uint64_t RvaActivateRoom = 0x3289a0;    // (data flag, DRLG room) -> a
 constexpr uint64_t RvaAutomapRoom = 0xd2240;      // (active room): D2R's automap callback, DRLG +0x838
 constexpr uint64_t RvaClientChat = 0x12c190;      // client handler of packet 0x26 (packet bytes)
 constexpr uint64_t RvaMenuNpcValid = 0x2a48760;   // u32, non-zero while the client talks to an NPC
-constexpr int UnitPath = 0x38, ActiveRoomDrlgRoom = 0x18, RoomActive = 0x58, RoomNext = 0x48, RoomW = 0x68, RoomH = 0x6c;
-constexpr int RoomLevel = 0x90, LevelFirstRoom = 0x10, LevelDrlg = 0x1c8, LevelId = 0x1f8, DrlgAutomapCallback = 0x838,
-              DrlgMapSeed = 0x840;
+constexpr int UnitPath = 0x38, ActiveRoomDrlgRoom = 0x18, RoomNext = 0x48;
+constexpr int RoomLevel = 0x90, LevelFirstRoom = 0x10, LevelDrlg = 0x1c8, LevelId = 0x1f8, DrlgAutomapCallback = 0x838;
 constexpr uint64_t HoldMs = 60000;  // a line held for an NPC talk is dropped after this
 
 // Entry bytes of the functions the part calls (a second guard under the build check; MapSense checks the same ones).
@@ -76,24 +74,19 @@ uint64_t g_base = 0;
 bool g_on = false;
 Settings g_settings;
 
-std::atomic<bool> g_tickQueued{false};
+std::atomic<bool> g_uiQueued{false};
 std::atomic<bool> g_pressQueued{false};
+std::atomic<bool> g_holding{false};  // a chat line waits for the end of an NPC talk
 
 // UI thread only from here on.
-Level g_levels[MaxLevels];
-const void* g_gameDrlg = nullptr;  // the game the marks belong to
-uint32_t g_gameSeed = 0;
-int g_level = 0;                   // the current level id (0: none, out of a game)
-int g_percent = 0;
-Gate g_gate = Gate::Below;
-char g_pending[256] = "";          // a chat line waiting for the end of an NPC talk
+int g_level = 0;                     // the level of the last press (0: none yet, or out of a game)
+char g_pending[256] = "";            // the held chat line
 uint8_t g_pendingColour = ColourWhite;
 uint64_t g_pendingSince = 0;
 char g_lastLine[256] = "";
 
 // Counters since load (status line)
-std::atomic<long> g_ticks{0}, g_presses{0}, g_reveals{0}, g_refusals{0}, g_announces{0}, g_lines{0}, g_heldLines{0},
-    g_droppedLines{0}, g_faults{0}, g_games{0};
+std::atomic<long> g_presses{0}, g_reveals{0}, g_refusals{0}, g_lines{0}, g_heldLines{0}, g_droppedLines{0}, g_faults{0};
 std::atomic<long> g_lastMade{0}, g_lastRooms{0}, g_lastRevealMs{0};
 
 template <typename F>
@@ -153,6 +146,7 @@ void Say(const char* text, uint8_t colour) noexcept {
 		std::snprintf(g_pending, sizeof(g_pending), "%s", text);
 		g_pendingColour = colour;
 		g_heldLines.fetch_add(1);
+		g_holding.store(true);
 		return;
 	}
 	SendLine(text, colour);
@@ -160,6 +154,7 @@ void Say(const char* text, uint8_t colour) noexcept {
 
 void FlushHeld() noexcept {
 	if (g_pending[0] == '\0') {
+		g_holding.store(false);
 		return;
 	}
 	if (*reinterpret_cast<const uint32_t*>(g_base + RvaMenuNpcValid) == 0) {
@@ -169,6 +164,7 @@ void FlushHeld() noexcept {
 		g_droppedLines.fetch_add(1);
 		g_pending[0] = '\0';
 	}
+	g_holding.store(g_pending[0] != '\0');
 }
 
 void BoundKey(char* out, size_t n) noexcept {
@@ -177,59 +173,6 @@ void BoundKey(char* out, size_t n) noexcept {
 	if (g_input != nullptr && g_action != D2RL::Input::InvalidHandle &&
 	    g_input->getBinding(g_context, g_action, D2RL::Input::BindingSlot::Primary, &b) == D2RL::Input::Result::Success) {
 		KeyName(static_cast<uint32_t>(b.key), static_cast<uint32_t>(b.modifier), out, n);
-	}
-}
-
-// Walks the current level: marks its active rooms and updates its areas. Returns its record, null out of a game.
-auto Sample(Where* w) noexcept -> Level* {
-	if (!Locate(w)) {
-		g_level = 0;
-		return nullptr;
-	}
-	const uint32_t seed = d2r::At<uint32_t>(w->drlg, DrlgMapSeed);
-	if (w->drlg != g_gameDrlg || seed != g_gameSeed) {  // another game: the automap starts empty again
-		std::memset(g_levels, 0, sizeof(g_levels));
-		g_gameDrlg = w->drlg;
-		g_gameSeed = seed;
-		g_games.fetch_add(1);
-	}
-	Level* l = &g_levels[w->levelId];
-	const void* first = d2r::At<const void*>(w->level, LevelFirstRoom);
-	if (l->first != first) {
-		ResetLevel(l, first);
-	}
-	int i = 0;
-	uint64_t total = 0, seen = 0;
-	for (const uint8_t* r = static_cast<const uint8_t*>(first); r != nullptr && i < MaxRooms; r = d2r::At<const uint8_t*>(r, RoomNext), ++i) {
-		const uint64_t a = static_cast<uint64_t>(d2r::At<uint32_t>(r, RoomW)) * d2r::At<uint32_t>(r, RoomH);
-		total += a;
-		if (d2r::At<const void*>(r, RoomActive) != nullptr) {
-			Mark(l, i);
-		}
-		if (Seen(*l, i)) {
-			seen += a;
-		}
-	}
-	l->rooms = i;
-	l->totalArea = total;
-	l->seenArea = seen;
-	g_level = w->levelId;
-	g_percent = Percent(seen, total);
-	g_gate = Decide(g_settings.threshold, Excluded(w->levelId, g_settings), seen, total);
-	return l;
-}
-
-void TickBody() noexcept {
-	g_ticks.fetch_add(1);
-	FlushHeld();
-	Where w{};
-	Level* l = Sample(&w);
-	if (l != nullptr && ShouldAnnounce(l, g_gate)) {
-		char key[24], line[160];
-		BoundKey(key, sizeof(key));
-		AvailableLine(line, sizeof(line), g_percent, key);
-		Say(line, ColourYellow);
-		g_announces.fetch_add(1);
 	}
 }
 
@@ -251,34 +194,32 @@ auto RevealLevel(const Where& w, int* rooms) noexcept -> int {
 void PressBody() noexcept {
 	g_presses.fetch_add(1);
 	Where w{};
-	Level* l = Sample(&w);
-	if (l == nullptr) {
+	if (!Locate(&w)) {
+		g_level = 0;
 		return;  // out of a game: nothing to say
 	}
+	g_level = w.levelId;
 	char line[160];
-	if (g_gate != Gate::Ready || l->revealed) {
-		RefusedLine(line, sizeof(line), g_gate, g_percent, g_settings.threshold, l->revealed);
+	if (Excluded(w.levelId, g_settings)) {
+		RefusedLine(line, sizeof(line));
 		Say(line, ColourWhite);
 		g_refusals.fetch_add(1);
 		return;
 	}
-	const int percent = g_percent;
 	const uint64_t t0 = GetTickCount64();
 	int rooms = 0;
 	const int made = RevealLevel(w, &rooms);
 	g_lastRevealMs.store(static_cast<long>(GetTickCount64() - t0));
 	g_lastMade.store(made);
 	g_lastRooms.store(rooms);
-	l->revealed = made == rooms;
-	l->announced = true;
 	g_reveals.fetch_add(1);
-	RevealedLine(line, sizeof(line), percent, made, rooms);
+	RevealedLine(line, sizeof(line), made, rooms);
 	Say(line, ColourWhite);
 }
 
-void TickGuarded() noexcept {
+void FlushGuarded() noexcept {
 	__try {
-		TickBody();
+		FlushHeld();
 	} __except (EXCEPTION_EXECUTE_HANDLER) {
 		g_faults.fetch_add(1);
 	}
@@ -292,24 +233,27 @@ void PressGuarded() noexcept {
 	}
 }
 
-void __cdecl TickOnUi(const D2RL::PluginContext*, void*) noexcept {
-	g_tickQueued.store(false);
-	TickGuarded();
+void __cdecl RunOnUi(const D2RL::PluginContext*, void*) noexcept {
+	g_uiQueued.store(false);
+	FlushGuarded();
 	if (g_pressQueued.exchange(false)) {
 		PressGuarded();
 	}
 }
 
-void QueueTick() noexcept {
-	if (!g_tickQueued.exchange(true) && g_threads->runOnUiThread(g_context, &TickOnUi, nullptr) != D2RL::Threads::Result::Success) {
-		g_tickQueued.store(false);
+void QueueUi() noexcept {
+	if (!g_uiQueued.exchange(true) && g_threads->runOnUiThread(g_context, &RunOnUi, nullptr) != D2RL::Threads::Result::Success) {
+		g_uiQueued.store(false);
 	}
 }
 
+// Sends a held chat line once the NPC talk is over (nothing to do while no line waits).
 DWORD WINAPI TimerThread(LPVOID) {
 	for (;;) {
 		Sleep(250);
-		QueueTick();
+		if (g_holding.load()) {
+			QueueUi();
+		}
 	}
 }
 
@@ -318,7 +262,7 @@ auto __cdecl OnAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent
 		return D2RL::Input::ActionResult::Ignored;
 	}
 	g_pressQueued.store(true);
-	QueueTick();
+	QueueUi();
 	return D2RL::Input::ActionResult::Handled;
 }
 
@@ -327,11 +271,12 @@ void ReadSettings(char* note, size_t n) noexcept {
 	uint32_t need = 0;
 	if (!g_context->ReadConfig(toml, sizeof(toml), &need)) {
 		g_settings = Settings{};
-		std::snprintf(note, n, "mxl2012-core.toml not read: defaults");
+		std::snprintf(note, n, "mxl2012-core.toml not read: nothing excluded");
 		return;
 	}
 	const bool found = ParseSettings(toml, &g_settings);
-	std::snprintf(note, n, "%s", found ? "mxl2012-core.toml" : "no [mapreveal] in mxl2012-core.toml: defaults");
+	std::snprintf(note, n, "%s%s", found ? "mxl2012-core.toml" : "no [mapreveal] in mxl2012-core.toml: nothing excluded",
+	              g_settings.oldThreshold ? ", its old threshold ignored" : "");
 }
 
 }  // namespace
@@ -350,7 +295,7 @@ auto InstallMapReveal(const D2RL::PluginContext* context, char* report, size_t r
 		std::snprintf(report, reportSize, "mapreveal off: ThreadService / InputService unavailable");
 		return false;
 	}
-	char note[96];
+	char note[112];
 	ReadSettings(note, sizeof(note));
 	const D2RL::Input::ActionRegistration reg{
 	    .structSize = D2RL::Input::ActionRegistrationSize,
@@ -377,29 +322,24 @@ auto InstallMapReveal(const D2RL::PluginContext* context, char* report, size_t r
 		const size_t len = std::strlen(ex);
 		std::snprintf(ex + len, sizeof(ex) - len, "%s%d", i ? " " : "", g_settings.exclude[i]);
 	}
-	std::snprintf(report, reportSize, "mapreveal on: Controls action mxl_map_level (default L) reveals the rest of the level at %d%% explored "
-	              "(%s; 0 = always, 101 = off), towns%s%s excluded; no hook",
-	              g_settings.threshold, note, g_settings.nExclude ? " and " : "", ex);
+	std::snprintf(report, reportSize, "mapreveal on: Controls action mxl_map_level (default L) reveals the current level on each press (%s); "
+	              "excluded: %s; no hook",
+	              note, g_settings.nExclude ? ex : "none");
 	return true;
 }
 
 void MapRevealStatus(char* out, size_t size) noexcept {
-	const Level* l = g_level > 0 ? &g_levels[g_level] : nullptr;
 	char key[24] = "";
 	if (g_on) {
 		BoundKey(key, sizeof(key));
 	}
-	static const char* const Gates[] = {"off", "excluded", "below", "ready"};
 	std::snprintf(out, size,
-	              "on=%d level=%d rooms=%d area=%llu seenarea=%llu percent=%d threshold=%d gate=%s announced=%d revealed=%d key=%s "
-	              "npc=%u held=%d ticks=%ld presses=%ld reveals=%ld refusals=%ld announces=%ld lines=%ld heldlines=%ld dropped=%ld "
-	              "faults=%ld games=%ld lastmade=%ld lastrooms=%ld lastms=%ld",
-	              g_on ? 1 : 0, g_level, l ? l->rooms : 0, static_cast<unsigned long long>(l ? l->totalArea : 0),
-	              static_cast<unsigned long long>(l ? l->seenArea : 0), g_percent, g_settings.threshold, Gates[static_cast<int>(g_gate)],
-	              l && l->announced ? 1 : 0, l && l->revealed ? 1 : 0, key[0] ? key : "-",
-	              g_base ? *reinterpret_cast<const uint32_t*>(g_base + RvaMenuNpcValid) : 0u, g_pending[0] ? 1 : 0, g_ticks.load(),
-	              g_presses.load(), g_reveals.load(), g_refusals.load(), g_announces.load(), g_lines.load(), g_heldLines.load(),
-	              g_droppedLines.load(), g_faults.load(), g_games.load(), g_lastMade.load(), g_lastRooms.load(), g_lastRevealMs.load());
+	              "on=%d level=%d excluded=%d key=%s npc=%u held=%d presses=%ld reveals=%ld refusals=%ld lines=%ld heldlines=%ld "
+	              "dropped=%ld faults=%ld lastmade=%ld lastrooms=%ld lastms=%ld",
+	              g_on ? 1 : 0, g_level, g_settings.nExclude, key[0] ? key : "-",
+	              g_base ? *reinterpret_cast<const uint32_t*>(g_base + RvaMenuNpcValid) : 0u, g_pending[0] ? 1 : 0, g_presses.load(),
+	              g_reveals.load(), g_refusals.load(), g_lines.load(), g_heldLines.load(), g_droppedLines.load(), g_faults.load(),
+	              g_lastMade.load(), g_lastRooms.load(), g_lastRevealMs.load());
 }
 
 auto MapRevealPress() noexcept -> bool {
@@ -408,10 +348,6 @@ auto MapRevealPress() noexcept -> bool {
 	}
 	PressGuarded();
 	return true;
-}
-
-void MapRevealSetThreshold(int threshold) noexcept {
-	g_settings.threshold = ClampThreshold(threshold);
 }
 
 auto MapRevealLastLine() noexcept -> const char* {

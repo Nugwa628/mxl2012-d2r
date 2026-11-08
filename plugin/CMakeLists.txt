@@ -32,7 +32,7 @@ set_property(SOURCE src/mxl2012_core.rc APPEND PROPERTY COMPILE_DEFINITIONS
              MXL_PV_STR="${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}" MXL_PV_NUM=${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/mxl2012_core.cpp)
 target_link_libraries(mxl2012_core PRIVATE D2RLPlugin::D2RLPlugin)
-# The plugin's settings (d2rloader/config/mxl2012-core.toml, written by D2RLoader when missing): the map reveal threshold, the clear legacy fonts.
+# The plugin's settings (d2rloader/config/mxl2012-core.toml, written by D2RLoader when missing): the map reveal exclusions, the clear legacy fonts.
 d2rlplugin_embed_config(TARGET mxl2012_core FILE mxl2012-core.toml)
 set_target_properties(mxl2012_core PROPERTIES OUTPUT_NAME "mxl2012-core")
 if(MSVC)

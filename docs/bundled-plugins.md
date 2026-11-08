@@ -1,6 +1,7 @@
 # Third-party D2RLoader plugins planned to ship with D2R-XL 2012
 
-Planned 2026-11-04. Shipped so far: D2R Legacy 16:9 and Buff HUD (0.1.12), Auto Belt Refill (0.1.15); add new candidates to
+Planned 2026-11-04. Shipped so far: D2R Legacy 16:9 and Buff HUD (0.1.12), Auto Belt Refill (0.1.15), PyreFly's Controller QOL
+Updates (0.1.17); add new candidates to
 the tables below. The compatibility work (which plugins
 need changes for Median XL 2012's data)
 starts after release 0.1.11. Each plugin keeps its author's credit in the release notes, the README credits and this file.
@@ -50,6 +51,60 @@ owner, 2026-11-04). Their READMEs state no licence, so the permission is the bas
 | [inventory-deposit](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/inventory-deposit/README.md) | "Deposit all gems, materials and runes" button by the inventory gold | Needs the HD advanced stash and its item-type rules; Median items with no slot on the open page stay put (bug #535 side note: such an item logged item asserts) |
 
 All five target D2RLoader 1.3.1 and plugin ABI 4 on Windows x64, the same loader the port uses.
+
+controller-qol audit for this build (version gate, hook conflicts with medtab and Auto Belt Refill, skill profile, plan):
+[controller-support.md](controller-support.md) section 3. controller-qol ships from 0.1.17 (next section).
+
+## Controller QOL Updates by PyreFly (shipped from 0.1.17)
+
+[controller-qol](https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/controller-qol/README.md) (`Controller QOL
+Updates.dll`, version 1.3.1+rev.95) by **PyreFly**: gamepad shortcuts for items (LB + A / X / Y, Deposit All with LB + L3),
+direct ground looting (hold LB, LB + a face button), menu, stash-tab and shared-page paging, and right-stick skill aiming with
+per-mod skill profiles. **Licence:** PyreFly's repository reserves all rights (its LICENSE); PyreFly gave the project owner
+permission to ship and adapt it on 2026-11-04. Credit: README, CHANGELOG / release notes, NOTICE.md and this file (lane
+cqol, docs/testing.md "Lane cqol"; research lanes padui and padskills, docs/controller-support.md sections 3 to 7).
+
+- **In the package:** `mods\mxl2012\d2rloader\plugins\Controller QOL Updates.dll` (mod-scoped) with PyreFly's LICENSE
+  (`Controller QOL Updates-LICENSE.txt`) and the PluginSDK's (`Controller QOL Updates-PluginSDK-LICENSE.txt`), and the config
+  `mods\mxl2012\d2rloader\config\controller-qol-updates.toml` as a `preserve` file (a player's changes survive Update and
+  Repair). The manifest's `bundledPlugins` names it with version, repository, path, author, commit and the patch checksums.
+- **Reproducible build, no fork:** the gitlink `third_party/D2R-Mods` pins PyreFly's repository at `df44457` (2026-10-30, still
+  the newest commit on 2026-11-08). `tools/build_controllerqol.ps1` exports `plugins/controller-qol`,
+  `plugins/inventory-deposit/src` and `/tests` (its build reuses the stash feedback from there) and `LICENSE` of that commit
+  (`git archive`, from the submodule or `MXL_CONTROLLERQOL_DIR`), applies `third_party/controller-qol-mxl2012/*.patch` in name
+  order, builds it with PyreFly's own CMakeLists.txt against the PluginSDK of `tools/build_plugin.ps1` and runs its 63 unit tests.
+  **SDK pin:** PyreFly pins `bb0b48e`, ours is `717f727`, one commit later, which changes only comments and the README; the plugin
+  builds against ours with no change. A system code page other than UTF-8 (932 on the build PC) needs `/utf-8` (set by the script). `tools/package_release.py`
+  generates the skill seed from the package's `skills.txt`, runs the script with `-SkillProfile` (or takes `--controllerqol
+  DLL`) and refuses a build of another commit, patch set or seed, another version, or PyreFly's own DLL (no `belt_actions`
+  switch); `tools/verify_package.py` checks all four files in a player package. `--no-data` and `--no-bundled` packages leave
+  it out (the seed needs the data). To move to a new upstream commit: update the gitlink, refresh the patches
+  (`third_party/controller-qol-mxl2012/README.md`), refresh `tools/data/controller_qol_catalog.json` against its
+  `skill_catalog.h`, run the in-game check `cqol`.
+- **Patches** (`third_party/controller-qol-mxl2012/`): `0001-mxl2012-belt-actions-switch.patch`, a `belt_actions` key (default
+  true as upstream; our config false): its belt module stays off, so **Auto Belt Refill keeps the belt** (owner ruling
+  2026-11-07). `0002-mxl2012-median-orbs-tabs.patch`: the stash's tabs 5 / 6 are MEDIAN / ORBS (advanced tabs whose slots sit
+  under the Runes page; Median's code characters in slot names), so Deposit All and LB + X work there instead of being refused or
+  treated as Runes. `0003-mxl2012-hooked-sound-entry.patch`: our `spiritsound` part (bug #502) hooks the entry of D2R's client
+  sound play `0x1a0780`, which controller-qol checks before Deposit All, advanced LB + X and Materials withdrawals; the check now
+  admits the hooked entry when the bytes after the 13 the hook replaces match (without it every LB + L3 was refused and fell
+  through to D2R's own L3, Open Cube).
+- **Next to mxl2012-core:** medtab no longer patches inside the tab getter `0x23af50` (its 21 callers go through a stub in the
+  pad after it), so controller-qol's check of the getter's first 128 bytes passes and none of its features is declined
+  (`controller-qol-updates.log`); `spiritsound`'s hook at `0x1a0780` is admitted by patch 0003; tabflash's hook of `0x15ef70`
+  turns off only controller-qol's own tab flash after Deposit All (one warning a session, the deposit works); pickup and
+  cube_dupe share code paths with it but no bytes. Open: #558 (engine asserts when the stash is clicked open with it loaded); `mxl2012`: "plugin clashes: none". Our harness `pad` (dev builds) feeds D2R's XInput import; controller-qol
+  reads the pad from D2R's own controller events, so the scripted pad reaches it.
+- **Skill profile:** `tools/controller_skill_profile.py` (lane padskills, docs/controller-support.md section 5) makes the
+  mxl2012 seed (818 skills, about 33 KB) from the final `skills.txt` / `skilldesc.txt`; the build embeds it in place of
+  PyreFly's vanilla `skill-defaults.toml`. At the first start the plugin writes the player's profile
+  `d2rloader\config\controller-qol-skills\<scope>.overrides.toml` (the scope is a hash of the install's mod folder) from it,
+  and later only adds keys that are missing: R3 choices and hand edits are never replaced, by Update and Repair neither (the
+  downloader does not list that folder).
+- **Turn it off:** `enabled = false` under `[qol]` and under `[aim]` in `controller-qol-updates.toml`; delete the DLL to remove it
+  (the downloader puts it back on Repair).
+- **Test runs:** a dev install (`tools/install_mod.py`) does not install it; the run's driver places the DLL and config for a
+  run (docs/testing.md "Lane cqol"); a release install has it.
 
 ## Buff HUD by Lukaszpg (shipped from 0.1.12)
 

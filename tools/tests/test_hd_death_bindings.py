@@ -39,5 +39,34 @@ class DeathBindingTests(unittest.TestCase):
         self.assertEqual(out["states"][0]["animationBindings"]["hth"], ["dead2"])
 
 
+class DeathClipTests(unittest.TestCase):
+    """Bug #560: a stand-in whose Death / Dead states bind no clip it has (D2R's `wolf`) leaves its dead monsters standing."""
+
+    def test_wolf_like_machine_is_unplayable(self):
+        sm = machine({"hth": ["death"]}, {"hth": ["neutral"]})
+        self.assertTrue(hu.death_unplayable(sm, {"neutral", "knockback", "gethit"}))
+
+    def test_machine_with_death_clips_is_fine(self):
+        sm = machine({"hth": ["death"]}, {"hth": ["neutral"]})
+        self.assertFalse(hu.death_unplayable(sm, {"neutral", "death", "dead"}))
+        self.assertFalse(hu.death_unplayable(sm, None))   # clips not indexed: nothing to judge
+
+    def test_binding_names_resolve_to_animation_files(self):
+        sm = machine({"hth": ["dead001"]}, {"hth": ["neutral"]})   # bonefetish1 binds animation names, not clip names
+        sm["animations"] = [{"name": "dead001", "filename": "data/hd/character/enemy/bonefetish1/animation/dead.animation"}]
+        self.assertFalse(hu.death_unplayable(sm, {"neutral", "dead"}))
+        self.assertTrue(hu.death_unplayable(sm, {"neutral"}))
+
+    def test_committed_mapping_has_no_deathless_stand_in(self):
+        """Every stand-in donor in the committed mapping whose tokens die has death clips (D2R's `wolf` had none)."""
+        import json
+        clips = json.loads((TOOLS / "data" / "d2r_unit_clips.json").read_text("utf-8"))["folders"]
+        tokens = json.loads((TOOLS / "data" / "hd_monster_tokens.json").read_text("utf-8"))["tokens"]
+        bad = [(t, e["donor"]) for t, e in tokens.items()
+               if e.get("donor") in clips and not ({"death", "dead"} <= {c.lower() for c in clips[e["donor"]]})
+               and e.get("ids_mapped", e.get("stand_in_ids"))]
+        self.assertEqual(bad, [])
+
+
 if __name__ == "__main__":
     unittest.main()

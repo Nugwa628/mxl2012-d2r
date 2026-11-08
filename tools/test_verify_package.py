@@ -47,6 +47,17 @@ class VerifyPackageTests(unittest.TestCase):
         (belt / "PATCHES").write_text("\n".join(pr.beltrefill_patches()), encoding="ascii")
         (self.tmp / "d2rl-auto-belt-refill.dll").write_bytes(b"MZ auto-belt-refill\0 0.35.9\0")
         pr.stage_beltrefill(self.mod, self.tmp / "d2rl-auto-belt-refill.dll", belt)
+        cq = self.tmp / "controllerqol-src"  # what tools/build_controllerqol.ps1 exports
+        (cq / "plugins" / "controller-qol").mkdir(parents=True)
+        for rel in ("plugins/controller-qol/controller-qol-updates.toml", "LICENSE", "PluginSDK-LICENSE"):
+            (cq / rel).write_text("x\n", encoding="utf-8")
+        (cq / "PINNED_COMMIT").write_text(pr.controllerqol_commit(), encoding="ascii")
+        (cq / "PATCHES").write_text("\n".join(pr.controllerqol_patches()), encoding="ascii")
+        seed = self.tmp / "mxl2012.overrides.toml"
+        seed.write_text("[aim.amazon]\n", encoding="utf-8")
+        (cq / "SKILL_PROFILE").write_text(pr.sha256(seed), encoding="ascii")
+        (self.tmp / "Controller QOL Updates.dll").write_bytes(b"MZ controller-qol-updates\0 1.3.1+rev.95\0 belt_actions = false")
+        pr.stage_controllerqol(self.mod, self.tmp / "Controller QOL Updates.dll", seed, cq)
 
     def test_a_staged_package_is_a_player_mod_folder(self):
         self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
@@ -61,12 +72,15 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / pr.BUFFHUD["licence"]).unlink()
         (self.mod / pr.BELTREFILL["dll"]).write_bytes(b"MZ auto-belt-refill\0 0.35.8\0")
         (self.mod / pr.BELTREFILL["config"]).unlink()
+        (self.mod / pr.CONTROLLERQOL["dll"]).write_bytes(b"MZ controller-qol-updates\0 1.3.1+rev.95\0")
+        (self.mod / pr.CONTROLLERQOL["licence"]).unlink()
         problems = vp.check_mod_folder(self.mod, "9.9.9")
         text = "\n".join(problems)
         for want in ("modinfo.json", "modVersion", "test harness", "PluginVersion", "Hero.d2s", "legacy169 test build",
                      "legacy169.toml is missing",
                      "not a packed MPQ", "d2rl-buff-panel-LICENSE.txt is missing",
-                     "Auto Belt Refill version 0.35.9", "auto-belt-refill.toml is missing"):
+                     "Auto Belt Refill version 0.35.9", "auto-belt-refill.toml is missing",
+                     "not our patched build", "Controller QOL Updates-LICENSE.txt is missing"):
             self.assertIn(want, text)
 
     def test_archive_paths_must_stay_in_the_mod_folder(self):

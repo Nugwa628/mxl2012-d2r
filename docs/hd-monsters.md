@@ -48,6 +48,8 @@ The same numbers are in `tools/data/hd_monster_tokens.json` (`counts`) and in th
 
 D2R binds an HD unit's animations by weapon class (`animationBindings` per state) and plays the death animation from the class of the death COF. Median ships death COFs for hth only, so `hd_units.adapt_state_machine` also binds hth on every Death / Dead state that lacks it (`death_lacks_hth`; today only the cr_archer1 machine: `sm_cr_archer1_death.json`). Without it the Amazonites (token `9x`) stood in the bind pose after `kill`. `tools/death_cofs.py` additionally derives `9xdtbow` / `9xddbow` COFs and animdata records (not needed for HD).
 
+A donor must also have a death and a dead clip. D2R's `wolf` (the Druid's werewolf form) has neither, so its machine's Death / Dead states were bound to `knockback` (`clip_fill`) and the Fallen Wolf Riders (`0(`) and Wyrdwolves (`^3`) stood on as werewolves after they died (bugs.md #560). They and `7$` are pinned to `spiritwolf`; `build` stops when a stand-in of monsters with a DT or DD mode has no clip for its Death / Dead state (`hd_units.death_unplayable`).
+
 ## Shared colour tables (bugs.md #360)
 
 Each stand-in colour is a VariantTransformTable (`data/hd/character/enemy/mxl/v_<hash>.json`). D2R keeps these in a cache of 128
@@ -74,7 +76,7 @@ loaded at the peak, so roughly 50 tables would reach 120 of 128. Keep `COLOUR_TA
 |---|---|---|---|---|---|
 | `!1` | arach1 | x1.35; hue +0.03 sat +0.20 val +0.25 | medium | `quest_lucion` | pin: Quest Lucion: 2012's art is a large multi-legged crawling demon (161x116 px); the same token is a flame in the reference art, so the reference stand-in (gorgon1) doe |
 | `!e` | baalminion1 | x1.15; hue -0.05 sat +0.12 val -0.02 | medium | `azmo_special` | pin: Azmo special (Dominator): red horned biped demon with a large curved blade, 104x138 px |
-| `7$` | wolf | x0.9; hue -0.00 sat +0.05 val +0.29 | low | `cougar` | pin: Trained Cougar: tan big cat on four legs (94x59 px) |
+| `7$` | spiritwolf | x1.5; hue -0.01 sat +0.09 val +0.21 | low | `cougar` | pin: Trained Cougar: tan big cat on four legs (94x59 px) |
 | `8@` | goatman1 | x1; none | medium | `hornedgods` | pin: Horned God: small horned humanoid with a mace and S8 part (58x76 px): the D2R goatman is the horned biped with a weapon; same pick the reference made for the Wereo |
 | `9$` | spiritwolf | x0.85; hue -0.00 sat -0.23 val -0.09 | high | `companion` | pin: Wolf companion: small grey wolf (40x38 px): the Druid's spirit wolf is the same animal and colour |
 | `ie` | frozenhorror1 | x1.1; hue -0.09 sat -0.22 val -0.18 | medium | `shardspawn` | pin: Shardspawn: hunched crystalline ice creature (79x111 px, blue-white) |
@@ -140,7 +142,7 @@ loaded at the peak, so roughly 50 tables would reach 120 of 128. Keep `COLOUR_TA
 | `(s` | blunderbore1 | x1.65; hue -0.02 sat -0.32 val +0.01 | medium | `giant1`, `giant2` | pin: Giant: huge muscular human giant; Blunderbore is D2R's giant (reference: hellbovine, a minotaur). |
 | `(x` | frogdemon1 | x1; hue +0.19 sat +0.06 val +0.21 | medium | `sumelite_1295`, `slimer1`, `slimer2` | pin: Slimer: green frog-like humanoid; Frog Demon (2 of the 7 reference rows). |
 | `0!` | summoner | x0.8; hue +0.00 sat -0.21 val +0.20 | high (review) | `quest_subboss`, `super_tehboss`, `quest_malic` | reused donors, 2012 names: the reference rows for this art disagree (55% for councilmember1, others {'summoner': 2}); 2012 monster names pick summoner among them |
-| `0(` | wolf | x1; hue -0.00 sat -0.13 val -0.18 | high | `fallenwolf1`, `fallenwolfE` | reused: same art files; reused donor wolf (3 rows, 100% agree) |
+| `0(` | spiritwolf | x1.75; hue -0.01 sat -0.09 val -0.25 | medium | `fallenwolf1`, `fallenwolfE` | pin: Fallen Wolf Rider (Kurast Bazaar, Travincal, Act 5 temples): a fallen with a spear on a grey wolf (65x85 px) |
 | `08` | warputriddefiler | x0.85; hue +0.01 sat +0.16 val +0.01 | high | `fellfiend1`, `fellfiend2`, `baalset_fellfiend2` | reused: same art files; reused donor warputriddefiler (4 rows, 100% agree) |
 | `0k` | maggotbaby1 | x1.5; hue +0.03 sat -0.38 val +0.22 | medium | `res_corpseworm`, `corpseworm` | pin: lane hdmon2 (Act 1-2 pass): Corpse Worm: pale segmented larva (87x70 px) |
 | `0n` | sandraider1 | x1.15; hue +0.03 sat -0.09 val -0.02 | high | `sumelite_1275`, `res_onyxknight`, `onyxknight1` +4 | reused: same art files; reused donor sandraider1 (18 rows, 92% agree) |
@@ -165,7 +167,7 @@ loaded at the peak, so roughly 50 tables would reach 120 of 128. Keep `COLOUR_TA
 | `@c` | zombie1 | x1.15; hue +0.02 sat +0.04 val -0.36 | high | `greenzombie` | pin: lane hdmon2 (Act 1-2 pass): Green Zombie: a shambling zombie (24x70 px) |
 | `@e` | summoner | x0.85; hue -0.01 sat +0.34 val +0.65 | high (review) | `friendlyelvensong`, `faewitchM`, `faewitchM2` | reused donors, 2012 names: the reference rows for this art disagree (60% for summoner, others {'vilemother1': 1, 'darkwanderer': 1}); 2012 monster names pick summoner among them |
 | `@f` | brute2 | x1.2; hue +0.02 sat -0.04 val +0.19 | high (review) | `sumelite_1262`, `bugbear1`, `bugbearE` +2 | reused donors, 2012 names: the reference rows for this art disagree (67% for brute2, others {'thornhulk1': 3}); 2012 monster names pick brute2 among them |
-| `^3` | wolf | x0.9; hue +0.00 sat +0.02 val +0.13 | high | `sumelite_1316`, `res_wyrdwolf1`, `wyrdwolf1` +2 | reused: same art files; reused donor wolf (5 rows, 100% agree) |
+| `^3` | spiritwolf | x1.5; none | low | `sumelite_1316`, `res_wyrdwolf1`, `wyrdwolf1` +2 | pin: Wyrdwolf (Act 3 dungeons, Act 5 temples): tan wolf-headed beast (47x77 px) |
 | `b#` | cantor1 | x1; hue +0.03 sat +0.15 val +0.70 | high | `sumelite_1268`, `sumelite_1284`, `crystal1` +2 | reused: same art files; reused donor cantor1 (7 rows, 86% agree) |
 | `c#` | firegolem | x0.9; hue -0.02 sat -0.24 val -0.12 | high | `totembounds` | reused: same art files; reused donor firegolem (1 rows, 100% agree) |
 | `c@` | councilmember1 | x1.1; hue +0.03 sat -0.05 val +0.47 | medium | `cloakdagger` | pin: lane hdmon2 (Act 1-2 pass): Cloak Dagger: hooded robed figure (40x82 px), the twin of Robe Dagger |
@@ -469,7 +471,7 @@ for the pinned donor. Picks and reasons are in `tools/data/hd_monster_pins.json`
 |---|---|---|---|
 | `!1` | Quest Lucion | arach1 | large multi-legged crawling demon: the giant spider |
 | `!e` | Azmo special (Dominator) | baalminion1 | red horned biped demon with a blade (alt: hephasto) |
-| `7$` | Trained Cougar | wolf | big cat; D2R has no cat (monster is broken in 2012: no monstats2 row) |
+| `7$` | Trained Cougar | spiritwolf | big cat; D2R has no cat (monster is broken in 2012: no monstats2 row) |
 | `8@` | Horned God | goatman1 | horned biped with a weapon (same donor the reference uses for the Wereowl) |
 | `9$` | Wolf companion | spiritwolf | small grey wolf |
 | `ie` | Shardspawn | frozenhorror1 | hunched crystalline ice giant (its attack2 is only a skill sequence; since lane hdmon3 A2 has a state of its own that plays it, section 11) |
@@ -557,7 +559,7 @@ unit through the same plumbing (unit, variant, state machine) and `model_lod_des
 - **Not done**: weapons and shields of the donor are dropped when Median has no slot for them (18 parts);
   no animation retargeting beyond the donor's own clips (a mode a donor has no clip for plays the nearest clip it has, section 9.1).
 
-`cougar`: **dropped** (owner 2026-10-29): Median's row is broken (no monstats2 row, author's status "WERKT NIET") and nothing spawns it. `txt_migrate.dropped_monsters` keeps the row (the ids after it stay) but switches it off (`enabled` 0, `isSpawn` 0) and drops its links (MonProp, minion); its `7$` wolf stand-in is now unused (lane unporteda).
+`cougar`: **dropped** (owner 2026-10-29): Median's row is broken (no monstats2 row, author's status "WERKT NIET") and nothing spawns it. `txt_migrate.dropped_monsters` keeps the row (the ids after it stay) but switches it off (`enabled` 0, `isSpawn` 0) and drops its links (MonProp, minion); its `7$` stand-in (spirit wolf since bug #560) is now unused (lane unporteda).
 
 ## 8. Per-TransLvl colours (`tools/hd_translvl.py`, lane tints 2026-10-29)
 

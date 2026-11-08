@@ -2,3 +2,5 @@
 *.sh text eol=lf
 # Patches applied to third-party source at build time: LF, as the exported source.
 *.patch text eol=lf
+# PyreFly's controller-qol sources are CRLF: its patches keep their bytes (git apply needs the CR of each line).
+third_party/controller-qol-mxl2012/*.patch -text

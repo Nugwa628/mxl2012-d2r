@@ -37,9 +37,10 @@ import package_release as pr  # noqa: E402
 
 NAME = pr.NAME
 DIFFERS_BY_DESIGN = {"d2rloader/plugins/mxl2012-core.dll", "d2rloader/metadata.json"}
-# the bundled plugins (package_release.LEGACY169, BUFFHUD, BELTREFILL): the package has them, install_mod.py does not install them
+# the bundled plugins (package_release.LEGACY169, BUFFHUD, BELTREFILL, CONTROLLERQOL): the package has them, install_mod.py does
+# not install them
 BUNDLED = ({pr.LEGACY169["dll"], pr.LEGACY169["config"]} | {pr.BUFFHUD[k] for k in pr.BUFFHUD_FILES}
-           | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES})
+           | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES} | {pr.CONTROLLERQOL[k] for k in pr.CONTROLLERQOL_FILES})
 STRING_FILES = ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json")
 
 
@@ -117,6 +118,12 @@ def check_mod_folder(mod: Path, version: str) -> list:
     for k in pr.BELTREFILL_FILES:
         if not (mod / pr.BELTREFILL[k]).is_file():
             problems.append(f"{pr.BELTREFILL[k]} is missing")
+    cq = mod / pr.CONTROLLERQOL["dll"]
+    if cq.is_file():
+        problems += pr.check_controllerqol(cq)
+    for k in pr.CONTROLLERQOL_FILES:
+        if not (mod / pr.CONTROLLERQOL[k]).is_file():
+            problems.append(f"{pr.CONTROLLERQOL[k]} is missing")
     if not (mod / "d2rloader" / "patches").is_dir():
         problems.append("d2rloader/patches/ is missing")
     data = mod / f"{NAME}.mpq" / "data"

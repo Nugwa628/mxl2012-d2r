@@ -14,6 +14,7 @@
 //
 // A verb ends with a line "h: <verb> OK" or "h: <verb> FAIL <reason>" in the harness console file.
 #include "harness_cmds_logic.h"
+#include "pad_input_logic.h"
 
 #include "client_skills.h"
 #include "d2r.h"
@@ -2999,23 +3000,187 @@ auto CmdSendStash(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
-// `mapreveal [press | threshold N]` (UI thread): the map reveal part's numbers for the current level; `press` does what the key
-// does, at once; `threshold N` sets another threshold until the next start (a test shortcut: the settings file stays).
+// `padui [on | off]` (UI thread): D2R's controller (gamepad) UI without a gamepad, for screenshots of the gamepad layouts.
+// Every input event asks PanelManager::RequestInputMethod (0x8a5440, via the thunk 0x847630) for its device, 1 = gamepad;
+// a change sets PanelManager +0xdb / +0xdc, and the next PanelManager update calls SetControllerMode (0x8a690, the byte
+// 0x2a23274) and reloads every layout from layouts/controller. While forced, the hook turns every request into 1, so mouse
+// and keys no longer switch back. Navigation still needs gamepad events: only the look of the gamepad UI is testable.
+constexpr uint64_t RvaRequestInput = 0x8a5440;  // (PanelManager*, int device)
+constexpr uint64_t RvaPanelManager = 0x3440170;  // PanelManager*
+constexpr uint64_t RvaControllerUi = 0x2a23274;  // byte: gamepad UI on (PC)
+// 0x8a5440: push rbp / push rbx / push rsi / lea rbp,[rsp-0x220] / sub rsp,0x320
+constexpr uint8_t RequestInputEntry[] = {0x40, 0x55, 0x53, 0x56, 0x48, 0x8d, 0xac, 0x24, 0xe0, 0xfd,
+                                         0xff, 0xff, 0x48, 0x81, 0xec, 0x20, 0x03, 0x00, 0x00};
+using RequestInputFn = void (*)(void*, int32_t);
+RequestInputFn g_requestInputOriginal = nullptr;
+bool g_requestInputHooked = false;
+volatile LONG g_forcePad = 0;
+
+void RequestInputHook(void* panels, int32_t device) noexcept {
+	g_requestInputOriginal(panels, g_forcePad != 0 ? 1 : device);
+}
+
+auto CmdPadUi(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	auto* panels = *reinterpret_cast<uint8_t**>(g_base + RvaPanelManager);
+	if (t.n > 1) {
+		const bool on = hcmd::LowerEq(t.tok[1], "on");
+		if (!on && !hcmd::LowerEq(t.tok[1], "off")) {
+			return Fail(c, "usage: padui [on | off]");
+		}
+		if (!g_requestInputHooked) {
+			return Fail(c, "padui: the input method hook is off (entry bytes differ)");
+		}
+		if (panels == nullptr) {
+			return Fail(c, "padui: no PanelManager yet");
+		}
+		InterlockedExchange(&g_forcePad, on ? 1 : 0);
+		g_requestInputOriginal(panels, on ? 1 : 0);
+	}
+	Out("padui forced=%ld gamepadUi=%d pending=%d device=%d", static_cast<long>(g_forcePad),
+	    *reinterpret_cast<const uint8_t*>(g_base + RvaControllerUi), panels != nullptr ? panels[0xdb] : -1,
+	    panels != nullptr ? *reinterpret_cast<const int32_t*>(panels + 0xdc) : -1);
+	return true;
+}
+
+// `pad [on | off | press <buttons> [ms] | hold <buttons> | release [buttons] | stick L|R <x> <y> | trigger L|R <0-255>]`
+// (UI thread): a scripted gamepad in controller slot 0, without a gamepad or a driver. D2R 3.3 reads pads only through
+// XInputGetState of XINPUT9_1_0.dll (IAT slot 0x1cb1258, one caller: OsControllerUpdate 0x1210940, each of 4 slots every
+// update while connected, else every 4 s), and turns wButtons changes into its own controller events (0x1210050). The first
+// verb that changes the pad swaps that IAT slot for XInputPadHook; `pad off` puts the original back. Buttons: a b x y lb rb
+// lt rt ls rs start back up down left right ('+' joins); sticks in percent, y up; `press` holds for ms (default 120) and at
+// least padin::TapPolls polls. Slot 0 of a real pad is hidden while the scripted one is on.
+constexpr uint64_t RvaXInputGetStateIat = 0x1cb1258;  // D2R's import of XINPUT9_1_0!XInputGetState
+struct XInputState {  // XINPUT_STATE
+	DWORD packet;
+	WORD buttons;
+	BYTE lt, rt;
+	SHORT lx, ly, rx, ry;
+};
+using XInputGetStateFn = DWORD(WINAPI*)(DWORD, XInputState*);
+XInputGetStateFn g_xinputOriginal = nullptr;
+SRWLOCK g_padLock = SRWLOCK_INIT;
+padin::State g_pad;
+volatile LONG g_padOn = 0;
+volatile LONG g_padPolls = 0;
+
+DWORD WINAPI XInputPadHook(DWORD user, XInputState* out) noexcept {
+	if (user != 0 || g_padOn == 0 || out == nullptr) {
+		return g_xinputOriginal(user, out);
+	}
+	AcquireSRWLockExclusive(&g_padLock);
+	const padin::Pad p = padin::Poll(&g_pad, GetTickCount64());
+	out->packet = g_pad.packet;
+	ReleaseSRWLockExclusive(&g_padLock);
+	out->buttons = p.buttons;
+	out->lt = p.lt;
+	out->rt = p.rt;
+	out->lx = p.lx;
+	out->ly = p.ly;
+	out->rx = p.rx;
+	out->ry = p.ry;
+	InterlockedIncrement(&g_padPolls);
+	return ERROR_SUCCESS;
+}
+
+// Swaps D2R's XInputGetState import for the hook (on) or back (off). Fails when the slot holds neither XINPUT9_1_0's
+// function nor the hook (another plugin or a different build).
+auto PadSwapIat(bool on) noexcept -> bool {
+	auto** slot = reinterpret_cast<void**>(g_base + RvaXInputGetStateIat);
+	if (g_xinputOriginal == nullptr) {
+		HMODULE dll = GetModuleHandleW(L"XINPUT9_1_0.dll");
+		g_xinputOriginal = dll != nullptr ? reinterpret_cast<XInputGetStateFn>(GetProcAddress(dll, "XInputGetState")) : nullptr;
+	}
+	void* const hook = reinterpret_cast<void*>(&XInputPadHook);
+	void* const want = on ? hook : reinterpret_cast<void*>(g_xinputOriginal);
+	if (g_xinputOriginal == nullptr || (*slot != hook && *slot != reinterpret_cast<void*>(g_xinputOriginal))) {
+		return false;
+	}
+	if (*slot == want) {
+		return true;
+	}
+	DWORD old = 0;
+	if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) {
+		return false;
+	}
+	InterlockedExchangePointer(slot, want);
+	VirtualProtect(slot, sizeof(void*), old, &old);
+	return true;
+}
+
+auto PadAxisPair(const hcmd::Tokens& t, int16_t* x, int16_t* y) noexcept -> bool {
+	return t.n == 5 && padin::ParseAxis(t.tok[3], x) && padin::ParseAxis(t.tok[4], y);
+}
+
+auto CmdPad(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	constexpr const char* Usage =
+	    "usage: pad [on | off | press <buttons> [ms] | hold <buttons> | release [buttons] | stick L|R <x> <y> | trigger L|R <0-255>]";
+	if (t.n > 1) {
+		const char* verb = t.tok[1];
+		const bool off = hcmd::LowerEq(verb, "off");
+		uint32_t mask = 0;
+		long long ms = 120;
+		const bool left = t.n > 2 && hcmd::LowerEq(t.tok[2], "l");
+		const bool sideOk = t.n > 2 && (left || hcmd::LowerEq(t.tok[2], "r"));
+		int16_t x = 0, y = 0;
+		long long trig = 0;
+		if (!off && !hcmd::LowerEq(verb, "on") &&
+		    !((hcmd::LowerEq(verb, "press") || hcmd::LowerEq(verb, "hold")) && padin::ParseButtons(t, 2, &mask, &ms)) &&
+		    !(hcmd::LowerEq(verb, "release") && (t.n == 2 || padin::ParseButtons(t, 2, &mask, &ms))) &&
+		    !(hcmd::LowerEq(verb, "stick") && sideOk && PadAxisPair(t, &x, &y)) &&
+		    !(hcmd::LowerEq(verb, "trigger") && sideOk && t.n == 4 && hcmd::ParseInt(t.tok[3], &trig) && trig >= 0 && trig <= 255)) {
+			return Fail(c, Usage);
+		}
+		if (!PadSwapIat(!off)) {
+			return Fail(c, "pad: D2R's XInputGetState import is not XINPUT9_1_0's (another hook or build)");
+		}
+		AcquireSRWLockExclusive(&g_padLock);
+		if (off) {
+			padin::Release(&g_pad, 0);
+		} else if (hcmd::LowerEq(verb, "press")) {
+			padin::Press(&g_pad, mask, static_cast<uint64_t>(ms));
+		} else if (hcmd::LowerEq(verb, "hold")) {
+			g_pad.held |= mask;
+		} else if (hcmd::LowerEq(verb, "release")) {
+			padin::Release(&g_pad, mask);
+		} else if (hcmd::LowerEq(verb, "stick")) {
+			(left ? g_pad.lx : g_pad.rx) = x;
+			(left ? g_pad.ly : g_pad.ry) = y;
+		} else if (hcmd::LowerEq(verb, "trigger")) {
+			(left ? g_pad.lt : g_pad.rt) = static_cast<uint8_t>(trig);
+		}
+		ReleaseSRWLockExclusive(&g_padLock);
+		InterlockedExchange(&g_padOn, off ? 0 : 1);
+	}
+	AcquireSRWLockShared(&g_padLock);
+	const padin::State s = g_pad;
+	ReleaseSRWLockShared(&g_padLock);
+	auto* panels = *reinterpret_cast<uint8_t**>(g_base + RvaPanelManager);
+	Out("pad on=%ld hooked=%d polls=%ld packet=%lu buttons=0x%04x lt=%u rt=%u l=%d,%d r=%d,%d held=0x%x pressed=0x%x gamepadUi=%d device=%d",
+	    static_cast<long>(g_padOn), *reinterpret_cast<void**>(g_base + RvaXInputGetStateIat) == reinterpret_cast<void*>(&XInputPadHook) ? 1 : 0,
+	    static_cast<long>(g_padPolls), static_cast<unsigned long>(s.packet), s.last.buttons, s.last.lt, s.last.rt, s.last.lx, s.last.ly,
+	    s.last.rx, s.last.ry, s.held, s.tapped, *reinterpret_cast<const uint8_t*>(g_base + RvaControllerUi),
+	    panels != nullptr ? *reinterpret_cast<const int32_t*>(panels + 0xdc) : -1);
+	return true;
+}
+
+// `mapreveal [press]` (UI thread): the map reveal part's counters and its last press; `press` does what the key does, at once.
+// `cells=` is the automap cell count of D2R's current layer (0x2a2cf68, the four tree counts at +0x28 / +0x50 / +0x78 / +0xa0,
+// docs/d2r-addresses.md): it grows when a press reveals more of the level.
 auto CmdMapReveal(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	const bool press = t.n > 1 && hcmd::LowerEq(t.tok[1], "press");
-	long long threshold = 0;
-	if (t.n > 2 && hcmd::LowerEq(t.tok[1], "threshold")) {
-		if (!hcmd::ParseInt(t.tok[2], &threshold)) {
-			return Fail(c, "usage: mapreveal threshold <0-101>");
-		}
-		MapRevealSetThreshold(static_cast<int>(threshold));
-	}
 	if (press && !MapRevealPress()) {
 		return Fail(c, "mapreveal: the part is off");
 	}
-	char status[640];
+	const auto* layer = *reinterpret_cast<const uint8_t* const*>(g_base + 0x2a2cf68);
+	uint32_t cells = 0;
+	if (layer != nullptr) {
+		for (const int o : {0x28, 0x50, 0x78, 0xa0}) {
+			cells += d2r::At<uint32_t>(layer, o);
+		}
+	}
+	char status[512];
 	MapRevealStatus(status, sizeof(status));
-	Out("mapreveal %s%s", status, press ? " (pressed)" : "");
+	Out("mapreveal %s layer=%d cells=%u%s", status, layer != nullptr ? d2r::At<int32_t>(layer, 0) : -1, cells, press ? " (pressed)" : "");
 	Out("mapreveal last=\"%s\"", MapRevealLastLine());
 	return true;
 }
@@ -3064,7 +3229,8 @@ const Verb Verbs[] = {
     {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"cstat", CmdClientStat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
     {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true},
-    {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true},
+    {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true}, {"padui", CmdPadUi, true},
+    {"pad", CmdPad, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {
@@ -3133,6 +3299,12 @@ void HarnessCmdsContext(const D2RL::PluginContext* context) noexcept {
 	                                             reinterpret_cast<void**>(&g_itemGenOriginal));
 	context->LogInfo(g_itemGenHooked ? "mxl2012-core: test harness item generator hook on (0x43cd50)"
 	                                 : "mxl2012-core: test harness item generator hook FAILED (entry bytes differ): no item rows");
+	// `padui on`: requests pass through unchanged until a verb forces the gamepad UI
+	g_requestInputHooked = context->InstallInlineHook(RvaRequestInput, RequestInputEntry, sizeof(RequestInputEntry),
+	                                                  reinterpret_cast<void*>(&RequestInputHook),
+	                                                  reinterpret_cast<void**>(&g_requestInputOriginal));
+	context->LogInfo(g_requestInputHooked ? "mxl2012-core: test harness input method hook on (0x8a5440)"
+	                                      : "mxl2012-core: test harness input method hook FAILED (entry bytes differ): no padui");
 }
 
 void HarnessCmdsInit(uint64_t exeBase) noexcept {

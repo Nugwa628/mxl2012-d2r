@@ -899,6 +899,7 @@ def build(paths: Paths, out: Path | None = None) -> dict:
     rows = []
     borrow_new = {b["new"].lower() for b in own_tokens.borrows()}
     level0 = {}
+    dying = defaultdict(set)   # donor -> tokens of Ids that die with a death (DT) or dead (DD) mode
     for e in mapping.values():
         u = e.get("donor")
         if has_standin(e) and u in ctx.donors and u not in level0:
@@ -946,6 +947,8 @@ def build(paths: Paths, out: Path | None = None) -> dict:
         key = json.dumps([d.unit, scale, sorted(s.slots.items()), vname, wk, sorted(vmap.items()) if vmap else None])
         uname = f"mxl_{d.unit}_" + hashlib.sha1(key.encode()).hexdigest()[:7]
         units[uname] = dict(donor=d.unit, scale=scale, slots=s.slots, vname=vname, weapon=wk, basew=s.basew, vmap=vmap)
+        if {"DT", "DD"} & set(s.modes):
+            dying[d.unit].add(tok)
         hd_json[mid] = uname
         colour = e["colour"] if vkey == own else "%s (shared table: %s)" % (e["colour"], colour_label(adj, tint))
         if base:
@@ -975,6 +978,9 @@ def build(paths: Paths, out: Path | None = None) -> dict:
         sm_name = None
         donor_sm = hu.load_json(ctx.paths.d2r / info["sm"])
         clips = hu.sm_clips(donor_sm, clip_index)
+        if u["donor"] in dying and hu.death_unplayable(donor_sm, clips):
+            raise SystemExit(f"stand-in {u['donor']} has no death / dead clip, so the dead monsters of tokens "
+                             f"{sorted(dying[u['donor']])} would stay standing (bugs.md #560): pin another donor")
         fill = hu.clip_fill(donor_sm, clips)
         if fill:
             fills[u["donor"]] = fill

@@ -255,6 +255,80 @@ class PackageReleaseTests(unittest.TestCase):
         with mock.patch.object(pr, "BELTREFILL_AUTHOR_DLL", pr.sha256(dll)):
             self.assertTrue(any("author's prebuilt" in p for p in pr.check_beltrefill(dll)))
 
+    def controllerqol_src(self, commit=None, patches=None, profile=b"[aim.amazon]\n"):
+        """A fake build/controllerqol-src (tools/build_controllerqol.ps1's export: PINNED_COMMIT, PATCHES, SKILL_PROFILE, the
+        patched config, the licences), the skill seed it was built with and a DLL."""
+        src = self.tmp / "controllerqol-src"
+        (src / "plugins" / "controller-qol").mkdir(parents=True, exist_ok=True)
+        (src / "PINNED_COMMIT").write_text((commit or pr.controllerqol_commit()) + "\n", encoding="ascii")
+        lines = pr.controllerqol_patches() if patches is None else patches
+        (src / "PATCHES").write_text("".join(ln + "\r\n" for ln in lines), encoding="ascii")
+        seed = self.tmp / "mxl2012.overrides.toml"
+        seed.write_bytes(profile)
+        (src / "SKILL_PROFILE").write_text(pr.sha256(seed) + "\r\n", encoding="ascii")
+        (src / "plugins" / "controller-qol" / "controller-qol-updates.toml").write_text("[qol]\nbelt_actions = false\n", "utf-8")
+        (src / "LICENSE").write_text("Copyright (c) 2026 PyreFly\n", encoding="utf-8")
+        (src / "PluginSDK-LICENSE").write_text("MIT License\n", encoding="utf-8")
+        dll = self.tmp / "Controller QOL Updates.dll"
+        dll.write_bytes(b"MZ...controller-qol-updates\0...1.3.1+rev.95\0...belt_actions = false\n")
+        return src, dll, seed
+
+    def test_controllerqol_is_pinned_with_our_patches(self):
+        self.assertRegex(pr.controllerqol_commit(), r"^[0-9a-f]{40}$")
+        self.assertEqual(pr.CONTROLLERQOL["dll"], "d2rloader/plugins/Controller QOL Updates.dll")
+        self.assertEqual(pr.CONTROLLERQOL["config"], "d2rloader/config/controller-qol-updates.toml")
+        names = [ln.split("  ")[1] for ln in pr.controllerqol_patches()]
+        self.assertEqual(names, ["0001-mxl2012-belt-actions-switch.patch", "0002-mxl2012-median-orbs-tabs.patch",
+                                 "0003-mxl2012-hooked-sound-entry.patch"])
+        # the shipped config turns the belt actions off (Auto Belt Refill keeps the belt), and the patches keep the CRs of
+        # PyreFly's CRLF sources (.gitattributes: -text)
+        belt = (pr.CONTROLLERQOL_OURS / "0001-mxl2012-belt-actions-switch.patch").read_bytes()
+        self.assertIn(b"\n+belt_actions = false\n", belt)
+        self.assertIn(b"\r\n", (pr.CONTROLLERQOL_OURS / "0002-mxl2012-median-orbs-tabs.patch").read_bytes())
+
+    def test_controllerqol_staged_with_its_config_preserved(self):
+        mod = self.staged()
+        src, dll, seed = self.controllerqol_src()
+        pr.stage_controllerqol(mod, dll, seed, src)
+        self.assertEqual((mod / pr.CONTROLLERQOL["dll"]).read_bytes(), dll.read_bytes())
+        self.assertIn("belt_actions = false", (mod / pr.CONTROLLERQOL["config"]).read_text("utf-8"))
+        self.assertIn("PyreFly", (mod / pr.CONTROLLERQOL["licence"]).read_text("utf-8"))
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, False, True))
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml",
+                                         "d2rloader/config/controller-qol-updates.toml"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["author"], entry["repo"], entry["path"], entry["commit"]),
+                         ("Controller QOL Updates", "PyreFly", "https://github.com/Pyre-Flies/D2R-Mods", "plugins/controller-qol",
+                          pr.controllerqol_commit()))
+        self.assertEqual(entry["patches"], pr.controllerqol_patches())
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+        self.assertEqual([b["name"] for b in pr.bundled_plugins(True, True, True, True)],
+                         ["D2R Legacy 16:9", "Buff HUD", "Auto Belt Refill", "Controller QOL Updates"])
+
+    def test_controllerqol_source_of_another_commit_patch_set_or_seed_is_refused(self):
+        mod = self.staged()
+        for commit, patches in (("0" * 40, None), (None, pr.controllerqol_patches()[:1])):
+            src, dll, seed = self.controllerqol_src(commit, patches)
+            with self.assertRaises(SystemExit):
+                pr.stage_controllerqol(mod, dll, seed, src)
+            self.assertFalse((mod / pr.CONTROLLERQOL["dll"]).exists())
+        src, dll, seed = self.controllerqol_src()
+        seed.write_bytes(b"[aim.sorceress]\n")  # this package's seed differs from the one built in
+        for profile in (seed, None):
+            with self.assertRaises(SystemExit):
+                pr.stage_controllerqol(mod, dll, profile, src)
+        self.assertFalse((mod / pr.CONTROLLERQOL["dll"]).exists())
+
+    def test_controllerqol_builds_that_are_not_ours_are_refused(self):
+        _src, dll, _seed = self.controllerqol_src()
+        self.assertEqual(pr.check_controllerqol(dll), [])
+        dll.write_bytes(b"MZ controller-qol-updates\0 1.3.1+rev.94\0 belt_actions = false")
+        self.assertTrue(any("version 1.3.1+rev.95" in p for p in pr.check_controllerqol(dll)))
+        dll.write_bytes(b"MZ controller-qol-updates\0 1.3.1+rev.95\0")  # PyreFly's own build: no belt switch
+        self.assertTrue(any("not our patched build" in p for p in pr.check_controllerqol(dll)))
+
     def test_legacy169_test_builds_are_refused(self):
         _src, dll = self.legacy169_src()
         self.assertEqual(pr.check_legacy169(dll), [])

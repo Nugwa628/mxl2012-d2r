@@ -3,8 +3,9 @@
 // tools/median_tabs.py puts 7 tabs in BankTabs and the new slots as direct children of advancedstash_runes (MEDIAN, ORBS) and
 // advancedstash_materials (the Median page): D2R's stash init takes a tab's accepted codes from those direct children only.
 // D2R's panel knows 5 pages (the table +0x278, bounds-checked against 5), so:
-//   - the tab getter 0x23af50 maps tabs 5 and 6 to 4 (Runes): its read of the tab bar (0x23af9f, mov ebx,[rdi+0x16c4]) calls a
-//     stub in the int3 pad 0x23afd2 that reads it and caps it at 4. Every user of the tab (22 callers) sees Runes;
+//   - the tab getter 0x23af50 answers tabs 5 and 6 as 4 (Runes) to D2R: its 21 direct calls go to a stub in the int3 pad 0x23afd2
+//     that calls it and caps the answer at 4 (the 22nd call, 0x23bbd2, is tabflash's). The getter's own bytes stay as D2R, so
+//     controller-qol's check of its first 128 bytes passes and its own calls see the real tab (median_tabs_logic.h);
 //   - the tab update 0x23e630(panel, ...) runs as D2R, then the real tab (the tab bar's +0x16c4) decides which slot groups of
 //     the Runes page are shown (Runes, MEDIAN, ORBS; medtab_names.h; their pictures and the selectors are panel children shown here by tab), and the cube is hidden on tabs 5 and 6. Outside a RotW
 //     game tabs 5 and 6 are hidden as D2R hides 2-4 (0x879260) and go back to Personal;
@@ -20,6 +21,7 @@
 #include "median_tabs_logic.h"
 #include "medtab_names.h"
 
+#include <D2RLPlugin/mutations.h>
 #include <D2RLPlugin/shared_events.h>
 #include <D2RLPlugin/threads.h>
 #include <D2RLPlugin/widgets.h>
@@ -33,13 +35,7 @@
 
 namespace {
 
-constexpr uint64_t TabReadRva = 0x23af9f;
-constexpr uint8_t TabRead[] = {0x8b, 0x9f, 0xc4, 0x16, 0x00, 0x00};  // mov ebx, [rdi+0x16c4]
-constexpr uint64_t StubRva = 0x23afd2;
 constexpr uint8_t StubPad[14] = {0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};
-// mov ebx, [rdi+0x16c4] / cmp ebx, 4 / jbe +2 / mov bl, 4 / ret (an index above 255 stays for D2R's own check)
-constexpr uint8_t Stub[14] = {0x8b, 0x9f, 0xc4, 0x16, 0x00, 0x00, 0x83, 0xfb, 0x04, 0x76, 0x02, 0xb3, 0x04, 0xc3};
-constexpr uint8_t TabCall[6] = {0xe8, 0x2e, 0x00, 0x00, 0x00, 0x90};  // call 0x23afd2 / nop
 constexpr uint64_t UpdateRva = 0x23e630;
 constexpr uint8_t UpdateEntry[] = {0x48, 0x89, 0x5c, 0x24, 0x10, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57};
 constexpr uint64_t ChildByNameRva = 0x855c90;    // (widget, const char* name) -> descendant widget or null
@@ -206,6 +202,36 @@ auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::U
 	return D2RL::SharedEvents::UiMessageAction::Continue;
 }
 
+// The stub and the redirected calls (median_tabs_logic.h), all or nothing
+auto CapGetterCalls(const D2RL::PluginContext* context, const D2RL::MutationService* mutations) noexcept -> bool {
+	D2RL::Mutations::TransactionHandle tx = 0;
+	if (mutations->beginTransaction(context, &tx) != D2RL::Mutations::Result::Success) {
+		return false;
+	}
+	auto stage = [&](uint64_t rva, const uint8_t* expected, const uint8_t* bytes, uint32_t size) noexcept {
+		const D2RL::Mutations::BytePatchRequest patch{.structSize = D2RL::Mutations::BytePatchRequestSize, .rva = rva, .expected = expected,
+		                                              .expectedSize = size, .bytes = bytes, .size = size};
+		D2RL::Mutations::OperationHandle op = 0;
+		return mutations->stageBytePatch(context, tx, &patch, &op) == D2RL::Mutations::Result::Success;
+	};
+	uint8_t stub[14];
+	median_tabs::StubBytes(stub);
+	bool staged = stage(median_tabs::StubRva, StubPad, stub, sizeof(stub));
+	for (uint64_t site : median_tabs::GetterCallers) {
+		uint8_t from[5];
+		uint8_t to[5];
+		median_tabs::CallBytes(site, median_tabs::GetterRva, from);
+		median_tabs::CallBytes(site, median_tabs::StubRva, to);
+		staged = staged && stage(site, from, to, sizeof(to));
+	}
+	D2RL::Mutations::CommitResult result{.structSize = D2RL::Mutations::CommitResultSize};
+	if (!staged || mutations->commit(context, tx, &result) != D2RL::Mutations::Result::Success) {
+		mutations->cancelTransaction(context, tx);
+		return false;
+	}
+	return true;
+}
+
 }  // namespace
 
 auto InstallMedianTabs(const D2RL::PluginContext* context, bool tabsOn, char* report, size_t reportSize) noexcept -> bool {
@@ -220,31 +246,41 @@ auto InstallMedianTabs(const D2RL::PluginContext* context, bool tabsOn, char* re
 		std::snprintf(report, reportSize, "medtab off: ThreadService / WidgetService / SharedEventService unavailable");
 		return false;
 	}
-	if (std::memcmp(image + TabReadRva, TabRead, sizeof(TabRead)) != 0 || std::memcmp(image + StubRva, StubPad, sizeof(StubPad)) != 0 ||
+	const D2RL::MutationService* mutations = nullptr;
+	if (context->QueryService(&mutations) != D2RL::ServiceQueryResult::Success || !D2RL::HasMutationServiceField(mutations, D2RL::MutationServiceRequiredSize)) {
+		std::snprintf(report, reportSize, "medtab off: MutationService unavailable");
+		return false;
+	}
+	bool callsAsD2R = true;
+	for (uint64_t site : median_tabs::GetterCallers) {
+		uint8_t call[5];
+		median_tabs::CallBytes(site, median_tabs::GetterRva, call);
+		callsAsD2R = callsAsD2R && std::memcmp(image + site, call, sizeof(call)) == 0;
+	}
+	if (!callsAsD2R || std::memcmp(image + median_tabs::StubRva, StubPad, sizeof(StubPad)) != 0 ||
 	    std::memcmp(image + RotwGameRva, RotwGameCode, sizeof(RotwGameCode)) != 0 ||
 	    std::memcmp(image + HideTabRva, HideTabEntry, sizeof(HideTabEntry)) != 0 ||
 	    std::memcmp(image + CodeReadRva, CodeReadEntry, sizeof(CodeReadEntry)) != 0 ||
 	    std::strcmp(reinterpret_cast<const char*>(image + BankTabsNameRva), "BankTabs") != 0) {
-		std::snprintf(report, reportSize, "medtab off: bytes differ at 0x23af9f / 0x23afd2 / 0x8d3e0 / 0x879260 / 0x2ce910 / 0x1ce4ba0, left as D2R");
+		std::snprintf(report, reportSize, "medtab off: bytes differ at the getter calls / 0x23afd2 / 0x8d3e0 / 0x879260 / 0x2ce910 / 0x1ce4ba0, left as D2R");
 		return false;
 	}
 	g_child = reinterpret_cast<ChildFn>(g_base + ChildByNameRva);
 	g_rotwGame = reinterpret_cast<BoolFn>(g_base + RotwGameRva);
 	g_hideTab = reinterpret_cast<HideTabFn>(g_base + HideTabRva);
-	// the code read and the update hook first (inert while the getter still answers 0-4), then the stub, then the call that
-	// makes it live
+	// the code read and the update hook first (inert while the getter still answers 0-4), then the stub and the 21 calls in one
+	// transaction: D2R sees either all of its callers capped or none
 	const bool ok = context->InstallInlineHook(CodeReadRva, CodeReadEntry, sizeof(CodeReadEntry), reinterpret_cast<void*>(&CodeReadHook),
 	                                           reinterpret_cast<void**>(&g_codeRead)) &&
 	                context->InstallInlineHook(UpdateRva, UpdateEntry, sizeof(UpdateEntry), reinterpret_cast<void*>(&UpdateHook),
 	                                           reinterpret_cast<void**>(&g_update)) &&
-	                context->PatchBytes(StubRva, StubPad, sizeof(StubPad), Stub, sizeof(Stub)) &&
-	                context->PatchBytes(TabReadRva, TabRead, sizeof(TabRead), TabCall, sizeof(TabCall));
+	                CapGetterCalls(context, mutations);
 	D2RL::SharedEvents::UiMessageListener listener{};
 	listener.structSize = D2RL::SharedEvents::UiMessageListenerSize;
 	listener.callback = &OnUiMessage;
 	D2RL::SharedEvents::ListenerHandle handle = 0;
 	const bool listening = ok && events->registerUiMessageListener(context, &listener, &handle) == D2RL::SharedEvents::Result::Success;
-	std::snprintf(report, reportSize, "medtab %s (layout mark %s): tabs 5 / 6 run as Runes (getter 0x23af50 capped through 0x23afd2), groups "
+	std::snprintf(report, reportSize, "medtab %s (layout mark %s): tabs 5 / 6 run as Runes (21 calls of the getter 0x23af50 capped through 0x23afd2), groups "
 	              "shown after 0x23e630, '@' codes restored at 0x2ce910, selector %s", !ok ? "FAILED" : tabsOn ? "on" : "guard only, Median tabs hidden (off word)",
 	              medtab_names::LayoutMark, listening ? "listening" : "not listening");
 	return ok;

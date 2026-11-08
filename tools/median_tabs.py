@@ -11,6 +11,8 @@ children of those widgets:
                            a background picture (`medtab_median_bg`, `medtab_orbs_bg`) that covers the Runes art (no plinth)
   advancedstash_materials  + the Median page (29 oils, arcane pieces, reagents; `medtab_mat_bg` over the vanilla recesses,
                            plinth kept) and a selector on both pages (`medtab_sel_vanilla`, `medtab_sel_median`)
+D2R's own slots whose code is no item of the mod (20 on the vanilla Materials page: keys, organs, essences, shards, `ua1`-`ua5`)
+are removed first: their empty-slot placeholder had item class -1 and every draw of one asserted (bug #548).
 The plugin shows one group at a time (tab 5 / 6 / Runes; selector Vanilla / Median). The tab bar gets 7 tabs (HD 139 x 72,
 classic 44 x 24 with the names in the art).
 
@@ -240,16 +242,17 @@ def page_art(materials, d2r_mat_slots, slots, box, seed):
     return im.crop(box)
 
 
-def tab_frames(sprite):
+def tab_frames(sprite, width=HD_TAB_W):
+    """D2R's two tab frames narrowed to `width` (the middle squeezed, the 22-pixel ends kept; tools/pad_ui.py: the gamepad tabs)."""
     from PIL import Image
     out = []
     for f in sprite[:2]:
         e = 22
-        mid = f.crop((e, 0, f.width - e, f.height)).resize((HD_TAB_W - 2 * e, f.height), Image.LANCZOS)
-        im = Image.new("RGBA", (HD_TAB_W, f.height))
+        mid = f.crop((e, 0, f.width - e, f.height)).resize((width - 2 * e, f.height), Image.LANCZOS)
+        im = Image.new("RGBA", (width, f.height))
         im.paste(f.crop((0, 0, e, f.height)), (0, 0))
         im.paste(mid, (e, 0))
-        im.paste(f.crop((f.width - e, 0, f.width, f.height)), (HD_TAB_W - e, 0))
+        im.paste(f.crop((f.width - e, 0, f.width, f.height)), (width - e, 0))
         out.append(im)
     return out
 
@@ -327,17 +330,49 @@ def check_misc(data: Path, report: list[str]) -> None:
     report.append(f"misc.txt: AdvancedStashStackable 1 on all {len(CODES)} codes")
 
 
+def item_codes(data: Path) -> set[str]:
+    codes = set()
+    for name in ("misc", "weapons", "armor"):
+        lines = (data / "global" / "excel" / f"{name}.txt").read_bytes().decode("latin-1").splitlines()
+        ci = lines[0].split("\t").index("code")
+        codes |= {f[ci] for f in (line.split("\t") for line in lines[1:]) if len(f) > ci and f[ci]}
+    return codes
+
+
+def drop_unknown_slots(lay: dict, known: set[str]) -> list[str]:
+    """Removes D2R's slots whose code is no item of the mod (the vanilla Materials page's keys, organs, essences, shards and
+    `ua1`-`ua5`). Each empty slot draws a placeholder item made from its code (0x2cf260); an unknown code gives an item of class
+    -1, and the first draw of one raised a burst of engine asserts (bug #548). Such a slot can never hold an item."""
+    dropped = []
+    for page in ("advancedstash_gems", "advancedstash_materials", "advancedstash_runes"):
+        node = find(lay, page)
+        keep = []
+        for c in node["children"]:
+            code = c.get("fields", {}).get("itemCode")
+            if c.get("type") == "AdvancedStashSlotWidget" and real_code(code) not in known:
+                dropped.append(code)
+            else:
+                keep.append(c)
+        node["children"] = keep
+    return dropped
+
+
 def apply(data: Path) -> list[str]:
     import rotw_stash_legacy as rsl
     report = []
     check_misc(data, report)
+    known = item_codes(data)
     lay_dir = data / "global" / "ui" / "layouts"
     hp = lay_dir / "bankexpansionlayouthd.json"
-    hd = apply_hd(rsl.lenient_json(hp.read_text("utf-8")))
+    hd = rsl.lenient_json(hp.read_text("utf-8"))
+    report.append(f"HD layout: {len(drop_unknown_slots(hd, known))} slots without an item of the mod removed (#548)")
+    hd = apply_hd(hd)
     hp.write_text(json.dumps(hd, indent=1, ensure_ascii=False) + "\n", "utf-8", newline="")
     sp = lay_dir / "bankexpansionlayout.json"
     if sp.exists():
-        sd = apply_sd(rsl.lenient_json(sp.read_text("utf-8")))
+        sd = rsl.lenient_json(sp.read_text("utf-8"))
+        report.append(f"classic layout: {len(drop_unknown_slots(sd, known))} slots without an item of the mod removed (#548)")
+        sd = apply_sd(sd)
         sp.write_text(json.dumps(sd, indent=1, ensure_ascii=False) + "\n", "utf-8", newline="")
     else:  # MXL2012_ROTW_LEGACY=0: legacy graphics keep D2R's 5 tabs (the plugin finds no LAYOUT_MARK there and stays out)
         report.append("classic layout: not in the mod (MXL2012_ROTW_LEGACY=0), left as D2R")

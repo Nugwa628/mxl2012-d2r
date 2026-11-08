@@ -36,7 +36,7 @@ markers by rarity with names, immunity letters or halos, missile dots on the aut
 objects) from a map-generation helper exe (a Zig build of libd2), GPS navigation and routing to a chosen level, an ImGui
 settings panel (D3D12 overlay), loot-filter and other mod compatibility profiles.
 
-## 2. Measuring "explored percent"
+## 2. Measuring "explored percent" (retired, bug #559: section 7)
 
 D2R keeps no per-level "explored" counter. It has (a) the automap cells of each layer, which only grow, and (b) the active
 rooms (`room +0x58`), which exist only near the player and are freed again behind them. Neither gives a percent by itself:
@@ -118,3 +118,25 @@ The hook-free per-level reveal works when the context byte is the player's data-
 the probe's `0x8b2d0()` is 0, the server's byte, and that is what closed the game. No `InitLevel` hook is needed. Game check
 `mapreveal`, run `checks-20261106-172408-s1` (slot 1): HD Cold Plains and Den of Evil, legacy Blood Moor and Cave Level 1,
 every room made, the game went on, 0 crash files. The part: docs/plugin-plan.md section 34.
+
+## 7. The explored share retired (lane reveal, 2026-11-08, bug #559)
+
+Player report on 0.1.16: the reveal was sometimes available right at the arrival, smaller maps reached 70 % much too fast, and
+in the sewers and catacombs the % did not match the map. Static reading of why the room measure of section 2 cannot follow the
+automap:
+
+- **Active is not seen.** 1.14d's periodic automap update `AUTOMAP_Update 0x459020` (every frame, once the player has moved
+  about 40 units) takes the rooms next to the player's room and calls `AUTOMAP_RevealRoom 0x458f40(room, 0, layer)`, which
+  adds only the floor and wall tiles that carry the seen flag `0x20000` (or all of them with the debug reveal flag or the
+  force argument). D2R's room callback `0xd2240` (DRLG `+0x838`, the one the plugin calls) passes force = 1 to its reveal
+  `0xd6550`, as 1.14d's `AUTOMAP_RevealRoomCallback 0x459150` does.
+- **Loaded is wider than the screen.** A room counted as "seen" once it had been active, and D2R makes the player's room and
+  all its neighbours active. A level of one or a few presets (Sewers Level 2 (93) is 18 x 22 tiles, Catacombs Level 4 (37)
+  22 x 31) is then largely "explored" on arrival, while the automap shows only what the player has seen. A maze or an outdoor
+  level, with many rooms, came out about right, which matches the report.
+
+A measure that follows the automap would have to count seen tiles per room while the room is loaded and estimate the rest.
+The owner chose to drop the share instead (2026-11-08): the key reveals the current level on every press, from the arrival
+on, in every level including towns. `exclude` stays as the only setting; an old `threshold` line is read and ignored. No
+in-game repro of the old numbers was run (the scope changed before the probe run). The part: docs/plugin-plan.md section 34;
+the game check: docs/testing.md "Lane reveal".

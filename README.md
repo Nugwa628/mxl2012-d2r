@@ -14,8 +14,14 @@ over is his; this project only moves it to Diablo II: Resurrected.
 Shipped with the mod from 0.1.12: **Buff HUD** by **Lukaszpg** (<https://github.com/Lukaszpg/d2rl-buff-hud>, MIT; copyright
 and licence notice in `mods\mxl2012\d2rloader\plugins\d2rl-buff-panel-LICENSE.txt`), in our fork for Median XL 2012
 (<https://github.com/Nugwa628/d2rl-buff-hud>): a panel of your timed buffs with timers and names. Turn it off with
-`enabled = false` in `mods\mxl2012\d2rloader\config\buff-panel.toml`. Planned: PyreFly's plugins by **PyreFly**
-(<https://github.com/Pyre-Flies/D2R-Mods>, by permission). See [docs/bundled-plugins.md](docs/bundled-plugins.md).
+`enabled = false` in `mods\mxl2012\d2rloader\config\buff-panel.toml`. See [docs/bundled-plugins.md](docs/bundled-plugins.md).
+
+Shipped with the mod from 0.1.17: **Controller QOL Updates** by **PyreFly** (<https://github.com/Pyre-Flies/D2R-Mods>,
+`plugins/controller-qol`, shipped and adapted with PyreFly's permission): gamepad shortcuts for items (LB + A / X / Y, Deposit
+All with LB + L3, also into the MEDIAN and ORBS stash tabs), direct ground looting with LB, menu and stash paging, and
+right-stick aiming with a skill profile made for Median XL 2012's skills. Its belt shortcuts are off (Auto Belt Refill keeps
+the belt). Settings: `mods\mxl2012\d2rloader\config\controller-qol-updates.toml`; your skill choices (R3 in the skill tree)
+are kept in `controller-qol-skills\` next to it.
 
 Shipped with the mod from 0.1.15: **Auto Belt Refill** by **jaycachou-svg** (<https://github.com/jaycachou-svg/auto-belt-refill>,
 shipped and adapted with the author's permission; the repository has no licence file): refills the potion belt from your

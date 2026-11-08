@@ -17,3 +17,6 @@
 [submodule "third_party/auto-belt-refill"]
 	path = third_party/auto-belt-refill
 	url = https://github.com/jaycachou-svg/auto-belt-refill
+[submodule "third_party/D2R-Mods"]
+	path = third_party/D2R-Mods
+	url = https://github.com/Pyre-Flies/D2R-Mods
