@@ -39,6 +39,9 @@ KNOWN_CAPACITIES = {"VariantTransformTable": 128, "PhysicsClothAsset": 128, "Uni
                     "SkeletonAsset": 512, "AnimationAsset": 512, "AnimationTimelineAsset": 512, "PhysicsTreeMeshAsset": 512,
                     "PopcornAsset": 1024, "ModelAsset": 2750, "TileMaskRuleSet": 16}
 OFF_BUCKETS_N, OFF_BUCKETS, OFF_COUNT, OFF_CAPACITY = 0x50, 0x58, 0x60, 0x70
+# Capacities our plugin starts a cache at (plugin/src/model_cache_logic.h `Capacity`: the ModelAsset cache at 8250, three
+# times D2R's 2750, which is not a growth of it).
+PLUGIN_CAPACITIES = {8250}
 # Kind per offset where it is known (keys read live); the three caches of DefaultCapacity 512 are not told apart yet.
 OFFSET_KINDS = {0x11618: "VariantTransformTable", 0x26648: "ModelAsset", 0x26ac8: "UnitAnimationStateMachine",
                 0x26be0: "TileMaskRuleSet", 0x26cf8: "PopcornAsset"}
@@ -55,7 +58,7 @@ def plausible(header):
     nb, arr, count, cap = header
     if not (nb and nb & (nb - 1) == 0 and nb <= 1 << 20 and arr and 0 < cap < 1 << 20 and count <= cap):
         return False
-    return any(grown(d, cap) for d in set(KNOWN_CAPACITIES.values()))
+    return cap in PLUGIN_CAPACITIES or any(grown(d, cap) for d in set(KNOWN_CAPACITIES.values()))
 
 
 def grown(default, cap, steps=12):

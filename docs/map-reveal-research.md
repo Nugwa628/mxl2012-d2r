@@ -140,3 +140,14 @@ The owner chose to drop the share instead (2026-11-08): the key reveals the curr
 on, in every level including towns. `exclude` stays as the only setting; an old `threshold` line is read and ignored. No
 in-game repro of the old numbers was run (the scope changed before the probe run). The part: docs/plugin-plan.md section 34;
 the game check: docs/testing.md "Lane reveal".
+
+## 8. Towns revealed on arrival (lane townreveal, 2026-11-08)
+
+Owner ruling: the towns are always revealed on arrival, with no key; everywhere else L reveals the current level, with no
+default exclusions. Median XL 2012's town levels are D2R's five (levels.txt: 1, 40, 75, 103, 109; the only other level with no
+monsters of its own is the boss level 136, Tristram, which is no town). The game check: docs/testing.md "Lane townreveal".
+
+A town's cell count says little by itself: Lut Gholein has 17 automap cells, the Pandemonium Fortress 29, Harrogath 6 (the
+Rogue Encampment about 740, Kurast Docks 762). Walking the town adds none after the reveal. D2R's `revealmap` jumps the count
+(17 -> 2269) because a town shares its layer with the act's outdoor levels (levels.txt Layer 27 has six levels, 57 nine, 77 and
+79 four each), so it adds those levels' cells, not the town's.

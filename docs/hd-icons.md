@@ -597,3 +597,13 @@ Ground `flippyfile`, item stats, names, description strings and charge recipes a
 departure from assigning colours through the two misc fields; it requires no plugin or save migration.
 
 The colour list is in CHANGELOG.md, Unreleased. In-game evidence and limits: docs/testing.md, Lane shrinecol.
+
+### Elixir colours (lane shrinetip)
+
+`tools/elixir_colours.py` gives the 22 elixirs of the MEDIAN tab one liquid colour each (`KINDS`: code, name, colour, hue, saturation
+and brightness factors). `tables` changes only `misc.txt invfile` (`invxyz` to `mxlelixir00..21`, both banks); `art` writes
+`global/items/mxlelixir00..21.dc6` from D2R's `invxyz.dc6` and `hd/global/ui/items/misc/mxl/elixir00..21` (HD and lowend) from D2R's
+`quest/scroll_of_self_resurrect` sprite, and points the per-code `hd/items/items.json` entries at them. Only green-dominant pixels
+change, so glass, cork and frame stay and each kind still reads as the same flask; alpha and canvas are unchanged. Poison keeps the
+original green. Legacy picks the closest palette entry, so its shades are coarser than HD's. `xyz`, `ice` and Goodberry keep
+their pictures. Transform / InvTrans stay 0, for the reason given above; saved elixirs change with no migration.

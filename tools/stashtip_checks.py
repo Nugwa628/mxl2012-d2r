@@ -74,7 +74,7 @@ def built(gc, log):
     return int(n.group(1)) if n else None
 
 
-def one(gc, log, shots, mode, tab, code, lay, legacy):
+def one(gc, log, shots, mode, tab, code, lay, legacy, prefix="stashtip"):
     """Makes `code` in the backpack, hovers it, Ctrl-clicks it into its slot, hovers the slot. True when it went in and the slot
     was hovered."""
     mt.tab(gc, tab)
@@ -91,7 +91,7 @@ def one(gc, log, shots, mode, tab, code, lay, legacy):
     grid = mt.SD_INV if legacy else gc.RP_INV
     xy = gc.rp_inv_xy(it["x"], it["y"], grid)
     hover(gc, xy)
-    shots.append(gc.sh("stashtip_%s_inv_%s" % (mode, code.replace("&", "o").replace("^", "x"))))
+    shots.append(gc.sh("%s_%s_inv_%s" % (prefix, mode, code.replace("&", "o").replace("^", "x"))))
     gc.g.click(*xy, mods=("ctrl",))
     time.sleep(1.0)
     if it["id"] in mt.backpack_ids(gc):
@@ -102,7 +102,7 @@ def one(gc, log, shots, mode, tab, code, lay, legacy):
         log.append("%s: no slot in the layout's %s" % (code, PAGES[tab]))
         return False
     hover(gc, sxy)
-    shots.append(gc.sh("stashtip_%s_slot_%s" % (mode, code.replace("&", "o").replace("^", "x"))))
+    shots.append(gc.sh("%s_%s_slot_%s" % (prefix, mode, code.replace("&", "o").replace("^", "x"))))
     park(gc)
     return True
 

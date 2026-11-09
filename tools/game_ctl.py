@@ -403,7 +403,7 @@ WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP = 0x200
 VK = {"esc": 0x1B, "enter": 0x0D, "tab": 0x09, "space": 0x20, "backspace": 0x08, "ctrl": 0x11, "shift": 0x10,
       "alt": 0x12, "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28, "`": 0xC0, "-": 0xBD, "=": 0xBB,
       ".": 0xBE, ",": 0xBC, "/": 0xBF, ";": 0xBA, "'": 0xDE}
-for _i in range(1, 11):
+for _i in range(1, 13):
     VK[f"f{_i}"] = 0x6F + _i
 for _c in "abcdefghijklmnopqrstuvwxyz0123456789":
     VK[_c] = ord(_c.upper())

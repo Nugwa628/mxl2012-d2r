@@ -27,6 +27,37 @@ int main() {
 	s.nExclude = 1;
 	Check(Excluded(73, s) && !Excluded(74, s), "a listed level is excluded");
 
+	// the act towns, revealed on each arrival (owner, 2026-11-08)
+	for (const int t : {1, 40, 75, 103, 109}) {
+		Check(IsTown(t), "an act town");
+	}
+	for (const int t : {0, 2, 39, 41, 74, 76, 102, 104, 108, 110, 136}) {
+		Check(!IsTown(t), "not a town");
+	}
+	Check(TownLayer(1) == 0 && TownLayer(40) == 27 && TownLayer(75) == 57 && TownLayer(103) == 77 && TownLayer(109) == 79, "the towns' layers");
+	Check(TownLayer(2) == -1 && TownLayer(136) == -1, "no layer for other levels");
+	TownWatch w;
+	const auto poll = [&w](int level) { return TownArrival(&w, level, TownLayer(level)); };
+	Check(!TownArrival(&w, 0, -1), "no level: nothing");
+	Check(!TownArrival(&w, 2, 1), "a field: nothing");
+	Check(!poll(1) && !poll(1), "town: waits for the level to settle");
+	Check(poll(1), "town: revealed on the third poll");
+	Check(!poll(1) && !poll(1), "town: once per arrival");
+	Check(!TownArrival(&w, 2, 1), "out of town again");
+	Check(!poll(1) && !poll(1) && poll(1), "back in town: revealed again");
+	Check(!poll(40) && !poll(40) && poll(40), "town to town (act change)");
+	Check(!TownArrival(&w, 0, -1) && !poll(40) && !poll(40) && poll(40), "a new game in the same town");
+	Check(!TownArrival(&w, 2, 1) && !poll(75) && !TownArrival(&w, 2, 1) && !poll(75) && !poll(75) && poll(75),
+	      "a town left before it settled: counted from the new arrival");
+	Check(!TownArrival(&w, 2, 1), "out of town before the act change");
+	for (int i = 0; i < 20; ++i) {
+		Check(!TownArrival(&w, 109, 57), "act change: never while the layer is still the old town's");
+	}
+	Check(!TownArrival(&w, 109, -1), "act change: no layer yet");
+	Check(!poll(109) && !poll(109) && poll(109), "act change: three polls once the layer is the town's");
+	Check(!TownArrival(&w, 2, 1), "out of town");
+	Check(!poll(103) && !TownArrival(&w, 103, 57) && !poll(103) && !poll(103) && poll(103), "the layer lost again: the count starts over");
+
 	// settings: [mapreveal] of mxl2012-core.toml
 	Settings p;
 	Check(!ParseSettings("", &p) && p.nExclude == 0 && !p.oldThreshold, "empty text: defaults");

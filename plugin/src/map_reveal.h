@@ -7,7 +7,7 @@
 
 // The Controls action "Reveal Level Map" (mxl_map_level, default L) reveals the current level's automap on every press (no
 // explored share needed since bug #559); levels in mxl2012-core.toml [mapreveal] exclude are refused. A chat line answers each
-// press. Client side only, no hook. True when on.
+// press. The act towns are revealed by themselves on each arrival. Client side only, no hook. True when on.
 auto InstallMapReveal(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> bool;
 
 // Test harness (UI thread): the counters since load and the last press ("level=34 presses=2 reveals=2 ... lastmade=60 ...").

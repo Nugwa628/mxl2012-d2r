@@ -3,7 +3,8 @@
 [mapreveal]
 # Options > Controls: "Reveal Level Map" (default L) reveals the current level's map, in any level, whenever you press it.
 # (The explored share it needed in 0.1.15 / 0.1.16 is gone: an old `threshold = ...` line here is ignored.)
-# Level ids where the key reveals nothing, e.g. exclude = [73, 74]
+# The five act towns are always revealed by themselves when you arrive.
+# Level ids where the key reveals nothing, e.g. exclude = [73, 74] (it does not stop the towns).
 exclude = []
 
 [fonts]

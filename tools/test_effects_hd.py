@@ -106,6 +106,14 @@ class Definitions(unittest.TestCase):
         self.assertEqual(d["entities"][0]["components"][0]["scale"]["y"], 2)  # the input is not touched
         self.assertEqual(out["entities"][0]["components"][1]["filename"], "f.particles")
 
+    def test_scaled_definition_adds_a_transform_only_when_asked(self):
+        d = {"name": "a", "entities": [{"components": [{"type": "VfxDefinitionComponent", "filename": "f.particles"}]}, {"components": [{"type": "UnitRootComponent"}]}]}
+        self.assertEqual(len(e.scaled_definition(d, "b", 2.0)["entities"][0]["components"]), 1)
+        out = e.scaled_definition(d, "b", 2.0, add_missing=True)["entities"]
+        self.assertEqual(out[0]["components"][1]["scale"], {"x": 2.0, "y": 2.0, "z": 2.0})
+        self.assertEqual(len(out[1]["components"]), 1)  # no effect on the entity: nothing to scale
+        self.assertEqual(len(e.scaled_definition(d, "b", 1, add_missing=True)["entities"][0]["components"]), 1)
+
 
 class Tables(unittest.TestCase):
     def test_read_tsv_crlf_and_short_rows(self):

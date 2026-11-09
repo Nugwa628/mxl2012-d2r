@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ds1_remap  # noqa: E402
 import map_tint  # noqa: E402
 import maps_hd  # noqa: E402
+import walls_scene  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SET_PIECE_CELLS = 3              # see Library.set_piece()
@@ -75,10 +76,12 @@ PIECE_CANDIDATES = 50            # entities kept per possible set piece while le
 # (4,989 entities, 4,423 of them with a model, 679 distinct models, 4,651,080 bytes). cap() drops pieces past these.
 MAX_PLACED = 4423
 MAX_BYTES = 4_651_080
-# Per-map budget over the cap (lane stairs): (placed models, bytes). cypherpunk with its stairs places 5,779 pieces (5.05 MB),
-# 1,356 over the cap, all props and details; the largest scene measured in game (6,255 pieces, 5,417,732 bytes, slot 2) loaded
-# with no assert or crash file, frame time and memory as with the capped scene (docs/maps-hd.md "Stairs at Fauztinville").
-MAP_LIMITS = {"expansion/ghetto/cypherpunk.ds1": (6255, 5_417_732)}
+# Per-map budget over the cap (lane stairs): (placed models, bytes). Lane stairs measured a 6,255-piece scene (5,417,732
+# bytes) in game. Lane hdscene2: composed from the classic layout with Median's tiles in the gaps, cypherpunk places 8,620
+# pieces (7,999,943 bytes, 126 distinct models): the budget is that scene, measured in game (docs/maps-hd.md "Sprite walls in
+# the gaps"). D2R reads no entity or byte limit from a scene; the engine limit is the ModelAsset cache (distinct models,
+# 2750, plugin model_cache.cpp: 8250).
+MAP_LIMITS = {"expansion/ghetto/cypherpunk.ds1": (8620, 7_999_943)}
 # Sunk walls (lane tawalls, Library.lift): a wall piece whose base is this far under D2R's ground and whose top ends below
 # SUNK_TOP over it stands at a terrace foot in D2R (the ground measured is the terrace top); on Median's flat map it is
 # stood on the floor.
@@ -178,6 +181,8 @@ FLOAT_Y = 3.0
 TERRAIN_SWITCH = "MXL2012_BELIAL_TERRAIN"
 TERRAIN_TRY = {"act2/arcane/belial.ds1": "act3/jungle/pygn2"}
 TERRAIN_MAPS: dict[str, str] = {}
+SCENE_OFF: dict[str, str] = {}   # maps whose walls stay per tile (walls_scene not used): {map: reason}
+SPRITE_OFF: dict[str, str] = {}  # maps whose gap cells keep the per-tile pick (no sprite walls, build_scene `sprites`): {map: reason}
 
 
 def terrain_maps(env=None) -> dict:
@@ -727,10 +732,14 @@ class Library:
         self.grounded = {}                                         # generic signature -> its variant stood on the floor (_ground)
         self._templates = None                                     # model -> a learnt entity of it (_stand_in_pieces)
         self.box_of, self._boxes = None, {}                        # model -> bounding box (learn_library; cover)
+        self.kit = None                                            # walls_scene.Kit: D2R's wall pieces by structure (learn_library)
+        self.floor_folders = {}                                    # Median map -> {(x, y): floor tile set folder} (run)
 
     def learn(self, name: str, cells: dict, scene: dict, ground=None):
         """cells: wall_cells() of a D2R map; scene: its preset json; ground: its Ground (wall_entities)."""
         per_cell, homeless = collections.defaultdict(list), []
+        if self.kit is not None:
+            self.kit.add(name, cells, wall_entities(scene, ground))
         for e, x, z in wall_entities(scene, ground):
             xy = (int(x // TILE), int(z // TILE))
             if xy in cells:
@@ -1271,17 +1280,44 @@ def local_walls(cells: dict, lib: Library) -> dict:
     return {o: max(c.items(), key=lambda t: t[1])[0] for o, c in seen.items()}
 
 
-def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_bytes=MAX_BYTES, fill=(), stand_ins=None):
+def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_bytes=MAX_BYTES, fill=(), stand_ins=None,
+                structured=None, sprites=None):
     """-> (scene json text, stats). The scene keeps at most `limit` entities and `max_bytes` bytes (cap()). fill: tile set
     folders whose hollow wall cells get a wall (HOLLOW_MAPS), placed after the other cells so that the walls already spanning
-    them are known. stand_ins: the map's STAND_INS (Library.stand_in)."""
+    them are known. stand_ins: the map's STAND_INS (Library.stand_in). structured: (entities, {(x, y): tiles}) of
+    walls_scene.compose: those entities are added and their tiles leave the cells' keys (a cell left with only floor or post
+    tiles gets nothing from the per-cell pick: its floor under the composed wall would otherwise get D2R's floor rubble, its post
+    the stones of a post key; the composed run has its own joints). sprites (SpriteFill): its gap cells whose per-tile pick
+    stays under full height get Median's own wall tiles as sprite models instead (walls_sprite.MapSprites); where such a
+    sprite wall meets a D2R piece (in a line or at a corner) the tile set's joint stands, its height scaled to the sprite's
+    (walls_scene.join_points / place_joins, with lib.kit)."""
+    import walls_sprite
     ents, stats, hollows = [], collections.Counter(), []
-    for serial, (xy, key) in enumerate(sorted(cells.items(), key=lambda t: (t[0][1], t[0][0]))):
+    sprite_edges, d2r_edges = {}, {}
+    kit = getattr(lib, "kit", None) if sprites is not None else None   # joins: only with sprites and D2R's kit
+    if structured and kit is not None:
+        for xy, done in structured[1].items():
+            for t in done:
+                a = walls_scene.axis_of(t[1])
+                if a:
+                    d2r_edges[(a, xy[1], xy[0]) if a == "x" else (a, xy[0], xy[1])] = t[0]
+    if structured:
+        cells = dict(cells)
+        for xy, done in structured[1].items():
+            if xy in cells:
+                rest = tuple(t for t in cells[xy] if t not in done)
+                if rest and not all(t[1] in (0, 7) for t in rest):   # a wall, tree or other piece left; floor or post alone: nothing
+                    cells[xy] = rest
+                else:
+                    del cells[xy]
+                    stats["structured_cells"] += 1
+
+    def one(serial, xy, key):
         sub = lib.stand_in(key, stand_ins)
         if sub is not None:
             stats["stand_in"] += 1
-            ents += place(sub, xy[0], xy[1], serial)
-            continue
+            ents.extend(place(sub, xy[0], xy[1], serial))
+            return
         sig, how = lib.pick(key)
         extra = list(lib.anchored.get(key, ())) if how == "exact" else []
         stats["anchored"] += len(extra)
@@ -1294,27 +1330,53 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
         if is_floor(key):          # floor-only cells: counted apart, never 'uncovered' (most floors are bare ground)
             stats["floor_cells"] += 1
             if not sig:
-                ents += place(extra, xy[0], xy[1], serial)
-                continue
+                ents.extend(place(extra, xy[0], xy[1], serial))
+                return
             stats["floor_walls"] += 1
         elif sig is None:
             if all(k[1] == TREE_ORIENTATION for k in key):   # a tree: its trunk cell holds the model, crown pieces none
                 stats["tree_cells"] += 1
-                ents += place(extra, xy[0], xy[1], serial)
+                ents.extend(place(extra, xy[0], xy[1], serial))
             else:
                 stats["uncovered"] += 1
-            continue
+            return
         else:
             stats[how] += 1
             if not sig:
                 stats["empty"] += 1     # D2R draws this tile without an entity (baked into its terrain, or nothing)
         if fill and hollow(key, sig, fill):
             hollows.append((serial, xy, key, extra))
-            continue
+            return
         variant = (lib.grounded.get(sig) if how == "generic" else None) or lib.variants.get(sig, [])
         keep = [v for v in variant if not lib.set_piece(model_of(v[0]))]
         stats["set_pieces"] += len(variant) - len(keep)
-        ents += place(keep + extra, xy[0], xy[1], serial)
+        ents.extend(place(keep + extra, xy[0], xy[1], serial))
+    gaps = sprites.gaps if sprites is not None else ()
+    for serial, (xy, key) in enumerate(sorted(cells.items(), key=lambda t: (t[0][1], t[0][0]))):
+        start, waiting = len(ents), len(hollows)
+        one(serial, xy, key)
+        if sprites is not None and (sprites.forced(xy) or xy in gaps and not sprites.tall(ents[start:] if len(hollows) == waiting else [], xy)):
+            drawn = sprites.entities(xy, serial, {t[1:] for t in key})
+            if drawn:     # Median's own tiles where D2R has no full-height wall (or no look-alike): replaces the cell's per-tile pick
+                del ents[start:], hollows[waiting:]
+                ents.extend(drawn)
+                stats["sprite_cells"] += 1
+                stats["sprites"] += len(drawn)
+                folder = {t[1:]: t[0] for t in key} if kit is not None else {}
+                for e in drawn:
+                    k = walls_sprite.key_of(model_of(e))
+                    a = walls_scene.axis_of(k[0])
+                    if a and folder.get(k):
+                        edge = (a, xy[1], xy[0]) if a == "x" else (a, xy[0], xy[1])
+                        top = sprites.top(k)
+                        if top > sprite_edges.get(edge, (0.0,))[0]:
+                            sprite_edges[edge] = (top, folder[k])
+                continue
+        if kit is not None and len(ents) > start:     # D2R's per-tile pieces
+            for t in key:
+                a = walls_scene.axis_of(t[1])
+                if a and t[0]:
+                    d2r_edges[(a, xy[1], xy[0]) if a == "x" else (a, xy[0], xy[1])] = t[0]
     if hollows:
         local, covered = local_walls(cells, lib), set()
         for e in ents:
@@ -1336,17 +1398,131 @@ def build_scene(cells: dict, lib: Library, biome: str, limit=MAX_PLACED, max_byt
     for n, (e, x, y, dx, dz) in enumerate(lib.fit(cells)):    # set pieces by layout (lane walls4)
         ents += place([(e, dx, dz)], x, y, len(cells) + n, "mxp")
         stats["pieces"] += 1
+    if structured:
+        ents += structured[0]
+        stats["structured"] += len(structured[0])
+    groups = []
+    if sprite_edges:
+        taken = walls_scene.joint_points([(e, *_position(e)) for e in structured[0]], kit) if structured else set()
+        groups, left = walls_scene.place_joins(walls_scene.join_points(sprite_edges, d2r_edges), kit, taken, stats)
+        stats["joins_left_at"] = sorted(left)
+    if sprites is not None:
+        floor = sprites.floor_entities()
+        ents += floor
+        stats["floor_sprites"] = len(floor)
     kept = cap(ents, limit)
     text = scene_json(biome, kept)
     while len(text.encode("utf-8")) > max_bytes and kept:
         kept = cap(ents, min(len(kept) - 1, int(len(kept) * max_bytes / len(text.encode("utf-8")))))
         text = scene_json(biome, kept)
+    if groups:
+        joins = budget_joins(groups, limit - len(kept), max_bytes - len(text.encode("utf-8")))
+        stats["joins"], stats["joins_over_budget"] = len(joins), len(groups) - len({e["name"].rsplit("_", 1)[0] for e in joins})
+        if joins:
+            text = scene_json(biome, kept + joins)
+            kept = kept + joins
     stats["cells"] = len(cells) - stats["floor_cells"]
-    stats["placed"] = len(ents)
-    stats["capped"] = len(ents) - len(kept)
+    stats["placed"] = len(ents) + stats["joins"]
+    stats["capped"] = len(ents) + stats["joins"] - len(kept)
     stats["entities"] = len(kept)
     stats["models"] = len({m for e in kept for m in models_of(e)})
     return text, stats
+
+
+COLOUR_NEAR = 1             # cells (each way) round a sprite wall in which D2R's wall pieces set its colour (sprite_neighbours)
+COLOUR_MIN = 10             # fewer neighbouring pieces than this (Ureh's one sprite cell): the map keeps Median's colours
+
+
+def sprite_neighbours(ents) -> collections.Counter:
+    """Counter(model) of the D2R wall pieces (cap() tier 2, not sprites) whose pivot lies within COLOUR_NEAR cells of a
+    sprite wall's cell: the pieces a sprite wall is seen against (walls_sprite.match_colour)."""
+    import walls_sprite
+    sprite, walls = set(), []
+    for e in ents:
+        m = model_of(e)
+        if not m:
+            continue
+        p = transform(e).get("position") or {}
+        cell = (int(float(p.get("x", 0.0)) // TILE), int(float(p.get("z", 0.0)) // TILE))
+        if walls_sprite.is_sprite(m):
+            if walls_sprite.key_of(m)[0]:
+                sprite.add(cell)
+        elif tier(m) == 2:
+            walls.append((m, cell))
+    return collections.Counter(m for m, (x, y) in walls
+                               if any((x + dx, y + dy) in sprite for dx in range(-COLOUR_NEAR, COLOUR_NEAR + 1)
+                                      for dy in range(-COLOUR_NEAR, COLOUR_NEAR + 1)))
+
+
+JOIN_ID_BASE = 0x6E7E0000   # joints between sprite walls and D2R pieces: above walls_sprite's floor sprite range
+
+
+def budget_joins(groups, room: int, room_bytes: int) -> list:
+    """Scene entities of the joints (walls_scene.place_joins' groups, one per join point) that fit the room the scene's budget
+    leaves (entities, bytes) after everything else: joints never push another piece out (cap()). When not all fit, whole joints
+    are kept spread over the map (spread(): the highest ranks), in their order. Names mxj_<joint>_<member>."""
+    keep = set(range(len(groups)))
+    if sum(len(g) for g in groups) > room:
+        keep, n = set(), 0
+        for i in sorted(range(len(groups)), key=lambda i: -spread(i)):
+            if n + len(groups[i]) <= room:
+                keep.add(i)
+                n += len(groups[i])
+    out, size = [], 0
+    for i, g in enumerate(groups):
+        if i not in keep:
+            continue
+        ents = walls_scene.entities(g, "mxj_%d" % i, strip_entity, JOIN_ID_BASE + len(out))
+        n = sum(len(json.dumps(e, separators=(",", ":"))) + 1 for e in ents)
+        if size + n > room_bytes:
+            continue
+        out += ents
+        size += n
+    return out
+
+
+def _position(e):
+    """(x, y, z, yaw, scale) of a scene entity, as walls_scene's placements carry them."""
+    t = transform(e)
+    p, s = t.get("position") or {}, t.get("scale") or {}
+    return (float(p.get("x", 0.0)), float(p.get("y", 0.0)), float(p.get("z", 0.0)), walls_scene.yaw_of(t),
+            (float(s.get("x", 1.0)), float(s.get("y", 1.0)), float(s.get("z", 1.0))))
+
+
+class SpriteFill:
+    """build_scene's `sprites`: a map's gap cells (walls_scene.compose `gaps`), its classic wall heights (classic_heights) and its
+    sprite tiles (walls_sprite.MapSprites). tall(ents, xy): whether the cell's per-tile pick reaches full height (HEIGHT_PER_PX of
+    the cell's classic tile); entities(xy, serial, only): the cell's sprite walls; forced(xy): the cell draws sprites whatever
+    its pick (walls_sprite.ARCH_TILES); floor_entities(): the map's floor sprites (walls_sprite.STEP_TILES)."""
+
+    def __init__(self, gaps, heights: dict, tiles, box_of=None):
+        self.gaps, self.heights, self.tiles = set(gaps), heights, tiles
+        self.box_of = functools.lru_cache(maxsize=None)(box_of or model_box)
+
+    def tall(self, ents, xy) -> bool:
+        px = self.heights.get(xy)
+        if not px:
+            return True
+        top = 0.0
+        for e in ents:
+            m, t = model_of(e), transform(e)
+            box = self.box_of(m) if m and t else None
+            if box:
+                top = max(top, float(t.get("position", {}).get("y", 0.0)) + box[1][1] * float((t.get("scale") or {}).get("y", 1.0) or 1.0))
+        return top >= HEIGHT_PER_PX * px
+
+    def entities(self, xy, serial, only=None):
+        return self.tiles.entities(xy, serial, only)
+
+    def top(self, key) -> float:
+        """Height of a sprite wall's top (its model's box)."""
+        return float(self.tiles.box(key)[1][1])
+
+    def forced(self, xy) -> bool:
+        return self.tiles.forced(xy)
+
+    def floor_entities(self) -> list:
+        return self.tiles.floor_entities()
 
 
 # ---- inputs ------------------------------------------------------------------------------------------------------------------
@@ -1406,6 +1582,8 @@ def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=No
     tiles = tiles or maps_hd.parse_tiles(inp.d2r_tiles)
     lib = Library()
     lib.pixels_of = functools.partial(tile_pixels, inp.d2r_tiles)
+    if box_of is not None:
+        lib.kit = walls_scene.Kit(box_of, model_of, lambda m: tier(m) in (1, 2))
     for key in sorted(k[:-4] for k in inp.d2r_tiles.keys(".ds1")):
         if key not in inp.scenes:
             continue
@@ -1418,6 +1596,9 @@ def learn_library(inp: maps_hd.Inputs, needed: set, scene_of=d2r_scene, tiles=No
             continue
         lib.learn(key, map_cells(ds, files, tiles.get), scene, ground_of(key, scene))
     lib.anchor()
+    if lib.kit is not None:
+        lib.kit.heights = walls_scene.tile_heights(tiles)
+        lib.kit.finish()
     if box_of is not None:
         lib.box_of = box_of
         lib.learn_pieces(box_of)
@@ -1513,10 +1694,14 @@ def run(inp: maps_hd.Inputs, only=None, scene_of=d2r_scene, ground_of=d2r_ground
     wanted = [e for e in maps if e["map"] in (only or MAPS)]
     cells = {e["map"]: median_cells(inp, e, donors, tiles) for e in wanted}
     lib = learn_library(inp, needed_stock(cells, donors), scene_of, stock, ground_of, box_of)
+    lib.floor_folders = {e["map"]: walls_scene.floor_folders(ds1_remap.Ds1(inp.mod_tiles.read(e["map"])),
+                                                             floor_index(e["dt1_files"], tiles.get),
+                                                             lambda p: donors[p]["donor"] if p in donors else p) for e in wanted}
     return wanted, cells, lib
 
 
-def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None, terrain=None, walkways=None):
+def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=None, floors=None, terrain=None, walkways=None,
+          heights=None, box_of=None, overrides=None, sprites=None):
     """Write the wall scenes. -> {map: stats + bytes}. biomes: {map: biome name}; None = the biome of the scene maps_hd's
     build wrote into data_dir (a generated floor biome, maps_hd.floor_biomes), else the plan's. The maps of map_tint.TINTS get a
     copy of that biome with their own key light (tools/map_tint.py); read(rel) -> D2R json for it (default fxpaths).
@@ -1524,15 +1709,42 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
     d2r_bytes), next to the scene as <map>/terrain_lod0.model, over floors[map] (floor_tiles; default: the map's cells);
     the map's size is its cells' extent (the corner tiles). terrain: {map: template}, default terrain_maps().
     walkways: {map: walkway_pieces()} (default none): those maps also get D2R's walkway meshes over terrain_cells(floors[map])
-    (add_walkway)."""
+    (add_walkway). heights: {map: classic_heights()} (default none): those maps' stats get wall_heights() of the written
+    scene (box_of: model boxes, default model_box). sprites: {map: walls_sprite.MapSprites} (default none): those maps' gap cells
+    (walls_scene.compose) whose per-tile pick stays under full height draw Median's own wall tiles (SpriteFill; needs `heights`);
+    their models, atlas and the shared flat textures are written under data_dir."""
+    import walls_sprite
     terrain = terrain_maps() if terrain is None else terrain
-    out, lods = {}, []
+    out, lods, sprite_files = {}, [], []
+    boxes = box_of or model_box
+    albedo = functools.lru_cache(maxsize=None)(lambda m: walls_sprite.albedo_stats(m, d2r_read or d2r_bytes))
     for e in wanted:
         biome = (biomes.get(e["map"]) if biomes is not None else maps_hd.scene_biome(data_dir, e["map"])) or e["biome"]
         biome = map_tint.apply(data_dir, e["map"], map_tint.base_biome(data_dir, biome, e["biome"]), read)   # the 8 retextured maps: a biome with the map's own light
         limit, max_bytes = MAP_LIMITS.get(e["map"], (MAX_PLACED, MAX_BYTES))
+        structured, sst, gaps = None, {}, set()
+        tiles = (sprites or {}).get(e["map"])
+        if lib.kit is not None and e["map"] not in SCENE_OFF:   # the cells of walls_sprite.ARCH_TILES stay out: they draw sprites
+            comp = {xy: k for xy, k in cells[e["map"]].items() if tiles is None or not tiles.forced(xy)}
+            placed, done, sst = walls_scene.compose(comp, lib.kit, gaps=gaps)
+            structured = (walls_scene.entities(placed, strip=strip_entity), done)
+        wanted_fill = tiles is not None and (gaps or tiles.arches or tiles.by_floor)
+        fill = SpriteFill(gaps, (heights or {}).get(e["map"]) or {}, tiles, boxes) if wanted_fill else None
         text, st = build_scene(cells[e["map"]], lib, biome, limit, max_bytes, fill=HOLLOW_MAPS.get(e["map"], ()),
-                               stand_ins=STAND_INS.get(e["map"]))
+                               stand_ins=STAND_INS.get(e["map"]), structured=structured, sprites=fill)
+        st = dict(st, scene={k: v for k, v in sst.items()})
+        if fill is not None:
+            scene = json.loads(text)
+            keys = {walls_sprite.key_of(m) for m in scene["dependencies"]["models"] for m in [m["path"]] if walls_sprite.is_sprite(m)}
+            near = sprite_neighbours(scene.get("entities") or ())
+            colour = None
+            if sum(near.values()) >= COLOUR_MIN:
+                colour = walls_sprite.pool_stats([(a[0], a[1], n) for m, n in sorted(near.items()) for a in [albedo(m)] if a])
+            entries, files = tiles.write(data_dir, keys, d2r_read or d2r_bytes, colour[:2] if colour else None)
+            lods += entries
+            sprite_files += files
+            st = dict(st, sprite_models=len(entries), sprite_bytes=sum(f.stat().st_size for f in files),
+                      colour_neighbours=sum(near.values()), colour_target=[round(float(v), 1) for v in colour[0]] if colour else None)
         dest = Path(data_dir) / "hd" / "env" / "preset" / (e["map"][:-4] + ".json")
         dest.parent.mkdir(parents=True, exist_ok=True)
         if e["map"] in terrain:
@@ -1548,17 +1760,107 @@ def build(data_dir: Path, wanted, cells, lib, biomes=None, read=None, d2r_read=N
         if (walkways or {}).get(e["map"]):
             text, ws = add_walkway(text, terrain_cells((floors or {}).get(e["map"]) or cells[e["map"]]), walkways[e["map"]])
             st = dict(st, **ws)
+        if (overrides or {}).get(e["map"]):
+            text, n = walls_scene.add_overrides(text, overrides[e["map"]], max_bytes)
+            st = dict(st, biome_overrides=n, biome_overrides_dropped=len(overrides[e["map"]]) - n)
         dest.write_text(text, encoding="utf-8")
+        if (heights or {}).get(e["map"]):
+            sbox = (lambda m, t=tiles: t.box(walls_sprite.key_of(m)) if walls_sprite.is_sprite(m) else boxes(m)) if tiles is not None else boxes
+            st = dict(st, **wall_heights(heights[e["map"]], json.loads(text)["entities"], sbox))
         out[e["map"]] = dict(st, bytes=len(text.encode("utf-8")), biome=biome)
+    if sprite_files:
+        walls_sprite.flat_textures(data_dir)
     write_lod_desc(data_dir, lods, d2r_read)
     return out
+
+
+# ---- wall heights against classic (lane duncraig) ----------------------------------------------------------------------------
+# A scene can put models on every wall cell and still look like bare floor: TA's Kurast ruin walls became knee-high ruins
+# (D2R uses those tiles at the foot of its dock terraces), Duncraig's Monastery facade only ivy (D2R builds it from 4-tile
+# models that `choose` learns as empty). Per wall cell: the top of the scene's models within one cell against the height of
+# the cell's classic wall tile. D2R's own maps give 0.048 (docktown3) to 0.066 (cathy3) HD units per classic pixel, and
+# 76-81% of their wall cells reach half of that.
+HEIGHT_PER_PX = walls_scene.FULL_PER_PX   # 0.028
+HEIGHT_MIN_OK = 0.70
+FOOT_MAX = 12      # wall_heights: a model's footprint counts when it spans at most this many cells each way (not a whole building)
+HEIGHT_KNOWN_LOW = {"expansion/morework/epicwhiners.ds1": "Duncraig, bug #561",
+                    "expansion/dystopic/desertpeak.ds1": "Tran Athulua's low ruin walls (docs/maps-hd.md, lane duncraig)"}
+
+
+def classic_heights(ds: ds1_remap.Ds1, paths, tiles_of) -> dict:
+    """{(x, y): pixel height of the tallest wall tile (orientations 1-9) on the cell}, tiles resolved as wall_index does."""
+    height = {}
+    for p in paths:
+        for t in tiles_of(p) or ():
+            if t.orientation in WALL_ORIENTATIONS:
+                height.setdefault(t.key, abs(t.height))
+    out = {}
+    for lay, ori in ds.wall_layers():
+        for i, (c, o) in enumerate(zip(lay, ori)):
+            h = height.get((o & 0xFF,) + ds1_remap.cell_key(c)) if c else None
+            if h:
+                xy = (i % ds.width, i // ds.width)
+                out[xy] = max(out.get(xy, 0), h)
+    return out
+
+
+def wall_heights(classic: dict, entities, box_of=None) -> dict:
+    """-> {"height_cells", "height_ok", "height_low", "height_none"}: the classic wall cells whose nearby models (within one
+    cell of the pivot or under the model's footprint, `y` + the model box's top times the scale) reach HEIGHT_PER_PX of the
+    tile's pixels, stay under it, or are none."""
+    box_of = box_of or model_box
+    boxes, top = {}, collections.defaultdict(float)
+    for e in entities:
+        m, t = model_of(e), transform(e)
+        if not m or not t:
+            continue
+        if m not in boxes:
+            boxes[m] = box_of(m)
+        if not boxes[m]:
+            continue
+        p, s = t.get("position", {}), t.get("scale") or {}
+        hi = float(p.get("y", 0.0)) + boxes[m][1][1] * float(s.get("y", 1.0) or 1.0)
+        px, pz = float(p.get("x", 0.0)), float(p.get("z", 0.0))
+        cx, cz = int(px // TILE), int(pz // TILE)
+        cover = {(cx + dx, cz + dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1)}
+        # a long model (a 4-tile wall stands on 1 cell of the 4 it covers): also the cells under its footprint, up to FOOT_MAX
+        sc = tuple(float(s.get(k, 1.0) or 1.0) for k in "xyz")
+        x0, z0, x1, z1 = walls_scene.world_box(boxes[m], px, pz, walls_scene.yaw_of(t), sc)[:4]
+        if x1 - x0 <= FOOT_MAX * TILE and z1 - z0 <= FOOT_MAX * TILE:
+            cover |= {(i, j) for i in range(int(x0 // TILE), int(x1 // TILE) + 1) for j in range(int(z0 // TILE), int(z1 // TILE) + 1)}
+        for xy in cover:
+            top[xy] = max(top[xy], hi)
+    out = collections.Counter(height_cells=len(classic))
+    for xy, px in classic.items():
+        h = top.get(xy, 0.0)
+        out["height_none" if h <= 0 else "height_ok" if h >= HEIGHT_PER_PX * px else "height_low"] += 1
+    return dict(out)
+
+
+def height_share(st: dict) -> float:
+    return st.get("height_ok", 0) / st["height_cells"] if st.get("height_cells") else 1.0
+
+
+def height_gate(stats: dict, known=None) -> list:
+    """Maps whose share of wall cells at full height is under HEIGHT_MIN_OK (D2R's own maps reach 76-81%) and not in
+    `known` (default HEIGHT_KNOWN_LOW). -> [(map, share)]"""
+    known = HEIGHT_KNOWN_LOW if known is None else known
+    return [(m, height_share(st)) for m, st in sorted(stats.items()) if height_share(st) < HEIGHT_MIN_OK and m not in known]
+
+
+def median_heights(inp: maps_hd.Inputs, entry: dict) -> dict:
+    """classic_heights of a Median map, its tile files read from the mod or D2R."""
+    import dt1
+    ds = ds1_remap.Ds1(inp.mod_tiles.read(entry["map"]))
+    store = lambda p: inp.mod_tiles if p in inp.mod_tiles else inp.d2r_tiles if p in inp.d2r_tiles else None
+    return classic_heights(ds, entry["dt1_files"], lambda p: dt1.parse(store(p).read(p)) if store(p) else ())
 
 
 def md_table(stats: dict, lib: Library) -> str:
     lines = ["| map | biome | wall cells | exact | partial | look-alike | generic | no D2R model | uncovered | tree cells (trees) "
              "| floor cells (with models) | set pieces left out (placed by layout) | placed | capped | models in scene "
-             "| distinct models | scene size |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "| distinct models | scene size | full height (low / none) |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     tot = collections.Counter()
     for m in MAPS:
         s = stats.get(m)
@@ -1568,9 +1870,11 @@ def md_table(stats: dict, lib: Library) -> str:
             m, s.get("biome", ""), s["cells"], s.get("exact", 0), s.get("partial", 0), s.get("lookalike", 0), s.get("generic", 0),
             s.get("empty", 0), s.get("uncovered", 0), s.get("tree_cells", 0), s.get("trees", 0), s.get("floor_cells", 0),
             s.get("floor_walls", 0), s.get("set_pieces", 0), s.get("pieces", 0), s.get("placed", s["entities"]), s.get("capped", 0),
-            s["entities"], s.get("models", 0), s["bytes"] / 1024))
+            s["entities"], s.get("models", 0), s["bytes"] / 1024) + (" %.0f%% (%.0f%% / %.0f%%) |" % tuple(
+                100.0 * s.get(k, 0) / s["height_cells"] for k in ("height_ok", "height_low", "height_none"))
+                if s.get("height_cells") else " |"))
         tot.update({k: v for k, v in s.items() if isinstance(v, int) and k != "models"})
-    lines.append("| all | | %d | %d | %d | %d | %d | %d | %d | %d (%d) | %d (%d) | %d (%d) | %d | %d | %d | | %.0f KB |" % (
+    lines.append("| all | | %d | %d | %d | %d | %d | %d | %d | %d (%d) | %d (%d) | %d (%d) | %d | %d | %d | | %.0f KB | |" % (
         tot["cells"], tot["exact"], tot["partial"], tot["lookalike"], tot["generic"], tot["empty"], tot["uncovered"],
         tot["tree_cells"], tot["trees"], tot["floor_cells"], tot["floor_walls"], tot["set_pieces"], tot["pieces"],
         tot["placed"], tot["capped"], tot["entities"], tot["bytes"] / 1024))
@@ -1585,9 +1889,12 @@ def md_table(stats: dict, lib: Library) -> str:
               "walls, ledges, stairs, trims; floor_cells); *set "
               "pieces*: models D2R places on fewer than %d wall cells (Library.set_piece), in brackets those placed where the map "
               "repeats the wall tiles under them (Library.fit); *capped*: pieces cap() dropped to stay "
-              "within D2R's largest scene (docktown3: %d placed models, %.2f MB)." % (
+              "within D2R's largest scene (docktown3: %d placed models, %.2f MB); *full height*: the wall cells whose models "
+              "(within one cell or under their footprint) reach %.3f HD units per pixel of the classic wall tile, half of what D2R's own maps give "
+              "(wall_heights; *low*: models under that, *none*: no model; D2R's own maps: 76-81%% at full height, the build "
+              "fails a map under %.0f%% that HEIGHT_KNOWN_LOW does not list)." % (
                   len(lib.sources), sum(lib.sources.values()), len(lib.seen), len(lib.variants), SET_PIECE_CELLS, MAX_PLACED,
-                  MAX_BYTES / 1048576)]
+                  MAX_BYTES / 1048576, HEIGHT_PER_PX, 100 * HEIGHT_MIN_OK)]
     return "\n".join(lines)
 
 
@@ -1608,8 +1915,12 @@ def main(argv=None):
         biomes = maps_hd.floor_biomes(data_dir, maps, dt1s)
     walk = {m: walkway_pieces([k[:-len(".ds1")] for k in inp.d2r_tiles.keys(".ds1") if k.startswith(folder)])
             for m, folder in walkway_maps().items() if m in cells}
+    overrides = {e["map"]: walls_scene.biome_overrides(lib.floor_folders.get(e["map"], {}), e["biome"],
+                                                       lambda d: maps_hd.biome_for_dir(d, inp.biomes)) for e in wanted}
+    import walls_sprite
+    sprites = {e["map"]: walls_sprite.MapSprites.load(inp, e) for e in wanted if e["map"] not in SPRITE_OFF}
     stats = build(data_dir, wanted, cells, lib, biomes, floors={m: floor_tiles(inp, m) for m in {**terrain_maps(), **walk} if m in cells},
-                  walkways=walk)
+                  walkways=walk, heights={e["map"]: median_heights(inp, e) for e in wanted}, overrides=overrides, sprites=sprites)
     for m, st in stats.items():
         if "walkway_pieces" in st:
             print("%s: %d walkway pieces cover %d of %d platform cells; bare %s; over the void %s" % (
@@ -1637,7 +1948,14 @@ def main(argv=None):
     print(table)
     total = sum(s["bytes"] for s in stats.values())
     print("wrote %d wall scenes (%.1f MB) to %s" % (len(stats), total / 1048576, data_dir / "hd" / "env" / "preset"))
-    return 0
+    for m, why in sorted(HEIGHT_KNOWN_LOW.items()):
+        if m in stats:
+            print("known low walls: %s %.0f%% at full height (%s)" % (m, 100 * height_share(stats[m]), why))
+    low = height_gate(stats)
+    for m, share in low:
+        print("WALL HEIGHT GATE: %s has %.0f%% of its wall cells at full height, D2R's own maps 76-81%% (minimum %.0f%%); "
+              "fix the scene or list it in HEIGHT_KNOWN_LOW" % (m, 100 * share, 100 * HEIGHT_MIN_OK))
+    return 1 if low else 0
 
 
 if __name__ == "__main__":

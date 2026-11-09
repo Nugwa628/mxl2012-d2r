@@ -105,7 +105,8 @@ entities made of D2R's own wall models**:
    cap is our own policy, not a measured engine limit: bug #360's overflow was the monster variant table cache, and no
    entity or byte limit of D2R's scenes is known (lane reimref read the Reimagined level editor: none there either). Only cypherpunk reaches it (5,825 placed:
    1,402 dropped, all 1,802 elevation walls kept). Since lane stairs cypherpunk has its own larger budget (`MAP_LIMITS`, measured in game:
-   [below](#stairs-at-fauztinville-lane-stairs-2026-11-07)); the other 16 maps keep the cap.
+   [below](#stairs-at-fauztinville-lane-stairs-2026-11-07)); since lane hdscene2 that budget is its composed scene (8,620 placed,
+   7,999,943 bytes; [Model cache](#model-cache-lane-hdscene2-2026-11-09)); the other 16 maps keep the cap.
 
 Size: the 8 scenes are 10.2 MB of JSON together (before wallsfix 10.9 MB); the largest is cypherpunk, 4,423 placed models,
 3.29 MB, 33 distinct models (before: 5,820, 4.31 MB, 42). They name only D2R's own models, no new textures.
@@ -315,28 +316,28 @@ art, docs/unported.md). The tool reads D2R's scenes from the D2R extraction or t
 
 <!-- walls_hd:begin (generated: py -3 -I tools/walls_hd.py docs) -->
 
-| map | biome | wall cells | exact | partial | look-alike | generic | no D2R model | uncovered | tree cells (trees) | floor cells (with models) | set pieces left out (placed by layout) | placed | capped | models in scene | distinct models | scene size |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2692 | 2384 | 292 | 2 | 14 | 994 | 0 | 0 (0) | 13435 (46) | 17 (0) | 4008 | 0 | 4008 | 42 | 3115 KB |
-| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3983 | 3218 | 677 | 83 | 5 | 867 | 0 | 0 (0) | 9039 (836) | 11 (0) | 11083 | 6660 | 4423 | 62 | 3675 KB |
-| expansion/glados/glados.ds1 | mxl2012_tint_glados | 832 | 436 | 275 | 78 | 42 | 320 | 1 | 0 (0) | 6911 (1322) | 109 (0) | 4175 | 0 | 4175 | 50 | 3527 KB |
-| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 3278 | 2085 | 355 | 4 | 422 | 396 | 0 | 412 (286) | 32292 (0) | 3 (0) | 2838 | 0 | 2838 | 28 | 2109 KB |
-| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 212 | 74 | 108 | 27 | 2 | 43 | 1 | 0 (0) | 308 (59) | 2 (0) | 528 | 0 | 528 | 99 | 478 KB |
-| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 734 | 418 | 278 | 34 | 3 | 18 | 1 | 0 (0) | 774 (57) | 1 (0) | 1193 | 0 | 1193 | 54 | 959 KB |
-| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 405 | 355 | 20 | 18 | 10 | 18 | 1 | 1 (1) | 1128 (0) | 30 (0) | 569 | 0 | 569 | 20 | 438 KB |
-| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 568 | 143 | 193 | 177 | 54 | 81 | 1 | 0 (0) | 1173 (21) | 47 (7) | 1097 | 0 | 1097 | 24 | 823 KB |
-| act3/jungle/dungrm6a.ds1 | act3_jungle | 475 | 470 | 0 | 0 | 0 | 209 | 5 | 0 (0) | 572 (87) | 0 (1) | 534 | 0 | 534 | 66 | 1049 KB |
-| act3/temple/temple5.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 352 | 0 | 352 | 30 | 321 KB |
-| act3/temple/temple6.ds1 | act3_kurast | 134 | 134 | 0 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 352 | 0 | 352 | 30 | 321 KB |
-| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 0 | 1 | 0 (0) | 84 (17) | 0 (0) | 20 | 0 | 20 | 15 | 17 KB |
-| act3/kurast/excelsior3.ds1 | act3_kurast | 892 | 813 | 11 | 0 | 0 | 330 | 68 | 0 (0) | 1709 (112) | 5 (2) | 1825 | 0 | 1825 | 92 | 1411 KB |
-| act2/arcane/belial.ds1 | act2_arcane | 78 | 72 | 3 | 0 | 0 | 0 | 3 | 0 (0) | 96 (96) | 0 (0) | 679 | 0 | 679 | 17 | 568 KB |
-| expansion/morework/epicwhiners.ds1 | act1_caves | 1261 | 804 | 423 | 19 | 14 | 423 | 1 | 0 (0) | 4412 (189) | 546 (6) | 4006 | 0 | 4006 | 91 | 3044 KB |
-| act1/cathedrl/inarius.ds1 | act1_cathedral | 110 | 110 | 0 | 0 | 0 | 16 | 0 | 0 (0) | 145 (0) | 1 (0) | 245 | 0 | 245 | 35 | 202 KB |
-| expansion/icecave/rockisdead.ds1 | expansion_icecave | 51 | 50 | 1 | 0 | 0 | 3 | 0 | 0 (0) | 3556 (481) | 0 (0) | 532 | 0 | 532 | 45 | 748 KB |
-| all | | 15842 | 11702 | 2636 | 442 | 566 | 3718 | 83 | 413 (287) | 75996 (3323) | 772 (16) | 34036 | 6660 | 27376 | | 22806 KB |
+| map | biome | wall cells | exact | partial | look-alike | generic | no D2R model | uncovered | tree cells (trees) | floor cells (with models) | set pieces left out (placed by layout) | placed | capped | models in scene | distinct models | scene size | full height (low / none) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| expansion/dystopic/desertpeak.ds1 | mxl2012_tint_desertpeak | 2171 | 2040 | 115 | 2 | 14 | 589 | 0 | 0 (0) | 13435 (46) | 17 (0) | 3743 | 0 | 3743 | 73 | 3905 KB | 97% (3% / 0%) |
+| expansion/ghetto/cypherpunk.ds1 | mxl2012_tint_cypherpunk | 3996 | 2661 | 843 | 5 | 11 | 791 | 0 | 0 (0) | 8563 (546) | 0 (0) | 8620 | 0 | 8620 | 126 | 7812 KB | 100% (0% / 0%) |
+| expansion/glados/glados.ds1 | mxl2012_tint_glados | 639 | 450 | 186 | 2 | 0 | 320 | 1 | 0 (0) | 6911 (1322) | 20 (0) | 4215 | 0 | 4215 | 55 | 4055 KB | 100% (0% / 0%) |
+| expansion/neonmile/downtown.ds1 | mxl2012_tint_downtown | 1419 | 718 | 218 | 0 | 68 | 340 | 0 | 412 (286) | 32292 (0) | 0 (0) | 1528 | 0 | 1528 | 23 | 2115 KB | 100% (0% / 0%) |
+| expansion/redsquare/moskvich.ds1 | mxl2012_tint_moskvich | 202 | 72 | 101 | 26 | 1 | 39 | 2 | 0 (0) | 308 (59) | 14 (0) | 632 | 0 | 632 | 153 | 571 KB | 100% (0% / 0%) |
+| expansion/terror/borgir.ds1 | mxl2012_tint_borgir | 733 | 417 | 278 | 34 | 3 | 18 | 1 | 0 (0) | 774 (57) | 1 (0) | 1666 | 0 | 1666 | 96 | 1238 KB | 100% (0% / 0%) |
+| expansion/voodoo/macumba.ds1 | mxl2012_tint_macumba | 207 | 198 | 5 | 0 | 1 | 3 | 2 | 1 (1) | 1128 (0) | 14 (0) | 561 | 0 | 561 | 24 | 453 KB | 100% (0% / 0%) |
+| expansion/zakarum/charismatic.ds1 | mxl2012_tint_charismatic | 242 | 68 | 73 | 75 | 25 | 54 | 1 | 0 (0) | 1173 (21) | 32 (1) | 1412 | 0 | 1412 | 40 | 1000 KB | 100% (0% / 0%) |
+| act3/jungle/dungrm6a.ds1 | act3_jungle | 75 | 74 | 0 | 0 | 0 | 25 | 1 | 0 (0) | 572 (87) | 0 (0) | 786 | 0 | 786 | 86 | 1050 KB | 100% (0% / 0%) |
+| act3/temple/temple5.ds1 | act3_kurast | 38 | 8 | 30 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 347 | 0 | 347 | 29 | 302 KB | 100% (0% / 0%) |
+| act3/temple/temple6.ds1 | act3_kurast | 38 | 8 | 30 | 0 | 0 | 0 | 0 | 0 (0) | 181 (0) | 0 (0) | 347 | 0 | 347 | 29 | 302 KB | 100% (0% / 0%) |
+| act1/caves/caveroom4.ds1 | act1_caves | 3 | 2 | 0 | 0 | 0 | 0 | 1 | 0 (0) | 84 (17) | 0 (0) | 20 | 0 | 20 | 15 | 17 KB | |
+| act3/kurast/excelsior3.ds1 | act3_kurast | 884 | 798 | 13 | 0 | 0 | 333 | 73 | 0 (0) | 1709 (112) | 5 (2) | 1621 | 0 | 1621 | 111 | 1235 KB | 100% (0% / 0%) |
+| act2/arcane/belial.ds1 | act2_arcane | 75 | 70 | 2 | 0 | 0 | 0 | 3 | 0 (0) | 96 (96) | 0 (0) | 673 | 0 | 673 | 18 | 563 KB | 100% (0% / 0%) |
+| expansion/morework/epicwhiners.ds1 | act1_caves | 315 | 86 | 16 | 4 | 208 | 18 | 1 | 0 (0) | 4412 (189) | 58 (0) | 1384 | 0 | 1384 | 47 | 1214 KB | 99% (0% / 1%) |
+| act1/cathedrl/inarius.ds1 | act1_cathedral | 6 | 6 | 0 | 0 | 0 | 4 | 0 | 0 (0) | 145 (0) | 1 (0) | 124 | 0 | 124 | 10 | 118 KB | 100% (0% / 0%) |
+| expansion/icecave/rockisdead.ds1 | expansion_icecave | 23 | 23 | 0 | 0 | 0 | 1 | 0 | 0 (0) | 3556 (481) | 0 (0) | 531 | 0 | 531 | 33 | 751 KB | 100% (0% / 0%) |
+| all | | 11066 | 7699 | 1910 | 148 | 331 | 2535 | 86 | 413 (287) | 75520 (3033) | 162 (3) | 28210 | 0 | 28210 | | 26700 KB | |
 
-Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 44298 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *look-alike*: a wall tile D2R never has borrows the variant of the learnt tile of its set and orientation that has the same silhouette (Library.lookalike); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *tree cells*: cells with only tree pieces (orientation 14), in brackets the trees placed on trunk tiles (Library.tree_pick); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece), in brackets those placed where the map repeats the wall tiles under them (Library.fit); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB).
+Learnt from 1490 D2R maps (485135 wall and floor cells, 10493 distinct cell keys, 44288 variants). *exact*: the cell's wall tiles were seen together in a D2R map; *partial*: the variant of a learnt key that shares a tile; *generic*: a wall tile D2R never has in a scene gets D2R's most common wall of the same orientation in the same tile set or act (Library.generic_pick); *look-alike*: a wall tile D2R never has borrows the variant of the learnt tile of its set and orientation that has the same silhouette (Library.lookalike); *no D2R model*: D2R draws that tile without an entity (part of a map's baked terrain or nothing); *uncovered*: no wall drawn in HD (not a wall orientation, or no learnt wall of that orientation); *tree cells*: cells with only tree pieces (orientation 14), in brackets the trees placed on trunk tiles (Library.tree_pick); *floor cells*: cells with a floor and no wall, in brackets those that get the models D2R puts on that floor tile (cave walls, ledges, stairs, trims; floor_cells); *set pieces*: models D2R places on fewer than 3 wall cells (Library.set_piece), in brackets those placed where the map repeats the wall tiles under them (Library.fit); *capped*: pieces cap() dropped to stay within D2R's largest scene (docktown3: 4423 placed models, 4.44 MB); *full height*: the wall cells whose models (within one cell or under their footprint) reach 0.028 HD units per pixel of the classic wall tile, half of what D2R's own maps give (wall_heights; *low*: models under that, *none*: no model; D2R's own maps: 76-81% at full height, the build fails a map under 70% that HEIGHT_KNOWN_LOW does not list).
 
 Self-check (D2R's own maps, `self_check`): the scenes this method makes for 40 of the learnt D2R maps have 3477 of their 6363 wall entities (55%; same model within 1.5 units).
 
@@ -396,9 +397,9 @@ they sit at `hd/env/preset/mxl2012/<path>.json` (ds1_paths). The other 17 .ds1 o
 | cypherpunk, excelsior3 | `wall_elevation_stone01` learnt at y 3 (cypherpunk 884, excelsior3 54, plus 38 at 5-10): retaining walls of D2R's terraces stand as free walls on the flat floor | excelsior3 arrival: classic's sunken courtyard with stairs is a flat yard fenced by slabs in HD (`wall_excelsior3_pair_0`) | medium | done (lane elevwalls): walls facing away from the camera left out, facing ones moved onto the floor ([below](#retaining-walls-and-stairs-lane-elevwalls-2026-11-07)) |
 | downtown (18), arrival and Harrogath walls | 422 generic cells: low crenellated `wall_segment_short` (288) where classic has a tall skull wall; shelf-like pieces stand where classic has a stone arch; 71 wrought-iron fences learnt at y 9 | yes, `pair_0`, `pair_2` | medium (look only, layout right) | needs art or a taller D2R wall as the generic pick for style 3; fences: drop or stand at y 0 |
 | glados (95) | 42 generic and 78 look-alike cells: walls and gargoyle pillars match; classic's big trees are missing in HD | yes, `pair_1`, `pair_2` | low | trees: object or tile layer not in the scene (not walls) |
-| charismatic (127) | 177 look-alike, 54 generic | walls, arches, huts follow classic (`pair_1`, `pair_2`) | low (known: item 10, tall pointed arch) | none |
+| Khalimgrad (`charismatic`, 127) | 177 look-alike, 54 generic | walls, arches, huts follow classic (`pair_1`, `pair_2`) | low (known: item 10, tall pointed arch) | none |
 | excelsior3 (84), cell 36,12 | 68 uncovered cells (known, 43 tiles without a file of the level type, 25 corner halves) | ruins as classic (`pair_2`) | low | none |
-| dungrm6a (90) | 209 cells with no D2R model | walls and arches follow the classic layout, a few near-side walls thinner (`pair_1`) | low | none |
+| The Proving Grounds (`dungrm6a`, 90) | 209 cells with no D2R model | walls and arches follow the classic layout, a few near-side walls thinner (`pair_1`) | low | none |
 | epicwhiners (13) | 423 no-model cells, 546 set pieces left out | arrival as classic (`pair_0`); the hop stopped short of both spots | low | look again by walking |
 | rockisdead (116) | 153 ledge corners at y 8 | HD dark where classic shows the lower ledges (`pair_1`); not conclusive | low | none now |
 | moskvich, borgir, macumba, inarius, belial, temple5/6, caveroom4 | nothing beyond the known items in the static pass (a few ornate walls at y 12-17 in moskvich and borgir: upper floors) | not visited (tawalls and hdwalls2 shots) | OK | none |
@@ -491,6 +492,174 @@ Cypherpunk's (59 Fauztinville) wide stairs, at the arrival and at every walkway 
 - The other 16 scenes are byte-equal to main's (full builds of both). Not done: the walkways' kerb edges (sequences
   12-15) have no model; the stairs' rise is drawn, not walked (the floor stays flat). Testing: docs/testing.md
   "Lane stairs".
+
+### Wall heights against legacy (lane duncraig, bug #561, 2026-11-08)
+
+A scene can place models on every wall cell and still read as bare floor next to legacy. Tran Athulua's Kurast ruin walls
+became knee-high ruins (D2R uses those tiles at the foot of its dock terraces, models 4.6-7.8 units tall). Duncraig's
+Monastery facade (level 13, `expansion/morework/epicwhiners`) got only ivy and low wall bits: D2R builds the facade from
+4-tile models (`act1/monastry/facade1`), which stand on 1 cell of the 4 they cover, so `choose` learns those keys as empty.
+`walls_hd.wall_heights` measures it per wall cell: the top of the models within one cell against the classic wall tile's
+pixel height. **Full height** is at least `HEIGHT_PER_PX` = 0.028 HD units per pixel, half of what D2R's own maps give
+(docktown3 0.048, cathy3 0.066). On D2R's own maps 76-81% of the wall cells reach it. The column "full height (low / none)"
+of the generated table below shows it per map. `report`, `build` and `docs` exit 1 when a map is under `HEIGHT_MIN_OK` (70%)
+and not in `HEIGHT_KNOWN_LOW`. Known low: epicwhiners (39%, 27% with no model) and desertpeak (43%). Lowest of the others:
+excelsior3 (76%, 22% with no model) and dungrm6a (77%). The release ships these scenes byte for byte (0.1.16 package
+checked), so what players see is the generator's result, not a packaging fault. Why the lanes judged TA "fixed": the
+`wall_maps` shots were judged by position ("walls where classic has them"), not by height. Full analysis and options:
+`mxl2012-runs/duncraig/HD-PIPELINE-FINDINGS.md`.
+
+### Walls composed from the classic layout (lane hdscene, 2026-11-09)
+
+`tools/walls_scene.py` (tests `tools/tests/test_walls_scene.py`), called by `walls_hd.build` for every map not in `SCENE_OFF`.
+Instead of one guess per cell, it rebuilds the classic map's wall structures with D2R's own multi-tile pieces:
+
+1. **Classic structures.** `find_runs`: wall runs along a cell edge (orientations 2/3/6/9 on the cell's top edge along x,
+   1/4/5/8 on its left edge along z), split at gaps and where the tile set changes; `find_posts`: the posts (orientation 7).
+2. **D2R's kit, learnt from D2R's scenes over D2R's own tiles** (`Kit`, fed by `Library.learn` for all 1490 D2R maps): the
+   models standing on a run are grouped by pivot and yaw into a *piece* (footprint, length in tiles, height, pivot across
+   the run, details riding on top such as spikes), recorded once per tile set together with the tile sequences it stands on
+   (`slots`). Left walls use the piece mirrored across the x = z diagonal. Posts within 3 units of a piece end are the
+   tile set's *joint*.
+3. **Composition** (`compose`): each run is cut into *opening* spans (tiles D2R draws with a gate, door, entrance or arch
+   piece: one piece per classic opening, at the same place, its length fitted to the classic span within 0.8-1.25) and
+   *plain* spans (the tile set's most used non-opening piece, end to end with no gap, height scaled by the classic tile's
+   pixel height against the tiles the piece was learnt on, 0.6-1.6). A joint goes on every piece boundary. A span whose
+   piece stays under full height (`FULL_PER_PX` = 0.028 units per classic pixel; D2R's footings and trims) is left to the
+   per-tile walls, so is every cell the kit has nothing for. A cell whose wall tiles were composed gets nothing more from the
+   per-tile pick when only floor or post tiles are left in it (the run's joints stand there): no floor rubble and no post
+   stones under a composed wall.
+4. **Floors.** `biome_overrides` writes D2R's `perTileBiomeOverrides` for floor cells whose tile set has another D2R biome
+   than the scene's (byte budget kept), for the `OVERRIDE_BIOMES` (2) biomes with the most cells only: with 3 or 4 override
+   biomes Fauztinville's arrival asserts `visibleTileBiomes.size() < BiomeVisibleCountMax` (terrain.cpp:664; lane hdscene2).
+
+The height gate (`wall_heights`) now also counts the cells under a model's footprint (up to `FOOT_MAX` = 12 cells each way),
+not only the cells around its pivot: a 4-tile wall stands on 1 cell of the 4 it covers.
+
+Result (build of 2026-11-09; kit: 150 pieces in 35 tile sets, learnt from the 1490 D2R maps). Wall cells at full height,
+release 0.1.16 -> now, both counted with footprints: Duncraig (epicwhiners) 53% -> 99% (1,213 of its 1,223 wall cells
+composed; its gate run at y 34 gets two `gateway01` arches at x 55-59 and 60-64, each fitted to the classic 5-tile span,
+then `wall01` to x 72, and `basic_wall01` down the side walls at x 55 and x 73), downtown 82% -> 100%, inarius 83% -> 100%,
+charismatic 96% -> 100%, desertpeak 43% -> 47% (Tran Athulua's ruins, known low), the others equal or higher.
+Composed / left per tile:
+
+- Composed in full or mostly: epicwhiners, downtown, dungrm6a, inarius, rockisdead, belial (4 cells), macumba, charismatic,
+  glados (210 cells; 274 left per tile).
+- Mostly per tile, because the kit's pieces for the tile set are footings or trims under full height: excelsior3, temple5,
+  temple6, borgir, moskvich, desertpeak (Kurast and docktown tile sets).
+- Per tile by `SCENE_OFF`: none since lane hdscene2 (Fauztinville (`cypherpunk`) was, at its model cap: the added pieces
+  pushed per-tile walls out, 61% vs 79%; it is now composed within its own budget,
+  [below](#sprite-walls-in-the-gaps-lane-hdscene2-2026-11-09)).
+- Nothing to compose: caveroom4 (its cave walls are floor tiles).
+
+The 8 retextured maps (lane maptint) take the kit of the D2R tile set their tiles stand in for: Duncraig the Monastery facade
+(`act1/monastry`), downtown and the Kurast-set maps D2R's own pieces of those sets, tinted by the map's biome. Where a span
+kept low per-tile walls (above), lane hdscene2 draws Median's own wall art instead
+([below](#sprite-walls-in-the-gaps-lane-hdscene2-2026-11-09)). The 17 scenes are 0.15 MB smaller in the download than release 0.1.16 (deflated 1.01 -> 0.86 MB; raw
+23.2 -> 27.2 MB, mostly `perTileBiomeOverrides`), no new models or textures.
+
+### Sprite walls in the gaps (lane hdscene2, 2026-11-09)
+
+Where D2R's kit has no full-height piece for a tile set (Kurast and docktown runs: their D2R pieces are footings and trims),
+`walls_scene.compose` leaves the span to the per-tile pick, and that pick stays low too. Those cells now get Median's own wall
+tiles as cut-out models (`tools/walls_sprite.py`, `MapSprites`; `walls_hd.SpriteFill`, `build_scene` `sprites`; tests
+`tools/tests/test_walls_sprite.py`, `test_walls_hd.py`):
+
+- **Which cells.** A gap cell (`compose` `gaps`) whose per-tile pick does not reach full height (`HEIGHT_PER_PX` of the cell's
+  classic tile, `SpriteFill.tall`) draws its wall layers as sprites instead of the pick. A cell whose pick reaches full height
+  keeps D2R's pieces. `SPRITE_OFF` lists maps that keep the pick everywhere (none).
+- **One model per classic tile** a map uses (orientation, main index, sub index): a vertical curtain over the cell's back
+  edges with the tile's sprite (the prototype of lane hdwallart), file names `wallsprite/<map>/wall_<o>_<s>_<q>.model` (tier 2
+  in `cap()`, a wall). Each map has one atlas at the classic size (BC3, 5 mips; the art has no more detail), and all maps share
+  one flat normal map and one ORM map (64 x 64, 5 mips). The models take the vertex and index counts of the prototype's
+  donor (`wood_burning06`, `DONOR`), padded, since `model_lod_desc.bin` stores the donor's.
+- **Joins.** A sprite cell meets the neighbouring D2R piece edge to edge, with a post of the tile set at the join and the
+  atlas toned toward its D2R neighbours (see "Joints and colour at sprite joins" below). Light: the flat normal map, so the
+  walls are lit like the floor (as lane hdwallart's second run).
+- **The Proving Grounds' arch** (`dungrm6a`, `ARCH_TILES`): the classic arch and its wall at x 1-4 draw as sprites whatever the pick (D2R had ruin
+  walls there). **Khalimgrad's steps** (`charismatic`, `STEP_TILES`): the 12 step tiles of the Fortress floor draw as floor sprites (flat
+  quads `FLOOR_LIFT` above the floor, `step_<o>_<s>_<q>.model`, tier 3) over their 250 cells, so the stairs read as steps.
+
+Two things learnt in game (slot 1): a 25-vertex donor (docktown `thatch03`) gives "Failed to create index buffer" for every
+model made from it, and 16 x 16 normal / ORM maps with one level lose the GPU device ("Present failed", 0x887A0005) as soon
+as a map that draws them loads; with the prototype's donor and 64 x 64 maps with mips, level 60 loads with no assert.
+
+Wall cells at full height (footprint count), lane hdscene's build -> this lane:
+
+| Map | Before | After | Sprite walls (models) |
+|-|-|-|-|
+| Tran Athulua (`desertpeak`, 60) | 48% (2,776 capped) | 97% (0 capped) | 1,143 (24) |
+| Fauztinville (`cypherpunk`, 59) | 79% (per tile, `SCENE_OFF`) | 100% (composed, 8,620 placed, 0 capped) | 1,897 (31) |
+| Kurast 3000 BA (`excelsior3`, 84) | 77% | 100% | 184 (14) |
+| Old Bremmtown (`borgir`, 126) | 82% | 100% | 699 (47) |
+| Rathma Square (`moskvich`, 98) | 89% | 100% | 137 (57) |
+| The Proving Grounds (`dungrm6a`, 90) | 100% (227 capped) | 100% (0 capped; 1,050 KB, was 4,539 KB) | 56 arch (14) |
+| Khalimgrad (`charismatic`, 127) | 100% | 100% | 26 walls, 250 floor steps |
+| Azmodan's Reliquary (`temple5`, `temple6`, 96) | 100% | 100% | 0 |
+
+Five more maps get a few sprite walls in their gap cells (Dimensional Sanctum (`belial`), Ureh (`downtown`), Duncraig (`epicwhiners`), Vizjun
+(`glados`), Toraja (`macumba`): 1 to 6 models each); the other maps are unchanged. Download: the sprite models add 6.4 MB deflated (1,115 files, 223 models x 5 LODs, 47 MB raw:
+the donor's counts are padding), the 12 atlases and 2 flat maps 2.1 MB (19 MB raw), the 17 scenes 0.2 MB (deflated 0.86 ->
+1.05 MB); about 8.7 MB together.
+
+### Joints and colour at sprite joins (lane walljoins, 2026-11-09)
+
+Where a sprite wall meets a D2R wall piece, `build_scene` now puts a post at the join, and each map's sprite atlas is toned
+toward the D2R pieces round it (`tools/walls_scene.py` `join_points`, `Kit.join_fit`, `place_joins`; `tools/walls_hd.py`
+`budget_joins`, `sprite_neighbours`; `tools/walls_sprite.py` `match_colour`, `albedo_stats`; tests
+`tools/tests/test_walls_joins.py`):
+
+- **Join points.** A grid point that ends both a sprite wall edge and a D2R wall edge (in line or at a corner). The joint's
+  height is the sprite wall's top there.
+- **Which joint.** The joints the kit learnt for the tile set (posts near piece ends in D2R's own maps), the D2R side's tile
+  set first, the most used first. A joint is used only when it is a post (`JOIN_FOOT`, footprint at most 7 units each way:
+  no ruin corners, fences or wall slabs) and its height scales to the sprite top within `JOIN_SCALE` (0.6 to 2). When the
+  tile set has none, the post of another tile set of the same act that needs the least scaling ("similar"). Else the join
+  is left as it was and listed (`joins_left_at`). A point that already has a joint from `compose` is skipped (`joins_taken`).
+- **Budget.** Joints are tier 2 but only take the room left under `cap()` / `MAP_LIMITS` after the map's own entities;
+  over it, whole joints are kept spread over the map (`budget_joins`). Entities `mxj_<i>_<k>`, ids from `JOIN_ID_BASE`.
+- **Colour.** The albedo (`_ALB.texture`, a small mip) of each D2R wall piece within one cell of a sprite wall is pooled per
+  map, weighted by count; the atlas's opaque pixels move per channel toward that mean and spread (`match_colour`: spread
+  ratio clamped to `SPREAD_RANGE` 0.5 to 2, applied `COLOUR_STRENGTH` 0.75 of the way). Maps with fewer than `COLOUR_MIN`
+  (10) neighbouring pieces keep Median's colours. Deterministic, at build time; `d2r_texture` decodes BC1 / BC3 / BC7.
+
+Per map (all 17 rebuilt, height gate clear, `validate` exit 0):
+
+| Map | Joints placed | Own / similar | Left | Colour target (RGB) |
+|-|-|-|-|-|
+| Tran Athulua (`desertpeak`, 60) | 197 | 186 / 11 | 5: (8,26) (8,81) (9,17) (9,26) (9,31) | 93 / 91 / 58 |
+| Old Bremmtown (`borgir`, 126) | 195 | 195 / 0 | 0 | 101 / 96 / 83 |
+| Rathma Square (`moskvich`, 98) | 40 | 40 / 0 | 0 | 94 / 88 / 78 |
+| Kurast 3000 BA (`excelsior3`, 84) | 33 | 33 / 0 | 0 | 104 / 97 / 83 |
+| The Proving Grounds (`dungrm6a`, 90) | 23 | 10 / 13 | 0 | 93 / 95 / 47 |
+| Toraja (`macumba`) | 23 | 23 / 0 | 0 | 106 / 97 / 88 |
+| Khalimgrad (`charismatic`, 127) | 11 | 11 / 0 | 3: (7,19) (7,20) (8,45) | 78 / 73 / 70 |
+| Vizjun (`glados`) | 3 | 3 / 0 | 0 | none (too few pieces) |
+| Dimensional Sanctum (`belial`) | 2 | 0 / 2 | 0 | none |
+| Duncraig (`epicwhiners`) | 1 | 0 / 1 | 0 | 95 / 85 / 74 |
+| Fauztinville (`cypherpunk`, 59) | 0 (329 over budget) | 329 / 0 | 0 | 98 / 95 / 65 |
+
+Joint counts are per join point (a joint can have several members). The posts used: Kurast's `vine_pillar02`, Travincal's
+round pillars and Kurast's `pillar_corner01` / `pillar_thin02` at Tran Athulua; Kurast's `wall_stone_buttress01` and
+`pillar01` at Kurast 3000 BA and Old Bremmtown. Fauztinville is at its entity limit (8,620 placed), so its joins stay edge
+to edge; the left points at Tran Athulua and Khalimgrad have no post in reach of their sprite height.
+Before/after HD sheets with legacy: `mxl2012-runs/walljoins/sheets/` (outside the repo).
+
+### Model cache (lane hdscene2, 2026-11-09)
+
+D2R keeps every HD model it has loaded in the render asset manager's ModelAsset cache (capacity 2,750). A full cache raises
+`BC_ASSERT: 0` (Fog AssetCache.h:187) and grows by half. Sprite walls add one model per classic tile a map uses (up to 57 per map, 223 over the 17 maps), so a session through
+several maps comes closer to the limit. The plugin
+(`plugin/src/model_cache.cpp`, `model_cache_logic.h`, test `plugin/tests/model_cache_test.cpp`, off word `modelcache`) starts
+the cache at 8,250 (three times D2R's) before the renderer starts: the asset manager's constructor sets the capacity
+(0xdfb5b9) and reserves the entry pool (0xdfb61d), and the ModelAssetCache init (0xf75c60, called from the renderer start)
+sets the capacity again (0xf75cc1). All three immediates are patched after their bytes are compared; with only the first two
+the live capacity read 2,750. `tools/cache_probe.py` accepts 8,250 as a ModelAsset capacity (`PLUGIN_CAPACITIES`).
+In game (slot 1, `checks-20261109-120054-s1`, 8 maps in HD and legacy): the live capacity reads 8,250, peak 1,531 models.
+
+The scene budget (`cap()`, `MAP_LIMITS`) is our own policy, not this cache: Fauztinville's (`cypherpunk`) composed scene is 8,620 placed pieces
+and 7,999,943 bytes. In game it loads with no crash: 59-59.5 fps, private memory 9.7-9.8 GB at Fauztinville in HD (lane
+stairs measured 9.54-9.77 GB with the 5,779-piece scene).
 
 ## Edited D2R maps (lane hole2, bug #525, 2026-11-03)
 

@@ -132,7 +132,35 @@ def write_bc3(path, a: np.ndarray, mips: int = 1, linear: bool = False) -> None:
 
 def read_texture(path):
     """(format, width, height, [mip data]) of a .texture file."""
-    d = open(path, "rb").read()
+    return parse_texture(open(path, "rb").read())
+
+
+BCN = {FMT_BC3: 3, FMT_BC3_LIN: 3, 58: 1, 65: 7, FMT_BC4: 4}   # .texture format -> Pillow's BCn decoder number
+
+
+def decode(fmt: int, w: int, h: int, data: bytes) -> np.ndarray:
+    """(h, w, 4) uint8 pixels of one mip (BC1/3/4/7 or RGBA8)."""
+    from PIL import Image
+    if fmt == FMT_RGBA8:
+        return np.frombuffer(data, np.uint8)[:w * h * 4].reshape(h, w, 4).copy()
+    n = BCN[fmt]
+    if n == 4:
+        a = np.array(Image.frombytes("L", (max(4, w), max(4, h)), data, "bcn", 4))[:h, :w]
+        return np.dstack([a, a, a, np.full_like(a, 255)])
+    return np.array(Image.frombytes("RGBA", (max(4, w), max(4, h)), data, "bcn", n).convert("RGBA"))[:h, :w].copy()
+
+
+def small_mip(data: bytes, most: int = 256) -> np.ndarray:
+    """The pixels of a .texture's largest mip no wider or higher than `most` (the smallest when all are larger)."""
+    fmt, w, h, mips = parse_texture(data)
+    for i, m in enumerate(mips):
+        mw, mh = max(1, w >> i), max(1, h >> i)
+        if max(mw, mh) <= most or i == len(mips) - 1:
+            return decode(fmt, mw, mh, m)
+
+
+def parse_texture(d: bytes):
+    """(format, width, height, [mip data]) of .texture bytes."""
     _m, v, w, h = struct.unpack_from("<4I", d, 0)
     n = (v >> 24) & 0xFF
     mips = []

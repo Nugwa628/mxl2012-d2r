@@ -189,6 +189,47 @@ class SceneTest(unittest.TestCase):
         self.assertEqual(sorted(walls_hd.transform(e)["position"]["x"] for e in scene["entities"]), [25.0, 26.0])
         self.assertTrue(all(c["type"] != "PhysicsBodyDefinitionComponent" for e in scene["entities"] for c in e["components"]))
 
+    def sprite_scene(self, gaps=(), forced=(), floor=0, heights=None, box=((0, 0, 0), (1, 1.0, 1))):
+        """build_scene of two learnt wall cells, (2, 2) and (3, 2), with a fake sprite set (walls_sprite.MapSprites' calls)."""
+        import walls_sprite
+        lib = walls_hd.Library()
+        k_wall = (("d", 1, 2, 0),)
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): k_wall}, {"entities": [entity(WALL, 5, 5)]})
+
+        class Tiles:
+            arches = frozenset()
+
+            def entities(self, xy, serial, only=None):
+                return [walls_sprite.entity(walls_sprite.model_path("m", k), xy[0], xy[1], 0, serial) for k in sorted(only)]
+
+            def forced(self, xy):
+                return xy in forced
+
+            def floor_entities(self):
+                return [walls_sprite.floor_entity(walls_sprite.model_path("m", (0, 0, 5)), 1, 1, 0, n) for n in range(floor)]
+
+        fill = walls_hd.SpriteFill(gaps, heights or {(2, 2): 100, (3, 2): 100}, Tiles(), lambda m: box)
+        text, st = walls_hd.build_scene({(2, 2): k_wall, (3, 2): k_wall}, lib, "act3_kurast", sprites=fill)
+        return [walls_hd.model_of(e) for e in json.loads(text)["entities"]], st
+
+    def test_a_low_gap_cell_draws_sprites_instead_of_its_pick(self):
+        sprite = "data/hd/env/model/mxl/wallsprite/m/wall_1_2_0.model"
+        self.assertEqual(self.sprite_scene()[0], [WALL, WALL])
+        models, st = self.sprite_scene(gaps={(2, 2)})          # 1 unit against 100 px * HEIGHT_PER_PX = 2.8
+        self.assertEqual(sorted(models), [WALL, sprite])
+        self.assertEqual((st["sprite_cells"], st["sprites"]), (1, 1))
+        models, st = self.sprite_scene(gaps={(2, 2)}, box=((0, 0, 0), (1, 3.0, 1)))   # the pick is full height: kept
+        self.assertEqual((models, st["sprite_cells"]), ([WALL, WALL], 0))
+        models, _st = self.sprite_scene(gaps={(2, 2)}, heights={(3, 2): 100})        # no classic height known: kept
+        self.assertEqual(models, [WALL, WALL])
+
+    def test_forced_cells_and_floor_sprites(self):
+        models, st = self.sprite_scene(forced={(3, 2)}, floor=2, box=((0, 0, 0), (1, 9.0, 1)))
+        self.assertEqual(models.count(WALL), 1)
+        self.assertEqual(st["sprite_cells"], 1)
+        self.assertEqual(st["floor_sprites"], 2)
+        self.assertEqual(models.count("data/hd/env/model/mxl/wallsprite/m/step_0_0_5.model"), 2)
 
     def test_floor_cells_are_counted_apart(self):
         lib = walls_hd.Library()
@@ -201,11 +242,67 @@ class SceneTest(unittest.TestCase):
         self.assertEqual((st["floor_cells"], st["floor_walls"], st["cells"], st["uncovered"]), (3, 1, 1, 1))
         self.assertEqual(lib.pick((("act1/caves", 0, 9, 9),)), ((), "floor"))   # a floor D2R never has stays bare
 
+    def test_a_composed_wall_cell_gets_no_floor_rubble(self):
+        lib = walls_hd.Library()
+        f_rubble, wall = ("act1/caves", 0, 2, 0), ("act1/caves", 1, 6, 1)
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): (f_rubble,), (1, 0): (wall,)}, {"entities": [entity(WALL, 5, 5)]})
+        cells = {(2, 2): (f_rubble, wall), (3, 2): (f_rubble,)}
+        text, st = walls_hd.build_scene(cells, lib, "act1_caves", structured=([], {(2, 2): {wall}}))
+        xs = [walls_hd.transform(e)["position"]["x"] for e in json.loads(text)["entities"]]
+        self.assertEqual(xs, [35.0])                         # the floor-only cell keeps its rubble, the composed wall cell none
+        self.assertEqual(st["structured_cells"], 1)
+
+    def test_a_composed_wall_cell_gets_no_post_stones(self):
+        lib = walls_hd.Library()
+        post, wall, other = ("act1/caves", 7, 6, 0), ("act1/caves", 1, 6, 1), ("act1/caves", 2, 6, 3)
+        for m in ("m1", "m2", "m3"):
+            lib.learn(m, {(0, 0): (post,), (1, 0): (wall,), (2, 0): (other,)}, {"entities": [entity(WALL, 5, 5), entity(WALL, 25, 5)]})
+        cells = {(2, 2): (wall, post), (3, 2): (wall, other)}
+        text, st = walls_hd.build_scene(cells, lib, "act1_caves", structured=([], {(2, 2): {wall}, (3, 2): {wall}}))
+        xs = [walls_hd.transform(e)["position"]["x"] for e in json.loads(text)["entities"]]
+        self.assertEqual(st["structured_cells"], 1)          # the post-only rest gets nothing
+        self.assertEqual(len(xs), 1)                         # the uncomposed wall tile keeps its per-tile piece
+
 
 PROP = "data/hd/env/model/act3/kurast/props/book02.model"
 BUTTRESS = "data/hd/env/model/act3/kurast/walls/wall_stone_buttress01.model"
 ELEVATION = "data/hd/env/model/act3/kurast/walls/wall_elevation_stone01.model"
 KURAST_STAIRS = "data/hd/env/model/act3/kurast/act3_kurast_stairs/stairs_b01.model"
+
+
+class HeightTest(unittest.TestCase):
+    """wall_heights / height_gate (lane duncraig): models on the right cells but far lower than the classic wall."""
+    BOX = {WALL: ((-5.0, 0.0, -1.0), (5.0, 10.0, 1.0)), PILLAR: ((-1.0, 0.0, -1.0), (1.0, 2.0, 1.0))}
+
+    def test_classic_heights_tallest_wall_tile_per_cell(self):
+        w = 3
+        ds = ds1_remap.Ds1(make_ds1(w, 1, [layer(w, 1, {(0, 0): (cell(2, 0), 1), (1, 0): (cell(2, 1), 1), (2, 0): (cell(2, 2), 13)}),
+                                            layer(w, 1, {(0, 0): (cell(2, 1), 2)})]))
+        tiles = {"a/w.dt1": dt1.parse(make_dt1([(1, 2, 0, 8, -160, b"a"), (1, 2, 1, 8, -96, b"b"), (2, 2, 1, 8, -320, b"c"),
+                                                (13, 2, 2, 8, -400, b"d")]))}
+        self.assertEqual(walls_hd.classic_heights(ds, ["a/w.dt1"], tiles.get), {(0, 0): 320, (1, 0): 96})   # 13: no wall
+
+    def test_wall_heights_ok_low_none(self):
+        classic = {(0, 0): 300, (5, 0): 300, (9, 9): 300}
+        ents = [entity(WALL, 2.0, 2.0), entity(PILLAR, 52.0, 2.0)]   # 10 units >= 0.028 * 300; 2 units under it
+        st = walls_hd.wall_heights(classic, ents, self.BOX.get)
+        self.assertEqual(st, {"height_cells": 3, "height_ok": 1, "height_low": 1, "height_none": 1})
+
+    def test_wall_heights_neighbour_cell_and_scale(self):
+        e = entity(PILLAR, 12.0, 2.0)
+        e["components"][0]["scale"]["y"] = 5.0
+        st = walls_hd.wall_heights({(0, 0): 300}, [e], self.BOX.get)      # one cell away, 2 x 5 = 10 units
+        self.assertEqual(st["height_ok"], 1)
+
+    def test_gate_fails_low_maps_unless_known(self):
+        stats = {"a.ds1": {"height_cells": 10, "height_ok": 9}, "b.ds1": {"height_cells": 10, "height_ok": 3},
+                 "c.ds1": {"height_cells": 10, "height_ok": 2}, "d.ds1": {"bytes": 1}}
+        self.assertEqual(walls_hd.height_gate(stats, known={"c.ds1": "bug"}), [("b.ds1", 0.3)])
+        self.assertEqual(walls_hd.height_gate({}, known={}), [])
+
+    def test_known_low_maps_are_generated_maps(self):
+        self.assertLessEqual(set(walls_hd.HEIGHT_KNOWN_LOW), set(walls_hd.MAPS))
 
 
 class CapTest(unittest.TestCase):
@@ -270,8 +367,8 @@ class CapTest(unittest.TestCase):
         self.assertEqual((walls_hd.MAX_PLACED, walls_hd.MAX_BYTES), (4423, 4651080))
 
     def test_map_limit_over_the_cap(self):
-        """Lane stairs: only cypherpunk has its own budget, the scene measured in game; build() passes it to build_scene."""
-        self.assertEqual(walls_hd.MAP_LIMITS, {"expansion/ghetto/cypherpunk.ds1": (6255, 5417732)})
+        """Lanes stairs, hdscene2: only cypherpunk has its own budget, the scene measured in game; build() passes it to build_scene."""
+        self.assertEqual(walls_hd.MAP_LIMITS, {"expansion/ghetto/cypherpunk.ds1": (8620, 7999943)})
         lib = walls_hd.Library()
         k = (("d", 1, 2, 0),)
         for m in ("m1", "m2", "m3"):

@@ -1,5 +1,7 @@
 """Unit tests of the HD UI tools on synthetic data (no game files). Run: py -3 -I -m unittest discover -s tools/tests -p "test_ui.py" """
+import hashlib
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -16,6 +18,25 @@ import ui_panels  # noqa: E402
 from PIL import Image  # noqa: E402
 
 PAL = [(i, 255 - i, i // 2) for i in range(256)]
+
+# v005 names the skill tabs only in the art: the tab column of skltree_<x>_back.dc6, top to bottom (StrSklTree4-34 are empty,
+# StrSklTabItem* are vanilla's "+N to .. Skills" item lines). class -> sha256 of that file, (label on the art, our word).
+CLASSIC_TABS = {
+    "ama": ("4c136f5827df67506a568dd351edac777be15ac98d49c93f440c7f1a930d2b07",
+            (("SPECIAL", "Special"), ("DEFEN.", "Defensive"), ("BLOOD", "Blood"), ("SPEAR", "Spear"), ("JAVELIN", "Javelin"), ("BOW", "Bow"))),
+    "sor": ("f4ea416a178016688fcb7a4dfac19b5ac3f874303f214a27ce488c1e68627eae",
+            (("SPECIAL", "Special"), ("MANA", "Mana"), ("POISON", "Poison"), ("LIGHTN.", "Lightning"), ("COLD", "Cold"), ("FIRE", "Fire"))),
+    "nec": ("0f2f9c152ceba2f41fc4875edffc04c84b3ec2527c0b0454bab3d918e8d8e41d",
+            (("SPECIAL", "Special"), ("SUMM.", "Summoning"), ("SUPPR.", "Suppression"), ("BATTLE", "Battle"), ("TOTEM2", "Totems II"), ("TOTEM1", "Totems I"))),
+    "pal": ("9c45de560185f3bd121fc21a5e46b7ef73036779997dac16f3cb8816aead0c7a",
+            (("SPECIAL", "Special"), ("NEUTR.", "Neutral"), ("SHADOW", "Shadows"), ("WICKED", "Wicked"), ("LIGHT", "Light"), ("HONOR", "Honor"))),
+    "bar": ("8b53f1383dd9247a3919a811b7c879de3cb6550b8ff591a963e8880d67941597",
+            (("SPECIAL", "Special"), ("RAGE", "Rage"), ("STANC.", "Stances"), ("SPIRITS", "Spirits"), ("THROW", "Throw"), ("MELEE", "Melee"))),
+    "dru": ("2c14d1dae0361c195ad18b536b43361d88b22a9eec0b17af34b35a2254555fc1",
+            (("SPECIAL", "Special"), ("BOW", "Bow"), ("POISON", "Poison"), ("ELEM.", "Elemental"), ("CHRM.2", "Charms II"), ("CHRM.1", "Charms I"))),
+    "ass": ("2e1df9be7b1a45729e5fbab6b5c9edbc9c43c2ee1242ab7150698bd8c551b5d7",
+            (("SPECIAL", "Special"), ("NINJA", "Ninja"), ("BOMBS", "Bombs"), ("THROW", "Throw"), ("KI", "Ki"), ("MELEE", "Melee"))),
+}
 
 
 def flat_block(w: int, h: int, index: int) -> bytes:
@@ -50,6 +71,24 @@ class SkillTreeTests(unittest.TestCase):
 
     def test_unknown_requirement_without_cell_above_gives_nothing(self):
         self.assertEqual(skill_tree_art.page_arrows({"A": (0, 0)}, {"A": ["Gone"]}), [])
+
+    def test_tab_names_match_classic_art(self):
+        self.assertEqual(set(CLASSIC_TABS), set(skill_tree_art.CLASSES))
+        for cls, (_sha, labels) in CLASSIC_TABS.items():
+            self.assertEqual(skill_tree_art.TAB_LABELS[cls], [word for _art, word in labels], cls)
+            for art, word in labels:
+                letters = iter(word.upper())
+                self.assertTrue(all(c in letters for c in re.sub("[^A-Z]", "", art)), (cls, art, word))
+                if art[-1] in "12":
+                    self.assertTrue(word.endswith({"1": " I", "2": " II"}[art[-1]]), (cls, art, word))
+        self.assertEqual(skill_tree_art.tab_titles("dru"), ["Special / Bow", "Poison / Elemental", "Charms II / Charms I"])
+
+    def test_classic_tab_table_is_of_the_v005_art(self):
+        for cls, (sha, _labels) in CLASSIC_TABS.items():
+            path = skill_tree_art.MOD_UI / "spells" / f"skltree_{skill_tree_art.CLASSES[cls][1]}_back.dc6"
+            if not path.exists():
+                self.skipTest("no Median extraction here")
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), sha, cls)
 
     def test_titles(self):
         self.assertEqual(skill_tree_art.tab_titles("bar"), ["Special / Rage", "Stances / Spirits", "Throw / Melee"])

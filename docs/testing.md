@@ -6565,3 +6565,390 @@ says "its old threshold ignored". The set-up row `elclear` found no El rune in s
 The first run (`checks-20261108-132834-s1`) crashed at character entry ("Could not add cof file IMghhth.COF"): the
 `build.py --data-only` data skips gfx_placeholders, so bug #3's necromorb fix was missing. Not a mapreveal fault; the run above
 used a full build. Shared slot files restored by the game-slot tools, slot 1 unlocked.
+
+## Lane townreveal: towns revealed on arrival (bug #559 follow-up, 2026-11-08, slots 2 and 1, background input)
+
+Owner ruling: the five act towns are revealed by themselves on arrival, no key; elsewhere L reveals the current level, no
+default exclusions. Part: docs/plugin-plan.md section 34. Unit tests `mapreveal_tests` (`IsTown`, `TownLayer`, `TownArrival`).
+Median XL 2012 has no other town levels (levels.txt).
+
+In game: `checks-20261108-190208-s1` (`py -3 tools/game_checks.py all mxl2012 mapreveal`, char `TownReveal`, god mode, full
+build of this branch), all rows PASS, every press by the real background L key, 0 faults, 0 crash files. Evidence in
+`mxl2012-runs\townreveal\`. Town rows: the automatic reveal counted with no key press and no chat line, shot of the automap,
+then L must add no cell. Every town round comes from another level; the HD tour changes act each time.
+
+| Mode | Town, arrival from | Rooms made | Cells on arrival -> after L |
+|-|-|-|-|
+| HD | Rogue Encampment (1), Catacombs 4 | 35/35 | 730 -> 730 |
+| HD | Kurast Docks (75), Sewers 1 | 48/48 | 762 -> 762 |
+| HD | Lut Gholein (40), Act 3 | 49/49 | 17 -> 17 |
+| HD | Pandemonium Fortress (103), Act 2 | 12/12 | 29 -> 29 |
+| HD | Harrogath (109), Act 4 | 25/25 | 6 -> 6 |
+| HD | Rogue Encampment (1), Act 5 | 35/35 | 730 -> 730 |
+| legacy | Kurast Docks (75), Sewers 2 | 48/48 | 762 -> 762 |
+| legacy | Rogue Encampment (1), Catacombs 2 | 35/35 | 730 -> 730 |
+
+Outside town the arrival reveals nothing and L does:
+
+| Mode | Level | Rooms made | Cells arrival -> after L |
+|-|-|-|-|
+| HD | Catacombs Level 1 (34) | 5/5 | 32 -> 194 |
+| HD | Catacombs Level 4 (37) | 12/12 | 28 -> 144 |
+| HD | Kurast Sewers Level 1 (92) | 34/34 | 45 -> 2643 |
+| legacy | Sewers Level 2 (93) | 9/9 | 33 -> 96 |
+| legacy | Catacombs Level 2 (35) | 4/4 | 28 -> 187 |
+
+Why 17, 29 and 6 are whole maps (`checks-20261108-191059-s1`, script `townprobe.py`, not a repo check): twelve legs walked
+through Lut Gholein, the Fortress, Harrogath and the Docks added 0 cells after the automatic reveal; D2R's act `revealmap`
+raised the count only with the act's outdoor levels, which share the town's layer (docs/map-reveal-research.md section 8).
+The shots show the same town map before and after it, plus outdoor pieces. An earlier run without the layer condition
+(`checks-20261108-185111-s2`) gave the same counts, so the condition guards an ordering the run did not show failing.
+
+The check `mapreveal` printed 5 engine asserts at game shutdown in the slot 1 run (`s_StatsPool.IsEmpty` and pool asserts,
+after the checks ended). The same lines are in lane reveal's and lane duncraig's runs, so they are not from this change.
+
+Shared slot files restored by the game-slot tools, slots unlocked.
+
+## Lane duncraig: Duncraig and Tran Athulua walls in HD, wall height gate (bug #561, 2026-11-08, slot 2, background input)
+
+Release check: the 0.1.16 package's 13 generated wall scenes are byte-equal to main's `walls_hd` output, and slot 2's
+24 preset scenes are byte-equal to the package (checked before the run). Run `checks-20261108-133053-s2`:
+`SLOT=2 LEVELS=60,13 SPOTS="13:45,105;95,55;65,75" TAG=release mxl2012-runs/duncraig/gamerun.sh` (locks and unlocks the
+slot; `MXL_RUN=duncraig MXL_CHAR=DuncraigTest ... tools/game_checks.py --slot 2 all wall_maps`). `wall_maps` PARTIAL (judged by
+hand): both levels reached in HD and legacy, 60 fps, only the shutdown pool asserts at game exit. Judged: Tran Athulua's HD
+walls are knee-high ledges where legacy has full walls; Duncraig's HD has no facade walls where legacy has the monastery.
+The hops to Duncraig's three facade spots failed (`place`: no free spot). Evidence `mxl2012-runs/duncraig/`: `pairs/` (HD
+left, legacy right), `shots/`, `run-release.log`, `HD-PIPELINE-FINDINGS.md`.
+
+Static: `walls_hd.wall_heights` (docs/maps-hd.md "Wall heights against legacy"), tests `HeightTest` in
+`tools/tests/test_walls_hd.py`. `py -3 -I tools/walls_hd.py docs` regenerates the table with the new column and must leave
+the 17 scenes byte-equal (checked against main's `work/maps_hd/walls_data`).
+
+## Lane hdwallart: Median's own wall tiles in HD (2026-11-08, slot 2, background input)
+
+Prototype only, not in the build: `tools/walls_sprite.py` (one cut-out model per wall tile, carrying the tile's sprite), tests
+`tools/tests/test_walls_sprite.py`. Prototype files were laid over the slot's mod for each run and restored after (byte-equal,
+checked). `wall_maps` runs `checks-20261108-180321-s2` (true wall normals: walls facing away from the key light are black)
+and `checks-20261108-181820-s2` (lit like the floor): level 60 in HD has full-height Median walls and trees at legacy's places, 0
+asserts, 60 fps. Evidence and the analysis of why HD differs from legacy: `mxl2012-runs/hdwallart/FINDINGS.md`.
+
+## Lane shrinetip: crafting shrine tooltips (bug #563) and elixir colours (2026-11-08, slots 1 and 2, background input)
+
+Check `shrinetip` (`tools/shrine_checks.py`, `run_tips`): `MXL_RUN=shrinetip MXL_SLOT=1 MXL_CHAR=ShrineTip MXL_RUNS=<evidence>
+py -3 tools/game_checks.py all mxl2012 shrinetip`. The harness makes the items (SHORTCUT); the rest is background input: the 22
+elixirs Ctrl-clicked onto MEDIAN, then per graphics mode every shrine kind hovered in the backpack, Ctrl-clicked in and hovered on its
+slot, plus 5- and 1-charge shrines in the backpack. The result is PARTIAL by design: the text and colours are judged on the shots.
+
+**Shrines, classic:** the 200 `A0+`..`T9+` misc rows have empty `spelldesc` and `spelldescstr`; the tooltip text is the name string
+alone (two verse lines + name, all 200 in the .tbl). Median 2012 patches no code (docs/plugin-plan.md), so nothing else adds a line.
+No native run was made: it would show the same data. The verse is all classic says; it names neither the stats nor a recipe.
+
+Runs (evidence `mxl2012-runs/shrinetip/`, contact sheets in `sheet/`):
+
+| Run | Install | Result |
+|-|-|-|
+| `checks-20261108-184412-s1` | branch build, slot 1, CPU 35-45% | HD and legacy: 20 kinds in backpack and on MEDIAN, name + charges + both verse lines, and the part-charged two (`sheet/tips_hd_*.png`, `sheet/tips_legacy_text.png`). Elixir rows coloured in both modes. Only the five known shutdown pool asserts, no crash |
+| `checks-20261108-190006-s2` | 0.1.17 package + dev DLL, slot 2 | HD: same 20 x 2 + part-charged (`sheet/tips_release_hd.png`), and the uncoloured elixirs as control. Legacy leg void |
+| `-191438-s2`, `-192318-s2`, `-193127-s2` | same, legacy only | Void: the stash was closed after the graphics switch, every Ctrl-click stayed in the backpack; a click on the chest in the last run did not reopen it |
+
+**Not proven:** legacy tooltips on the release package in game. Its 200 strings equal the .tbl in all 13 languages in both `strings` and
+`strings-legacy` (static, `relstr.py`), and the branch build shows them in legacy. Why the panel closes there is not known; the slot 1
+branch run kept it open through the same switch, and only that one run compares the two. The `mxl2012` check reads FAIL on the release
+installs only for its `other plugins` line. The player's version is not known.
+
+**Elixirs:** `tools/elixir_colours.py`, docs/hd-icons.md "Elixir colours", tests `tools/tests/test_elixir_colours.py`. Build for the run:
+`work/` copied from lane shrinecol, data steps and art steps rerun except the wall scenes (no wall change); validate 0 errors.
+Legacy shades are coarser (palette), and Wealth / Vitality / Fire are the closest pairs there. MEDIAN items left alone: the 14 trophies
+(`^01`-`^14`) share one cup picture but each has its own cube text (list for the owner); the Buyable signets share a picture with the
+signet of the same effect, as they should.
+
+## Lane druidtabs: Druid skill tab names against v005 (2026-11-08, slot 2, background mode)
+
+Bug #564. No mod or plugin change: slot 2's installed build, whose strings hold the same `Charms II / Charms I` text as a build of this branch.
+`MXL_RUN=druidtabs MXL_SLOT=2 MXL_CHAR=DruTabs MXL_STIP_CLASSES=druid MXL_STIP_LIMIT=1 py -3 tools/game_checks.py all stip_tooltips`
+(`mxl2012-runs/druidtabs/checks-20261108-194602-s2`).
+
+| Check | Result | Evidence |
+|-|-|-|
+| Tab names of all seven classes against the v005 art, read from the tab column of each `skltree_<x>_back.dc6` | PASS: all match, nothing changed | `mxl2012-runs/druidtabs/classic_all_tabcolumns.png`, `classic_druid_tabcolumn_x3.png` |
+| Druid tree, HD, three tabs | PASS: Special / Bow, Poison / Elemental, Charms II / Charms I; each tab opens its page | `stip_dru_hd_tree_tab1_0.png`, `_tab2_0`, `_tab3_0` |
+| Druid tree, legacy, three tabs | PASS: the art's own SPECIAL, BOW, POISON, ELEM., CHRM.2, CHRM.1 (tooltips of the hovered skill cover part of the column on tabs 2 and 3; all labels but SPECIAL are readable on tab 1) | `stip_dru_legacy_tree_tab1_0.png`, `_tab2_0`, `_tab3_0` |
+| Run verdict | PARTIAL (lines are judged by hand); only the known exit-only pool asserts at Save and Exit, 0 crash files | `report.md` |
+
+Static: `test_tab_names_match_classic_art` holds each class's labels as drawn with our word for each; `test_classic_tab_table_is_of_the_v005_art` pins the seven DC6 files by sha256 (skipped without a Median extraction). Changing a Druid name makes the first one fail (tried).
+
+## Lane shrineline: the Cube line on crafting shrines (bug #563, 2026-11-08, slot 2, background input)
+
+Check `shrineline` (`tools/shrine_checks.py`, `run_lines`): `MXL_RUN=shrineline MXL_SLOT=2 MXL_CHAR=ShrineLine MXL_RUNS=<evidence>
+py -3 tools/game_checks.py all mxl2012 shrineline`. The harness makes the items (SHORTCUT). Legacy comes first and each mode hovers the
+backpack, so no stash has to survive the graphics switch; HD then also hovers three MEDIAN slots. PARTIAL by design: the text and
+the wrapping are judged on the shots. Seen with the harness, not a player-path verification.
+
+Run `checks-20261108-204938-s2` (branch build, slot 2, CPU 43%; evidence `mxl2012-runs/shrineline/`, contact sheets
+`sheet/lines_legacy.png` and `sheet/lines_hd.png`): all 20 kinds at 10 charges plus Creepy at 5 and Cryptic at 1, in legacy and HD: name, charges
+and verse unchanged in orange-gold, the blue line last, on one line. MEDIAN slots A0+, L0+, T0+ in HD show the same line. No new assert or crash.
+
+Not seen in game: the legacy MEDIAN slot hover, the other charge counts (the same generated line; tests cover all 200 strings), and
+languages other than English. Non-English lines use D2R's word for Strength, Dexterity, Vitality, Energy, Mana, Defense and Damage; every other stat
+name and "Cube:" stay English, like the shrine verses.
+
+## Lane hdscene: HD walls composed from the classic layout (2026-11-09, slot 2, background input)
+
+Check `wall_maps` through `mxl2012-runs/hdscene/gamerun.sh` (CPU check, lock, `install_mod.py`, unlock after):
+`MXL_RUN=hdscene MXL_SLOT=2 MXL_CHAR=SceneTest MXL_WALL_LEVELS=<levels> MXL_WALL_SPOTS=<spots> py -3 tools/game_checks.py --slot 2
+all wall_maps`. SHORTCUT: travel by `h level` / `place`, god mode. Seen with the harness, not a player-path verification.
+`wall_visit` now tries a straight `place` at a far spot (and round it) before the hops, hops in shorter steps, walks on a 2
+sub-tile `walkmap` grid, goes back by `h level` when the walk takes a warp out of the level, and writes
+`walkmap_<level>_<mode>_<spot>.txt` to the run folder when a spot stays out of reach.
+
+- `checks-20261109-031148-s2` (level 13, Duncraig): 0 asserts, 59-60 fps (HD). Only the arrival could be seen: its walk
+  collision is a pocket of about 3 x 2 cells next to the stairs up, and `place` refuses the gate's rooms (not active), so
+  the gate wall itself (y 34, x 55-71) was not seen in game. From the arrival the HD monastery front now stands as a full
+  wall on the line where legacy has it (release 0.1.16: an arch fragment and dark): `mxl2012-runs/hdscene/pairs/
+  duncraig_arrival.jpg`, `duncraig_arrival_walls.jpg` (brightened crops).
+- `checks-20261109-035336-s2` (levels 18 downtown, 90 dungrm6a, 127 charismatic): 0 asserts in HD and legacy, 58-60 fps.
+  Walls on legacy's lines; charismatic's gate arch in place; dungrm6a's walls are D2R ruin walls where legacy has red brick
+  and an arch, charismatic's floor is flat where legacy has steps. Pairs `pairs/<map>_<n>.jpg` (HD left, legacy right).
+- Build: `walls_hd` height gate passes (wall cells at full height, footprint count, release 0.1.16 -> this lane: Duncraig 53% -> 99%, downtown 82% -> 100%, the others
+  equal or higher than release 0.1.16; cypherpunk stays per tile, `SCENE_OFF`). `validate.py`: 0 errors.
+- `checks-20261109-053002-s2` (levels 13, 18), on the build where a composed wall cell no longer gets post stones from the
+  per-tile pick (Duncraig's gate row and side walls: 0 stray stones, before 9): 0 asserts in HD and legacy, 60 fps, no
+  crash files. Again only Duncraig's arrival in reach.
+
+## Lane hdscene2: sprite walls in the gaps and a larger model cache (2026-11-09, slot 1, background input)
+
+Check `wall_maps` through `mxl2012-runs/hdscene2/gamerun.sh` (CPU check, lock, `install_mod.py`, unlock after; cache poll on):
+`MXL_RUN=hdscene2 MXL_SLOT=1 MXL_CHAR=SceneTest MXL_CACHE_POLL=5 MXL_WALL_LEVELS=<levels> MXL_WALL_SPOTS=<spots> py -3
+tools/game_checks.py --slot 1 all wall_maps`. SHORTCUT: travel by `h level` / `place`, god mode. Seen with the harness, not a
+player-path verification. Evidence and HD / legacy pairs (HD left): `mxl2012-runs/hdscene2/pairs/<map>_<n>.jpg`.
+
+| Run | Build | Result |
+|-|-|-|
+| `checks-20261109-094411-s1`, `-102940-s1` | sprite donor `thatch03`, 16 x 16 flat maps | crash entering Tran Athulua (`desertpeak`, 60): "Failed to create index buffer" for the sprite models, then "Present failed" 0x887A0005 |
+| `checks-20261109-113706-s1` | donor `wood_burning06`, 16 x 16 flat maps | the same crash: the donor is not the cause |
+| `checks-20261109-114306-s1` | the same, `MXL_CONTROL=modelcache` | "Present failed" again: the model cache patch is not the cause |
+| `checks-20261109-114547-s1` | 64 x 64 flat maps with 5 levels | Tran Athulua loads in HD and legacy, no assert in the map, 59.8 fps, no crash file |
+| `checks-20261109-120054-s1` | the same, 8 maps | all reached in HD and legacy, no crash file, only the known pool asserts at exit; 59-60 fps (the overlay's 10 s average); private memory 9.5-10.4 GB in HD, 10.3-11.2 GB in legacy later in the session. ModelAsset cache: capacity 8,250 live (`cache_poll.jsonl`), peak 1,531 models. Asserts: Fauztinville (`cypherpunk`) in HD `visibleTileBiomes.size() < BiomeVisibleCountMax` (terrain.cpp:664; its scene had 4 override biomes besides its own); Khalimgrad (`charismatic`) in legacy `result->last_used_frame != PrismGetFrameCount()` (D2PrismSpriteCache.cpp:339), once, in legacy mode (the HD scenes are not drawn there) with a pack of about 100 monsters on screen; not seen in earlier runs, cause not known |
+| `checks-20261109-142239-s1` | Fauztinville's overrides cut to 3 biomes | the same terrain.cpp:664 assert at the arrival in HD |
+| `checks-20261109-145015-s1` | cut to 2 biomes (the scene trimmed by hand the way `walls_scene.OVERRIDE_BIOMES` trims it) | Fauztinville in HD and legacy: no assert in the map, only the known pool asserts at exit, no crash file; 59.8 fps at the arrival; private memory 9.77-9.80 GB (HD), 9.85-9.86 GB (legacy). The arrival's stair flights as before (`pairs/cypherpunk_0`) |
+| `checks-20261109-153811-s1` | the final build (`OVERRIDE_BIOMES` 2; Fauztinville keeps more Kurast and Fortress override cells in its byte budget, Ureh (`downtown`) drops its 2 crypt cells) | Fauztinville and Ureh in HD and legacy: no assert in either map, only the known pool asserts at exit, no crash file; private memory 9.66-9.73 GB (HD), 9.89-9.99 GB (legacy); ModelAsset capacity 8,250, peak 1,354. Pairs `pairs/cypherpunk_<n>.jpg`, `pairs/downtown_0.jpg` |
+
+Pictures (by eye): walls stand where legacy has them at full height in Tran Athulua, Fauztinville, Rathma Square (`moskvich`)
+and Old Bremmtown (`borgir`); The Proving Grounds (`dungrm6a`) shows the arch at the arrival (`dungrm6a_0`, grey stone in HD
+where legacy's light makes it red); Khalimgrad's floor shows the steps' edges as legacy (`charismatic_0`). Kurast 3000 BA
+(`excelsior3`): walls along legacy's lines, but legacy's sunken courtyard and its stairs are still a flat yard
+(`excelsior3_0`). Azmodan's Reliquary (`temple5`, 96): no sprite walls, as before. Not checked in game: the gate of Duncraig
+(left as it is) and sessions long enough to fill 2,750 models (the cache patch is checked by its live capacity only).
+
+Build: `walls_hd` height gate passes, `validate.py` 0 errors; tests `tools/tests/test_walls_sprite.py`, `test_walls_hd.py`,
+`test_walls_scene.py`, `test_cache_probe.py`, `plugin/tests/model_cache_test.cpp`.
+
+## Lane hdmissile: projectiles in HD (bug #562, 2026-11-08, slot 2, background mode)
+
+Lab `mxl2012-runs/hdmissile/lab.py` (kept outside the repo): Sorceress `HdmSor` in the Blood Moor, the skill learnt with `setskill`, cast by a background right click at a far ground spot or, for Tempest and Thunderstone, at a zombie. Bursts of shots in HD and legacy, side by side in `tri_*.png` (legacy, HD with the old map, HD with the new). God mode on, so this is seen in game, not a player-path check.
+
+| Skill | HD before | HD after | Legacy |
+|-|-|-|-|
+| Flamefront | nothing in flight, fire at the player only | fireball flying | arcs and a glow |
+| Pyroblast | no flying picture (the fire field draws) | fire streak with a glowing head; smaller than legacy | chain of fire puffs |
+| Forked Lightning | only the light on the ground | white forked bolts | blue forked bolts |
+| Tempest | only the light on the ground | white bolt to the target | blue bolt |
+| Blast Wave | one white blob | expanding fire rings, brighter than legacy | fire rings |
+| Flame Wave, Arcane Torrent, Force Shout | | draw like legacy (samples) | |
+
+Runs: `before`, `before2`, `before3` (old map), `after2` (new). Moonbeam, Great Hunt and Thunderstone showed nothing in either mode with this set-up (bow or target needed), so they are not proven. The other changed rows were not looked at one by one.
+
+## Lane druidmorph: shapeshift forms showing the weapon and shield in HD (bug #565, 2026-11-09, slot 1, background input)
+
+Check `morphgear` (tools/game_checks.py): Blood Moor, weapon and shield worn (set-up by harness: gear, level 90, strength and
+dexterity 1000, life and mana), the form taken by a real right click on a mortal character (harness cast only for a skill a Druid
+cannot cast by hand), shots with the form and with the form after the gear is taken off, HD and legacy. The form's own skill is
+cast at a spawned target. Pictures are judged by eye. `MXL_MORPHGEAR` picks forms. Without a game: `tools/tests/test_form_state_gear.py`,
+and `validate.py` reports a form with `bossinv` as an error. Evidence `mxl2012-runs/druidmorph/` (`before/`, `after/`, `after_click/`).
+
+| Run | Result |
+|-|-|
+| Baseline, ea12741 (`checks-20261108-205810-s1`, `-210800-s1`, `-211618-s1`) | HD: buckler on Trap Rat's attach bones, at Treewarden's and Deathlord's feet. Legacy: no gear. Deathlord's sword in legacy is its own art (also in the shot without gear) |
+| Fixed, all six forms, harness cast (`checks-20261109-000923-s1`) | No gear on any form in HD or legacy; 449 and 464 cast. FAIL only from the engine assert `UnitGetMode(hUnit) == PMODE_CAST` (PlrSkills.cpp:862), which the unmodified baseline `-210800-s1` also logs and the right-click run does not |
+| Fixed, Trap Rat and Treewarden by right click, mortal (`checks-20261109-002337-s1`) | Form on, no gear in HD or legacy, 449 and 464 cast; PARTIAL (shots), 0 crash files |
+
+Seen beside the bug, not changed: Superbeast (635) draws as a bright star over a faint body in both modes, before and after the fix.
+Cow Disguise and Merc Werebear were checked with the harness cast only. Porkulator and the Diablo / Baal twins go on a target and
+cannot be taken by a player on demand, so they were not shot.
+
+## Lane skillscan: every skill's HD picture (bug #562, 2026-11-09, slots 1 and 2, background input)
+
+Static check of all 1,110 skills: `tools/skill_looks.py` (docs/hd-effects.md section 11). No skill somebody can use draws in legacy and nothing in HD (`--check`, `tools/tests/test_skill_looks.py`).
+
+Lab `mxl2012-runs/skillscan/lab.py` (kept outside the repo): a `Scan<Hero>` character per class, skills taught with `setskill`, `god 1`, one real right click per skill at a zombie (a corpse or the ground where the skill wants that), two frames before the click and eight after it. Warlock and class-less skills are cast by the Barbarian, because the Warlock cannot be created on these accounts. Seen with the harness in god mode, not a player-path check.
+
+| Pass | Slot | Skills | What |
+|-|-|-|-|
+| `hd2`, `hd1` | 2, 1 | 520 | HD: every class skill with a picture, every skill the scan changed, one skill per distinct picture |
+| `hd3` | 1 | 164 | HD again: refused casts, weak results, auras |
+| `hd4` | 1 | 38 | HD: fixed skills not in `hd3` |
+| `leg3` | 1 | 127 | Legacy: the weak ones and the fixed sample |
+| `hd5` | 1 | 9 | HD again: casts that made no missile, after an 11 s wait for cooldowns |
+| `hd6`, `leg6` | 1 | 9 | Both modes on the final build: the skills the row-pick fix and Flamefront's pick changed |
+| `hd7`, `leg7` | 1 | 4 | Both modes: skills that only start a client function (Mirrored Blades, Massacre, Black Sleep, Black Mass) |
+
+In all 526 skills were cast in HD and 138 in both modes. `sheets.py` compares each frame with both pre-cast frames: the share of the play area that changed. A plain attack without walking changes about 1%. Contact sheets (HD left, legacy right): `mxl2012-runs/skillscan/cmp-sheets/` (`flagged_*`, `bothlow_*`, `sheet_*`), `re3-sheets`, `re4-sheets`; HD only: `hd3-sheets`, `hd4-sheets`, `hd5-sheets`. The status of every skill: `mxl2012-runs/skillscan/skill_looks.tsv`.
+
+Results:
+
+- 435 of the first 520 change 1.5% or more of the play area in HD.
+- The first passes were spoilt by a shapeshift left on (every later spell answers "Impossible"); those were cast again with the form off.
+- Not castable here: Shunpo (no base of its weapon type could be worn), Engorge, Death Mark, Bind Demon (Warlock skills, refused on the Barbarian), MinionSpawner (a monster skill: the game closes when a player casts it, in both modes).
+- Both modes side by side: the comparison flagged 40 of 126. By eye: 7 are leftovers of the skill before in the legacy frames; 10 show nothing in either mode (8 monster skills that do nothing on a player, and the single thrown weapon of Mon Javelin and Mon Tknife, which the frames of neither mode caught); 22 draw in HD but smaller, dimmer or darker than legacy (Fairy Ring's totems are dark meshes on dark ground; Psychic Scream, Slayer, Holy Armor, Deathlord, Wychwind, Queen of Blades and Seismic Charge are the clearest; Cascade is a faint glow); and Ricochet's green sparks show in legacy but were not seen in the HD frames, although its rows have models, so it stays on the hand-work list.
+- The rest of the skill table (584 skills, mostly monster and item rows that share a picture with a skill that was cast) is checked by the files only.
+- Named leftovers: Moonbeam, Great Hunt and Thunderstone draw in HD. Flamefront is a stream of fire now, somewhat larger than legacy. `legiontile` (Phalanx New) stands on a Grim Ward until it has its own art.
+
+## Lane menutitle: HD main-menu credit (2026-11-09)
+
+`tools/menu_credit.py`, run by `tools/build.py`, reads the stock 93847 CASC extraction's
+`mainmenubuttonribbonhd.json` and writes a generated override under `work/mod/data/global/ui/layouts/`.
+`mainmenupanelhd.json` handles the character scene; the separate ribbon owns the logo and left buttons.
+Both controller layouts inherit their PC counterparts. The controller ribbon preserves the base ribbon's
+children, so it inherits the new credit without replacing controller navigation.
+
+D2RLoader 1.3.1's bundled ribbon defines `D2RLoaderText` as a TextBoxWidget at (221,568),
+387 x 38; it is not drawn by plugin code. Our override retains that caption and adds `MedianMenuCredit`
+at (64,640), 680 x 130, centred, pale gold, 24-point D2R font. Options begins at y=820.
+The `MenuCredit` string is generated in its own namespace string file with identical English in all 13 languages.
+The ribbon uses qualified localization references; its audit exemption requires a resolved, qualified key,
+and does not exempt other layouts. No plugin changes. Stock copies and build/test logs are in
+`mxl2012-runs/menutitle/` (not shipped in git).
+
+Slot 1, background input, lock `menutitle`: final run `mxl2012-runs/menutitle/game3.log`.
+The credit is readable on two lines, centred under D2RLOADER with clearance above Options at both
+1600 x 900 and 1280 x 1024. Screenshots: `mxl2012-runs/menutitle/runs/menutitle/menu-1600x900.png`
+and `menu-1280x1024.png`; legacy regression `legacy-town.png`. Entered the lane's level-1 Barbarian
+MenuTitle by real menu clicks, toggled HD -> legacy -> HD; no combat or character edits.
+Final log: 0 ERROR/ASSERT, 0 new crash files. Game closed, six shared files restored and verified, slot unlocked.
+Controller inheritance was inspected statically, not tested with gamepad input; other client languages not run.
+
+Final unittest discovers passed: 1216 tests (no skips) and 545 tests (five skips).
+Results are recorded in `tests-verified.log` and `tests-tools-verified.log` in the lane evidence folder. Public check: 0 hits; docs links: 0 findings.
+The full fresh build was stopped during unrelated wall generation after about 18 minutes of active CPU work.
+For game evidence the completed coordinator output was copied into the lane, its extra strings merged with
+`merge_string_overrides.py`, and `menu_credit.py` applied. An initial retry had duplicate skill-tab strings
+from the interrupted build; the standard merge resolved that. First visual trial exposed misplaced newline
+options; moving them into `style` and reducing the point size fixed the second capture. No fresh full-build
+completion is claimed. No plugin source changes; game runs used the coordinator's Release DLL.
+
+### Lane menutitle follow-up: larger three-line credit (2026-11-09)
+
+Changed the credit from 24 to 40 points, in a 680 x 175 box at (64,620). Its exact text in all 13 languages is
+`Median XL 2012`, `By BrotherLaz`, `(D2R Fan Port)`, separated by two newlines. Pale gold and centre alignment
+stay the same; buttons retain their original positions. In-game captures at 1600 x 900 and 1280 x 1024 show
+three readable lines inside the left column, clear of its edges and Options. Slot 1, lock `menutitle`, background
+input; evidence `mxl2012-runs/menutitle/runs-large/menutitle/menu-1600x900.png` and `menu-1280x1024.png`.
+Run log: `mxl2012-runs/menutitle/game-large.log`; test logs `tests-large.log` and `tests-tools-large.log`.
+Both suites passed: 1216 tests, no skips; 545 tests, five skips. Public check: 0 hits; docs links: 0 findings.
+Final game log: 0 ERROR/ASSERT lines, 0 new crashes; game closed and six shared files restored and verified,
+slot 1 unlocked. The same run also entered MenuTitle and toggled legacy/HD successfully.
+
+## Lane skillfix: hand work on the skills' HD pictures (bug #562, 2026-11-09, slot 2, background input)
+
+Twenty skills compared legacy | HD before | HD after, one real right click each at a zombie in god mode, fixed casting spot per character, two frames before the click and eight after it. Seen with the harness, not a player-path check. Lab, runs and sheets: `mxl2012-runs/skillfix/` (kept outside the repo): `lab.py`, `triptych.py`, `sheet_01.png` to `sheet_06.png` (`index.txt`, `stats.json`), review strips in `review/`.
+
+| Run | What |
+|-|-|
+| `legacy`, `before` | all 20 skills, legacy and HD on the base build (main bef8885) |
+| `before3`, `before7` | HD on the base map: Buckshot (the first cast of `before` made no missile), Holy Trap's blast. `before7` is the final build with main's `missiles.json` put back |
+| `after1` | all 20, first picks |
+| `after2`, `after3`, `after4` | the skills whose picks changed; the final map is `after4`'s plus Holy Trap's row |
+| `after5`, `after6` | Holy Trap at the cast: the glow ball (not kept) and the final model |
+
+Each panel of the sheets comes from the last run whose build had that skill's final rows (`AFTERS` in `triptych.py`). Holy Trap's mine goes off about 1 s after the cast when the zombie is near, later or not at all when it is elsewhere, so the lab polls the missile list and starts the frames at the blast; a monster spawned onto the mine or beside it did not set it off.
+
+| Skill | Rows | Seen with the harness |
+|-|-|-|
+| Tempest (535) | none | Unchanged: every row as in main 80a5ab4. From a fixed spot the bolt and its ground glow are like legacy; the earlier impression came from where the bolt landed |
+| Pyroblast (526) | none | Unchanged, as Tempest: very close to legacy |
+| Holy Trap (21) | `holymine` back on `yellow_ball_glow_intro` | Fixed: the flash when it is laid is back (`after6`); the blast is as large as legacy's and did not change (`before7`, `after3`) |
+| Buckshot (483) | overlay `shotgun` on `sorceress/light_cast_1`, `buckshotshard` on `expansion_hurricane_rocks` | Fixed: the pillar of light is gone, a small burst and sparks like legacy; the flash is smaller than legacy's |
+| Ricochet (308) | `shock_green` on `charged_bolt` in a green ramp | Improved: the crackle shows, small and mostly white; legacy's is a bright green blob |
+| Phalanx New (303) | `legiontile` on `yellow_ball_glow_2`, `dopplezonexplode` on `exp_arrow_explode`, `catapult_death_e` on `sorceress/fire_cast_1` at 3 | Improved: columns of golden lights and a fire flash; legacy's big fireball is still larger |
+| Mon Frog Prince (567) | `frogburst` on `sanctuary` | Unchanged look: the white ring was already comparable |
+| Hypnotoad Prince (25) | `hypnoprinceaura` on `chill_blood_puff`, `hypnoprincecenter` on `sanctuary` | Improved: the blue clouds show like legacy's |
+| Psychic Scream (652) | `mindwavenova` on `expansion_shockwave` | Improved: the wide ring like legacy |
+| Slayer (516) | `slayercloud` on `common/valkyrie` | Improved: a soft yellow glow where the crescents were, about half of legacy's cloud |
+| Holy Armor (521) | `aurareflection(cast)` on `paladin/holyfreeze` at 1.6 | About unchanged: the swirl does not grow; legacy is a big globe |
+| Deathlord (487) | `splatter` on `monster/willowispdeath` at 2.2 | Improved: white wisps show, narrower than legacy's splash |
+| Wychwind (343) | `wychknife`, `wychblade` on `expansion_bladefury_c` | Improved: the knives show as pale streaks |
+| Queen of Blades (328) | `queenidolcast` on `exp_arrow_explode` | Improved: size close to legacy; orange and white, legacy is red |
+| Seismic Charge (337) | `seismicchargeblink` on `exp_arrow_explode` | Improved: as Queen of Blades |
+| Moonbeam (306) | `cath2arrow` on `bone_spirit`, `cath2tail` on `chill_blood_puff` | Improved: a long pale beam like legacy's |
+| Egg Trap (450) | `eggliving` on `meteor_target_indicator` | Improved: glowing rings like legacy's, smaller and orange |
+| Taunt (137), Overseer Whip (235) | none | Unchanged: like legacy |
+| Fairy Ring (310) | none | Unchanged: dark totems; legacy's red light has no counterpart |
+
+Tried in game and dropped: Holy Trap on `yellow_ball_glow_2`; Buckshot's pillar is the overlay, not the shards; Ricochet on `poison_sparks`, `expansion_catapultpoisonbomb`, `goo_hit`; Phalanx on `light_beams`, `common/suicide_death`; Slayer on `barbarian/whirlwind`; Holy Armor on `sorceress/energyshield`; Deathlord on `necro/bonearmor_cast`. `summonah` no skill reaches. `churelcenter` (mist rule) was not run. Static: `skill_looks.py --check` and `missile_looks.py --check` clean, no skill for hand work.
+
+## Lane artcache: HD effects from correct art statistics (2026-11-09, slot 2, background input)
+
+The art statistics cache held heights from before commit 78a5e54: 243 of 1,491 art files, height only. The cache now records the code that measured it (`tools/tests/test_art_cache.py`). A full build with the old file in place re-measured it to the same numbers as a build without one.
+
+Old numbers against correct numbers, by comparing the two builds' maps: 182 keys of the missile map (171 rows by name) and one overlay (`common/amazinggrace`, scale 1.0 to 1.2). 76 rows have a different picture, 58 a scale change of 20% or more, 37 a smaller one. 124 skills reach a changed row, 24 of them class skills.
+
+Thirty skills were cast in legacy, HD with the old numbers and HD with the correct numbers, one real right click each at a zombie in god mode, eight frames after the click. Seen with the harness, not a player-path check. Idol2Scosglen refused the cast in HD (`I can't`), so 29 were compared. Lab, runs and sheets: `mxl2012-runs/artcache/` (kept outside the repo): `sheet_01.png` to `sheet_08.png`, `final_strip.png`, `mapdiff.txt`, `groups.json`, `reach.json`.
+
+| Result | Skills |
+|-|-|
+| Pinned to the old pick | Scatter Shot (the correct numbers chose an arrow: no ring at all), Mana Coil (looks the same, but the automatic choice is a weak match in the skill audit) |
+| Better with correct numbers | Miasma (no lightning sparks on a poison skill), Soulshatter (orange like legacy, not bright yellow; long red streaks legacy does not have) |
+| Same or a matter of timing | Beacon, Colosseum, Flamefront, Flamestrike, Great Hunt, Pyroblast, Rain of Fire, Twin Fang Strike, Death Blossom, Deathstrike, Maelstrom, Spell Flurry, Ashes to Ashes, Aerials Disaster, Batstrike, Bear Claw, Blackstorm, Fireball Sentry, Holy Trap Advanced, Phase Bomb, Rebound, Stampede, Wildfire, Holy Trap, Sunspear |
+
+Not cast: the other 94 skills that reach a changed row (mostly monster and item skills), the skills whose rows changed scale by less than 20%, and the overlay.
+
+## Lane devmenu: the developer menu (2026-11-09, slot 2, background input)
+
+Check `devmenu` (`tools/devmenu_checks.py`): `MXL_RUN=devmenu MXL_SLOT=2 MXL_CHAR=<new name> MXL_CHAR_CLASS=amazon py -3 tools/game_checks.py --slot 2 all devmenu`.
+Last run `checks-20261109-224228-s2` on a new level 1 Amazon, all rows PASS, 0 crash files. The `s_StatsPool` lines at exit are the usual exit-only ones.
+
+- Opens by real Ctrl+F12 in HD; the buttons are driven through the `devmenu` harness verb, and the input text is set by the harness.
+- Spawned by name, HD: Staff of Kings, Dragon's Egg (a level 120 row), Civerb's Icon, Cathan's Seal and four more set amulets, Horazon's Focus, the Dawn
+  kit. Each result's row and code are compared with the wanted ones. Legacy: Staff of Kings.
+- Travel: Fauztinville (`cypherpunk`, across acts, arrival read back) and the uber arena Welcome to Toraja (status says "Map only").
+- Level 1 to 50 on a new Amazon: `stat player 4` = 245 (49 levels x 5), `stat player 5` = 49, life and level as read by the harness.
+- Waypoints: bits read back on all three difficulties. Quests cheat after the warning and Confirm; quest word 26 read back.
+
+**By hand:** overlays are not in background captures (see lane beltmatch), so the rows, header and status never appear in the shots. With the window in
+front, press Ctrl+F12 and search `staff` in HD and legacy: the rows should be white, next to their arrows and inside the panel; a spawn should write its
+status in gold at the bottom. Not tested: a real TCP game (no automation; by design the joiner has no server frame and the host has a listener on
+port 4000).
+
+## Lane walljoins: joints and colour at sprite wall joins (2026-11-09, slot 1, background input)
+
+Posts at the joins between Median's sprite walls and D2R wall pieces, and the sprite atlases toned toward their D2R neighbours
+(`docs/maps-hd.md`, "Joints and colour at sprite joins"; `tools/tests/test_walls_joins.py`). The wall scenes of all 17 maps were
+rebuilt on a main build (`walls_hd`'s build from its learnt library), height gate clear, `validate` exit 0.
+
+Check `wall_maps` on slot 1 at three join spots each of Tran Athulua (`desertpeak`, 60), Fauztinville (`cypherpunk`, 59),
+Old Bremmtown (`borgir`, 126) and Kurast 3000 BA (`excelsior3`, 84), HD and legacy, travel by `h level` / `place`, god mode:
+
+| Run | Build | Result |
+|-|-|-|
+| `checks-20261109-204514-s1` | main | every map reached, no asserts in the maps, 0 crash files |
+| `checks-20261109-223536-s1` | joints of any shape, colour | every spot reached, no asserts, 0 crash files; ruin corners and wall slabs as joints at Tran Athulua and Kurast 3000 BA |
+| `checks-20261109-231304-s1` | posts only (this commit) | every spot reached, no asserts, 0 crash files, shared files restored |
+
+Seen in the sheets: posts at Old Bremmtown's joins, Kurast 3000 BA's plaster sprites a little darker, Fauztinville's red
+sprite walls less saturated, no joints at Fauztinville (entity limit). Not judged: whether the albedo-space toning reads
+right under D2R's light (the sprites are lit like the floor, D2R's walls from the side), and the joins at Rathma Square,
+Toraja, The Proving Grounds and Khalimgrad (not visited). Sheets and logs: `mxl2012-runs/walljoins/` (kept outside the repo):
+`sheets/joins_<map>.jpg` (before HD | after HD | legacy).
+
+## Lane devmenu2: the developer menu's text as native text boxes (2026-11-10, slot 2, background input)
+
+Bug 567. Check `devmenu` (`MXL_RUN=devmenu2 MXL_SLOT=2 MXL_CHAR=<new name> MXL_CHAR_CLASS=amazon py -3 tools/game_checks.py --slot 2 all devmenu`), last run
+`work/runs/checks-20261110-024602-s2` on a new level 1 Amazon: all 19 rows PASS, 0 crash files, `textfails=0`. The `s_StatsPool` / pool lines at exit are the usual exit-only ones.
+New rows use a real posted mouse click on a row arrow: `real click spawns the row` (HD), `travel Fauztinville` (Fauztinville, `cypherpunk`, by arrow click, HD) and `real click spawns in legacy`.
+
+Rows, page line and status now appear in ordinary background captures, HD and legacy (`mxl2012-runs/devmenu2/r3-shots`: `devmenu_hd_rows.png`, `devmenu_hd_clicked_status.png`,
+`devmenu_hd_travel_rows.png`, `devmenu_legacy_items.png`, `devmenu_legacy_clicked_status.png`, `devmenu_legacy_travel.png`). The check does not read the text from the shots; they were looked at.
+
+**By hand** (window in front, Ctrl+F12, HD and after G in legacy): search `staff`. Rows should be white beside their arrows, the page line and status gold, inside the panel; click an arrow and the status should say what was spawned. Tell me if a line is cut at your resolution.
+
+Why the loader's overlay is invisible is not established, and the other overlay text (wrong-build notice, belt counts) was not re-tested here.

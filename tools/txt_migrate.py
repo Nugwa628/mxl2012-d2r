@@ -287,6 +287,33 @@ STATE_COLOUR_SHIFTS = {
 }
 
 
+def form_states_showing_gear(state_header: list[str], state_rows: list[list[str]], skill_header: list[str],
+                             skill_rows: list[list[str]]) -> list[str]:
+    """Names of the shapeshift states D2R's HD renderer draws the character's weapon and shield on: a state a skill gives its own
+    caster (skills.txt aurastate) that turns the unit into a monster (transform 1, gfxtype 1) and has bossinv 1. Measured in game
+    (bug #565): clearing bossinv alone removes the gear; legacy graphics never show it."""
+    if "bossinv" not in state_header or "aurastate" not in skill_header:
+        return []
+    col = {c: state_header.index(c) for c in ("state", "transform", "gfxtype", "bossinv")}
+    aura = skill_header.index("aurastate")
+    given = {r[aura].strip() for r in skill_rows if aura < len(r) and r[aura].strip()}
+    cell = lambda r, c: r[col[c]].strip() if col[c] < len(r) else ""  # noqa: E731
+    return [cell(r, "state") for r in state_rows if cell(r, "state") in given and cell(r, "transform") == "1"
+            and cell(r, "gfxtype") == "1" and cell(r, "bossinv") == "1"]
+
+
+def form_state_gear_fix(state_header: list[str], state_rows: list[list[str]], skill_header: list[str],
+                        skill_rows: list[list[str]]) -> list[str]:
+    """Clears bossinv on the states of form_states_showing_gear (in place); the names done. Only a caster's own form qualifies, so
+    a state put on a target (Porkulator, the Diablo and Baal twins) keeps its boss immunity."""
+    names = form_states_showing_gear(state_header, state_rows, skill_header, skill_rows)
+    ni, bi = state_header.index("state") if names else 0, state_header.index("bossinv") if names else 0
+    for r in state_rows:
+        if names and ni < len(r) and r[ni].strip() in names:
+            r[bi] = ""
+    return names
+
+
 def state_colour_shift_fix(header: list[str], rows: list[list[str]]) -> list[str]:
     """Writes STATE_COLOUR_SHIFTS into states.txt rows (in place); the names done. A row whose value is not Median's is left
     alone (someone changed it on purpose)."""
@@ -1037,6 +1064,20 @@ class Migrator:
             if bank == "base":
                 done = [f"{n} {STATE_COLOUR_SHIFTS[n][0]} -> {STATE_COLOUR_SHIFTS[n][1]}" for n in names]
         self.report.append("\nstates colorshift for HD (bug #496): " + (", ".join(done) or "none"))
+
+    def form_state_gear(self) -> None:
+        """Shapeshift forms must not show the character's weapon and shield in HD (form_state_gear_fix, bug #565)."""
+        done: list[str] = []
+        for bank in ("base", ""):
+            d = OUT / "data" / "global" / "excel" / bank
+            if not (d / "states.txt").exists() or not (d / "skills.txt").exists():
+                continue
+            h, rows = read_tsv(d / "states.txt")
+            names = form_state_gear_fix(h, idmap.records(rows), *read_tsv(d / "skills.txt"))
+            write_tsv(d / "states.txt", h, rows)
+            if bank == "base":
+                done = names
+        self.report.append("\nshapeshift forms without bossinv, so HD hides the gear (bug #565): " + (", ".join(done) or "none"))
 
     def book_cursors(self) -> None:
         """misc `spellicon` of the scroll and tome codes from books.txt `SpellIcon`, as 1.13c reads it (bug #485, book_spell_icons)."""
@@ -2154,6 +2195,7 @@ def main() -> int:
     m.clean_references()
     m.item_spell_states()
     m.state_colour_shifts()
+    m.form_state_gear()
     m.book_cursors()
     m.belt_columns()
     m.conversion_calcs()

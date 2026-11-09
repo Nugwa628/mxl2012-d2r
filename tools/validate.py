@@ -28,6 +28,7 @@ import os  # noqa: E402
 import localconfig  # noqa: E402  (.mxl-local.json defaults, D2R extraction)
 import strings_ns  # noqa: E402
 from func_slots import POISON  # noqa: E402
+from txt_migrate import form_states_showing_gear  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 # D2R 93847 baseline tables: the machine's extract_dir (read-only), or MXL_D2R_EXTRACT
@@ -413,6 +414,11 @@ class Validator:
     def engine_rules(self) -> None:
         """Rules D2R asserts on at load time that the field schema does not express."""
         d = self.data
+        # a shapeshift form with bossinv draws the character's weapon and shield on the form in HD (bug #565)
+        st, sk = d.table("states"), d.table("skills")
+        if st and sk:
+            for name in form_states_showing_gear(st[0], st[1], sk[0], sk[1]):
+                self.add("error", "states", "bossinv", "a shapeshift form must not set bossinv: HD draws the gear on it", name, "1")
         # treasure class items: item code, item type, treasure class, unique/set item index, or an auto class
         tc = d.table("treasureclassex")
         if tc:

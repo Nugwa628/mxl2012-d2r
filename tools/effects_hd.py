@@ -41,6 +41,7 @@ import argparse
 import colorsys
 import copy
 import hashlib
+import inspect
 import json
 import math
 import re
@@ -65,7 +66,7 @@ CRLF, LF, TAB = chr(13) + chr(10), chr(10), chr(9)
 # separators removed, so 'violetlightning', 'blackfiresmall' and 'bluenovab' read right.
 FAMILY = {
     "fire": ["fire", "flame", "burn", "inferno", "meteor", "lava", "magma", "molten", "ember", "blaze", "hellfire",
-             "pyre", "scorch", "immolat", "brimstone", "firestorm"],
+             "pyre", "pyro", "scorch", "immolat", "brimstone", "firestorm"],
     "ice": ["cold", "ice", "frost", "freez", "frozen", "chill", "blizzard", "glaci", "shiver", "icicle", "arctic"],
     "elec": ["lightning", "ltng", "shock", "elec", "thunder", "static", "charged", "volt", "spark", "tesla", "fury"],
     "poison": ["poison", "venom", "toxic", "plague", "acid", "spit", "goo", "sludge", "pestil", "decay", "spore"],
@@ -179,11 +180,26 @@ def load_json(p: Path):
 
 
 # ----------------------------------------------------------------------------------------------- classic art
+STATS_KEY = "_stats_version"  # cache entry naming the code that measured the file; art keys always hold a "/"
+
+
+def stats_version() -> str:
+    """Fingerprint of the code behind the art statistics. A cache written by other code holds other numbers and the
+    HD picks and scales are chosen from them, so it must not be reused."""
+    import dcc
+    sources = (ArtCache.stats, _hues, dcc.decode_direction)
+    text = "\n".join("\n".join(inspect.getsource(f).splitlines()) for f in sources)
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+
+
 class ArtCache:
     def __init__(self, path: Path):
         self.path = path
-        self.d = json.loads(path.read_text("utf-8")) if path.exists() else {}
-        self.dirty = False
+        version = stats_version()
+        cached = json.loads(path.read_text("utf-8")) if path.exists() else {}
+        current = cached.get(STATS_KEY) == version
+        self.d = cached if current else {STATS_KEY: version}
+        self.dirty = path.exists() and not current  # rewritten even when nothing is measured afterwards
         self.pal = None
         self.files: dict[str, dict[str, Path]] = {}
 
@@ -198,7 +214,7 @@ class ArtCache:
     def get(self, side: str, kind: str, rel: str) -> dict | None:
         """Statistics of direction 0 of a DCC: frames n, box w x h (classic pixels), mean colour, hue/sat/val."""
         key = f"{side}/{kind}/{rel.lower()}"
-        if key in self.d:
+        if self.d.get(key) is not None:
             return self.d[key]
         p = self.locate(side, kind, rel)
         st = None
@@ -224,7 +240,7 @@ class ArtCache:
         pick = sorted({int(i * n / 12) for i in range(12)}) if n > 12 else range(n)
         sum_rgb, sum_w = np.zeros(3), 0.0
         minx = miny = 10 ** 9
-        maxx = maxy = -1
+        maxx = maxy = -10 ** 9  # a frame's offsets can be negative (art drawn left of its anchor, as Blast Wave's ring is)
         hue_h = np.zeros(12)
         for i in range(n):
             fx, fy, fw, fh, pix = frames[i]
@@ -243,7 +259,7 @@ class ArtCache:
                 sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1), 0)
                 hue = _hues(rgb, mx, mn)
                 np.add.at(hue_h, (hue * 12).astype(int) % 12, w * sat)
-        if sum_w == 0 or maxx < 0:
+        if sum_w == 0 or maxx == -10 ** 9:
             return None
         mean = sum_rgb / sum_w
         h, s, v = colorsys.rgb_to_hsv(*(mean / 255.0))
@@ -436,16 +452,25 @@ def pick(m: Prof, cands: list[Prof], same_art: bool):
 
 
 # ----------------------------------------------------------------------------------------------- definitions
-def scaled_definition(d: dict, name: str, k: float) -> dict:
+def scaled_definition(d: dict, name: str, k: float, add_missing: bool = False) -> dict:
+    """A copy under a new name, scaled through the entities' transforms. Most of D2R's overlays have none, so the scale alone is lost on them;
+    add_missing gives an entity with an effect and no transform one (a hand pick's explicit scale; the art-size guess keeps today's sizes)."""
     d = copy.deepcopy(d)
     d["name"] = name
     if k != 1:
         for e in d.get("entities", []):
-            for c in e.get("components", []):
+            comps = e.get("components", [])
+            found = False
+            for c in comps:
                 if c["type"] == "TransformDefinitionComponent":
+                    found = True
                     for ax in "xyz":
                         c["scale"][ax] = round(c["scale"][ax] * k, 4)
                         c["position"][ax] = round(c["position"][ax] * k, 4)
+            if add_missing and not found and any(c["type"] == "VfxDefinitionComponent" for c in comps):
+                comps.append({"type": "TransformDefinitionComponent", "name": "component_transform_scale",
+                              "position": {"x": 0.0, "y": 0.0, "z": 0.0}, "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                              "scale": {"x": k, "y": k, "z": k}, "inheritOnlyPosition": False})
     return d
 
 
@@ -624,6 +649,15 @@ def load_art_fix(path: Path | None) -> dict[tuple[str, str], str]:
 
 PICK_COLS = ["kind", "art", "effect", "scale", "confidence", "reason"]
 PICK_OPT = ["tint", "rows"]  # optional (lane picktint): a ramp of hd_recolour.RAMPS; the only rows the line is for
+
+
+ROW_PICK = "row:"  # marks a row name in picked_names: a row may be called what another row's art is called (dopplezonexplode)
+
+
+def picked_names(picks: dict, kind: str | None = None) -> frozenset:
+    """What hand picks protect from the later look steps: the art of a line for a whole art, the row of a line with `rows`
+    (the art's other rows stay free)."""
+    return frozenset(ROW_PICK + k[2] if len(k) > 2 else k[1] for k in picks if kind is None or k[0] == kind)
 
 
 def load_picks(path: Path | None) -> dict[tuple, dict]:
@@ -855,7 +889,7 @@ def main() -> int:
             by_model.setdefault(p.model, p)
     library = [p for p in dm.values() if p.model and p.art and p.art_name not in ("", "null")]
     d2r_arts = {p.art_name for p in dm.values()}
-    changed_vanilla = {norm_key(n) for n, m in mm.items() if n in dm and dm[n].art_name != m.art_name}
+    changed_vanilla = {norm_key(n) for n, m in mm.items() if n in dm and (dm[n].art_name != m.art_name or (pick_line(picks, "missile", m) or {}).get("rows"))}
     new_models: dict[str, tuple[str, float]] = {}  # variant model name -> (base model, scale)
     keys: dict[str, str] = {}
     raw: dict[str, str] = {}
@@ -864,7 +898,7 @@ def main() -> int:
         if only and name not in only:
             continue
         v = dm.get(name)
-        if v is not None and v.art_name == m.art_name and norm_key(name) in d2r_hd_m:
+        if v is not None and v.art_name == m.art_name and norm_key(name) in d2r_hd_m and not (pick_line(picks, "missile", m) or {}).get("rows"):
             n_own_m += 1
             continue  # D2R's own missile with D2R's art and HD effect
         c, art_in = None, where_m[m.art_name]
@@ -1017,7 +1051,8 @@ def main() -> int:
             why = (f"{'base-game art without a D2R HD effect' if has_d2r_art else 'Median-only art'}; like D2R {c.name} "
                    f"({c.art_name}); score {sc:.1f}, margin {margin:.1f}; " + ", ".join(parts))
         res("overlay", m, cls, f"{c.folder}/{norm_key(c.name)}", scale, conf, why, c, art_in=art_in)
-        d = scaled_definition(load_json(HDO / c.folder / f"{norm_key(c.name)}.json"), norm_key(name), scale)
+        d = scaled_definition(load_json(HDO / c.folder / f"{norm_key(c.name)}.json"), norm_key(name), scale,
+                              add_missing=cls == "hand" and (hpl or {}).get("scale") is not None)
         if cls == "hand" and empty_definition(d):
             raise SystemExit(f"data/hd-effects-picks.tsv line {hpl['line']}: overlay {m.art_name}: D2R's {c.folder}/{norm_key(c.name)} "
                              "is an empty stub (no components): it draws nothing in HD (lane hdgreen, bug #507)")

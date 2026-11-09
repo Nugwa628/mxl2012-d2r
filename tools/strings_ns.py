@@ -219,11 +219,12 @@ def overrides() -> dict[str, dict]:
 
 def effective_texts(lang: str = "enUS") -> dict[str, str]:
     """bare key -> the text the player reads: D2R's strings/ text, replaced by the mod's override, plus the
-    Median-only keys of mxl2012/median.json (a key has one text; D2R and Median-only key sets do not overlap)."""
+    Median-only keys from the namespace string files (including generated UI credits)."""
     out = {k: recs[0].get(lang, "") for k, recs in d2r_loaded().items()}
     out.update({k: e[lang] for k, e in overrides().items() if lang in e})
-    p = MOD_STRINGS / NAMESPACE / "median.json"
-    if p.exists():
+    for p in sorted((MOD_STRINGS / NAMESPACE).glob("*.json")):
+        if p.name == "overrides.json":
+            continue
         out.update({e["Key"]: e.get(lang, "") for e in json.loads(p.read_text("utf-8-sig"))})
     return out
 

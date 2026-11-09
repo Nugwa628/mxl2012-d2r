@@ -241,6 +241,10 @@ def audit_layouts(layouts: Path, strings: Strings) -> list[Finding]:
                     if not tok.startswith("@"):
                         continue
                     key, t = strings.resolve(tok[1:])
+                    # The loader's frontend ribbon supports qualified localization references.
+                    if (p.name == "mainmenubuttonribbonhd.json" and t is not None
+                            and tok.startswith(("@d2r:", "@mxl2012:"))):
+                        continue
                     kind = "layout-key-missing" if t is None else "layout-at-key"
                     found.append(Finding(kind, "layout", p.name, f"{p.name} line {n}", tok, t or "Missing string"))
     return found

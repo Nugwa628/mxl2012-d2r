@@ -62,6 +62,8 @@ class Header(unittest.TestCase):
         self.assertFalse(cp.plausible(cp.cache_header(self.raw(100, 0x1000, 1, 128))))  # bucket count not a power of two
         self.assertFalse(cp.plausible(cp.cache_header(self.raw(128, 0x1000, 200, 128))))  # more entries than room
         self.assertFalse(cp.plausible(cp.cache_header(self.raw(128, 0x1000, 1, 100))))  # not a known capacity
+        self.assertTrue(cp.plausible(cp.cache_header(self.raw(8192, 0x1000, 900, 8250))))  # the plugin's ModelAsset capacity
+        self.assertEqual(cp.PLUGIN_CAPACITIES, {3 * cp.KNOWN_CAPACITIES["ModelAsset"]})
 
     def test_growth(self):
         self.assertTrue(cp.grown(128, 192) and cp.grown(128, 288) and not cp.grown(128, 200))

@@ -1307,3 +1307,14 @@ Read from the Ghidra project (decompiles `0x90e230`, `0x90da90`, `0x90ca60` in `
 | free DC6 | `0x79d200` | `(handle)` |
 | free all fonts | `0x90ca60` | called by the text shutdown `0x902ac0` |
 | text language set-up | `0x90da90` | only caller `0x902ff0` (the call at `0x902ff4`; `0x903002`-`0x90300f` are int3): language dir, scale `0x2672404`, then loads font 1 |
+
+## Setting a native text box (lane devmenu2, 2026-11-10; plugin/src/devmenu.cpp)
+
+WidgetService can find and hide widgets but not change their text, and its handles are not native pointers. D2RLoader's own notification counter sets a `TextBoxWidget` this way, which gave these (build 93847, UI thread only):
+
+| What | RVA | Signature / use |
+|-|-|-|
+| Root widget | `0x3440170` | data: pointer to the root widget |
+| Find panel | `0x89f760` | `(root, char name[128])` -> panel widget; the name is the layout's root name, in a zeroed 128-byte buffer |
+| Find child | `0x855c90` | `(widget, const char* name)` -> child widget, or null |
+| Set text | `0x86dd50` | `(TextBoxWidget, const string_view*)`: pointer to `{const char* data, size_t size}` |

@@ -466,3 +466,92 @@ definition is written under the picked effect's folder, and that folder becomes 
 `work/mod` leaves the old row's file in its former folder (seen here: `sorceress/catapult_death_s.json`), which is harmless because
 `Character` names the folder D2R reads. Not fixed: in HD Lightning Arena shows a ring of ground glows without legacy's tall bolts.
 In game: docs/testing.md "Lane hdfx".
+
+## 10. Pictures by what the missile does (`tools/missile_looks.py`, lane hdmissile, 2026-11-08, bug #562)
+
+Runs in the build right after `effects_hd.py`. That step gives a row the HD effect of the D2R row that shares its art file, and the art file says nothing about how
+a row is used.
+
+**Why the mapping failed:**
+
+| Failure | Who | Why |
+|-|-|-|
+| The model is an empty stub | Pyroblast's fire pieces (`fsexplode`), 166 rows with art before this step | 56 of D2R's 374 definitions have a root and a transform, no effect. `exact` took them as a D2R row drawing the art |
+| The flying row is a logic row | Forked Lightning (`funkybolt`), Tempest (`newlcbolt`), Pyroblast (`pbthunder`) | No art, so `null` in the map; legacy draws them with short client missiles along the path, and HD draws those pieces as a light with no bolt |
+| An explosion flies | Flamefront, Blast Wave | The art is an explosion, so the effect plays once where it starts; hundreds of them on Blast Wave blow out the screen |
+| Art read as empty | Blast Wave's `SoulForgeNova` | Every pixel left of the anchor: the statistics treated the file as blank (fixed in `ArtCache.stats`) |
+
+**What D2R does.** The flying row carries the picture and its trail pieces may be stubs (bone spear's trail, `suicidefireexplode`). A definition has an effect or a mesh
+or draws nothing.
+
+**The step.** Per row, what it does (flight, trail, burst, ground: `kind_of`) and what legacy shows while it flies (its art, or the art of a trail piece: short-lived and
+directional or playing once; a looping piece without directions is what an emitter leaves on the ground and draws by itself). Then:
+
+- a flying row needs a model vanilla mostly uses on rows that travel or stay, or it gets the closest flying model; a logic row whose pieces draw in legacy gets one too, 1.5 times larger, because one projectile replaces a chain of pieces;
+- a row that does not fly needs a model that draws, of its own kind;
+- a trail piece that a flying row carries may stay a stub;
+- D2R's own rows on D2R's own models and hand picks are left alone;
+- with nothing close by colour and element, a row that draws keeps its model and is listed for hand work (`work/mod/missile_looks.md`).
+
+Closest means colour, then size, element (the art's name and colour, the source art from `art_provenance.py`, the elements of its skills' names) and shape; a logic row's name is a nickname (Pyroblast's row is `pbthunder`, which reads as lightning) and is not used.
+
+Result: 1,874 rows legacy draws looked at, 1,671 kept, 203 changed (150 flying rows, 27 of them logic rows; 27 bursts, 17 ground, 9 trail pieces), 3 for hand work. `missile_looks.py --check` is the audit and
+`tools/tests/test_missile_looks.py` runs it on a built mod. Not possible: the colour of an effect with no gradient (chain lightning stays white where legacy is blue). In game: docs/testing.md "Lane hdmissile".
+
+Three rules added by lane skillscan (2026-11-09):
+
+- A definition whose only effect is one of D2R's empty particle programs (`vfx_empty`, `vfx_br_death_empty`, `vfx_dummy_suppress2doverlay`: six D2R models, for example `miasma_smoke_puff`) draws nothing either; 69 of D2R's 374 definitions now count as empty.
+- A row that stays (`stays`: it does not fly and its range is at least twice the frames of its art) needs a model vanilla keeps drawing. On a model vanilla only plays once it shows for a moment and is gone, so it gets the closest ground model even when nothing is close (`plays_once`; listed for hand work when not close). A ground row that lasts about as long as its art is treated as a burst (`needs`).
+- A hand pick with a `rows` column protects only those rows (`picked`). A pick used to protect every row of its art, which had left Hunting Banshee and 21 other flying rows with no flying picture.
+
+Result now: 1,874 rows looked at, 1,617 kept, 257 changed (175 flying, 39 of them logic rows; 40 ground, 33 bursts, 9 trail pieces), 4 for hand work: `frogburst`, `hypnoprincecenter`, `summonah` (a blue caster's circle, no close D2R ground effect) and `legiontile` (its art is a golden armoured archer standing on the ground, nothing in D2R's effects looks like it; it needs its own art).
+
+## 11. Every skill's chain (`tools/skill_looks.py`, lane skillscan, 2026-11-09, bug #562)
+
+Runs after `missile_looks.py`. That step decides per missile row; this one starts from the skills, so overlays, states and the rows only a sub-missile reaches are covered, and the answer is per skill.
+
+**The walk.** Every row of skills.txt (1,110), who can use it (class, monster table, item property), and everything it can make: the missile columns, each missile's sub-missiles, hit sub-missiles, client pieces, explosion and overlay; the skill's cast, target, progressive, server and summon overlays and its client overlays; its aura, target and passive states with each state's overlays and missile. A node is `draws`, `blank` (legacy draws nothing there either), `gap`, or `accepted` (HD rightly draws nothing: a trail piece its flying row carries, an overlay whose partner in the same state draws, a D2R row on D2R's own stub while the skill draws elsewhere, a hand pick).
+
+What counts as drawing: a definition with a mesh or an effect that is not an empty program. An effect behind a `UnitSourceSkillFilterComponent` that names other skills does not count for this skill.
+
+| Way to end in nothing | Code | Rows before this lane's step (skills) |
+|-|-|-|
+| The HD definition is an empty stub | `stub` | 69 (78) |
+| A long-lived or flying row on a model vanilla plays once | `play_once` | 70 (81) |
+| Legacy draws the row, the map has no model | `null` | 29 (28) |
+| An overlay with a legacy picture whose definition is empty, missing, or only for other skills | `stub`, `no_overlay`, `filtered` | 9 overlays, repaired here |
+
+(Rows counted against the map `effects_hd.py` leaves. A skill can have more than one.)
+
+**Status per skill.** `not visual`: no node draws in legacy (passives, plain attacks, skills that only start a client function). `ok`: every node legacy draws has a picture. `partial`: some do not. `invisible`: legacy draws something, HD nothing. The report's words are `ok`, `fixed` (it had a gap, now none), `hand` (a gap remains) and `not visual`.
+
+**Repairs.** Missile rows go through `missile_looks.py`. An overlay row with a legacy picture and an empty or missing HD definition gets the closest D2R overlay that draws, by colour, size and words, of its own role (a state overlay takes one that a vanilla state loops, a cast overlay one that vanilla plays once), scaled to the legacy art and written under its own name. Hand picks are never overruled and D2R's own rows on stubs are left alone unless the skill would otherwise show nothing.
+
+Result: 1,110 skills: `ok` 735, `fixed` 190 (class 42, items 72, monsters 35, no user 41), `hand` 0, `not visual` 185. Before this lane (main at lane hdmissile): 855 ok, 65 partial, 5 invisible, 185 not visual. Overlays repaired: `coldenchant`, `deaf`, `deathcoilcast`, `extravaganza`, `lightningenchant`, `minimushroomcast`, `risingdawncast`, `spiders_boom`, `zakarumpriest_death`. Two hand picks came out of the game checks: `firesmoke` (grey smoke for `edictorstrike` and `lavapitsmoke`) and the pieces of Flamefront (`spazfire`, ground fire along the path, so the skill reads as a stream of fire).
+
+The table of every skill is `work/mod/skill_looks.tsv` (with `skill_looks.md` for the hand list and overlays; generated, not committed). `skill_looks.py --check` and `tools/tests/test_skill_looks.py` fail when a skill somebody can use draws in legacy and nothing in HD.
+
+"Draws" here means the files say so; what it looks like in the game is in docs/testing.md "Lane skillscan".
+
+## 12. Hand work on the skills' looks (lane skillfix, 2026-11-09, bug #562)
+
+The skills the two passes above left for hand work, and the regressions they caused. Picks are in `data/hd-effects-picks.tsv` (reason on each line), what was seen in game is in docs/testing.md "Lane skillfix".
+
+**Rule changes.**
+
+- `missile_looks.py`: `mist` is no longer a candidate (`NOT_A_PICTURE`). It does not show in game: it hid Holy Trap's mine and `churelcenter`, which now gets the next closest model (`expansion_shock_field`, not run in game).
+- `picked_names` marks row names (`ROW_PICK`, `row:<name>`): a row called like an art (`dopplezonexplode`) used to protect every row of that art from the look steps.
+- A pick with `rows` also works on D2R's own rows (same name and art): `effects_hd.py` skipped those rows before looking at the picks, and kept D2R's key in `missiles.json`.
+- A hand pick with an explicit scale reaches definitions without a transform (`scaled_definition(add_missing=True)`). Most of D2R's overlays have none, so the scale was lost on them. An `auto` scale is left as it was: 43 overlay rows have a scale that never applied and were looked at in that size. Of the older picks only `firecrown` (0.6) changes.
+
+**What a scale does.** A transform scale makes meshes and some effects larger. Most particle effects keep their size: `yellow_ball_glow_2` looked the same at 1.8, 2.6 and 4, `common/valkyrie` at 1 and 2.4, `paladin/holyfreeze` at 1 and 1.6. For a bigger picture take an effect drawn big (Exploding Arrow's blast), not a larger scale.
+
+**Tints.** `exp_arrow_explode` and `meteor_target_indicator` have no gradient to tint, so Queen of Blades, Seismic Charge and Egg Trap stay orange where classic is red.
+
+**Holy Trap.** The rule for rows that stay moved `holymine` from its art's exact model (`yellow_ball_glow_intro`) to `mist`. A line for the row restores it. Other exact rows under that rule keep what lane skillscan gave them (`binddemonchannel`, the Beacon, Mirv and Baal idol centres): their exact models play once and vanish.
+
+**Open.**
+
+- Fairy Ring: classic's red light on the ground has no counterpart, a pick cannot add a light. Totems unchanged.
+
+**Art statistics cache.** `work/effects_hd_art.json` is git-ignored and survives rebuilds, so it records which code measured it (`_stats_version`, a fingerprint of `ArtCache.stats`, `_hues` and the DCC decoder). A file written by other code is dropped and measured again, so every checkout builds the same map from the same sources. Heights measured before commit 78a5e54 were too tall for art drawn wholly above its anchor: 243 files were affected, and with correct heights 171 missile rows and one overlay changed scale or picture. Twenty-nine skills that use them were compared in game (`docs/testing.md`, lane artcache). The correct numbers are kept, except for Scatter Shot's ring and Mana Coil's bolt, which are pinned in `data/hd-effects-picks.tsv`.

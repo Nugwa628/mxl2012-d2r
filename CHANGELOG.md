@@ -5,6 +5,52 @@ version being released (docs/release.md).
 
 ## Unreleased
 
+## D2R-XL 2012
+
+### 0.1.18 (2026-11-10)
+
+- New developer menu, single player only: press Ctrl+F12 in a game (rebindable in Options > Controls). Spawn any unique, set item, charm, quest item or base by name, get a runeword kit (the base with sockets and the runes), travel to any area by name, raise your level, unlock every waypoint. See `docs/dev-menu-guide.md`.
+
+- In HD, where Median's own wall art meets a D2R wall, a stone post or pillar now covers the seam, sized to the wall, on
+  Tran Athulua (`desertpeak`), Old Bremmtown (`borgir`), Kurast 3000 BA (`excelsior3`), Rathma Square (`moskvich`), Toraja
+  (`macumba`), The Proving Grounds (`dungrm6a`) and Khalimgrad (`charismatic`). Median's wall art on those maps is also toned
+  to the colours of the D2R walls beside it. Fauztinville (`cypherpunk`) gets the toning but no posts, as the map is already
+  at its limit.
+
+- The HD main menu has a larger, centred three-line credit: "Median XL 2012", "By BrotherLaz", "(D2R Fan Port)".
+
+- In HD, about 170 skill and monster effects changed size or picture to sit closer to their classic art. Among them, Miasma no longer throws lightning sparks and Soulshatter's rings are orange instead of bright yellow.
+
+- In HD, more skills now look close to their classic picture: Buckshot's muzzle flash no longer throws a tall pillar of light, Holy Trap shows its flash again when it is laid, Psychic Scream has its wide ring, Moonbeam its long beam, Hypnotoad Prince its blue clouds, Wychwind its knives, and Queen of Blades, Seismic Charge, Phalanx and Egg Trap have bigger blasts (still orange where classic is red).
+
+- In HD, about 150 more skills, monsters' skills included, now show a picture where part or all of their effect was missing: among them Egg Trap,
+  Lava Pit, Rising Dawn, Beacon, Moonbeam, Great Hunt, Thunderstone, Holy Trap and Meteor Shower. Effects that stay on the ground no longer vanish right after
+  they appear. Colours are only close for now and will be matched later.
+
+- In HD, the walls of Median's own maps now follow the classic walls as whole wall lines built from D2R's own wall pieces, with
+  gateways and doors where the classic map has them and walls as tall as in legacy. Duncraig's (`epicwhiners`) monastery front, which was only
+  ivy and low stones, now stands as a full wall with its two arched gates.
+- In HD, walls that were knee-high or missing on Median's Kurast and docktown maps now stand at full height with Median's
+  own wall art where D2R has no matching wall: Tran Athulua (`desertpeak`), Fauztinville (`cypherpunk`), Kurast 3000 BA
+  (`excelsior3`), Rathma Square (`moskvich`) and Old Bremmtown (`borgir`). Fauztinville now gets the same whole wall lines as
+  the other maps. In The Proving Grounds (`dungrm6a`) the red brick arch is back, and the stairs of Khalimgrad
+  (`charismatic`) show as steps instead of flat floor. The HD download grows by about 9 MB.
+- In HD, projectiles that used to fly invisibly now draw: Flamefront, Pyroblast, Forked Lightning, Tempest and about 150 others. Blast Wave shows its expanding fire rings instead of a white flash. Forked Lightning and Tempest are white in HD (blue in legacy).
+
+- Every crafting shrine now has one more line in its tooltip, in blue, naming what its Cube recipes give, for example
+  "Cube: Strength, Crushing Blow". The name, charges and verse stay as they were.
+
+- HD graphics: your weapon and shield no longer appear on you while you are in Trap Rat, Treewarden, Deathlord or Cow Disguise
+  form. Legacy graphics already hid them.
+
+- The five act towns now show their whole map as soon as you arrive, with no key press. Everywhere else, L still reveals the
+  current level.
+
+- Elixirs now have a liquid colour of their own in HD and legacy, also those already in your stash: Fire red-orange, Cold ice
+  blue, Lightning yellow, Poison green, Experience violet, Greed magenta, Wealth gold, Strength crimson, Dexterity teal, Energy
+  deep blue, Vitality orange, Adrenaline hot pink, Concentration grey-blue, Power white, Love pink, and the Greater ones a
+  brighter shade: Experience blue-violet, Greed bright purple, Wealth pale gold, Strength bright red, Dexterity mint, Energy
+  sky blue, Vitality peach. Names, effects and ground pictures stay the same.
 - Crafting shrines now have a colour of their own in HD and legacy inventory/stash views, at every charge count:
   Creepy: dark red; Abandoned: light grey; Quiet: light blue; Eerie: dark purple; Weird: crystal red; Gloomy: dark
   blue; Tainted: dark green; Fascinating: orange; Ornate: light gold; Sacred: crystal blue; Shimmering: white;
@@ -20,8 +66,7 @@ version being released (docs/release.md).
   first are gone: they did not match the map, in the sewers and catacombs and in small levels (bug #559). An old
   `threshold` line in `d2rloader/config/mxl2012-core.toml` is ignored; `exclude = [...]` there still turns the key off for
   the levels you list.
-
-## D2R-XL 2012
+- HD walls: the wall-scene build now measures how tall the generated HD walls are against the legacy walls on every map and stops when a map falls below the range of D2R's own maps. Duncraig and Tran Athulua are known to be below it (their HD walls are missing or much lower than in legacy, bug #561) and are listed as known issues until they are fixed. No change in game.
 
 ### 0.1.17 (2026-11-08)
 

@@ -1134,9 +1134,14 @@ with other parts or plugins (the hook clash report has nothing to list for it).
   counted as the tile area of the level's rooms that had been active once. That followed what D2R had loaded round the player
   (the player's room and its neighbours), not what the automap drew, so small levels were "70 %" at the arrival. Now every
   press reveals the current level, from the arrival on, in every level including towns. No timer walks the rooms any more.
+- **Towns (owner, 2026-11-08):** the five act towns (1, 40, 75, 103, 109; Median XL 2012 has no other town levels) are revealed
+  on each arrival with no key and no chat line. A timer thread asks the UI thread four times a second which level the player is
+  in; after three polls in a row in the same town with D2R's current automap layer (`0x2a2cf68` +0) already that town's
+  (`TownArrival`: levels.txt Layer 0 / 27 / 57 / 77 / 79) the same room walk runs once, as the callback draws into the current
+  layer. `exclude` does not stop it; it only refuses the key.
 - **Level:** player `0x9a480(0x8b2d0())`, path `+0x38`, room `0x341c30(path)`, DRLG room `+0x18`, level `+0x90`, first room
   `level + 0x10`, next `+0x48` (at most 4096 rooms). An exclusion list (`exclude`, empty by default) refuses listed level ids
-  (uber and boss levels could go there later, owner 2026-11-06).
+  (no default exclusions, boss and uber levels included: owner 2026-11-08).
 - **Key:** a D2RLoader InputService action `mxl_map_level`, "Reveal Level Map" in Options > Controls (category D2R-XL 2012),
   default **L** (free in D2R's key file and Median's own map reveal key; the first port's `mxl_map_reveal` id is not reused).
 - **Reveal:** for every room of the level, `CreateActiveRoom 0x3289a0(flag, room)` and the level's automap callback (DRLG
@@ -1145,7 +1150,7 @@ with other parts or plugins (the hook clash report has nothing to list for it).
 - **Chat:** one line per press: "Map: level revealed." ("revealed in part (N of M rooms)" when a room activation returned
   nothing), or "Map: no reveal in this area." in an excluded level. The line goes to the client's own chat handler `0x12c190` (packet 0x26 type 4), so it works
   in a joined game too; while an NPC talks (`0x2a48760`) the line waits (at most 60 s; a timer thread runs only while a line
-  waits), as a line then freezes the speech.
+  waits), as a line then freezes the speech. The town poll sends the held line too.
 - **Settings:** `d2rloader/config/mxl2012-core.toml` (`[mapreveal] exclude = []`), embedded in the DLL
   (`d2rlplugin_embed_config`), installed by `tools/install_mod.py` when missing and kept on updates (`preserve` in the release
   manifest). Players who had 0.1.15 / 0.1.16 keep their file with `threshold = 70`: the key is read and ignored, and the

@@ -64,6 +64,8 @@
 //      so instead of D2R's "Could not get act!" end of the game (reassign_guard.cpp, off word reassign, #511 / #292);
 //   +  HD draws no ground plane on Median's Ancient Tunnels (level 65) either, as D2R does on 74, so its void shows round the
 //      platform the build floors with D2R's Arcane walkways (void_floor.cpp, off word void65, docs/maps-hd.md item 12);
+//   +  D2R's HD model cache starts at 8250 models instead of 2750, so the maps that draw Median's wall tiles as models do
+//      not fill it and assert (model_cache.cpp, off word modelcache, docs/maps-hd.md "Model cache");
 //   +  a Barbarian spirit (Guardian, Defender, Protector) farther than 20 sub-tiles from its owner is warped to it by D2R's pet
 //      warp, unless it is fighting a target in reach within 40 (spirit_warp.cpp, off word spiritwarp, #534);
 //   +  a second personal stash page on D2RLoader's one custom player page (item page 6 + <char>.d2rl, 10 x 10), drawn by the
@@ -73,7 +75,7 @@
 //   +  a Ctrl-click deposit flashes the stash tab the item went to, MEDIAN and ORBS too, not RUNES (tab_flash.cpp, off word
 //      tabflash, #550);
 //   +  the level map reveal: the Controls action "Reveal Level Map" (default L) reveals the current level's automap on every
-//      press (mxl2012-core.toml [mapreveal] exclude, bug #559); client side, no hook (map_reveal.cpp, off word mapreveal);
+//      press (mxl2012-core.toml [mapreveal] exclude, bug #559), the act towns by themselves on arrival; client side, no hook (map_reveal.cpp, off word mapreveal);
 //   +  the automap's top-right text shows "Area Level N" (levels.txt MonLvlEx of the game's difficulty) on D2R's terror-zone
 //      line (area_level.cpp, off word arealvl);
 //   +  the clear legacy fonts setting: mxl2012-core.toml [fonts] legacy_clear_fonts and the Controls action "Clear Legacy Fonts"
@@ -121,9 +123,11 @@
 #include "clear_fonts.h"
 #include "merc_equip.h"
 #include "translation_guard.h"
+#include "devmenu.h"
 #include "send_stash.h"
 #include "vo_chat.h"
 #include "void_floor.h"
+#include "model_cache.h"
 
 #include <windows.h>
 #include <tlhelp32.h>
@@ -136,7 +140,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.17";
+constexpr const char* PluginVersion = "0.1.18";
 constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -181,7 +185,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -467,6 +471,8 @@ char g_medTabReport[256] = "";
 char g_stashTipReport[192] = "";
 char g_tabFlashReport[192] = "";
 char g_voidFloorReport[160] = "";
+char g_modelCacheReport[192] = "";
+char g_devMenuReport[320] = "";
 char g_stashPageReport[192] = "";
 char g_sendStashReport[192] = "";
 char g_mapRevealReport[256] = "";
@@ -512,7 +518,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
 	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport},
-	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport},
+	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport}, {"modelcache", g_modelCacheReport},
 	             {"arealvl", g_areaLevelReport}, {"clearfonts", g_clearFontsReport}, {"cltdostub", g_stubReport}};
 	for (const auto& p : parts) {
 		words[count] = p.word;
@@ -777,6 +783,7 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		SayPart(command, "tabflash", line);
 	}
 	Say(command, Off("void65") ? "void65 off: left out by mxl2012-core-off.txt" : g_voidFloorReport);
+	Say(command, Off("modelcache") ? "modelcache off: left out by mxl2012-core-off.txt" : g_modelCacheReport);
 	{
 		char status[256];
 		StashPagesStatus(status, sizeof(status));
@@ -801,6 +808,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		AreaLevelCounts(&filled, &level, &area, &difficulty);
 		std::snprintf(line, sizeof(line), "%s; lines filled %ld, last level %d area level %d, difficulty %d", g_areaLevelReport, filled, level, area, difficulty);
 		SayPart(command, "arealvl", line);
+	}
+	{
+		char status[512];
+		DevMenuStatus(status, sizeof(status));
+		std::snprintf(line, sizeof(line), "%s | %s", g_devMenuReport, status);
+		SayPart(command, "devmenu", line);
 	}
 	{
 		char status[512];
@@ -1038,6 +1051,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voidFloorReport);
 		context->LogInfo(line);
 	}
+	if (!Off("modelcache")) {
+		InstallModelCache(context, g_modelCacheReport, sizeof(g_modelCacheReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_modelCacheReport);
+		context->LogInfo(line);
+	}
 	if (Off("stashpage2")) {
 		StashPagesOff(context);  // the stock stash's page 2 arrows stay hidden
 	} else {
@@ -1063,6 +1081,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("clearfonts")) {
 		InstallClearFonts(context, g_selfPath, g_clearFontsReport, sizeof(g_clearFontsReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_clearFontsReport);
+		context->LogInfo(line);
+	}
+	if (!Off("devmenu")) {
+		InstallDevMenu(context, g_selfPath, g_devMenuReport, sizeof(g_devMenuReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_devMenuReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cltdostub")) {

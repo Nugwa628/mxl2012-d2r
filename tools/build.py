@@ -9,6 +9,7 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   tbl2json.py        strings                  -> work/mod/data/local/lng/ (namespace mxl2012, docs/strings.md)
   txt_migrate.py     D2R table layout         -> work/mod/data/global/excel/{base,} (ids: tools/idmap.py, docs/id-mapping.md)
   d2r_adds.py        D2R's own additions (Terror Zones and others) switched off, docs/d2r-additions.md
+  shrine_lines.py apply  one extra blue tooltip line per crafting shrine: the stats of its Cube recipes (docs/bugs.md #563)
   chronicle.py       D2R's Chronicle over Median's uniques / sets / runewords: item type UI categories, disableChronicle
                      (docs/d2r-additions.md)
   warlock_scale.py apply  the Warlock's skills on Median's rules and power (data/warlock_rules.tsv, data/warlock_balance.tsv,
@@ -34,6 +35,9 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   hd_skill_anims.py  HD skill animation data for Median skills (D2R's player state machines: read once from the CASC of
                      MXL_SLOT 2|3 and cached in work/d2r-cache when the baseline extraction lacks them)
   missile_hd.py      HD models for Median's missiles (by CelFile) -> hd/missiles/missiles.json
+  missile_looks.py   after effects_hd: rows that fly get a model vanilla uses on rows that travel, rows that stay one that loops, rows with no picture one that draws
+  skill_looks.py     every skill's chain (missiles, overlays, states) walked in HD: overlays with no picture get the closest D2R overlay that draws; report of every skill;
+                     --check fails a skill that shows something in legacy and nothing in HD (docs/hd-effects.md section 11)
   effects_hd.py      every Median missile/overlay row -> exact D2R HD effect, scaled variant or closest stand-in; a
                      recoloured vanilla effect gets a gradient tint (tools/hd_recolour.py, D2R vfx from the shared cache)
                      (also refreshes the committed data/hd-effects-map.tsv); build_effects.py --check-only checks the result
@@ -118,6 +122,8 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["txt_migrate.py"],
               ["d2r_adds.py", "--mod", str(ROOT / "work" / "mod"), "--d2r", str(D2R_EXTRACT)],
               ["shrine_colours.py", "tables", str(MOD / "data")],
+              ["elixir_colours.py", "tables", str(MOD / "data")],
+              ["shrine_lines.py", "apply", str(MOD / "data"), "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
               ["chronicle.py", "--mod", str(ROOT / "work" / "mod"), "--d2r", str(D2R_EXTRACT)],
               ["warlock_scale.py", "apply", "--mod", str(ROOT / "work" / "mod")],
               ["string_gaps.py", "apply", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"),
@@ -132,15 +138,17 @@ STRING_MERGE = [["merge_string_overrides.py"], DATA_STEPS[-1]]
 ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"], ["art_provenance.py"],
              ["hd_monsters.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],
              ["hd_translvl.py", "build", "--d2r", str(D2R_EXTRACT)],
-             ["animdata_merge.py"], ["hd_skill_anims.py"], ["missile_hd.py"], ["effects_hd.py"],
+             ["animdata_merge.py"], ["hd_skill_anims.py"], ["missile_hd.py"], ["effects_hd.py"], ["missile_looks.py"], ["skill_looks.py"],
              ["build_effects.py", "--check-only"],
              ["hd_icons.py", "baseline", str(D2R_EXTRACT)], ["hd_icons.py", "build", {"MXL2012_HD_OUT": str(MOD)}],
              ["hd_ui.py", "baseline", str(D2R_EXTRACT)], ["hd_ui.py", "build", {"MXL2012_UI_OUT": str(MOD)}],
              ["pet_icons.py", "build", "--mod", str(MOD)],
+             ["menu_credit.py"],
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
              ["shrine_colours.py", "art", str(MOD / "data")],  # needs HD jbscross; preserve the ground/drop art
+             ["elixir_colours.py", "art", str(MOD / "data")],
              ["ds1_paths.py", "build", "--mod", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after every tile / scene writer
              ["sounds_port.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
              # after legacy_art: its item pictures. In the mod by default (owner, 2026-10-31): the plugin's rotwstash part keeps
@@ -152,7 +160,7 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              # after median_tabs: the gamepad UI's inventory and stash from the finished PC layouts (bugs #556, #557)
              ["pad_ui.py", "build", str(MOD / "data")],
              ["legacy_fonts.py", "--mod", str(MOD)]]  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
-STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["validate.py"]]
+STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["devmenu_catalog.py"], ["validate.py"]]
 LOGS = ROOT / "work" / "build-logs"
 
 
@@ -224,7 +232,7 @@ def main() -> int:
         shutil.rmtree(d, ignore_errors=True)
     rc = 0
     failed = []
-    steps = [*DATA_STEPS, STRING_MERGE[0], ["validate.py"]] if data_only else STEPS
+    steps = [*DATA_STEPS, STRING_MERGE[0], ["devmenu_catalog.py"], ["validate.py"]] if data_only else STEPS
     for n, step in enumerate(steps, 1):
         rc = run(step, n)
         if rc and step[0] != "validate.py":

@@ -4740,7 +4740,7 @@ def acts_rest(log, frac=0.7, wait_s=150):
     return p.get("life")
 
 
-def acts_planned_walk(tx, ty, log, budget=300, reach=10, rounds=4):
+def acts_planned_walk(tx, ty, log, budget=300, reach=10, rounds=4, step=4):
     """Lane endgame: left clicks to (tx, ty) on paths planned on the game's own walk collision (relp_walk_to over `walkmap`,
     merged as the walk goes), fighting what comes near before each waypoint. The straight `move` legs and the search walk
     stayed pinned at the Chaos Sanctuary's wing walls for 10-50 minutes (lane acts5: 7812,5201; 7804-7819,5223-5260; the pocket
@@ -4763,7 +4763,7 @@ def acts_planned_walk(tx, ty, log, budget=300, reach=10, rounds=4):
         if there() or left < 20:
             break
         H("skill left 0")  # a left click on the ground walks, on a monster it attacks
-        relp_walk_to(c, tx, ty, there, log, budget=left, fight=fight)
+        relp_walk_to(c, tx, ty, there, log, budget=left, fight=fight, step=step)
         p = c.player()
         if player_dead(p) or p.get("area") != area0:
             break
@@ -8644,13 +8644,14 @@ def relp_follow(c, path, done, log, fight=None):
     return done()
 
 
-def relp_walk_to(c, x, y, done, log, budget=120, fight=None):
+def relp_walk_to(c, x, y, done, log, budget=120, fight=None, step=4):
     """Left clicks to the map point (x, y) on paths planned on `walkmap` (relp_plan with a target), planning again from each stop.
-    Without `walkmap` (an older DLL) plain clicks toward the point. Returns done()."""
+    Without `walkmap` (an older DLL) plain clicks toward the point. step: the walkmap grid in sub-tiles (2 finds narrow ledges).
+    Returns done()."""
     t0, tried, plans, known = time.time(), [], 0, {}
     while not done() and time.time() - t0 < budget and plans < 8:
         p = c.player()
-        wm0 = relp_walkmap(p["x"], p["y"])
+        wm0 = relp_walkmap(p["x"], p["y"], step=step)
         if wm0 is None:
             return relp_click_walk(c, x, y, done, clicks=40)
         wm = relp_known_wm(relp_merge(known, wm0), wm0["step"])
@@ -9126,6 +9127,20 @@ def wall_spots(env=None):
     return out
 
 
+def wall_place(x, y, rings=(0, 6, 12)):
+    """`place` straight at (x, y), else at points round it (rings of 8, `rings` sub-tiles out): a far room that is already loaded
+    takes the player even across a void. -> where the player is."""
+    for r in rings:
+        for ox, oy in ((0, 0),) if r == 0 else ((r, 0), (-r, 0), (0, r), (0, -r), (r, r), (-r, -r), (r, -r), (-r, r)):
+            if H("place %d %d" % (x + ox, y + oy))[0]:
+                p = hstate()["player"]
+                if abs(p.get("x", 0) - x - ox) <= 8 and abs(p.get("y", 0) - y - oy) <= 8:   # an OK can also say "did not take"
+                    time.sleep(2)
+                    return p.get("x"), p.get("y")
+    p = hstate()["player"]
+    return p.get("x"), p.get("y")
+
+
 def wall_hop(x, y, step=15, hops=40):
     """Move the player toward (x, y) by `place` hops of at most `step` sub-tiles (a far `place` fails: its room is not loaded),
     sideways around what blocks the way. -> where the player ended."""
@@ -9135,8 +9150,11 @@ def wall_hop(x, y, step=15, hops=40):
         dx, dy = x - cx, y - cy
         if abs(dx) <= 2 and abs(dy) <= 2:
             break
-        sx, sy = max(-step, min(step, dx)), max(-step, min(step, dy))
-        for ox, oy in ((sx, sy), (sx, 0), (0, sy), (sx // 2 - 5, sy // 2 + 5), (sx // 2 + 5, sy // 2 - 5)):
+        tries = []
+        for st in (step, step // 2, 4):   # narrow ledges: shorter hops
+            sx, sy = max(-st, min(st, dx)), max(-st, min(st, dy))
+            tries += [(sx, sy), (sx, 0), (0, sy), (sx // 2 - st // 3, sy // 2 + st // 3), (sx // 2 + st // 3, sy // 2 - st // 3)]
+        for ox, oy in dict.fromkeys(tries):
             if (ox or oy) and H("place %d %d" % (cx + ox, cy + oy))[0]:
                 break
         else:
@@ -9167,7 +9185,7 @@ def wall_visit(mode, log, shots):
             continue
         time.sleep(5)  # the scene and its models stream in
         x0, y0 = p.get("x"), p.get("y")
-        views, mems = WALL_OFFSETS, []
+        views, mems, walk_ok = WALL_OFFSETS, [], True
         if wall_spots().get(lv) and x0 is not None:   # MXL_WALL_SPOTS: map cells to look at, from the level's origin
             rooms = [(int(r["x"]), int(r["y"])) for r in (kv(ln) for ln in H("presets rooms")[1] if ln.startswith("room x="))]
             if rooms:
@@ -9179,7 +9197,28 @@ def wall_visit(mode, log, shots):
                 H("place %d %d" % (x0 + dx, y0 + dy))
                 time.sleep(3)
             elif n and x0 is not None:   # a far spot: hop there, the rooms ahead load as the player nears them
-                at = wall_hop(x0 + dx, y0 + dy)
+                tx, ty = x0 + dx, y0 + dy
+                far = lambda a: abs(a[0] - tx) > 6 or abs(a[1] - ty) > 6
+                at = wall_place(tx, ty)   # straight there when its room is loaded (across a void no hop crosses)
+                if far(at):
+                    at = wall_hop(tx, ty)
+                if far(at) and walk_ok:   # walls in the way (Duncraig's arrival is in a cave pocket): walk a path planned on
+                    acts_planned_walk(tx, ty, log, budget=240, reach=6, step=2)   # `walkmap`
+                    p2 = hstate()["player"]
+                    if p2.get("area") != lv:   # the walk took a warp out of the level: back, and no more walks here
+                        log.append("%s %d %s: the walk left the level (area %s); back by `h level`" % (mode, lv, name, p2.get("area")))
+                        goto(lv, timeout=60)
+                        walk_ok = False
+                        time.sleep(5)
+                        p2 = hstate()["player"]
+                    at = (p2.get("x"), p2.get("y"))
+                if far(at):   # still not there: the walk collision round the player, for planning a route by hand
+                    wm = relp_walkmap(at[0], at[1], half=100, step=2)
+                    if wm:
+                        with open(os.path.join(g.current_run(), "walkmap_%d_%s_%d.txt" % (lv, mode, n)), "w", encoding="utf-8") as f:
+                            f.write("x0=%d y0=%d step=%d player=%s,%s\n" % (wm["x0"], wm["y0"], wm["step"], at[0], at[1]))
+                            f.write("\n".join(wm["grid"]) + "\n")
+                time.sleep(3)
                 log.append("%s %d %s: spot %d -> %s,%s (wanted %d,%d)" % (mode, lv, name, n, at[0], at[1], x0 + dx, y0 + dy))
             shots.append(sh("wall_%s_%s_%d" % (name, mode, n)))
             mems.append(game_private_mb())   # lane stairs: the game's memory with a larger scene
@@ -15379,6 +15418,15 @@ def check_mapreveal():
 
 CHECKS += [("mapreveal", check_mapreveal)]
 
+def check_devmenu():
+    """The developer menu: opened with Ctrl+F12, one spawn of each kind, travel to Fauztinville and an uber arena, the raise to level 50, the
+    waypoint unlock, the panel in HD and legacy (tools/devmenu_checks.py; a new character: MXL_CHAR=<letters only>, MXL_CHAR_CLASS=amazon)."""
+    import devmenu_checks
+    devmenu_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("devmenu", check_devmenu)]
+
 # lane hdcombat: player report "damage, hits and chance-to-cast procs work less well in HD than in legacy graphics". The same
 # Barbarian, sword and zombie in each graphics mode: HC_ATTACKS left clicks without procs (hits = clicks after which the zombie
 # lost life, damage = its life lost), then HC_ATTACKS clicks with Addertongue (25 % Venomous Spirit 841 on attack; procs = the
@@ -15637,6 +15685,24 @@ def check_shrinecol():
 CHECKS += [("shrinecol", check_shrinecol)]
 
 
+def check_shrinetip():
+    """Lane shrinetip: tooltips of all 20 crafting shrines, backpack and MEDIAN, HD and legacy; the elixir colours."""
+    import shrine_checks
+    shrine_checks.run_tips(sys.modules[__name__])
+
+
+CHECKS += [("shrinetip", check_shrinetip)]
+
+
+def check_shrineline():
+    """Lane shrineline: the Cube line on all 20 crafting shrines, HD and legacy (bug #563)."""
+    import shrine_checks
+    shrine_checks.run_lines(sys.modules[__name__])
+
+
+CHECKS += [("shrineline", check_shrineline)]
+
+
 WEREWOLF_MONSTERS = ("fallenwolf1", "wyrdwolf1", "ape2")  # tokens 0( and ^3 (stand-in donor), ape2 a D2R-unit corpse to compare
 
 
@@ -15677,6 +15743,84 @@ def check_werewolf():
 
 
 CHECKS += [("werewolf", check_werewolf)]
+
+
+# Forms a player can take: (label, skill id, states.txt row, weapons.txt code for the right hand, a skill of the form or None)
+MORPHGEAR_FORMS = (
+    ("traprat", 448, "trapratstate", "145", 449), ("treewarden", 463, "tritonstate", "115", 464),
+    ("deathlord", 487, "deathlordstate", "115", None), ("superbeast", 635, "growl", "115", None),
+    ("cow", 67, "cowdisguise", "115", None), ("werebear", 880, "bear", "115", None),
+)
+MORPHGEAR_SHIELD = "621"  # Buckler (Grade 1)
+
+
+def check_morphgear():
+    """A form must not show the character's weapon or shield. Blood Moor, each MORPHGEAR_FORMS row (MXL_MORPHGEAR: labels, comma
+    separated) on a fresh entry into the game: weapon and shield worn, the form taken by a real right click on a mortal character,
+    shot without the form, with the form, and with the form and the gear taken off (the picture to compare with), in HD and
+    in legacy (G). The state must be on the server; the pictures are judged by eye. tools/tests/test_form_state_gear.py and
+    validate.py catch the data cause without a game."""
+    mark = engine_mark()
+    log, shots, notes = [], [], []
+    wanted = [x for x in os.environ.get("MXL_MORPHGEAR", "").split(",") if x]
+    ids = {r["state"]: int(r["*ID"]) for r in table("states") if re.fullmatch(r"\d+", r.get("*ID", ""))}
+    for label, skill, state, weapon, form_skill in MORPHGEAR_FORMS:
+        if wanted and label not in wanted:
+            continue
+        enable_debug()
+        goto(2, timeout=60)
+        with Tank(), Level(90):
+            setstat("player", 0, 1000)
+            setstat("player", 2, 1000)
+            for loc in ("rhand", "lhand"):
+                Hl("unequip %s" % loc, log)
+            worn = [Hl("equip %s rhand" % weapon, log)[0], Hl("equip %s lhand" % MORPHGEAR_SHIELD, log)[0]]
+            time.sleep(1.0)
+            set_graphics("hd")
+            shots.append(sh("mg_%s_hd_0gear" % label))
+            learn(skill)
+            Hl("skill right %d" % skill, log)
+            g.click(0.5, 0.45, button="right")  # the player's own right click on the free ground
+            time.sleep(2.5)
+            took = any(re.match(r"server state %d:" % ids[state], ln) for ln in Hl("states player", log)[1])
+            how = "right click"
+            if not took:  # a skill the character's class cannot cast by hand (the class-less ones) goes through the harness
+                how = "harness"
+                Hl("cast %d self" % skill, log)
+                time.sleep(2.5)
+                took = any(re.match(r"server state %d:" % ids[state], ln) for ln in Hl("states player", log)[1])
+            for gfx in ("hd", "legacy"):
+                set_graphics(gfx)
+                time.sleep(1.5)
+                shots.append(sh("mg_%s_%s_1form" % (label, gfx)))
+            used = "-"
+            if form_skill:  # the form's own skill still works (a target next to the player, killed again for the next shot)
+                set_graphics("hd")
+                learn(form_skill)
+                Hl("skill right %d" % form_skill, log)
+                px, py = player_xy()
+                mons = re.findall(r"id=(\d+)", " ".join(Hl("spawn 5 3 %d %d" % (px + 3, py), log)[1]))
+                time.sleep(1.0)
+                used = "%d no target" % form_skill
+                if mons:
+                    used = "%d %s" % (form_skill, "cast" if Hl("cast %d unit %s" % (form_skill, mons[0]), log)[0] else "REFUSED")
+                    Hl("kill nearest 5", log)
+                time.sleep(1.5)
+            for loc in ("rhand", "lhand"):
+                Hl("unequip %s" % loc, log)
+            time.sleep(1.5)
+            for gfx in ("legacy", "hd"):
+                set_graphics(gfx)
+                time.sleep(1.5)
+                shots.append(sh("mg_%s_%s_2bare" % (label, gfx)))
+        notes.append("%s: gear %s, form %s by %s, form skill %s" % (label, worn, "on" if took else "NOT on", how, used))
+        leave_and_reenter()  # ends the form, also when the state does not toggle off
+    log.extend(notes)
+    finish("morphgear", bool(notes) and all("NOT on" not in n for n in notes), "; ".join(notes), mark, shots, log,
+           partial="whether gear shows is judged by eye")
+
+
+CHECKS += [("morphgear", check_morphgear)]
 
 if __name__ == "__main__":
     main()

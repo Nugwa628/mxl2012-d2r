@@ -2,7 +2,8 @@
 // tests/map_reveal_test.cpp.
 //
 // The key reveals the current level's automap on every press, from the arrival on (owner, bug #559, 2026-11-08: no explored
-// share, no threshold). Only the optional exclusion list of mxl2012-core.toml can refuse it.
+// share, no threshold). Only the optional exclusion list of mxl2012-core.toml can refuse it. The act towns are revealed by
+// themselves on each arrival, no key needed (owner, 2026-11-08); the list does not stop that.
 #pragma once
 
 #include <cstddef>
@@ -17,10 +18,50 @@ inline constexpr int MaxLevels = 256;  // level ids (Median XL 2012: 1-137)
 inline constexpr int MaxExclude = 32;
 
 struct Settings {
-	int exclude[MaxExclude] = {};  // level ids with no reveal; empty by default (towns can be revealed too)
+	int exclude[MaxExclude] = {};  // level ids where the key reveals nothing; empty by default
 	int nExclude = 0;
 	bool oldThreshold = false;     // the file still has the retired `threshold` key (0.1.15 / 0.1.16): read and ignored
 };
+
+// The act towns. Median XL 2012 has no others (levels.txt: only these and the boss level 136 have no monsters of their own);
+// D2R's town check 0x327850 compares the same five ids.
+inline auto IsTown(int levelId) noexcept -> bool {
+	return levelId == 1 || levelId == 40 || levelId == 75 || levelId == 103 || levelId == 109;
+}
+
+// The automap layer of a town (levels.txt Layer; D2R's current layer +0 reads the same once it has switched), -1 for other levels.
+inline auto TownLayer(int levelId) noexcept -> int {
+	return levelId == 1 ? 0 : levelId == 40 ? 27 : levelId == 75 ? 57 : levelId == 103 ? 77 : levelId == 109 ? 79 : -1;
+}
+
+// The automatic town reveal: fed the player's level (0: none) and D2R's current automap layer (-1: none) by a poll of about
+// 250 ms. True once per arrival in a town, after TownSettlePolls polls in a row with the level the same and the layer the
+// town's: D2R's automap callback draws into its current layer.
+inline constexpr int TownSettlePolls = 3;
+
+struct TownWatch {
+	int level = 0;
+	int polls = 0;
+	bool done = false;
+};
+
+inline auto TownArrival(TownWatch* w, int levelId, int layer) noexcept -> bool {
+	if (levelId != w->level) {
+		*w = TownWatch{levelId, 0, false};
+	}
+	if (!IsTown(levelId) || w->done) {
+		return false;
+	}
+	if (layer != TownLayer(levelId)) {
+		w->polls = 0;
+		return false;
+	}
+	if (++w->polls < TownSettlePolls) {
+		return false;
+	}
+	w->done = true;
+	return true;
+}
 
 inline auto Excluded(int levelId, const Settings& s) noexcept -> bool {
 	for (int i = 0; i < s.nExclude; ++i) {

@@ -5,6 +5,8 @@
 // reveals the current level's automap on every press, from the arrival on, in every level (towns too) except the ones listed
 // in mxl2012-core.toml [mapreveal] exclude (empty by default). Each press is answered with a short chat line. The explored
 // share and its `threshold` (0.1.15 / 0.1.16) are gone: an old `threshold` line in the file is read and ignored.
+// The five act towns are revealed by themselves on each arrival, no key and no chat line (owner, 2026-11-08): a timer thread
+// asks the UI thread about four times a second which level the player is in (map_reveal_logic.h TownArrival).
 //
 // Everything is client side and per player: the automap is the client's own (built from its own copy of the act's DRLG); no
 // packet is sent, so a joiner of another player's game reveals only its own map. The part installs no hook:
@@ -46,6 +48,7 @@ constexpr uint64_t RvaActivateRoom = 0x3289a0;    // (data flag, DRLG room) -> a
 constexpr uint64_t RvaAutomapRoom = 0xd2240;      // (active room): D2R's automap callback, DRLG +0x838
 constexpr uint64_t RvaClientChat = 0x12c190;      // client handler of packet 0x26 (packet bytes)
 constexpr uint64_t RvaMenuNpcValid = 0x2a48760;   // u32, non-zero while the client talks to an NPC
+constexpr uint64_t RvaAutomapLayer = 0x2a2cf68;   // D2R's current automap layer (+0: its id, levels.txt Layer), null out of a game
 constexpr int UnitPath = 0x38, ActiveRoomDrlgRoom = 0x18, RoomNext = 0x48;
 constexpr int RoomLevel = 0x90, LevelFirstRoom = 0x10, LevelDrlg = 0x1c8, LevelId = 0x1f8, DrlgAutomapCallback = 0x838;
 constexpr uint64_t HoldMs = 60000;  // a line held for an NPC talk is dropped after this
@@ -76,6 +79,7 @@ Settings g_settings;
 
 std::atomic<bool> g_uiQueued{false};
 std::atomic<bool> g_pressQueued{false};
+std::atomic<bool> g_townPollQueued{false};
 std::atomic<bool> g_holding{false};  // a chat line waits for the end of an NPC talk
 
 // UI thread only from here on.
@@ -84,10 +88,12 @@ char g_pending[256] = "";            // the held chat line
 uint8_t g_pendingColour = ColourWhite;
 uint64_t g_pendingSince = 0;
 char g_lastLine[256] = "";
+TownWatch g_townWatch;
 
 // Counters since load (status line)
 std::atomic<long> g_presses{0}, g_reveals{0}, g_refusals{0}, g_lines{0}, g_heldLines{0}, g_droppedLines{0}, g_faults{0};
 std::atomic<long> g_lastMade{0}, g_lastRooms{0}, g_lastRevealMs{0};
+std::atomic<long> g_town{0}, g_townReveals{0}, g_townMade{0}, g_townRooms{0};
 
 template <typename F>
 auto Fn(uint64_t rva) noexcept -> F {
@@ -217,6 +223,29 @@ void PressBody() noexcept {
 	Say(line, ColourWhite);
 }
 
+void TownPollBody() noexcept {
+	Where w{};
+	const int level = Locate(&w) ? w.levelId : 0;
+	const auto* layer = *reinterpret_cast<const uint8_t* const*>(g_base + RvaAutomapLayer);
+	if (!TownArrival(&g_townWatch, level, layer != nullptr ? d2r::At<int32_t>(layer, 0) : -1)) {
+		return;
+	}
+	int rooms = 0;
+	const int made = RevealLevel(w, &rooms);
+	g_town.store(w.levelId);
+	g_townMade.store(made);
+	g_townRooms.store(rooms);
+	g_townReveals.fetch_add(1);
+}
+
+void TownPollGuarded() noexcept {
+	__try {
+		TownPollBody();
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		g_faults.fetch_add(1);
+	}
+}
+
 void FlushGuarded() noexcept {
 	__try {
 		FlushHeld();
@@ -239,6 +268,9 @@ void __cdecl RunOnUi(const D2RL::PluginContext*, void*) noexcept {
 	if (g_pressQueued.exchange(false)) {
 		PressGuarded();
 	}
+	if (g_townPollQueued.exchange(false)) {
+		TownPollGuarded();
+	}
 }
 
 void QueueUi() noexcept {
@@ -247,13 +279,12 @@ void QueueUi() noexcept {
 	}
 }
 
-// Sends a held chat line once the NPC talk is over (nothing to do while no line waits).
+// The poll for a town arrival, and with it a held chat line once the NPC talk is over.
 DWORD WINAPI TimerThread(LPVOID) {
 	for (;;) {
 		Sleep(250);
-		if (g_holding.load()) {
-			QueueUi();
-		}
+		g_townPollQueued.store(true);
+		QueueUi();
 	}
 }
 
@@ -323,7 +354,7 @@ auto InstallMapReveal(const D2RL::PluginContext* context, char* report, size_t r
 		std::snprintf(ex + len, sizeof(ex) - len, "%s%d", i ? " " : "", g_settings.exclude[i]);
 	}
 	std::snprintf(report, reportSize, "mapreveal on: Controls action mxl_map_level (default L) reveals the current level on each press (%s); "
-	              "excluded: %s; no hook",
+	              "the act towns on each arrival; excluded from the key: %s; no hook",
 	              note, g_settings.nExclude ? ex : "none");
 	return true;
 }
@@ -335,11 +366,12 @@ void MapRevealStatus(char* out, size_t size) noexcept {
 	}
 	std::snprintf(out, size,
 	              "on=%d level=%d excluded=%d key=%s npc=%u held=%d presses=%ld reveals=%ld refusals=%ld lines=%ld heldlines=%ld "
-	              "dropped=%ld faults=%ld lastmade=%ld lastrooms=%ld lastms=%ld",
+	              "dropped=%ld faults=%ld lastmade=%ld lastrooms=%ld lastms=%ld town=%ld townreveals=%ld townmade=%ld townrooms=%ld",
 	              g_on ? 1 : 0, g_level, g_settings.nExclude, key[0] ? key : "-",
 	              g_base ? *reinterpret_cast<const uint32_t*>(g_base + RvaMenuNpcValid) : 0u, g_pending[0] ? 1 : 0, g_presses.load(),
 	              g_reveals.load(), g_refusals.load(), g_lines.load(), g_heldLines.load(), g_droppedLines.load(), g_faults.load(),
-	              g_lastMade.load(), g_lastRooms.load(), g_lastRevealMs.load());
+	              g_lastMade.load(), g_lastRooms.load(), g_lastRevealMs.load(), g_town.load(), g_townReveals.load(), g_townMade.load(),
+	              g_townRooms.load());
 }
 
 auto MapRevealPress() noexcept -> bool {
