@@ -16,8 +16,9 @@ it must be inside the project root R or the repo, and only its own unpacked/ and
    d2rloader/plugins/mxl2012-core.dll (the release DLL against the dev DLL) and d2rloader/metadata.json (modVersion,
    description, website); a reference file the package lacks must be a byte copy of D2R's own (the D2R baseline or the shared
    D2R cache, package_release.baselines()); the package has no file the reference lacks except the bundled plugins' files
-   (legacy169.dll / legacy169.toml, Buff HUD's DLL, MPQ, licences and buff-panel.toml, and Auto Belt Refill's DLL and
-   auto-belt-refill.toml; checked in step 2: present, a release build of the pinned version).
+   (legacy169.dll / legacy169.toml, Buff HUD's DLL, MPQ, licences and buff-panel.toml, Auto Belt Refill's DLL and
+   auto-belt-refill.toml, Controller QOL's files, and CharmInv's DLL, MPQ and charm-inv.toml; checked in step 2: present, a
+   release build of the pinned version, CharmInv the author's pinned bytes with allow_inventory_charms = true).
 
 unpacked/ and reference/ are deleted at the end unless --keep (or a check failed). Exit 0 = the package installs the same game
 as install_mod.py. Reads the build (work/mod/data) and the baselines; writes only into DIR.
@@ -40,7 +41,8 @@ DIFFERS_BY_DESIGN = {"d2rloader/plugins/mxl2012-core.dll", "d2rloader/metadata.j
 # the bundled plugins (package_release.LEGACY169, BUFFHUD, BELTREFILL, CONTROLLERQOL): the package has them, install_mod.py does
 # not install them
 BUNDLED = ({pr.LEGACY169["dll"], pr.LEGACY169["config"]} | {pr.BUFFHUD[k] for k in pr.BUFFHUD_FILES}
-           | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES} | {pr.CONTROLLERQOL[k] for k in pr.CONTROLLERQOL_FILES})
+           | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES} | {pr.CONTROLLERQOL[k] for k in pr.CONTROLLERQOL_FILES}
+           | {pr.CHARMINV[k] for k in pr.CHARMINV_FILES})
 STRING_FILES = ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json")
 
 
@@ -99,6 +101,13 @@ def check_mod_folder(mod: Path, version: str) -> list:
         problems += pr.check_release_plugin(dll, pr.plugin_version())
     else:
         problems.append("d2rloader/plugins/mxl2012-core.dll is missing")
+    dc = mod / pr.DRAWCAP["dll"]
+    if dc.is_file():
+        problems += pr.check_drawcap(dc)
+    else:
+        problems.append(f"{pr.DRAWCAP['dll']} is missing")
+    if not (mod / pr.DRAWCAP["config"]).is_file():
+        problems.append(f"{pr.DRAWCAP['config']} is missing")
     l169 = mod / pr.LEGACY169["dll"]
     if l169.is_file():
         problems += pr.check_legacy169(l169)
@@ -124,6 +133,12 @@ def check_mod_folder(mod: Path, version: str) -> list:
     for k in pr.CONTROLLERQOL_FILES:
         if not (mod / pr.CONTROLLERQOL[k]).is_file():
             problems.append(f"{pr.CONTROLLERQOL[k]} is missing")
+    problems += pr.check_charminv(mod / Path(pr.CHARMINV["dll"]).parent)
+    cfg = mod / pr.CHARMINV["config"]
+    if not cfg.is_file():
+        problems.append(f"{pr.CHARMINV['config']} is missing")
+    elif "allow_inventory_charms = true" not in cfg.read_text("utf-8"):
+        problems.append(f"{pr.CHARMINV['config']} lacks allow_inventory_charms = true (charms work from the inventory too)")
     if not (mod / "d2rloader" / "patches").is_dir():
         problems.append("d2rloader/patches/ is missing")
     data = mod / f"{NAME}.mpq" / "data"

@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import package_release as pr
 import verify_package as vp
@@ -26,7 +27,9 @@ class VerifyPackageTests(unittest.TestCase):
             (data / rel).parent.mkdir(parents=True, exist_ok=True)
             (data / rel).write_bytes(body)
         self.mod = self.tmp / "stage" / "mxl2012"
-        pr.stage(self.mod, pr.plugin_version(), self.dll, self.tmp, data_from=data)
+        drawcap = self.tmp / "drawcap.dll"
+        drawcap.write_bytes(b"MZ Draw List Cap" + bytes(1) + b"drawcap" + bytes(1) + pr.drawcap_version().encode() + bytes(1))
+        pr.stage(self.mod, pr.plugin_version(), self.dll, self.tmp, data_from=data, drawcap=drawcap)
         src = self.tmp / "legacy169-src"  # what tools/build_legacy169.ps1 exports
         src.mkdir()
         (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\n", encoding="utf-8")
@@ -58,6 +61,15 @@ class VerifyPackageTests(unittest.TestCase):
         (cq / "SKILL_PROFILE").write_text(pr.sha256(seed), encoding="ascii")
         (self.tmp / "Controller QOL Updates.dll").write_bytes(b"MZ controller-qol-updates\0 1.3.1+rev.95\0 belt_actions = false")
         pr.stage_controllerqol(self.mod, self.tmp / "Controller QOL Updates.dll", seed, cq)
+        ci = self.tmp / "charminv"  # the author's two files (fakes, pinned for the test)
+        ci.mkdir()
+        (ci / "d2rl-charm-inv.dll").write_bytes(b"MZ charm-inv\0")
+        (ci / "d2rl-charm-inv.mpq").write_bytes(b"MPQ\x1a charm-inv")
+        pins = mock.patch.dict(pr.CHARMINV, {"sha256": {k: pr.sha256(ci / f"d2rl-charm-inv.{k}") for k in ("dll", "mpq")},
+                                             "size": {k: (ci / f"d2rl-charm-inv.{k}").stat().st_size for k in ("dll", "mpq")}})
+        pins.start()
+        self.addCleanup(pins.stop)
+        pr.stage_charminv(self.mod, ci)
 
     def test_a_staged_package_is_a_player_mod_folder(self):
         self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
@@ -74,13 +86,19 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / pr.BELTREFILL["config"]).unlink()
         (self.mod / pr.CONTROLLERQOL["dll"]).write_bytes(b"MZ controller-qol-updates\0 1.3.1+rev.95\0")
         (self.mod / pr.CONTROLLERQOL["licence"]).unlink()
+        (self.mod / pr.DRAWCAP["dll"]).write_bytes(b"MZ Draw List Cap" + bytes(1) + b"drawcap" + bytes(1) + b"0.0.0" + bytes(1))
+        (self.mod / pr.DRAWCAP["config"]).unlink()
+        (self.mod / pr.CHARMINV["mpq"]).write_bytes(b"MPQ\x1a other")
+        (self.mod / pr.CHARMINV["config"]).write_text("[charm-inv]\nallow_inventory_charms = false\n", encoding="utf-8")
         problems = vp.check_mod_folder(self.mod, "9.9.9")
         text = "\n".join(problems)
         for want in ("modinfo.json", "modVersion", "test harness", "PluginVersion", "Hero.d2s", "legacy169 test build",
                      "legacy169.toml is missing",
                      "not a packed MPQ", "d2rl-buff-panel-LICENSE.txt is missing",
                      "Auto Belt Refill version 0.35.9", "auto-belt-refill.toml is missing",
-                     "not our patched build", "Controller QOL Updates-LICENSE.txt is missing"):
+                     "not our patched build", "Controller QOL Updates-LICENSE.txt is missing",
+                     "is not drawcap", "drawcap.toml is missing",
+                     "d2rl-charm-inv.mpq is not CharmInv 1.0.1", "lacks allow_inventory_charms = true"):
             self.assertIn(want, text)
 
     def test_archive_paths_must_stay_in_the_mod_folder(self):

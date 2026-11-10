@@ -30,6 +30,11 @@ exactly the potion at its bottom, a completely empty column stays empty until yo
 each column shows how many of that potion you have left; elixirs are never moved. Set fixed columns, or turn it off with
 `enabled = false`, in `mods\mxl2012\d2rloader\config\auto-belt-refill.toml`.
 
+Shipped with the mod: **CharmInv** by **Dimentio**, D2RLoader's author (<https://d2rloader.net/hub/plugins/charm-inventory>,
+redistributed with D2RLoader by the owner's decision): a charm inventory of 10 x 4 cells, opened by its button on the
+inventory panel or a key you bind (Options > Controls: Open Charm Inventory). Median charms work there and, as before, in
+the normal inventory. HD graphics only for now. Settings: `mods\mxl2012\d2rloader\config\charm-inv.toml`.
+
 Shipped with the mod: our own plugin **D2R Legacy 16:9** (`legacy169.dll`, <https://github.com/Nugwa628/D2R-Legacy169>, MIT), the
 classic graphics in 16:9 (1066x600 / 853x480). Turn it off with `enabled = false` in
 `mods\mxl2012\d2rloader\config\legacy169.toml`.

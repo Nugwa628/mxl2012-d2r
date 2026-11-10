@@ -1094,6 +1094,41 @@ top, unchanged. Control: `MXL_CONTROL=uniquecarry` (the off list keeps letters o
 D2R-XL 2012 (this project, bug #280): the same rule as **data**: `tools/txt_migrate.py` `carry_numbers` writes record index + 1 into each carry1 cell
 of the built uniqueitems.txt (D2R's loader reads the cell as that int), `validate.py` fails on a repeated number; no plugin part (lane pluginplan2).
 
+## 22c. Charm stats, "requirements not met" and carry1 duplicates (lane charmdup, 2026-11-10; plugin/src/charm_dup.cpp)
+
+Read from the dump (`mxl2012-runs/charmdup/re-notes.md` has the evidence) and checked in the game (docs/testing.md "Lane charmdup").
+Several D2R calls of this path go through D2RLoader `D2RCore.dll` thunks (`0x3e2bxxx`, code not in the dump).
+
+| What | RVA | Notes |
+|-|-|-|
+| Requirements `BOOL (item, unit, bEquipping, int* strOk, int* dexOk, int* lvlOk)` | `0x36bc50` (hooked) | entry `4c 89 4c 24 20 44 89 44 24 18 55 56 57 48 83 ec 60`; strength `rec+0x11a`, dexterity `rec+0x11c`, level `0x376de0` (a D2RCore thunk), identified flag `0x10`. Callers: the server's "can use" `0x475760`, the client tooltip requirement lines (`0x2bd480`, `0x2bf1b0`), the body slots (`0x2c9aeb`), the equip click; the grid's test `0x2c3774` calls D2RCore `0x3e2b298` with the same arguments |
+| Charm usable `BOOL (item, player)` | `0x36ae00` (no direct caller) | not broken / NOEQUIP (`0x36ad20`), item type 13 (`0x373890(item, 13)`), page byte 0, `0x36bc50`. Every caller goes through D2RCore thunk `0x3e2b61c` instead (server `0x470d9a`, `0x475102`, identify, NPC; client `0x1c39f5` ... `0x1c97e3`), where D2RLoader adds the custom player page (CharmInv's policy) |
+| Refresh `(game, player, x)` | `0x470ca0` (hooked) | entry `44 89 44 24 18 57 41 57 48 81 ec 88 00 00 00`. Charm loop `0x470d6a`: a stored item on the grid that passes `0x3e2b61c`, is not merged (`0x2f8120(item, 0)` null) and passes `0x475760` gets NOEQUIP cleared and `0x475090` (merge). **It never takes a charm out.** Equipped items that fail: NOEQUIP set (`0x36d8f0(item, 0x4000, 1)`), `0x34e140(player, 0x80000000, 1)`, `0x475020(game, player, item)`, `0x34e140(..., 0)` (`0x470e64`..`0x470ea3`). Called after place `0x471835`, move `0x47226f` / `0x47249e`, identify, break / repair, level-up, join, save load |
+| Detach `(target, item)` | `0x2f8290` | takes the item's stat list out of its owner (`0x2f6e50`); the level-up path `0x46f220` detaches and re-merges every merged item |
+| Merged list `(item, int* out)` | `0x2f8120` | non-null while the item's stat list is merged into its owner (list `+0x78`, flag `0x80000000` of `+0x1c`) |
+| Stat merge `(target, unit, bType)` | `0x2f81a0` | entry patched by D2RCore (`jmp [0x3e2a288]`) |
+| Grid colour | `0x2c35ea` | palette `0x1e32e0(idx)`: 0 red (requirement thunk fails, broken or NOEQUIP), 4 unidentified, 2 usable. No native inactive-charm tint: D2RLoader's tint lives in its cell draw `0x3e2b268` |
+| Carry lists | `0x46c690` layout (`0x4888` bytes) | list B (`+0x2304` bases, `+0x3c00` u16 uniques, counts `+0x3bf8` / `+0x4880`) = the cursor item, **every item of the inventory list** (added through D2RCore `0x3e2b256` at `0x4733af`, so the custom page is decided there), then the new items; list A (`+0x1c84` / `+0x423a`) = the items of the player's corpses. Add `0x46d750`: the unique index when its record has `+0x30 > 0`. Every existing item passes the carry check again when a layout is made, so a backpack with two "same" carry1 uniques would refuse every later move |
+| Carry check, unique half | `0x473960 (item, uniques, uniquesEnd, bases, basesEnd)` (hooked) | entry `48 89 5c 24 08 48 89 6c 24 10 48 89 74 24 18`; one compare call `0x4739e2` (`e8 6f 7b 9b 03` to thunk `0x3e2b556`, which also serves `0x5277f2` in the cube executor) |
+| Client refresh `(unit)` | `0x1c9610` (hooked) | entry `40 53 48 83 ec 70` (then a rip-relative load); D2Client Item.cpp's copy of the charm loop (`0x1c97c0`..: grid node, thunk `0x3e2b61c` at `0x1c97e3`, `0x2f8120`), called after the item packets (27 call sites `0x1c3016`..`0x1c95cd`). The client keeps its own copy of the item stats (the character sheet, harness `cstat`) |
+| Compare slot | `0x3e2abb0` (replaced) | the `ff 25` slot of thunk `0x3e2b556` (D2RCore `UniqueItemsShareCarryOneGroup`), called from `0x4739e2` and the cube executor `0x5277f2` |
+| `multiunique` cheat | `0x4130d0` -> global `0x2aa6a74` | D2R's "duplicate-unique allowance": read by item generation (`0x43ed62`.., `0x443910`), not by the carry test; not used |
+
+**In the game (D2RLoader 1.3.1, CharmInv 1.0.1, allow_inventory_charms; docs/testing.md "Lane charmdup"):** with the unique half
+out, the backpack takes a second copy whether the first lies in the backpack or in CharmInv (page 6). CharmInv (D2RLoader's
+custom page placement) refuses a second copy of a unique already carried anywhere, also with the compare slot replaced: its
+test is D2RCore's own. A second inline hook on `0x36bc50` is refused by D2RLoader ("game bytes did not match"): mercequip
+hooks it first, so `charmdup` adds its veto to that hook.
+
+**The part `charmdup`** (`MXL_CONTROL=charmdup` leaves it out): the carry check runs with an empty unique range (`uniquesEnd =
+uniques`), so carry1 never refuses; the base half (`+0x13a`) stays. `0x36bc50` answers false (not met) for a carry1 unique stored on
+page 0 or 6 of `unit` that is not the active copy (charm_dup_logic.h: CharmInv first, then the top row, then the left column),
+so the refresh never merges it and the client draws it red. The refresh hook first takes out a merged copy that is no longer
+active by detaching its stat list (`0x2f8290(player, item)`, as the level-up re-merge `0x46f220` does). In the game neither
+the equipped-item sequence above (NOEQUIP + `0x475020`) nor `0x2f81a0(player, item, 0)` took the stats out. D2R's charm loop
+then merges the active one. The client refresh `0x1c9610` gets the same step (its own stat copy), and the compare slot
+`0x3e2abb0` answers "not the same" for any carry1 record (also for the cube executor's test).
+
 ## 23. Model and texture index: why new asset paths were invisible (lane new-asset-paths, 2026-10-23; tools/model_lod_desc.py)
 
 Read from the memory dump (`tools/d2r_find.py`, RVA = file offset); format and the in-game proof in hd-models.md section 3c.
@@ -1318,3 +1353,34 @@ WidgetService can find and hide widgets but not change their text, and its handl
 | Find panel | `0x89f760` | `(root, char name[128])` -> panel widget; the name is the layout's root name, in a zeroed 128-byte buffer |
 | Find child | `0x855c90` | `(widget, const char* name)` -> child widget, or null |
 | Set text | `0x86dd50` | `(TextBoxWidget, const string_view*)`: pointer to `{const char* data, size_t size}` |
+
+## Text boxes and key bindings (lane devmenu3, 2026-11-10; plugin/src/devmenu.cpp "typing")
+
+Why the 0.1.18 developer menu's text box lost every key that has a game binding, and what the menu does about it: read statically from the dump
+(capstone, `mxl2012-runs/devmenu3/re/`) and checked in game, build 93847.
+
+| What | RVA | Notes |
+|-|-|-|
+| InputTextBoxWidget field table | `0x2537780` | 0x30-byte entries {name, kind, offset}: `fontType` 0x6f8, `fontStyle`, `backgroundColor`, `cursorColor`, `padding`, `canInsertNewlines` 0x784, `alwaysAcceptsKeyInput` 0x588, `virtualKeyboardType`, `maxStringLength` 0x780, `hint`, `onUpdateMessage` 0x9b8, `imeEnabled` 0xc20, `disabledFontColor`, `onReturnInputMessage` 0xad8, `leftCursorPadding`. No escape / cancel message. |
+| FocusableWidget field table | `0x2535d90` | `tooltipString`, `tooltipStyle`, `buttonLegendAction`, `buttonLegendString`, `navigation`, `focusOnMouseOver` 0x458, `focusIndicatorVisible`, `focusIndicatorFilename`, `focusIndicatorOffset`, `focusIndicatorPadding`, `useParentRectAsFocusRect` 0x45a |
+| InputTextBoxWidget vtable | `0x1d77a60` | Draw `0x8889a0`, message handler `0x88baa0` (continues at `0x88bbcb`) |
+| Editing text box | data `0x3440c48` | the text box being edited; set by start-editing `0x88c810`, cleared by `0x88b270` and the destructor `0x887200`; read only by InputTextBoxWidget code (`0x88c7c0`, `0x88eb00`: no `ClosePanel` while a box is edited, `0x88c1be`) |
+| Is focused | `0x88b180` | keyboard / mouse: `editing == this`; else (controller, `0x77e10` / `0xebee0`) the UI root's focus `0x846020()+0x190 == this` |
+| UI focus test | `0x876160` | `(widget)`: root focus `0x846020()+0x190 == widget`; entry `40 53 48 83 ec 20 48 8b d9 e8` |
+| Mark input handled | `0x843fc0` | `()`: sets UI root byte `+0xb8`; read through `0x8460d0`, the binding dispatcher then skips the binding; entry `48 8b 05 a9 c1 bf 02 48 85 c0 74 07 c6 80 b8 00` |
+| Key-binding commands | `0x22a7930` | 0x18-byte entries {press, release, ...} (skill hotkey press `0x119f70` / release `0x11a960`), dispatched by `0x11ff30`; the binding loop `0x11e9e0` is gated by the input mode dword `0x2a48ea0` |
+| Char event | table `0x229bef0` | event `0x1000f` (WM_CHAR) -> the loader's hook and the CharacterTyped sender `0x841e50` |
+
+The click branch of the message handler (`0x88bd4e`...): when the box is clicked it calls start-editing `0x88c810` (`0x88bdc5`), **except** when
+`alwaysAcceptsKeyInput` (0x588) is set and the input is keyboard and mouse (`0x77d80` false, `0xebee0` false). Start-editing only opens the
+controller's TextInputModal: in keyboard and mouse mode nothing keeps the bindings off, with or without the flag (checked in game: a plugin call of
+`0x88c810` set the edited box and every bound key still ran its command).
+
+How a key travels, as the plugin's UI listener sees it (lane devmenu3, in game): WM_KEYDOWN -> `InputMessage:KeyDown`; a key with a binding then
+`InputMessage:BindingDown`, and its command runs unless a handler marked the input handled (`0x843fc0`); then the game's message loop's
+`TranslateMessage` character (the exe imports it) -> `InputMessage:CharacterTyped`, which the focused box takes, **only after a key press that
+matched no binding** (a bound key's character is dropped; with the key press held back, all but the first character are lost). So the fix lives in
+front of D2R's window procedure (devmenu.cpp, a subclass of the game window, no system hook): while the box has the keyboard a printable key's
+WM_KEYDOWN / WM_KEYUP reach D2R as F24 (no default binding), its character types; editing keys (Backspace, Enter, arrows, Home, End, Delete) go on
+as themselves and the listener marks their BindingDown / BindingUp handled. D2R keeps the UI focus on the box after a click on a button or the game,
+so "has the keyboard" follows the last left click (on the box or not), not the focus.

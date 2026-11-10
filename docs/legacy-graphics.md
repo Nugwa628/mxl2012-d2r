@@ -209,7 +209,11 @@ Classic mode recolours art at draw time; HD has to be told. Two kinds matter for
 
 The side-by-side shots of both modes are made by check `tint_hd` (docs/testing.md "Lane tints").
 
-## 8. Warlock in classic mode (lane wlklegacy, 2026-10-29; static only, not seen in game: no slot account owns RotW)
+## 8. Warlock in classic mode (lane wlklegacy, 2026-10-29, static; seen in game since lane wltree, 2026-11-10)
+
+**Reign of the Warlock works on the test slots now** (lane wltree, 2026-11-10): the slot 2 account owns it, the create screen
+offers Game Version "Reign of the Warlock", and a Warlock was made, entered Act 1 and switched to classic with G (the mod's
+`d2rloader.toml` has the keybind key below). The "no slot account owns RotW" notes of earlier lanes are out of date.
 
 D2R refuses the graphics toggle in Reign of the Warlock games ("Only Available in Classic and Expansion games"), and the
 Warlock exists only there. D2RLoader's `[d2rcore.player] always_enable_rotw_legacy_graphics_keybind = true` lifts the block.
@@ -220,8 +224,9 @@ the first gap below is in D2R's files, so vanilla RotW has it too.
 
 **What a Warlock looks like in classic mode.** D2R's `chars/wk/` files are byte copies of the Necromancer's plus three block COFs
 (`wkbl2hs`, `wkbl2ht`, `wkblstf`), so the Warlock looks like a Necromancer. Its skills' classic art is D2R's own classic stand-ins
-(`overlays/warlock_*.dcc`, `missiles/grimward*.dcc`, ...). The tree back `skltree_w_back.dc6` is a byte copy of D2R's Necromancer
-back, and the icon sheet `waskillicon.dc6` a copy of the Druid's (60 frames). The mod overrides none of these.
+(`overlays/warlock_*.dcc`, `missiles/grimward*.dcc`, ...). D2R's tree back `skltree_w_back.dc6` is a byte copy of its
+Necromancer back and its icon sheet `waskillicon.dc6` a copy of the Druid's (60 frames); the mod replaces both with a Median-style
+tree of its own (section 8.5).
 
 ### 8.1 The checker
 
@@ -265,7 +270,7 @@ every class (the Clue Gem's flippy, below).
 | Gap | Cause | Fix |
 |---|---|---|
 | `WKA1HTH`, `WKA2HTH`: animdata 16 frames, but the classic COFs `wka1hth` / `wka2hth` and their 36 DCCs have 15 | D2R 93847's own data: its Warlock animdata records were made for the HD model, and the classic art is the Necromancer's (`NEA1HTH` 15). An unarmed Warlock attack in classic would ask for frame 15 of a 15-frame DCC. The mod's merge keeps D2R's records (`animdata_merge.py`), so the mod had the gap too | `tools/animdata_merge.py` `CLASSIC_CAPS` caps both records at 15 frames. Speed 256 and the action frames (9, 7) stay, so the hit lands on the same frame. **Side effect:** the unarmed attack is one frame shorter in HD too (animdata is the game's timing in both modes) |
-| `skillstreepanel.json` `cancelPositionCode` has 7 entries (Amazon .. Assassin) | D2R's own classic layout. The field is an `int[8]` (exe descriptor at `0x29ea8d0`: element 4 bytes, count 8, panel offset `0x86c`), so the Warlock's slot keeps its default and the close button of its classic tree has no defined position | `tools/ui_layouts.py` `warlock_cancel_position` appends the Necromancer's code (131), since the Warlock's tree back is the Necromancer's picture |
+| `skillstreepanel.json` `cancelPositionCode` has 7 entries (Amazon .. Assassin) | D2R's own classic layout. The field is an `int[8]` (exe descriptor at `0x29ea8d0`: element 4 bytes, count 8, panel offset `0x86c`), so the Warlock's slot keeps its default and the close button of its classic tree has no defined position | `tools/ui_layouts.py` `warlock_cancel_position` appends an 8th code. Lane wlklegacy used the Necromancer's (131); since lane wltree it is `warlock_tree.cancel_code` (212: each page's Close button where its row 6 is free) |
 
 **Notes left (explained, not crash candidates):**
 
@@ -297,15 +302,39 @@ every class (the Clue Gem's flippy, below).
 for a Warlock. Expect the Necromancer look, a Flame Wave without its wave and shortened swings. The remaining risk is in the exe
 (the sequences above). The vanilla A1 / A2 HTH overrun is the most likely meaning of the loader author's "crash in Vanilla RotW".
 
-### 8.4 Test on a RotW account (owner / user; the slots cannot)
+### 8.5 The Warlock's classic skill tree (lane wltree, 2026-11-10)
+
+Seen in game (slot 2, `WltreeWarlock`): D2R's classic Warlock tree was the vanilla Necromancer's art with the Druid's icons. 15 of
+the 30 skills sat on cells that art leaves empty (no arrow, stone or an arrow under the icon) and 15 cells the art draws for a
+skill stayed empty. The buttons themselves were where the icons were (hover = the right skill). The tab titles were the wrong way
+round: classic tab n shows SkillPage 3 - n, but D2R's `textTab0[7]` is SkillCategoryWa1 ("Demon", page 1), so the top tab said
+"Demon" over the Chaos skills and the bottom one "Chaos" over the Demon skills.
+
+Owner choice (option A of the lane's mockups): Median's look on the Warlock's own grid, no table change. `tools/warlock_tree.py`
+(an `hd_ui.py build` step) writes, from Median's classic art and D2R's HD Warlock icons at build time:
+
+- `data/global/ui/spells/skltree_w_back.dc6`: Median's stone and page frame (its Necromancer page with the cells taken out),
+  Median's skill box and level box on each of the Warlock's cells (layout `skillColumn` / `skillRow`), one arrow per
+  same-page `reqskill` in Median's arrow colours, Median's tab column with each tab's own page name (CHAOS / ELDRITCH / DEMON, top
+  to bottom) in Median's lettering: the letters are cut from the Sorceress' tab labels by the tool (`median_glyphs`), not a font.
+- `data/global/ui/spells/waskillicon.dc6`: D2R's 60 HD Warlock icons at 48 x 48, toned like Median's icons.
+- `skillstreepanel.json` (ui_layouts): no Warlock tab title text (the art carries it, as for the seven classes) and the
+  Warlock's `cancelPositionCode` 212.
+
+The step's check (also run by `hd_ui.py build`) fails when a skill's button has no box under it, a box has no skill, a
+prerequisite has no arrow or an arrow no prerequisite, an IconCel + 1 is past the sheet, or the layout entries differ. On D2R's
+original files it reports 29 problems. HD and the gamepad UI keep D2R's own Warlock trees (same cells). Tests:
+`tools/tests/test_warlock_tree.py`.
+
+### 8.4 Test on a RotW account (the slots can now, lane wltree)
 
 1. Install a build of this branch into `mods\mxl2012`. That install's `d2rloader\config\d2rloader.toml` has
    `always_enable_rotw_legacy_graphics_keybind = true` (`tools/install_mod.py` and the downloader set it, also in a kept file;
    the game-wide `<D2R>\d2rloader\config\d2rloader.toml` is never edited).
 2. Make a new Warlock in a RotW game. In HD first: walk, open I / C / T, cast nothing. Then press **G**: expect a
    Necromancer-looking Warlock.
-3. Classic UI: I (10 x 6 grid), C, and T: the tabs Demon / Eldritch / Chaos, and the close button on all three tabs (the #498
-   entry). Also the skill select popup (the left / right skill buttons).
+3. Classic UI: I (10 x 6 grid), C, and T: the tabs Chaos / Eldritch / Demon (top to bottom, section 8.5), and the close
+   button on all three tabs (the #498 entry). Also the skill select popup (the left / right skill buttons).
 4. **Unarmed attack:** take the dagger off and attack a monster several times (A1 / A2 HTH, the fixed records). Then attack
    with the dagger.
 5. Raise the level (`cheat level 30`, docs/dev-console.md) and cast every skill once in classic:

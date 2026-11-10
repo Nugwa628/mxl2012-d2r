@@ -51,7 +51,7 @@ class StashPage2Test(unittest.TestCase):
         self.assertEqual(sp.stock_strip_hd()["fields"]["rect"], {"x": 369, "y": 1211, "width": 420, "height": 93})
         self.assertEqual(sp.stock_strip_sd()["fields"]["rect"], {"x": 15, "y": 385, "width": 164, "height": 32})
 
-    def test_hd_stash_layout_has_the_strip(self):
+    def test_hd_stash_layout_has_no_strip(self):
         import ui_layouts
         if not (ui_layouts.BASE_UI / "layouts" / "bankexpansionlayouthd.json").exists():
             self.skipTest("no D2R baseline (py -3 tools/hd_ui.py baseline <extraction>)")
@@ -59,7 +59,8 @@ class StashPage2Test(unittest.TestCase):
         cube = {"gridX": 10, "gridY": 8}
         lay = lenient_json(ui_layouts.stash_hd(cube))
         box = find(lay, "basicstash_container")
-        self.assertEqual([c["name"] for c in box["children"]][-2:], ["MxlPersonalNavigation", "SharedStashTabContainer"])
+        # D2RLoader's one custom player page belongs to CharmInv: the stock stash has no page 2 arrows
+        self.assertNotIn("MxlPersonalNavigation", [c["name"] for c in box["children"]])
         ctl = ui_layouts.stash_hd(cube, "controller/bankexpansionlayouthd.json")
         self.assertNotIn("MxlPersonalNavigation", ctl)  # the gamepad layout has no arrows to click
 

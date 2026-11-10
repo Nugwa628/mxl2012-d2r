@@ -13,6 +13,7 @@ page (cube on both Materials pages, none on MEDIAN / ORBS: judged on the shots);
 the backpack still without the items. `medtabclassic` (an expansion character, MXL_CHAR=StashTab): tabs 6 and 7 hidden, no bounce
 needed, shots HD and legacy.
 """
+import json
 import re
 import time
 
@@ -241,3 +242,108 @@ def run_classic(gc):
         log.append("ROW %s %s: %s" % (r[0], "PASS" if r[1] else "FAIL", r[2]))
     gc.finish("medtabclassic", all(r[1] for r in rows), "; ".join("%s %s" % (r[0], "ok" if r[1] else "FAIL") for r in rows)
               + "; the hidden tabs judged on the shots", mark, shots, log)
+
+
+# ---- stashgrid: every slot of the new pages filled, looked at HD / legacy at two client sizes --------------------------------
+# (user report 2026-11-10: the item cells drifted against the page art; tools/median_tabs.py recess_tiles / classic_slots)
+GRID_PAGES = ("median", "orbs", "materials", "runes", "gems")
+GRID_SIZES = ((1600, 900), (1280, 720))
+
+
+def mat_page(gc, log, want):
+    """The Materials tab's page `want` ("Median" / "Vanilla") shown; True when the part says so."""
+    for _ in range(2):
+        if status(gc, log).get("page") == want:
+            return True
+        selector(gc)
+    return status(gc, log).get("page") == want
+
+
+def grid_codes(name):
+    """The codes of a page's slots: the new pages from tools/median_tabs.py, Runes / Gems (D2R's and Median's, the mod's grid of
+    tools/median_stash.py) from the built HD layout."""
+    import median_tabs
+    if name in ("runes", "gems"):
+        lay = median_tabs.find(json.loads((median_tabs.ROOT / "work" / "mod" / "data" / "global" / "ui" / "layouts" /
+                                           "bankexpansionlayouthd.json").read_text("utf-8-sig")), "advancedstash_" + name)
+        own = {median_tabs.layout_code(c) for c in median_tabs.SINGLES + median_tabs.SHRINES + median_tabs.ORBS}
+        return [median_tabs.real_code(c["fields"]["itemCode"]) for c in lay["children"]
+                if c.get("type") == "AdvancedStashSlotWidget" and c["fields"]["itemCode"] not in own]
+    return {"median": median_tabs.SINGLES + median_tabs.SHRINES, "orbs": median_tabs.ORBS, "materials": median_tabs.MAT_MEDIAN}[name]
+
+
+def grid_shots(gc, log, shots, tag):
+    for name in GRID_PAGES:
+        tab(gc, name)
+        if name == "materials":
+            mat_page(gc, log, "Median")
+        shot(gc, shots, "grid_%s_%s" % (tag, name))
+
+
+def resize(gc, w, h):
+    gc.g.CLIENT_W, gc.g.CLIENT_H = w, h
+    r = gc.g.fit_window(gc.g.need_window())
+    time.sleep(2.0)
+    return r
+
+
+def panel_open(gc):
+    """gc.right_panel_open at any client size: its pixel tests are placed for a 1600 x 900 client, so the grab is scaled to that
+    first (at 1280 x 720 the unscaled test misses the open stash)."""
+    from PIL import Image
+    full = gc.g.grab_client(gc.g.need_window()).convert("RGB").resize((1600, 900), Image.BILINEAR)
+    px = list(full.crop((840, 100, 1260, 160)).getdata())
+    if sum(1 for r, g, b in px if r > 50 and r > 2 * g and r > 2 * b) > 0.03 * len(px):
+        return True
+    return gc.close_button_red(full) > 0.1
+
+
+def run_grid(gc):
+    """`stashgrid` (a RotW character): every code of MEDIAN, ORBS, the Median Materials page, Runes and Gems Ctrl-clicked in
+    (MXL_GRID_FILL=0: the slots are full already, shots only), then each page shot in HD and legacy at 1600 x 900 and 1280 x 720
+    (the item cells are judged on the shots against the page art)."""
+    import os
+    mark = gc.engine_mark()
+    log, shots, rows = [], [], []
+    gc.enable_debug()
+    gc.goto(1, timeout=60)
+    gc.set_graphics("hd")
+    gc.close_right_panel()
+    gc.H("packclear")
+    if not gc.sp2_open_stash(log):
+        gc.finish("stashgrid", False, "the stash did not open", mark, shots, log)
+        return
+    st = status(gc, log)
+    rows.append(("tabs live", st.get("live") is True, "%s" % st))
+    if os.environ.get("MXL_GRID_FILL", "1") != "0":
+        for name in GRID_PAGES:
+            tab(gc, name)
+            if name == "materials" and not mat_page(gc, log, "Median"):
+                rows.append(("materials median page", False, "selector did not reach the Median page"))
+                continue
+            res = [(c, ctrl_move(gc, log, c)) for c in grid_codes(name)]
+            missed = [c for c, ok in res if not ok]
+            rows.append(("fill %s" % name, not missed, "%d of %d in; missed %s" % (len(res) - len(missed), len(res), missed)))
+    try:
+        for w, h in GRID_SIZES:
+            r = resize(gc, w, h)
+            log.append("client %d x %d: %s" % (w, h, r))
+            gc.set_graphics("hd")
+            if not panel_open(gc) and not gc.sp2_open_stash(log):
+                rows.append(("stash at %dx%d" % (w, h), False, "the stash did not open"))
+                continue
+            grid_shots(gc, log, shots, "hd_%d" % w)
+            if gc.set_graphics("legacy"):
+                time.sleep(1.0)
+                grid_shots(gc, log, shots, "legacy_%d" % w)
+            else:
+                rows.append(("legacy at %dx%d" % (w, h), False, "legacy graphics not reached"))
+            gc.set_graphics("hd")
+    finally:
+        resize(gc, *GRID_SIZES[0])
+    gc.close_right_panel()
+    gc.H("packclear")
+    for r in rows:
+        log.append("ROW %s %s: %s" % (r[0], "PASS" if r[1] else "FAIL", r[2]))
+    gc.finish("stashgrid", all(r[1] for r in rows), "; ".join("%s %s" % (r[0], "ok" if r[1] else "FAIL") for r in rows)
+              + "; cells judged on the shots; SHORTCUT: items made by the harness", mark, shots, log)

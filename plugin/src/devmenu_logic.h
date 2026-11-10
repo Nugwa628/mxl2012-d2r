@@ -16,7 +16,7 @@
 namespace devmenu {
 
 // --- catalog (tools/devmenu_catalog.py writes it, data/mxl2012-devmenu/catalog.tsv in the mod) ----------------------------------------------
-inline constexpr int CatalogFormat = 1;
+inline constexpr int CatalogFormat = 3;
 inline constexpr int MaxLevel = 120;
 inline constexpr int ClassCount = 8;
 inline constexpr int MaxRunes = 6;
@@ -41,6 +41,7 @@ struct Item {
 	uint32_t code = 0;
 	uint32_t quality = QualityNormal;  // QualityNormal, QualitySet or QualityUnique
 	int32_t row = -1;                  // zero-based uniqueitems / setitems record, -1 for the rest
+	int sockets = 0;                   // a normal item's maximum sockets (catalog); uniques and sets keep their row's
 	std::string name;
 	std::string tag;  // "retired row" or empty
 };
@@ -60,12 +61,21 @@ struct Level {
 	std::string name;
 };
 
+// An uber level (its entrance says "DANGER - Uberquest Area"): the menu warps to `entry`, the area right before it, never into it.
+struct Uber {
+	int id = 0;     // the uber level
+	int entry = 0;  // the level with its entrance (`how` 0) or its red portal (`how` 1)
+	int how = 0;
+	std::string name;
+};
+
 struct Catalog {
 	bool ok = false;
 	std::string hash;
 	std::vector<Item> items;  // all categories but runewords, in the file's order
 	std::vector<Kit> kits;
 	std::vector<Level> levels;
+	std::vector<Uber> ubers;  // levels.txt order
 	int thresholds[ClassCount][MaxLevel] = {};
 	std::string error;
 };
@@ -121,7 +131,7 @@ inline auto ParseCatalog(std::string_view text) -> Catalog {
 			}
 			c.hash = std::string(f[2]);
 			header = true;
-		} else if (f[0] == "I" && f.size() >= 6 && f[2].size() <= 4) {
+		} else if (f[0] == "I" && f.size() >= 7 && f[2].size() <= 4) {
 			static constexpr struct {
 				char letter;
 				Category cat;
@@ -141,9 +151,10 @@ inline auto ParseCatalog(std::string_view text) -> Catalog {
 			const int q = ToInt(f[3], 0);
 			it.quality = q == 5 ? QualitySet : q == 7 ? QualityUnique : QualityNormal;
 			it.row = ToInt(f[4]);
-			it.name = std::string(f[5]);
-			if (f.size() > 6) {
-				it.tag = std::string(f[6]);
+			it.sockets = ToInt(f[5], 0);
+			it.name = std::string(f[6]);
+			if (f.size() > 7) {
+				it.tag = std::string(f[7]);
 			}
 			c.items.push_back(std::move(it));
 		} else if (f[0] == "K" && f.size() >= 5 && f[1].size() <= 4) {
@@ -175,6 +186,15 @@ inline auto ParseCatalog(std::string_view text) -> Catalog {
 			if (l.id > 0) {
 				c.levels.push_back(std::move(l));
 			}
+		} else if (f[0] == "U" && f.size() >= 5) {
+			Uber u;
+			u.id = ToInt(f[1]);
+			u.entry = ToInt(f[2]);
+			u.how = ToInt(f[3], 0);
+			u.name = std::string(f[4]);
+			if (u.id > 0 && u.entry > 0) {
+				c.ubers.push_back(std::move(u));
+			}
 		} else if (f[0] == "X" && f.size() == static_cast<size_t>(MaxLevel) + 2) {
 			const int cls = ToInt(f[1]);
 			if (cls >= 0 && cls < ClassCount) {
@@ -204,6 +224,59 @@ inline auto Fold(std::string_view s) -> std::string {
 }
 
 // All the words of the query appear in the name (ASCII case folded; UTF-8 sequences compare as bytes).
+// The empty sockets asked for when an item is spawned: a normal item gets its maximum (the catalog's count, 0 for an item that cannot have
+// sockets); a unique or set item asks for none, so it keeps its row's fixed `sock` property or stays without sockets, as Median makes it.
+inline auto SpawnSockets(const Item& item) -> uint32_t {
+	return item.quality == QualityNormal && item.sockets > 0 ? static_cast<uint32_t>(item.sockets) : 0;
+}
+
+// Real sockets. D2 has two parts to a socketed item: the socket count (stat 194, item_numsockets) and the item flag "socketed" (0x800 in the
+// item data's flag word); the item service's socketCount sets both. Until lane devmenu4 normal items were created unidentified (stateFlags 0),
+// and D2R's tooltip shows an unidentified item's sockets as "Max Sockets: N" instead of "Socketed (N)". Every spawned item is now created
+// identified, as D2 makes every normal item; the native item is then read back (count and flag) for the status and the check.
+inline constexpr uint32_t ItemFlagIdentified = 0x10;
+inline constexpr uint32_t ItemFlagSocketed = 0x800;
+inline constexpr int StatNumSockets = 194;
+
+inline auto SpawnIdentified(uint32_t /*quality*/) -> bool {
+	return true;
+}
+
+// The item has usable sockets: a count, the socketed flag and identified (nothing asked: nothing to check). The count can be lower than asked
+// when the game caps it; the status says "n of m".
+inline auto SocketsReal(uint32_t wanted, uint32_t flags, int32_t count) -> bool {
+	return wanted == 0 || (count > 0 && (flags & ItemFlagSocketed) != 0 && (flags & ItemFlagIdentified) != 0);
+}
+
+// Keys of the search / level box while it has the focus (devmenu.cpp "typing"), by Windows virtual key. A typed key makes a character (letters,
+// digits, space, punctuation, numpad digits and operators): D2R gets its character and not its key press, so no binding runs. An editing key
+// moves or deletes in the box and keeps going to D2R, with its binding blocked. Everything else (Esc, F-keys, Tab, modifiers) stays the game's.
+inline auto TypedKey(unsigned vk) -> bool {
+	return vk == 0x20 || (vk >= 0x30 && vk <= 0x39) || (vk >= 0x41 && vk <= 0x5A) || (vk >= 0x60 && vk <= 0x6F && vk != 0x6C) || (vk >= 0xBA && vk <= 0xC0) ||
+	       (vk >= 0xDB && vk <= 0xDF) || vk == 0xE2;
+}
+
+inline auto EditingKey(unsigned vk) -> bool {
+	return vk == 0x08 || vk == 0x0D || vk == 0x2E || (vk >= 0x23 && vk <= 0x28);  // Backspace, Enter, Delete, End, Home, arrows
+}
+
+// The key D2R is given instead of a typed key while the box has the keyboard: a key with no binding by default (F24), so D2R treats the key
+// press like any unbound key and turns its character into typing.
+inline constexpr unsigned StandInKey = 0x87;
+
+// Whether a click at client pixel (x, y) is on the search / level box. The panel is centred in the window (anchor 0.5, 0.5); HD layouts are in
+// units of a 2160-pixel-high screen, classic ones in an 800 x 600 screen scaled to fit (the same mapping the in-game check clicks with).
+// `margin` widens the box by that many layout units on each side.
+inline auto OnBox(bool hd, int clientW, int clientH, int panelX, int panelY, int boxX, int boxY, int boxW, int boxH, int x, int y, int margin = 6) -> bool {
+	if (clientW <= 0 || clientH <= 0) {
+		return false;
+	}
+	const double scale = hd ? clientH / 2160.0 : (clientH / 600.0 < clientW / 800.0 ? clientH / 600.0 : clientW / 800.0);
+	const double left = clientW / 2.0 + (panelX + boxX - margin) * scale, top = clientH / 2.0 + (panelY + boxY - margin) * scale;
+	const double right = left + (boxW + 2 * margin) * scale, bottom = top + (boxH + 2 * margin) * scale;
+	return x >= left && x < right && y >= top && y < bottom;
+}
+
 inline auto Matches(std::string_view name, std::string_view query) -> bool {
 	const std::string hay = Fold(name), q = Fold(query);
 	size_t from = 0;
@@ -268,6 +341,52 @@ inline auto FindLevel(const Catalog& c, int id) -> const Level* {
 		}
 	}
 	return nullptr;
+}
+
+// One row of the Travel tab: a heading (index 0 "Uber levels", 1 "Areas"; no arrow), an uber level (index into Catalog::ubers) or an area
+// (index into Catalog::levels).
+struct TravelRow {
+	enum Kind : uint8_t { Heading, UberLevel, Area } kind = Area;
+	int index = 0;
+};
+
+inline constexpr const char* const TravelHeadings[] = {"Uber levels: to the area in brackets", "Areas"};
+
+// The Travel tab's results: the uber levels whose name matches (or all of them for "uber") under their heading, then the areas as before.
+// An uber level is found by its own name; the area list still holds it too (an arrow there goes inside).
+inline auto SearchTravel(const Catalog& c, std::string_view query) -> std::vector<TravelRow> {
+	std::vector<TravelRow> out;
+	for (size_t i = 0; i < c.ubers.size(); ++i) {
+		if (Matches("Uber " + c.ubers[i].name, query)) {
+			if (out.empty()) {
+				out.push_back({TravelRow::Heading, 0});
+			}
+			out.push_back({TravelRow::UberLevel, static_cast<int>(i)});
+		}
+	}
+	const std::vector<int> areas = SearchLevels(c, query);
+	if (!out.empty() && !areas.empty()) {
+		out.push_back({TravelRow::Heading, 1});
+	}
+	for (int i : areas) {
+		out.push_back({TravelRow::Area, i});
+	}
+	return out;
+}
+
+// The text of an uber level's row: its name and, in brackets, the area the arrow puts the player in (the heading says so). Fits the
+// HD row (52 characters) for all 16 of Median 2012's.
+inline auto UberRowText(const Catalog& c, const Uber& u) -> std::string {
+	const Level* entry = FindLevel(c, u.entry);
+	const std::string where = entry != nullptr ? entry->name : "level " + std::to_string(u.entry);
+	return u.name + " (" + where + (u.how == 1 ? " portal)" : ")");
+}
+
+// The status after arriving for an uber level.
+inline auto UberArrivalText(const Catalog& c, const Uber& u) -> std::string {
+	const Level* entry = FindLevel(c, u.entry);
+	return "You arrived in " + (entry != nullptr ? entry->name : std::string("?")) + ", right before " + u.name + ": its " +
+	       (u.how == 1 ? "red portal" : "entrance") + " is in this area.";
 }
 
 // Pages over a result list. `page` is zero-based; a page past the end clamps.

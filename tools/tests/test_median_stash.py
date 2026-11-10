@@ -95,10 +95,17 @@ class Layout(unittest.TestCase):
 class Art(unittest.TestCase):
     def test_page_art(self):
         mat = ms.Image.new("RGBA", (ms.PAGE_W, ms.PAGE_H), (60, 60, 60, 255))
-        mat.paste((10, 10, 10, 255), (102, 460, 200, 558))  # dhn's recess
+        d = ms.ImageDraw.Draw(mat)
+        for x, y, h in ((105, 461, 91), (105, 235, 190), (209, 599, 91)):  # pk1, dhn, rvs: off their rects as D2R's
+            d.rectangle((x - 3, y - 3, x + 93, y + h + 2), fill=(150, 120, 80, 255))
+            d.rectangle((x, y, x + 90, y + h - 1), fill=(10, 10, 10, 255))
         im = ms.page_image("runes", layout(), mat)
         self.assertEqual(im.size, (ms.PAGE_W, ms.PAGE_H))
         self.assertEqual(im.getpixel((114 + 49, 218 + 49)), (10, 10, 10, 255))   # a recess under r01
+        self.assertEqual(im.getpixel((114 + 3, 218 + 3)), (10, 10, 10, 255))     # its inside 3 pixels in from the rect
+        self.assertEqual(im.getpixel((114 + 1, 218 + 1)), (150, 120, 80, 255))   # its frame on the rect's edge
+        stone = ms.page_image("runes", layout(), mat, stone_only=True)
+        self.assertNotEqual(stone.getpixel((114 + 49, 218 + 49)), (10, 10, 10, 255))  # no recess
         self.assertEqual(im.getpixel((500, 900)), (60, 60, 60, 255))           # the plinth stays
         self.assertEqual(ms.lowend(im).size, (ms.PAGE_W // 2, ms.PAGE_H // 2))
         with self.assertRaises(ValueError):

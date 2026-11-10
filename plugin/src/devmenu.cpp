@@ -76,6 +76,12 @@ constexpr uint64_t RvaUiRoot = 0x3440170;        // data: the root widget
 constexpr uint64_t RvaUiFindPanel = 0x89f760;    // (root, char name[128]) -> panel widget
 constexpr uint64_t RvaUiFindChild = 0x855c90;    // (widget, name) -> child widget, searching below it
 constexpr uint64_t RvaTextBoxSetText = 0x86dd50; // (TextBoxWidget, const string view*)
+constexpr uint64_t RvaHasUiFocus = 0x876160;     // (widget) -> the UI root's focus is this widget
+constexpr uint64_t RvaMarkHandled = 0x843fc0;    // (): the UI handled this input (root byte +0xb8): the key binding does not run
+constexpr uint64_t RvaItemData = 0x34a500;       // (item) -> item data, +0x18 the flag word (cube_dupe.cpp, harness_cmds.cpp)
+constexpr int ItemDataFlags = 0x18;
+constexpr unsigned char HasUiFocusEntry[] = {0x40, 0x53, 0x48, 0x83, 0xec, 0x20, 0x48, 0x8b, 0xd9, 0xe8};
+constexpr unsigned char MarkHandledEntry[] = {0x48, 0x8b, 0x05, 0xa9, 0xc1, 0xbf, 0x02, 0x48, 0x85, 0xc0, 0x74, 0x07, 0xc6, 0x80, 0xb8, 0x00};
 constexpr int UnitIdOffset = 0x08;
 constexpr int GameClients = 0x138, ClientNext = 0x628;
 constexpr int StatLevel = 12, StatExperience = 13;
@@ -89,6 +95,7 @@ constexpr uint64_t HopSettleMs = 2000;  // the client loads the new act before t
 constexpr int ListWalkLimit = 64;
 
 using GetStatFn = int32_t (*)(d2r::Unit*, int32_t, int32_t);
+using ItemDataFn = uint8_t* (*)(d2r::Unit*);
 using AddExperienceFn = void (*)(d2r::Game*, d2r::Unit*, int32_t, int32_t);
 using PlayerDataFn = uint8_t* (*)(d2r::Unit*);
 using WaypointSetFn = int32_t (*)(void*, int32_t);
@@ -138,11 +145,15 @@ std::atomic<d2r::Game*> g_game{nullptr};     // the local server game of the las
 std::atomic<long> g_presses{0}, g_actions{0}, g_refused{0}, g_faults{0}, g_listenChecks{0}, g_listeners{0}, g_gameOps{0}, g_taken{0}, g_done{0};
 
 std::atomic<long> g_textsSet{0}, g_textFails{0};
+std::atomic<long> g_socketFails{0};                       // spawned items whose sockets did not read back as real
+std::atomic<uint32_t> g_lastItemFlags{0};                 // the native flag word of the last spawned item that asked for sockets
 std::string g_portsSeen;
 std::mutex g_uiMutex;          // guards the strings the native text boxes show
 std::string g_rowTexts[layout::MaxRows];
 int g_rowCount = 0;
 std::string g_header, g_status = "Ready. Ctrl+F12 closes this menu.";
+std::string g_queryShown;      // the input box's text, for the harness's status line
+std::atomic<bool> g_boxFocus{false};   // the box has the UI focus (keys type into it), as of the last UI tick
 std::atomic<bool> g_drawHd{true};
 
 // UI-thread-only state
@@ -153,19 +164,21 @@ std::string g_testInput;    // the harness's "input" verb (unset: the input box)
 bool g_testInputSet = false;
 int g_pageIndex = 0;
 std::vector<Hit> g_itemHits;
-std::vector<int> g_levelHits;
+std::vector<TravelRow> g_travelHits;
+bool g_rowHeading[layout::MaxRows] = {};  // the row is a heading: no arrow
+char g_rowKinds[layout::MaxRows + 1] = {};  // per shown row: I item, H heading, U uber level, A area (the harness's status line; g_uiMutex)
 bool g_dirty = true;
 bool g_questArmed = false;  // the Quests tab: warning shown, Confirm visible
-std::string g_shownRows[layout::MaxRows], g_shownHeader, g_shownStatus[layout::StatusLines];  // what the text boxes hold
+std::string g_shownRows[layout::MaxRows], g_shownHeader[layout::HeaderLines], g_shownStatus[layout::StatusLines];  // what the text boxes hold
 bool g_shownValid = false;  // false: resend every line (a new panel or graphics mode)
 std::vector<int> g_presses_q;  // queued button indices
 std::mutex g_pressMutex;
 
-enum class ActionKind : uint8_t { Item, Kit, Travel, Raise, Unlock };
+enum class ActionKind : uint8_t { Item, Kit, Travel, UberTravel, Raise, Unlock };
 
 struct Action {
 	ActionKind kind = ActionKind::Item;
-	int index = 0;  // Catalog::items / kits / levels index, or the target level
+	int index = 0;  // Catalog::items / kits / levels / ubers index, or the target level
 };
 
 Action g_pending;
@@ -178,6 +191,7 @@ struct Travel {
 	int hopWarp = 0;       // 0 waits for current == target; a level id to warp to next once in the act's town
 	uint64_t start = 0;
 	uint64_t hopAt = 0;    // when the player reached the town (0: not yet)
+	int uber = -1;         // Catalog::ubers index when the travel goes to the area right before that uber level
 } g_travel;
 
 constexpr int ActTowns[] = {1, 40, 75, 103, 109};
@@ -299,6 +313,34 @@ auto Stat(d2r::Unit* player, int stat) noexcept -> int32_t {
 	return Fn<GetStatFn>(RvaGetStat)(player, stat, 0);
 }
 
+// The new item's sockets read back from the native item (devmenu_logic.h SocketsReal): count and flag word, for the status and the check.
+// Read only: the item service sets both, and a change here would not reach the client's copy. Game thread.
+struct NativeSockets {
+	uint32_t flags = 0;
+	int32_t count = 0;
+};
+
+void __cdecl ReadSockets(const D2RL::PluginContext*, void* native, void* user) noexcept {
+	auto* s = static_cast<NativeSockets*>(user);
+	auto* item = static_cast<d2r::Unit*>(native);
+	const uint8_t* data = item != nullptr ? Fn<ItemDataFn>(RvaItemData)(item) : nullptr;
+	if (data != nullptr) {
+		s->flags = d2r::At<uint32_t>(data, ItemDataFlags);
+		s->count = Fn<GetStatFn>(RvaGetStat)(item, StatNumSockets, 0);
+	}
+}
+
+void CheckSockets(D2RL::ItemHandle item, uint32_t sockets) noexcept {
+	NativeSockets s;
+	const D2RL::Items::Result rc =
+	    g_items->editNativeItem != nullptr ? g_items->editNativeItem(g_context, item, &ReadSockets, &s) : D2RL::Items::Result::Unavailable;
+	g_lastItemFlags.store(s.flags);
+	if (rc != D2RL::Items::Result::Success || !SocketsReal(sockets, s.flags, s.count)) {
+		g_socketFails.fetch_add(1);
+		LogLine(Fmt("sockets: asked %u, count %d, flags 0x%x, read %u", sockets, s.count, s.flags, static_cast<unsigned>(rc)).c_str());
+	}
+}
+
 // One created item in `container`; returns the handle or 0.
 auto CreateOne(D2RL::PlayerHandle player, uint32_t code, uint32_t quality, int32_t row, uint32_t sockets, D2RL::Items::ItemContainer container,
                D2RL::Items::Result* rc, D2RL::Items::ItemInfo* info) noexcept -> D2RL::ItemHandle {
@@ -311,13 +353,16 @@ auto CreateOne(D2RL::PlayerHandle player, uint32_t code, uint32_t quality, int32
 	spec.quantity = D2RL::Items::DefaultValue;
 	spec.durability = D2RL::Items::DefaultValue;
 	spec.socketCount = sockets;
-	spec.stateFlags = quality == QualityUnique || quality == QualitySet ? D2RL::Items::ItemStateIdentified : 0;
+	spec.stateFlags = SpawnIdentified(quality) ? D2RL::Items::ItemStateIdentified : 0;  // "Socketed (N)", not "Max Sockets: N"
 	spec.flags = quality == QualityUnique ? D2RL::Items::ItemCreateFlagBit(D2RL::Items::ItemCreateFlag::AllowDuplicateUnique) : 0;
 	spec.destination.structSize = D2RL::Items::ItemDestinationSize;
 	spec.destination.container = container;
 	spec.destination.placement = D2RL::Items::Placement::Automatic;
 	D2RL::ItemHandle item = D2RL::InvalidItemHandle;
 	*rc = g_items->createItem(g_context, player, &spec, &item);
+	if (*rc == D2RL::Items::Result::Success && sockets > 0) {
+		CheckSockets(item, sockets);
+	}
 	if (*rc == D2RL::Items::Result::Success && info != nullptr) {
 		info->structSize = D2RL::Items::ItemInfoSize;
 		(void)g_items->getItemInfo(g_context, item, info);
@@ -378,7 +423,8 @@ void DoItem(const Item& item) noexcept {
 		return;
 	}
 	D2RL::Items::ItemInfo info{};
-	const Placed placed = PlaceSomewhere(player, item.code, item.quality, item.row, 0, &info);
+	const uint32_t sockets = SpawnSockets(item);
+	const Placed placed = PlaceSomewhere(player, item.code, item.quality, item.row, sockets, &info);
 	if (placed.handle == D2RL::InvalidItemHandle) {
 		SetStatus(Fmt("%s was not created: no room or refused (item service result %u). Nothing was lost.", item.name.c_str(), static_cast<unsigned>(placed.rc)));
 		return;
@@ -387,7 +433,8 @@ void DoItem(const Item& item) noexcept {
 		SetStatus(Fmt("%s: the game made another item (row %d, wanted %d).", item.name.c_str(), info.qualityRecordId, item.row));
 		return;
 	}
-	SetStatus(Fmt("Spawned %s %s.", item.name.c_str(), placed.where));
+	SetStatus(sockets > 0 ? Fmt("Spawned %s with %u of %u sockets %s.", item.name.c_str(), info.socketCount, sockets, placed.where)
+	                      : Fmt("Spawned %s %s.", item.name.c_str(), placed.where));
 	g_gameOps.fetch_add(1);
 }
 
@@ -507,6 +554,7 @@ void DoTravel(d2r::Game* game, d2r::Unit* player, const Level& target) noexcept 
 		Warp(game, player, target.id, false);
 	}
 	g_travel.on = true;
+	g_travel.uber = -1;
 	SetStatus(Fmt("Traveling to %s...", target.name.c_str()));
 }
 
@@ -544,6 +592,20 @@ void ExecuteInner() {
 	case ActionKind::Travel:
 		DoTravel(game, player, g_catalog.levels[static_cast<size_t>(a.index)]);
 		return;  // ends in the frame callback
+	case ActionKind::UberTravel: {
+		const Uber& u = g_catalog.ubers[static_cast<size_t>(a.index)];
+		const Level* entry = FindLevel(g_catalog, u.entry);
+		if (entry == nullptr) {
+			SetStatus(Fmt("No area %d in the catalog.", u.entry));
+			break;
+		}
+		DoTravel(game, player, *entry);
+		if (g_travel.on) {
+			g_travel.uber = a.index;
+			SetStatus(Fmt("Traveling to %s, right before %s...", entry->name.c_str(), u.name.c_str()));
+		}
+		return;  // ends in the frame callback
+	}
 	}
 	g_busy.store(false);
 }
@@ -612,6 +674,10 @@ void FrameInner(d2r::Game* game) {
 		g_travel.current = target;
 		g_travel.start = now;
 		Warp(game, player, target, false);
+		return;
+	}
+	if (g_travel.uber >= 0 && g_travel.uber < static_cast<int>(g_catalog.ubers.size())) {
+		TravelDone(UberArrivalText(g_catalog, g_catalog.ubers[static_cast<size_t>(g_travel.uber)]));
 		return;
 	}
 	const Level* level = FindLevel(g_catalog, g_travel.target);
@@ -685,11 +751,134 @@ void ApplyTexts() {
 	for (int i = 0; i < m.rows; ++i) {
 		SetLine(panel, Fmt("RowText%d", i).c_str(), g_shownRows[i], i < count ? Ellipsize(rows[i], static_cast<size_t>(m.rowChars)) : std::string(), force);
 	}
-	SetLine(panel, "HeaderText", g_shownHeader, Ellipsize(header, static_cast<size_t>(m.headerChars)), force);
-	const auto lines = WrapText(status, static_cast<float>(m.statusChars), static_cast<size_t>(layout::StatusLines), [](const std::string& text) { return static_cast<float>(text.size()); });
+	const auto chars = [](const std::string& text) { return static_cast<float>(text.size()); };
+	const auto headerLines = WrapText(header, static_cast<float>(m.headerChars), static_cast<size_t>(layout::HeaderLines), chars);
+	for (int i = 0; i < layout::HeaderLines; ++i) {
+		SetLine(panel, Fmt("HeaderText%d", i).c_str(), g_shownHeader[i], static_cast<size_t>(i) < headerLines.size() ? headerLines[static_cast<size_t>(i)] : std::string(), force);
+	}
+	const auto lines = WrapText(status, static_cast<float>(m.statusChars), static_cast<size_t>(layout::StatusLines), chars);
 	for (int i = 0; i < layout::StatusLines; ++i) {
 		SetLine(panel, Fmt("StatusText%d", i).c_str(), g_shownStatus[i], static_cast<size_t>(i) < lines.size() ? lines[static_cast<size_t>(i)] : std::string(), force);
 	}
+}
+
+// --- typing into the search / level box --------------------------------------------------------------------------------------
+// How D2R routes a key (docs/d2r-addresses.md "Text boxes and key bindings"): WM_KEYDOWN becomes InputMessage:KeyDown for the UI; a key with a
+// binding then becomes InputMessage:BindingDown and runs its command unless a UI handler marked the input as handled (`0x843fc0`, root byte
+// +0xb8); the key's WM_CHAR becomes InputMessage:CharacterTyped, which the focused text box takes, only for a key without a binding. Nothing
+// marks a bound key while a layout text box has the focus (the game's own "edited box" belongs to the controller's TextInputModal), so in 0.1.18
+// a bound key ("A", the digits) ran its command and never reached the box.
+//
+// While the menu is open and its box has the UI focus (a click on the box), two things, both scoped to that state:
+// - a printable key without Ctrl or Alt (letters, digits, space, punctuation, numpad digits) reaches D2R as an unbound key (`StandInKey`, F24):
+//   the subclass of the game's own window (not a system hook) changes the key of its WM_KEYDOWN / WM_KEYUP, so no binding matches, D2R takes the
+//   press as an unbound key and its WM_CHAR types (D2R types a character only after a key press that matched no binding, so holding the
+//   press back loses all but the first character);
+// - an editing key (Backspace, Enter, arrows, Home, End, Delete) still goes to D2R, so the box edits with it, and the UI listener marks its
+//   BindingDown / BindingUp as handled (Enter would otherwise open the chat line).
+// Esc and keys with Ctrl or Alt (Ctrl+F12) are untouched: Esc closes the menu, Ctrl+F12 toggles it. "Has the keyboard" follows the player's last
+// left click while the menu is open: on the box (`OnBox`, from the click's own window message) it does, anywhere else (a button, the rows, the
+// game) it does not, and the keys are the game's as before. D2R keeps the UI focus on the box after such clicks, so the focus alone cannot say.
+using HasUiFocusFn = bool (*)(void* widget);
+using MarkHandledFn = void (*)();
+bool g_typingOk = false;        // the functions' entry bytes matched at install
+std::atomic<long> g_keysTaken{0}, g_keysHeld{0};
+HWND g_window = nullptr;        // the subclassed game window (UI thread)
+WNDPROC g_gameProc = nullptr;
+std::atomic<bool> g_ctrl{false}, g_alt{false};  // as the window's own key messages say (posted test keys included)
+std::atomic<unsigned> g_lastKey{0};              // the virtual key of the last key down
+
+auto BoxFocused() noexcept -> bool {
+	if (!g_typingOk) {
+		return false;
+	}
+	void* panel = NativePanel();
+	void* box = panel != nullptr ? Fn<NativeFindChildFn>(RvaUiFindChild)(panel, layout::InputName) : nullptr;
+	return box != nullptr && Fn<HasUiFocusFn>(RvaHasUiFocus)(box);
+}
+
+std::atomic<bool> g_boxClicked{false};  // the last left click while the menu was open was on the box
+
+auto Typing() noexcept -> bool {
+	return g_open.load() && g_boxClicked.load() && g_boxFocus.load() && !g_ctrl.load() && !g_alt.load();
+}
+
+void NoteClick(HWND window, LPARAM lParam) noexcept {
+	if (!g_open.load()) {
+		return;
+	}
+	RECT r{};
+	GetClientRect(window, &r);
+	const bool hd = g_drawHd.load();
+	const auto& m = hd ? layout::Hd : layout::Sd;
+	g_boxClicked.store(OnBox(hd, r.right - r.left, r.bottom - r.top, m.panelX, m.panelY, m.inputX, m.inputY, m.inputW, m.inputH,
+	                         static_cast<int>(static_cast<short>(LOWORD(lParam))), static_cast<int>(static_cast<short>(HIWORD(lParam)))));
+}
+
+LRESULT CALLBACK MenuWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+	if (message == WM_KEYDOWN || message == WM_KEYUP || message == WM_SYSKEYDOWN || message == WM_SYSKEYUP) {
+		const auto key = static_cast<unsigned>(wParam);
+		const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+		if (key == VK_CONTROL || key == VK_LCONTROL || key == VK_RCONTROL) {
+			g_ctrl.store(down);
+		} else if (key == VK_MENU || key == VK_LMENU || key == VK_RMENU) {
+			g_alt.store(down);
+		}
+		if (down) {
+			g_lastKey.store(key);
+		}
+		if ((message == WM_KEYDOWN || message == WM_KEYUP) && TypedKey(key) && Typing()) {
+			g_keysHeld.fetch_add(1);
+			return CallWindowProcW(g_gameProc, window, message, StandInKey, lParam);
+		}
+	} else if (message == WM_LBUTTONDOWN) {
+		NoteClick(window, lParam);
+	} else if (message == WM_KILLFOCUS || message == WM_ACTIVATEAPP) {
+		g_ctrl.store(false);
+		g_alt.store(false);
+	}
+	return CallWindowProcW(g_gameProc, window, message, wParam, lParam);
+}
+
+auto CALLBACK PickGameWindow(HWND window, LPARAM out) -> BOOL {
+	RECT r{};
+	if (GetWindow(window, GW_OWNER) == nullptr && GetClientRect(window, &r) && r.right > 320 && r.bottom > 200) {
+		*reinterpret_cast<HWND*>(out) = window;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+// UI thread (the thread that owns the game window): subclasses the window once, the first time the menu opens.
+void HookGameWindow() noexcept {
+	if (g_window != nullptr || !g_typingOk) {
+		return;
+	}
+	HWND found = nullptr;
+	EnumThreadWindows(GetCurrentThreadId(), &PickGameWindow, reinterpret_cast<LPARAM>(&found));
+	if (found == nullptr) {
+		return;
+	}
+	const auto previous = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(found, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&MenuWindowProc)));
+	if (previous != nullptr) {
+		g_gameProc = previous;
+		g_window = found;
+		LogLine("typing: the game window is subclassed");
+	}
+}
+
+// UI thread (the UI message listener): true when this binding message belongs to an editing key of the focused box.
+auto TakeBindingForBox(const char* target, const char* command) noexcept -> bool {
+	if (target == nullptr || command == nullptr || std::strcmp(target, "InputMessage") != 0 ||
+	    (std::strcmp(command, "BindingDown") != 0 && std::strcmp(command, "BindingUp") != 0)) {
+		return false;
+	}
+	if (!Typing() || !EditingKey(g_lastKey.load()) || !BoxFocused()) {
+		return false;
+	}
+	Fn<MarkHandledFn>(RvaMarkHandled)();
+	g_keysTaken.fetch_add(1);
+	return true;
 }
 
 // --- UI ---------------------------------------------------------------------------------------------------------------------
@@ -726,7 +915,7 @@ void ApplyTabWidgets() noexcept {
 		Show(panel, Fmt("Btn_cat%d", i), g_tab == 0);
 	}
 	for (int i = 0; i < layout::MaxRows; ++i) {
-		Show(panel, Fmt("Btn_row%d", i), list && i < g_rowCount);
+		Show(panel, Fmt("Btn_row%d", i), list && i < g_rowCount && !(g_tab == 1 && g_rowHeading[i]));
 	}
 	Show(panel, "Btn_prev", list);
 	Show(panel, "Btn_next", list);
@@ -742,16 +931,18 @@ void RebuildList() noexcept {
 	if (g_tab == 0) {
 		g_itemHits = SearchItems(g_catalog, g_cat, g_query);
 	} else if (g_tab == 1) {
-		g_levelHits = SearchLevels(g_catalog, g_query);
+		g_travelHits = SearchTravel(g_catalog, g_query);
 	}
-	const int total = g_tab == 0 ? static_cast<int>(g_itemHits.size()) : g_tab == 1 ? static_cast<int>(g_levelHits.size()) : 0;
+	const int total = g_tab == 0 ? static_cast<int>(g_itemHits.size()) : g_tab == 1 ? static_cast<int>(g_travelHits.size()) : 0;
 	const Page page = PageOf(total, g_pageIndex, perPage);
 	g_pageIndex = page.page;
 	const std::lock_guard<std::mutex> lock(g_uiMutex);
 	g_rowCount = 0;
+	std::fill(std::begin(g_rowKinds), std::end(g_rowKinds), '\0');
 	if (g_tab == 0) {
 		for (int i = 0; i < page.count; ++i) {
 			const Hit& h = g_itemHits[static_cast<size_t>(page.first + i)];
+			g_rowKinds[g_rowCount] = 'I';
 			if (h.kit) {
 				const Kit& k = g_catalog.kits[static_cast<size_t>(h.index)];
 				g_rowTexts[g_rowCount++] = Fmt("[Kit] %s: base + %zu runes, socket in order", k.name.c_str(), k.runes.size());
@@ -763,11 +954,20 @@ void RebuildList() noexcept {
 		g_header = Fmt("Items: %d found, page %d / %d. An arrow spawns the row.", total, page.page + 1, page.pages);
 	} else if (g_tab == 1) {
 		for (int i = 0; i < page.count; ++i) {
-			const Level& l = g_catalog.levels[static_cast<size_t>(g_levelHits[static_cast<size_t>(page.first + i)])];
-			const char* note = l.note == 1 ? "  [map only, the fight needs its normal summon]" : l.note == 2 ? "  [portal area]" : "";
-			g_rowTexts[g_rowCount++] = Fmt("%s  (Act %d)%s", l.name.c_str(), l.act + 1, note);
+			const TravelRow& t = g_travelHits[static_cast<size_t>(page.first + i)];
+			g_rowHeading[g_rowCount] = t.kind == TravelRow::Heading;
+			g_rowKinds[g_rowCount] = t.kind == TravelRow::Heading ? 'H' : t.kind == TravelRow::UberLevel ? 'U' : 'A';
+			if (t.kind == TravelRow::Heading) {
+				g_rowTexts[g_rowCount++] = Fmt("-- %s --", TravelHeadings[t.index]);
+			} else if (t.kind == TravelRow::UberLevel) {
+				g_rowTexts[g_rowCount++] = UberRowText(g_catalog, g_catalog.ubers[static_cast<size_t>(t.index)]);
+			} else {
+				const Level& l = g_catalog.levels[static_cast<size_t>(t.index)];
+				const char* note = l.note == 1 ? "  [map only, the fight needs its normal summon]" : l.note == 2 ? "  [portal area]" : "";
+				g_rowTexts[g_rowCount++] = Fmt("%s  (Act %d)%s", l.name.c_str(), l.act + 1, note);
+			}
 		}
-		g_header = Fmt("Travel: %d areas, page %d / %d. An arrow goes there.", total, page.page + 1, page.pages);
+		g_header = Fmt("Travel: %d rows, page %d / %d. An arrow goes there; \"uber\" lists the uber levels.", total, page.page + 1, page.pages);
 	} else if (g_tab == 2) {
 		g_header = "Character: type a level in the box, then Raise to level. Raises only.";
 	} else if (g_tab == 3) {
@@ -807,7 +1007,7 @@ void OnPress(int button) noexcept {
 			return;
 		}
 		const int perPage = g_drawHd.load() ? layout::Hd.rows : layout::Sd.rows;
-		const int offset = PageOf(g_tab == 0 ? static_cast<int>(g_itemHits.size()) : static_cast<int>(g_levelHits.size()), g_pageIndex, perPage).first + row;
+		const int offset = PageOf(g_tab == 0 ? static_cast<int>(g_itemHits.size()) : static_cast<int>(g_travelHits.size()), g_pageIndex, perPage).first + row;
 		if (g_tab == 0) {
 			if (offset >= static_cast<int>(g_itemHits.size())) {
 				return;
@@ -815,8 +1015,13 @@ void OnPress(int button) noexcept {
 			const Hit h = g_itemHits[static_cast<size_t>(offset)];
 			Enqueue(h.kit ? ActionKind::Kit : ActionKind::Item, h.index);
 		} else if (g_tab == 1) {
-			if (offset < static_cast<int>(g_levelHits.size())) {
-				Enqueue(ActionKind::Travel, g_levelHits[static_cast<size_t>(offset)]);
+			if (offset < static_cast<int>(g_travelHits.size())) {
+				const TravelRow& t = g_travelHits[static_cast<size_t>(offset)];
+				if (t.kind == TravelRow::Area) {
+					Enqueue(ActionKind::Travel, t.index);
+				} else if (t.kind == TravelRow::UberLevel) {
+					Enqueue(ActionKind::UberTravel, t.index);
+				}
 			}
 		}
 	} else if (std::strcmp(name, "raise") == 0) {
@@ -883,6 +1088,8 @@ void TickInner() {
 	}
 	g_open.store(open);
 	if (!open) {
+		g_boxFocus.store(false);
+		g_boxClicked.store(false);
 		const std::lock_guard<std::mutex> lock(g_pressMutex);
 		g_presses_q.clear();  // a press never waits for the next opening
 		return;
@@ -900,6 +1107,8 @@ void TickInner() {
 	for (int b : presses) {
 		OnPress(b);
 	}
+	HookGameWindow();
+	g_boxFocus.store(BoxFocused());
 	char input[64] = "";
 	if (g_testInputSet) {
 		std::snprintf(input, sizeof(input), "%s", g_testInput.c_str());
@@ -915,6 +1124,8 @@ void TickInner() {
 		g_query = input;
 		g_pageIndex = 0;
 		g_dirty = true;
+		const std::lock_guard<std::mutex> lock(g_uiMutex);
+		g_queryShown = g_query;
 	}
 	if (g_dirty) {
 		g_dirty = false;
@@ -961,6 +1172,9 @@ auto __cdecl OnAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent
 }
 
 auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::UiMessageEvent* event, void*) noexcept -> D2RL::SharedEvents::UiMessageAction {
+	if (event != nullptr && TakeBindingForBox(event->target, event->command)) {
+		return D2RL::SharedEvents::UiMessageAction::Consume;
+	}
 	if (event == nullptr || event->target == nullptr || event->command == nullptr || event->text == nullptr || std::strcmp(event->target, "PanelManager") != 0 ||
 	    std::strcmp(event->command, "OpenPanel") != 0) {
 		return D2RL::SharedEvents::UiMessageAction::Continue;
@@ -1021,6 +1235,8 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 	g_context = context;
 	g_base = context->exeBase;
 	g_hd = reinterpret_cast<HdFn>(g_base + rotw_stash::HdModeRva);
+	g_typingOk = std::memcmp(reinterpret_cast<const void*>(g_base + RvaHasUiFocus), HasUiFocusEntry, sizeof(HasUiFocusEntry)) == 0 &&
+	             std::memcmp(reinterpret_cast<const void*>(g_base + RvaMarkHandled), MarkHandledEntry, sizeof(MarkHandledEntry)) == 0;
 	const D2RL::SharedEventService* events = nullptr;
 	const D2RL::ResourceService* resources = nullptr;
 	if (context->QueryService(&g_threads) != D2RL::ServiceQueryResult::Success || !D2RL::HasThreadServiceField(g_threads, D2RL::ThreadServiceRequiredSize) ||
@@ -1106,22 +1322,29 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 		CloseHandle(t);
 	}
 	g_on = true;
-	std::snprintf(report, reportSize, "devmenu on: Controls action mxl_dev_menu (default Ctrl+F12), catalog %s (%zu items, %zu kits, %zu levels), socket table %s",
-	              catalogError.empty() ? "ok" : catalogError.c_str(), g_catalog.items.size(), g_catalog.kits.size(), g_catalog.levels.size(), g_extTcp != nullptr ? "readable" : "unavailable");
+	std::snprintf(report, reportSize, "devmenu on: Controls action mxl_dev_menu (default Ctrl+F12), catalog %s (%zu items, %zu kits, %zu levels), socket table %s, typing keys %s",
+	              catalogError.empty() ? "ok" : catalogError.c_str(), g_catalog.items.size(), g_catalog.kits.size(), g_catalog.levels.size(), g_extTcp != nullptr ? "readable" : "unavailable",
+	              g_typingOk ? "taken from the bindings while the box has the focus" : "off (entry bytes differ)");
 	return true;
 }
 
 void DevMenuStatus(char* out, size_t size) noexcept {
-	std::string status, ports;
+	std::string status, ports, query, kinds;
 	{
 		const std::lock_guard<std::mutex> lock(g_uiMutex);
+		kinds = g_rowKinds;
 		status = g_status;
 		ports = g_portsSeen;
+		query = g_queryShown;
 	}
 	std::snprintf(out, size,
-	              "on=%d open=%d tab=%d cat=%d rows=%d busy=%d local=%u host=%u clients=%d presses=%ld actions=%ld taken=%ld ops=%ld refused=%ld faults=%ld listen=%ld/%ld texts=%ld textfails=%ld hasclient=%d found=%d ports=%s status=\"%s\"",
+	              "on=%d open=%d tab=%d cat=%d rows=%d busy=%d local=%u host=%u clients=%d presses=%ld actions=%ld taken=%ld ops=%ld refused=%ld faults=%ld listen=%ld/%ld texts=%ld textfails=%ld hasclient=%d found=%d ports=%s boxfocus=%d boxclicked=%d keysheld=%ld keystaken=%ld rowkinds=%s query=\"%s\" status=\"%s\"",
 	              g_on ? 1 : 0, g_open.load() ? 1 : 0, g_tab, static_cast<int>(g_cat), g_rowCount, g_busy.load() ? 1 : 0, g_clientPlayer.load(), g_hostPlayer.load(), g_clients.load(),
-	              g_presses.load(), g_actions.load(), g_taken.load(), g_gameOps.load(), g_refused.load(), g_faults.load(), g_listeners.load(), g_listenChecks.load(), g_textsSet.load(), g_textFails.load(), g_hasClient.load() ? 1 : 0, g_hostFound.load() ? 1 : 0, ports.empty() ? "-" : ports.c_str(), status.c_str());
+	              g_presses.load(), g_actions.load(), g_taken.load(), g_gameOps.load(), g_refused.load(), g_faults.load(), g_listeners.load(), g_listenChecks.load(), g_textsSet.load(), g_textFails.load(), g_hasClient.load() ? 1 : 0, g_hostFound.load() ? 1 : 0, ports.empty() ? "-" : ports.c_str(), g_boxFocus.load() ? 1 : 0, g_boxClicked.load() ? 1 : 0, g_keysHeld.load(), g_keysTaken.load(), kinds.empty() ? "-" : kinds.c_str(), query.c_str(), status.c_str());
+}
+
+void DevMenuSockets(char* out, size_t size) noexcept {
+	std::snprintf(out, size, "sockfails=%ld lastitemflags=0x%x", g_socketFails.load(), g_lastItemFlags.load());
 }
 
 auto DevMenuHarness(const char* verb, const char* argument) noexcept -> bool {
@@ -1139,6 +1362,12 @@ auto DevMenuHarness(const char* verb, const char* argument) noexcept -> bool {
 	if (std::strcmp(verb, "input") == 0) {
 		g_testInput = argument != nullptr ? argument : "";
 		g_testInputSet = true;
+		g_dirty = true;
+		QueueTick();
+		return true;
+	}
+	if (std::strcmp(verb, "box") == 0) {  // back to the input box's own text (`input` overrides it)
+		g_testInputSet = false;
 		g_dirty = true;
 		QueueTick();
 		return true;

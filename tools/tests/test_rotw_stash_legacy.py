@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import numpy as np  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 import dc6  # noqa: E402
 import rotw_stash_legacy as rs  # noqa: E402
@@ -83,7 +83,15 @@ def fake_d2r(root: Path) -> None:
                          ("panel/stash/additionalstash/horadriccubecover", (296, 393), 1),
                          ("frontend/hd/final/frontend_buttonsmall", (366, 93), 4),
                          ("panel/stash/additionalstash/stashnotification", (195, 62), 1)):
-        ui_art.write_sprite(hd / f"{rel}.sprite", [Image.new("RGBA", size, (120, 100, 60, 255))] * n, stride=size[0] + 2 if n > 1 else None)
+        im = Image.new("RGBA", size, (120, 100, 60, 255))
+        if rel.endswith("consumables"):  # D2R's Materials page: a recess (91-wide dark inside, light frame) on each slot
+            d = ImageDraw.Draw(im)
+            for c in rs.find(HD, "advancedstash_materials")["children"]:
+                r = c["fields"]["rect"]
+                x, y, h = r["x"] + 3, r["y"] + 3, (r.get("height", 98) - 6 if r.get("height", 98) > 98 else 91)
+                d.rectangle((x - 3, y - 3, x + 93, y + h + 2), fill=(150, 120, 80, 255))
+                d.rectangle((x, y, x + 90, y + h - 1), fill=(12, 11, 10, 255))
+        ui_art.write_sprite(hd / f"{rel}.sprite", [im] * n, stride=size[0] + 2 if n > 1 else None)
 
 
 def fake_mod(mod: Path) -> None:
@@ -152,7 +160,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual((plain["textStrings"][3], plain["activeFrames"]), ("Materials", [1] * 5))
         box = rs.find(lay, "basicstash_container")
         self.assertEqual([c["name"] for c in box["children"]],
-                         ["gold_max", "gold_amount", "gold_withdraw", "grid", "MxlPersonalNavigation", "SharedStashTabContainer"])
+                         ["gold_max", "gold_amount", "gold_withdraw", "grid", "SharedStashTabContainer"])
         gw = rs.find(lay, "gold_withdraw")["fields"]   # base fields carried, the expansion's rect wins, the key written out
         self.assertEqual((gw["rect"], gw["filename"], gw["tooltipString"]), ({"x": 15, "y": 357}, "PANEL\\goldcoinbtn", "Withdraw"))
         self.assertEqual(rs.find(lay, "CurrentSharedStashText")["fields"]["text"], "Page %u / %u")

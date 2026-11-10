@@ -1,0 +1,16 @@
+# drawcap: the legacy draw list cap of Diablo II: Resurrected 3.3. D2R still draws the classic scene from a fixed list of
+# 3000 entries (walls, floors, units, shadows, missiles); what does not fit is silently not drawn, which crowds and heavy
+# on-hit procs reach. This plugin raises that cap and can measure how full the list gets. Changes apply at the next game start.
+[drawcap]
+# true: raise the cap to `cap` entries. The entries move to a buffer of the plugin's; 7 compares and 7 instructions of the
+# game are changed, only after every one of them matched its signature (else nothing is changed and drawcap.log says why).
+# An empty file drawcap-nopatch.txt next to drawcap.dll turns it off for one launch (test runs).
+patch = true
+# the raised cap, 3001 .. 100000 entries of 32 bytes (12000 = 375 KB)
+cap = 12000
+# true: count the list every frame and write a line per second to d2rloader\logs\drawcap-stats.csv (frames, max, mean,
+# frames over the cap, entries dropped, graphics mode, view size). An empty file drawcap-probe.txt next to drawcap.dll
+# turns it on as well (test runs).
+probe = false
+# milliseconds per stats line (250 .. 60000)
+interval_ms = 1000

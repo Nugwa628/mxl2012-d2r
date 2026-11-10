@@ -89,7 +89,7 @@ The table is lane padui's state; #556 and #557 are fixed since (section 5).
 | Stash | **incomplete (#557, fixed: section 5)**: Personal, Shared, Gems, Materials, Runes; no MEDIAN / ORBS; the backpack beside it is partly hidden under the stash panel; the stash cube (10 x 8) is right | `run1-panels/padui_hd_pad_stash*.png` |
 | Cube | right: Median's 10 x 8 grid, transmute button, "Y Transmute" legend; the inventory beside it has the #556 overflow | `run2-native/padui2_horadriccubelayout.png` |
 | Character sheet | draws (D2R's gamepad sheet with the mod's values) | `run2-native/padui2_characterstatspanel.png` |
-| Skill tree | draws, Median's tab names (Special / Rage, Stances / Spirits, Throw / Melee, General Skills) | `run2-native/padui2_skillstreepanel.png` |
+| Skill tree | draws, Median's tab names (Special / Rage, Stances / Spirits, Throw / Melee, General Skills), **but on D2R's vanilla tree art** (empty sockets, arrows to nothing): fixed by lane wltree, section 8 | `run2-native/padui2_skillstreepanel.png` |
 | Tooltips | a mouse hover does not show them in the gamepad UI; gamepad focus (`h pad`, section 1a) does: belt potion, Horadric Cube | `run2-native/padui2_tooltip_hp1.png`; padinput `run3-final/padin_inv_right2.png` |
 | Plugin parts | medtab: tabs missing (#557); stashtip / tabflash: work on the MEDIAN / ORBS slots, so nothing to show; send_stash: no button (#556); buff HUD, legacy 16:9: not seen in the gamepad UI shots | |
 
@@ -308,3 +308,19 @@ Found on the way:
 
 Needs a real gamepad (lane cqlive): LB + X / A / Y on focused items, right-stick aiming on Median skills (R3 toggles in the
 skill tree), the Runes deposit with real timing, and whether #558 shows outside the harness.
+
+## 8. Lane wltree: the gamepad UI's skill trees (2026-11-10)
+
+D2R's gamepad skill tree draws each tab from `Controller/Panel/Spells/V2/<xx>SkillTree` (3 frames, transparent but for the tab
+strip and the engraved socket + level box of every vanilla cell, with vanilla's arrows) over the shared stone
+`CenterPanelBG_SkillTrees`. The mod shipped none, so for all seven Median classes the icons (columns 1 and 3, rows 1-5) sat on
+vanilla's sockets: 12-14 empty sockets per class (column 2 and row 6), arrows into empty sockets, some icons on cells vanilla
+has none (seen in game on slot 2, Sorceress, and lane padui's Barbarian shot). The Warlock is right: its cells are D2R's own.
+
+`tools/pad_skill_trees.py` (an `hd_ui.py build` step) writes `data/hd/global/ui/controller/panel/spells/v2/<xx>skilltree.sprite`
+and `.lowend.sprite` for am so ne pa ba dr as: D2R's tab strip of each frame, D2R's own socket (cut from its Sorceress art) on
+every cell of the page that holds a skill, at the offset D2R's art uses round a button, and D2R's arrow head on every chain link
+(`skill_tree_art.page_arrows`, the links the HD and classic pages draw). No layout change: the controller layout already names
+these files. Its check (sockets on skills only and placed like D2R's, an arrow on every link and on no other gap) reports 357
+problems on D2R's own files and none on the built ones. Tests: `tools/tests/test_warlock_tree.py` (`PadSkillTreeTests`).
+

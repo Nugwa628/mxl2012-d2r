@@ -22,11 +22,11 @@ The HD panels' title text is written out as a literal (docs/bugs.md #30): `"text
 The stash (10 x 10), trade, vendor and hireling layouts and every other panel stay D2R's, but for the RotW stash pages' cube
 window (`stash_hd`, bug #515: Median's 10 x 8 cube small on 10 x 8 cells of its own). The HD skill tree layout stays D2R's too
 (3 tabs; the tab titles come from strings, tools/skill_tree_art.py). The classic one (`skillstreepanel.json`) draws no tab title
-for the seven classic classes (docs/bugs.md #33, coordinator decision): the mod's skltree_*_back.dc6 art has its own labels on the
-tabs and D2R's text sat on top of them; its `textTab0-2` entries of those classes are empty literals, Warlock's keys stay. As for
+for any class (docs/bugs.md #33, coordinator decision): the mod's skltree_*_back.dc6 art has its own labels on the tabs and D2R's
+text sat on top of them; all eight `textTab0-2` entries are empty literals (the Warlock's art is tools/warlock_tree.py's). As for
 the HD titles (#30), a `@key` in a widget's `text` / `tooltipString` of a layout the mod serves draws "Missing string" (the
 "Skill Choices Remaining" box, seen in game), so those are written out as D2R's English text; the same for the close / drop gold /
-transmute tooltips of the inventory and cube and the Warlock tab titles (`LITERALS`, `literalize` runs over every file written).
+transmute tooltips of the inventory and cube (`LITERALS`, `literalize` runs over every file written).
 
 Slot/grid positions are the Amazon row of inventory.txt (the seven classic classes share every number) minus invLeft; the
 cube's the "Transmogrify Box Page 1" row; the picture items (tabs, gold, transmute square) were measured on the DC6.
@@ -43,7 +43,6 @@ from icon_paths import EXCEL, read_tsv  # noqa: E402
 from ui_paths import BASE_UI, LAYOUT_OUT  # noqa: E402
 import median_stash  # noqa: E402
 import send_stash  # noqa: E402
-import stash_page2  # noqa: E402
 from rotw_stash_legacy import lenient_json  # noqa: E402
 
 SX, SY = 1162 / 320, 1507 / 432
@@ -280,8 +279,8 @@ def stash_hd(row: dict[str, int], name: str = "bankexpansionlayouthd.json") -> s
     across the frame (STASH_CUBE_WINDOW), and an image of 10 x 8 cells of the same size at the same place
     (`horadriccube_cells`, PANEL\\mxl\\stashcube) goes under it over D2R's painted 3 x 4 lines. D2R's own cover stays (it
     hides it when the cube is there). The pages' slots, the Transmute button and everything else stay D2R's; the `@` keys are
-    written as text and the page arrows get D2RLoader's tooltip. The keyboard / mouse layout also gets personal stash page
-    2's strip (tools/stash_page2.py) in `basicstash_container`. `name`: also D2R's gamepad UI stash
+    written as text and the page arrows get D2RLoader's tooltip. No personal stash page 2 strip: D2RLoader's one custom
+    player page belongs to CharmInv (docs/bundled-plugins.md). `name`: also D2R's gamepad UI stash
     (controller/bankexpansionlayouthd.json, a whole layout of its own with the same window; its page arrows are button
     legends, no tooltip)."""
     t = baseline(name)
@@ -301,10 +300,7 @@ def stash_hd(row: dict[str, int], name: str = "bankexpansionlayouthd.json") -> s
             a, b = block_span(t, f'"name": "{arrow}"')
             f = t.index('"fields": {', a, b) + len('"fields": {')
             t = t[:f] + f' "tooltipString": {json.dumps(PAGE_ARROW_TOOLTIP)}, "tooltipIsTopAligned": true,' + t[f:]
-    if name == "bankexpansionlayouthd.json":  # personal stash page 2's arrows (keyboard / mouse layout; tools/stash_page2.py)
-        s, _e = block_span(t, '"name": "SharedStashTabContainer"')
-        indent = t[t.rindex("\n", 0, s) + 1:s]
-        t = t[:s] + json.dumps(stash_page2.stock_strip_hd()) + ",\n" + indent + t[s:]
+    if name == "bankexpansionlayouthd.json":  # keyboard / mouse layout
         for page in median_stash.PAGES:  # Median's runes and gems in the Runes / Gems pages (tools/median_stash.py)
             s, e = block_span(t, f'"name": "advancedstash_{page}"')
             comma = "," if t[e - 1] == "," else ""
@@ -366,7 +362,7 @@ def cube(row: dict[str, int]) -> str:
     return set_grid(t, row["gridLeft"] - row["invLeft"], row["gridTop"], row["gridX"], row["gridY"], None)
 
 
-CLASSIC_TAB_KEY = re.compile(r'"@SkillCategory(?:Am|So|Ne|Pa|Ba|Dr|As)[123]"')
+CLASSIC_TAB_KEY = re.compile(r'"@SkillCategory(?:Am|So|Ne|Pa|Ba|Dr|As|Wa)[123]"')
 
 
 # D2R's English (ui.json / skills.json, the same in the mod's overrides.json) for every `@key` the served layouts name: a `@key`
@@ -390,33 +386,35 @@ def literalize(text: str, name: str) -> str:
 
 
 CANCEL_CODE = re.compile(r'("cancelPositionCode"\s*:\s*\[)([^\]]*)(\])')
-WARLOCK_CANCEL_FROM = 2  # the Necromancer's entry: D2R's skltree_w_back.dc6 is a byte copy of its skltree_n_back.dc6
 
 
-def warlock_cancel_position(text: str) -> str:
-    """D2R's classic `cancelPositionCode` (where the close button sits per class and tab) has 7 entries, the field is an
-    int[8] (descriptor at exe 0x29ea8d0: element 4 bytes, count 8, panel +0x86c), so the Warlock's slot keeps its default;
-    the 8th entry is the Necromancer's, whose tree art the Warlock's is (bugs.md #498)."""
+def warlock_cancel_position(text: str, code: int) -> str:
+    """D2R's classic `cancelPositionCode` (where the close button sits per class and page) has 7 entries, the field is an
+    int[8] (descriptor at exe 0x29ea8d0: element 4 bytes, count 8, panel +0x86c), so the Warlock's slot keeps its default
+    (bugs.md #498). The 8th entry is `code`: warlock_tree.cancel_code, the Close button where each page's row 6 is free."""
     m = CANCEL_CODE.search(text)
     if not m:
         raise ValueError("skillstreepanel.json: no cancelPositionCode")
     vals = [v.strip() for v in m.group(2).split(",") if v.strip()]
-    if len(vals) >= 8:
-        return text
-    if len(vals) != 7:
+    if len(vals) not in (7, 8):
         raise ValueError(f"skillstreepanel.json: cancelPositionCode has {len(vals)} entries, 7 or 8 expected")
-    vals.append(vals[WARLOCK_CANCEL_FROM])
+    vals = vals[:7] + [str(code)]
     return text[:m.start(2)] + " " + ", ".join(vals) + " " + text[m.end(2):]
 
 
-def skilltree_classic() -> str:
-    """D2R's classic skill tree panel with the tab title strings of the seven classic classes emptied (bug #33), a Warlock
-    entry in `cancelPositionCode` (bug #498) and its widget texts / tooltips written as literals."""
+def skilltree_classic(warlock_code: int | None = None) -> str:
+    """D2R's classic skill tree panel with the tab title strings of all eight classes emptied: the classic art carries the
+    titles (bug #33; the Warlock's art is tools/warlock_tree.py's, whose tabs name their own pages: D2R's textTab0[7] put
+    "Demon" over the Chaos page), the Warlock's Close button entry in `cancelPositionCode` (bug #498) and the widget texts
+    / tooltips written as literals."""
     t = baseline("skillstreepanel.json")
     out, n = CLASSIC_TAB_KEY.subn('""', t)
-    if n != 21:
-        raise ValueError(f"skillstreepanel.json: {n} classic tab title keys, 21 expected")
-    return literalize(warlock_cancel_position(out), "skillstreepanel.json")
+    if n != 24:
+        raise ValueError(f"skillstreepanel.json: {n} classic tab title keys, 24 expected")
+    if warlock_code is None:
+        import warlock_tree
+        warlock_code = warlock_tree.cancel_code(warlock_tree.load()[0])
+    return literalize(warlock_cancel_position(out, warlock_code), "skillstreepanel.json")
 
 
 def build(out: Path = LAYOUT_OUT, table: Path = EXCEL / "inventory.txt") -> list[str]:

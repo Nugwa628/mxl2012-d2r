@@ -257,7 +257,7 @@ class LayoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ui_layouts.set_title('{ "name": "title", "fields": { } }', "x")
 
-    def test_classic_skilltree_tab_titles_emptied_except_warlock(self):
+    def test_classic_skilltree_tab_titles_emptied_for_all_eight(self):
         classes = ("Am", "So", "Ne", "Pa", "Ba", "Dr", "As", "Wa")
         lists = ",\n".join(f'"textTab{i}": [ ' + ", ".join(f'"@SkillCategory{c}{i + 1}"' for c in classes) + " ]" for i in range(3))
         text = ('{ "fields": { ' + lists + ', "cancelPositionCode": [ 321, 113, 131, 121, 313, 333, 231 ], }, '
@@ -267,22 +267,23 @@ class LayoutTests(unittest.TestCase):
         orig = ui_layouts.baseline
         ui_layouts.baseline = lambda name: text if name == "skillstreepanel.json" else orig(name)
         try:
-            t = ui_layouts.skilltree_classic()
+            t = ui_layouts.skilltree_classic(212)
             self.assertNotIn("@SkillCategoryAm1", t)
             self.assertNotIn("@SkillCategoryAs3", t)
-            self.assertEqual(t.count('""'), 21)
-            for i, title in enumerate(("Demon", "Eldritch", "Chaos"), 1):   # Warlock's keys are written out too
+            self.assertEqual(t.count('""'), 24)   # all eight classes: the art carries the titles (lane wltree: the Warlock's too)
+            for i, title in enumerate(("Demon", "Eldritch", "Chaos"), 1):   # D2R's text put "Demon" over the Chaos page
                 self.assertNotIn(f'"@SkillCategoryWa{i}"', t)
-                self.assertIn(f'"{title}"', t)
+                self.assertNotIn(f'"{title}"', t)
+            self.assertIn("231, 212 ]", t)
             self.assertIn('"name": "TextTab0"', t)
             self.assertIn('"text": "Skill Choices Remaining"', t)    # a @key in a mod layout draws "Missing string"
             self.assertIn('"tooltipString": "Skill Tab 1"', t)
             ui_layouts.baseline = lambda name: text.replace("@StrSklTreea", "@unknownKey")
             with self.assertRaises(ValueError):
-                ui_layouts.skilltree_classic()
+                ui_layouts.skilltree_classic(212)
             ui_layouts.baseline = lambda name: text.replace('"@SkillCategoryDr2"', '"x"')
             with self.assertRaises(ValueError):
-                ui_layouts.skilltree_classic()
+                ui_layouts.skilltree_classic(212)
         finally:
             ui_layouts.baseline = orig
 
@@ -397,21 +398,21 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(len(runes), 23)
         self.assertIn('"rect": { "x": 89, "y": 219 }, "cellCount": { "x": 10, "y": 10 }', t)   # the stash grid untouched
         arrows = lay["children"][1]["children"][1:3]
-        self.assertEqual([c["name"] for c in lay["children"][1]["children"][3:]], ["MxlPersonalNavigation", "SharedStashTabContainer"])   # page 2's strip
+        self.assertEqual([c["name"] for c in lay["children"][1]["children"][3:]], ["SharedStashTabContainer"])   # no page 2 strip (CharmInv owns the page)
         for a in arrows:   # D2RLoader's bundled file's page arrow tooltip, as text
             self.assertEqual(a["fields"]["tooltipString"], ui_layouts.PAGE_ARROW_TOOLTIP)
             self.assertIs(a["fields"]["tooltipIsTopAligned"], True)
 
     def test_classic_skilltree_gets_a_warlock_cancel_position(self):   # bug #498: D2R's array stops at the Assassin
         t = '{ "cancelPositionX": [ 15, 100, 171 ],\n "cancelPositionCode": [ 321, 113, 131, 121, 313, 333, 231 ],\n }'
-        out = ui_layouts.warlock_cancel_position(t)
-        self.assertIn('"cancelPositionCode": [ 321, 113, 131, 121, 313, 333, 231, 131 ]', out)
+        out = ui_layouts.warlock_cancel_position(t, 212)
+        self.assertIn('"cancelPositionCode": [ 321, 113, 131, 121, 313, 333, 231, 212 ]', out)
         self.assertIn('"cancelPositionX": [ 15, 100, 171 ]', out)
-        self.assertEqual(ui_layouts.warlock_cancel_position(out), out)   # 8 entries: left as it is
+        self.assertEqual(ui_layouts.warlock_cancel_position(out, 212), out)   # 8 entries: the 8th is set again
         with self.assertRaises(ValueError):
-            ui_layouts.warlock_cancel_position('{ "cancelPositionCode": [ 1, 2 ] }')
+            ui_layouts.warlock_cancel_position('{ "cancelPositionCode": [ 1, 2 ] }', 212)
         with self.assertRaises(ValueError):
-            ui_layouts.warlock_cancel_position('{ }')
+            ui_layouts.warlock_cancel_position('{ }', 212)
 
     def test_literalize_writes_every_at_key_out(self):
         t = '{ "a": { "tooltipString": "@strClose", "text": "@strGoldDrop" }, "b": { "text": "@strUiMenu2" }, "c": "plain" }'

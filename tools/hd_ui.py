@@ -2,7 +2,8 @@
 
   py -3 -I tools/hd_ui.py baseline <a D2R 93847 extraction>   copy the D2R baseline pieces we read into work/d2r-baseline
                                                                 (read-only source: an extraction of D2R 93847)
-  py -3 -I tools/hd_ui.py build                                  skill trees -> panels -> layouts -> check (about 1 min)
+  py -3 -I tools/hd_ui.py build                                  skill trees (HD, gamepad, the Warlock's classic one) -> panels
+                                                                 -> layouts -> check (about 1 min)
   py -3 -I tools/hd_ui.py check                                  only the check
 
 The mod side is read from <R>/mxl2012-runs/extract-mpq (MXL2012_EXTRACT overrides); everything is written to work/hd-ui (ignored).
@@ -17,7 +18,8 @@ from ui_paths import BASE, BASE_UI, PAL  # noqa: E402
 
 LAYOUTS = ("playerinventoryoriginallayout", "playerinventoryexpansionlayout", "horadriccubelayout")
 CHECK_LAYOUTS = ("bankexpansionlayouthd", "tradelayouthd", "vendorpanellayouthd")  # only read by the check (grid sizes)
-CONTROLLER_LAYOUTS = ("horadriccubelayouthd", "bankexpansionlayouthd")  # layouts/controller: ui_layouts (gamepad UI)
+CONTROLLER_LAYOUTS = ("horadriccubelayouthd", "bankexpansionlayouthd",  # layouts/controller: ui_layouts (gamepad UI)
+                      "skillstreepanelhd")                             # pad_skill_trees reads its geometry
 CLASSIC_LAYOUTS = ("skillstreepanel",)  # classic only (ui_layouts.skilltree_classic, bug #33)
 CLASS_PREFIXES = ("am", "so", "ne", "pa", "ba", "dr", "as")
 STASH_ART_DIR = Path("panel") / "stash" / "additionalstash"
@@ -41,6 +43,12 @@ def baseline(src: Path) -> int:
     for name in [f"{p}skilltree" for p in CLASS_PREFIXES] + ["panel_skilltreebg"]:  # bg: lane skillhd's candidates
         jobs.append((src / "data" / "hd" / "global" / "ui" / "spells" / "skill_trees" / f"{name}.sprite",
                      BASE_UI / "spells" / "skill_trees" / f"{name}.sprite"))
+    for prefix in CLASS_PREFIXES:  # the gamepad UI's trees: pad_skill_trees
+        for suffix in ("", ".lowend"):
+            jobs.append((src / "data" / "hd" / "global" / "ui" / "controller" / "panel" / "spells" / "v2" / f"{prefix}skilltree{suffix}.sprite",
+                         BASE_UI / "controller" / "panel" / "spells" / "v2" / f"{prefix}skilltree{suffix}.sprite"))
+    jobs.append((src / "data" / "hd" / "global" / "ui" / "spells" / "warlock" / "waskillicon.sprite",  # warlock_tree
+                 BASE_UI / "spells" / "warlock" / "waskillicon.sprite"))
     for name in STASH_ART:
         jobs.append((src / "data" / "hd" / "global" / "ui" / STASH_ART_DIR / f"{name}.sprite",
                      BASE_UI / STASH_ART_DIR / f"{name}.sprite"))
@@ -57,9 +65,22 @@ def build() -> int:
     import ui_layouts
     import ui_panels
     rc = 0
-    for name, mod in (("skill trees", skill_tree_art), ("panels", ui_panels), ("layouts", ui_layouts)):
+    import pad_skill_trees
+    import warlock_tree
+    for name, mod in (("skill trees", skill_tree_art), ("controller skill trees", pad_skill_trees)):
         print(f"== {name}")
         rc |= mod.main([])
+    print("== warlock classic tree")  # before the layouts (they take its Close button code), checked after them
+    for line in warlock_tree.build():
+        print(line)
+    for name, mod in (("panels", ui_panels), ("layouts", ui_layouts)):
+        print(f"== {name}")
+        rc |= mod.main([])
+    print("== warlock classic tree: check (with the served classic layout)")
+    left = warlock_tree.check()
+    for p in left:
+        print(f"PROBLEM: {p}")
+    rc |= 1 if left else 0
     print("== stash pages")
     import median_stash
     from rotw_stash_legacy import lenient_json

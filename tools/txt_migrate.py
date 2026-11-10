@@ -457,6 +457,56 @@ DROPPED_MONSTERS = {"cougar": {"enabled": ("1", "0"), "isSpawn": ("1", "0"), "Mo
 
 read_tsv = idmap.read_tsv  # one record rule for the whole pipeline (tools/idmap.py)
 
+# The character sheet's Advanced Stats panel (D2R 93847, D2Client AdvancedStatsPanel.cpp). Its list builder 0x14eaf40 walks
+# itemstatcost in row order and reads `advdisplay` (record +0x140): 1 = row always listed, 2 = listed while the player's stat
+# (layer 0, >> ValShift; 0x14eb1b0) is not 0; the always rows come first. The row text is 0x2d97e0: the stat value, op 2-5
+# applied, then the item tooltip formatter 0x2d6520, so a row reads like the stat's tooltip line and needs a descfunc. Never
+# shown: stats with a parameter (skill on hit, auras; the panel reads layer 0) and per-level item stats (op 2-5: the player holds
+# them at 0, their amount is in the target stat, e.g. MF; seen in game, lane advstats).
+# Median's rows come from data/advanced_stats.tsv: Laz's PlugY stat pages (plugy/statsinterface.txt of the v005 MPQ) plus the
+# vanilla rows D2R lists that mean the same in Median. D2R's own rows that Median has no row for keep D2R's value.
+ADVANCED_STATS = ROOT / "data" / "advanced_stats.tsv"
+ADVDISPLAY = {"always": "1", "nonzero": "2"}
+
+
+def read_advanced_stats(path: Path = ADVANCED_STATS) -> dict[str, str]:
+    """Stat name -> advdisplay value of data/advanced_stats.tsv (columns stat, show, source)."""
+    lines = [line.split("\t") for line in path.read_text("utf-8").splitlines() if line.strip()]
+    h = lines[0]
+    si, wi = h.index("stat"), h.index("show")
+    out = {}
+    for r in lines[1:]:
+        if r[si] in out:
+            raise ValueError(f"{path.name}: {r[si]} listed twice")
+        if r[wi] not in ADVDISPLAY:
+            raise ValueError(f"{path.name}: {r[si]}: show must be one of {sorted(ADVDISPLAY)}, not {r[wi]!r}")
+        out[r[si]] = ADVDISPLAY[r[wi]]
+    return out
+
+
+def advanced_stats_fix(header: list[str], rows: list[list[str]], wanted: dict[str, str], mod_stats: set[str]) -> list[str]:
+    """Sets itemstatcost `advdisplay`: `wanted` rows get their value, every other row of the mod (`mod_stats`) none; rows D2R
+    alone has keep theirs. Returns the problems: a listed stat missing from the table, not the mod's, or without a descfunc."""
+    if "advdisplay" not in header:
+        return ["itemstatcost has no advdisplay column"]
+    ad, fn = header.index("advdisplay"), header.index("descfunc")
+    seen, problems = set(), []
+    for r in rows:
+        if not idmap.is_record(r):
+            continue
+        name = r[0]
+        if name in wanted:
+            seen.add(name)
+            if name not in mod_stats:
+                problems.append(f"{name}: not a Median stat")
+            elif not r[fn] or r[fn] == "0":
+                problems.append(f"{name}: no descfunc, the panel would show an empty row")
+            r[ad] = wanted[name]
+        elif name in mod_stats:
+            r[ad] = ""
+    problems += [f"{name}: not in itemstatcost" for name in sorted(set(wanted) - seen)]
+    return problems
+
 
 def by_row_merge(mod_rows: list[list[str]], d2r_rows: list[list[str]], convert) -> list[list[str]]:
     """BY_ROW tables: the mod's row i is D2R's row i. A record takes D2R's row at its position as the match; a separator
@@ -1394,6 +1444,26 @@ class Migrator:
         self.report.append(f"\nstat format keys (descfunc 27 / 28, D2R reads the format from descstrpos): {len(filled)} cells: "
                            + (", ".join(filled) or "none"))
 
+    def advanced_stats(self) -> list[str]:
+        """The Advanced Stats panel's rows (advanced_stats_fix) in both banks; returns the problems, which fail the step."""
+        _, named = read_tsv(NAMED / "itemstatcost.txt")
+        mod_stats = {r[0] for r in named if idmap.is_record(r)}
+        wanted = read_advanced_stats()
+        problems = []
+        for bank in ("base", ""):
+            p = OUT / "data" / "global" / "excel" / bank / "itemstatcost.txt"
+            if not p.exists():
+                continue
+            h, rows = read_tsv(p)
+            problems += [f"{bank or 'rotw'}: {e}" for e in advanced_stats_fix(h, rows, wanted, mod_stats)]
+            write_tsv(p, h, rows)
+            if bank == "base":
+                ad = h.index("advdisplay")
+                shown = Counter(r[ad] for r in rows if idmap.is_record(r) and r[ad])
+                self.report.append(f"\nAdvanced Stats panel (itemstatcost advdisplay, data/advanced_stats.tsv): {shown['1']} rows always, "
+                                   f"{shown['2']} while not 0 (D2R's own rows included)")
+        return problems
+
     def namespace_cells(self) -> None:
         """Last pass: every localization cell of both banks that names a mod-only (group 2) key is written through
         strings_ns.cell_value (`mxl2012:<key>`, the short alias where the field is too small); references to unique / set item
@@ -2222,6 +2292,7 @@ def main() -> int:
     m.median_skill_wording()
     m.misc_spell_values()
     m.stat_format_keys()
+    adv_problems = m.advanced_stats()
     m.namespace_cells()
     m.report += ["", "## ID mapping (tools/idmap.py remap_table, applied to the mod's tables before the merge)", "",
                  "| Table | Cells rewritten |", "|---|---|"]
@@ -2236,6 +2307,7 @@ def main() -> int:
     errors = []
     for bank_dir in (OUT / "data" / "global" / "excel" / "base", OUT / "data" / "global" / "excel"):
         errors += [f"{bank_dir.name}: {e}" for e in idmap.check_built(bank_dir, D2R)]
+    errors += [f"advanced stats: {e}" for e in adv_problems]
     m.report += ["", "## idmap.check_built (fixed item type ids)", ""] + ([f"- ERROR {e}" for e in errors] or ["- 0 errors"])
     if m.dangling:
         m.report += ["", "## References emptied in rows kept from D2R (target only existed in D2R's replaced tables)", ""]

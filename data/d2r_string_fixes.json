@@ -18,5 +18,15 @@
     "key": "d2r:DesecratedAutomapLevel",
     "text": "Area Level %d",
     "why": "Owner request 2026-11-06 (player): the automap's top-right text shows the area level. D2R's line for a terror zone (\"Terrorized: %d\") is the one mxl2012-core part arealvl fills with levels.txt MonLvlEx of the current area and difficulty when the area is not terrorized (area_level.cpp); Median 2012 has no terror zones."
+  },
+  {
+    "key": "d2r:Charmdes",
+    "text": "Keep in Inventory or Charm Inventory to Gain Bonus",
+    "why": "CharmInv (Dimentio's D2RLoader plugin, bundled; docs/bundled-plugins.md): owner decision 2026-11-10, charms grant their bonus from the normal inventory and from the Charm Inventory (charm-inv.toml allow_inventory_charms = true). CharmInv's own strings.json says \"Keep in Charm Inventory to Gain Bonus\"; Median's .tbl says \"Keep in Inventory to Gain Bonus\". Mod overrides win over plugin overrides, so this text names both places."
+  },
+  {
+    "key": "d2r:ItemExpcharmdesc",
+    "text": "Keep in inventory or Charm Inventory to gain bonus",
+    "why": "CharmInv (Dimentio's D2RLoader plugin, bundled; docs/bundled-plugins.md): owner decision 2026-11-10, charms grant their bonus from the normal inventory and from the Charm Inventory (charm-inv.toml allow_inventory_charms = true). CharmInv's own strings.json says \"Keep in Charm Inventory to Gain Bonus\"; Median's .tbl says \"Keep in Inventory to Gain Bonus\". Mod overrides win over plugin overrides, so this text names both places."
   }
 ]

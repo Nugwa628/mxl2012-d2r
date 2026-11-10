@@ -53,5 +53,17 @@ class MadeName(unittest.TestCase):
         self.assertEqual(gc.made_name(before, "IlvlAma", self.dir), "IlvlAma")
 
 
+class SmokePlugins(unittest.TestCase):
+    def test_bundled_plugins_and_explicit_probes(self):
+        for value in ('none', 'd2rl-charm-inv.dll (mod mxl2012), drawcap.dll (mod mxl2012)',
+                      'drawcap.dll (mod mxl2012)', 'gp-probe-test.dll (global)'):
+            self.assertTrue(gc.smoke_plugins_ok('other plugins: '+value))
+
+    def test_unknown_plugins_and_wrong_scopes_still_fail(self):
+        for value in ('', 'unknown.dll (mod mxl2012)', 'drawcap.dll (global)',
+                      'd2rl-charm-inv.dll (mod other)', 'none, unknown.dll (global)'):
+            self.assertFalse(gc.smoke_plugins_ok('other plugins: '+value))
+
+
 if __name__ == "__main__":
     unittest.main()

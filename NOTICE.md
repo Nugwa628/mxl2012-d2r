@@ -74,6 +74,13 @@ PyreFly gave the project owner permission to ship and adapt it on 2026-11-04. Py
 are in `mods\mxl2012\d2rloader\plugins\` next to the DLL. It is credited to PyreFly in the README, the release notes and
 docs/bundled-plugins.md.
 
+The release package also ships **CharmInv** 1.0.1 by Dimentio, D2RLoader's author
+(<https://d2rloader.net/hub/plugins/charm-inventory>): the author's signed `d2rl-charm-inv.dll` and its `d2rl-charm-inv.mpq`,
+unchanged and not kept in this repository (pinned by SHA-256, `third_party/charm-inv/README.md`). No source or licence
+text is published; it is redistributed with D2RLoader by the owner's decision (author: Dimentio, D2RLoader's author),
+2026-11-10. Our part is its config and the Median XL 2012 charm-type table the build writes. It is credited to Dimentio in
+the README, the release notes and docs/bundled-plugins.md.
+
 ## The downloader's 7z decoder (`launcher/third_party/lzma`)
 
 `D2R-XL-2012-Downloader.exe` unpacks the release's `.7z` with the C 7z decoder of the

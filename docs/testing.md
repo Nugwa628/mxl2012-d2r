@@ -4,7 +4,83 @@ Changes that are built and installed but not yet confirmed in the game. Restart 
 "Confirmed" (or into docs/bugs.md) once tested. Console command `mxl` shows the plugin version and how many skill
 functions it installed.
 
+## Lane stashfix: retirement startup blocker (2026-11-11)
+
+Based on main a4091c8. No data build: copied the main checkout's completed `work/mod/data`.
+The release refusal was reproducible on slot-2 `DevMenuD.d2s`: the reader ended its Chronicle-tagged unique
+`a68` before the Chronicle trailer, then interpreted trailer bytes as the next item's flags/stats. Several other
+DevMenu/Dm fixtures had the same issue. Compact quest `bks` / `qey` also needed their quest-difficulty bits before
+GUID. Native and Python readers now consume both, plus the noncompact advanced-stash presence/count field.
+
+Policy regression: a folder containing invalid, mismatched and unknown-stat pairs plus a valid retired-page save
+leaves each bad pair byte-identical and cleans the valid one. Per-file warnings name the character; no startup
+MessageBox or ExitProcess. Other characters continue. Do not load a skipped character until repaired: loader
+integrity checks may refuse it, but valid unsupported old page-6 contents could otherwise appear in CharmInv.
+See [retirement policy](stash-page-retirement.md#unreadable-characters-stashfix).
+
+Read-only corpus copied under slot locks from immediate save files in slots 1-4: **474 files**. Native and Python
+payload readers parse **469** (s1 95, s2 217, s3 92, s4 65), **0 valid-payload reader failures**. Four 403-byte retail
+new-character header stubs have no item section or sidecar. `DmFourJ.d2s` is zero-filled (invalid signature/checksum).
+Of the 469 valid payloads, 468 original pairs validate; slot-4 `Rcpala.d2rl` has invalid magic, so its valid 23-item
+payload was additionally read using inspection-only metadata inside the project. Production leaves that pair alone.
+No original save was modified for the corpus audit. Evidence: `mxl2012-runs/stashpage/stashfix-corpus/fixed-audit.json`.
+
+Plugin/native tests: release and dev DLLs built, 43 plugin test executables plus drawcap pass; 15 native-reader Python tests pass. Full `py -3 -m pytest tools/tests -q`: **1,382 pass, 30 subtests pass**.
+Slot-2 proof with existing folder, `MXL_CHAR=DevMenuD`: **PASS**, final run `checks-20261111-041413-s2`, host lock owner `stashfix`. Both `mxl2012` and `stashfix-stash` pass. The game reached the menu,
+loaded the character, showed the stash in HD/legacy, and logged zero core ERROR lines; invalid DmFourJ pair
+remained byte-identical. Slot shared files restored and slot unlocked, no new crash file. The first run's `mxl2012` check exposed an obsolete harness expectation that no other plugins run;
+that now accepts only the bundled CharmInv/drawcap in this mod and the existing explicit global probe plugins.
+Unknown DLLs and wrong scopes still fail (unit tests). Existing exit-only engine pool assertions remain outside
+mxl2012-core.log, as in earlier fixture runs; no new crash file.
+
+## Lane stashpage: retirement with CharmInv (2026-11-10)
+
+Core 0.1.19, based on CharmInv `f6459eb`, deletes old personal-page-2 contents before character select.
+See [stash-page-retirement.md](stash-page-retirement.md) for origin markers, exact scope and interrupted-write recovery.
+The alpha owner explicitly authorized deletion; there is no item migration.
+
+Offline: release and harness DLLs built; all 42 native test executables pass. The production reader passes 12
+Python-driven native tests covering real normal charm/body-part/scroll records, sockets, item qualities, raw-byte
+preservation of other storage, empty-page no-op, origin markers and pair recovery. Targeted Python suite: 104 pass.
+Stash/layout suites: all 41 pass against the completed full build.
+Commands: `tools/build_plugin.ps1 -Release -Tests`; `py -3 -m unittest tools.tests.test_d2save tools.tests.test_stash_retire
+ tools.tests.test_charm_inv tools.tests.test_ui tools.tests.test_stash_page2 tools.test_install_mod`; layout suites:
+`tools.tests.test_rotw_stash_legacy tools.tests.test_median_stash tools.tests.test_send_stash tools.tests.test_median_tabs`.
+
+Throwaway fixture only: locked slot 4, Barbarian StashMigrate, nested `mxl2012-s4/stashpage-transitional/` savepath.
+Old core 0.1.18 saved seven retired items (r08, r09, r10, A0+, x1x, hrt, 0sc), plus 860 items in other storage.
+Personal/shared storage is filled; equipment, inventory and cube are present. Full decoded item identities include
+GUIDs/properties, not just counts. After cleanup, a real CharmInv grid click places a new Sunstone with +7 Strength;
+a pre-update filler moves into the cube to make its inventory cell available.
+
+Recovery checks before the final data install: run `checks-20261110-223145-s4` recovered a deliberately half-written
+save/sidecar pair, logged exactly seven deletions and loaded with CharmInv empty. The audit found 867 before,
+860 after cleanup, 861 after adding the new charm. A fresh process with a deliberately stale journal kept the
+consistent newer pair and its charm; its GUID and every property matched the first save (only the normal new-item
+flag clears on reload). All 860 original survivors remained, no duplicates. An old-core real fixture without retired
+items also returned byte-identical save and sidecar output. Games closed, shared slot
+files restored, no crash file. Exit-only BC_ASSERT pool checks also occur in the old fixture build (existing engine
+shutdown behavior documented elsewhere here).
+
+Final full-build/install verification: PASS (2026-11-11). The locked full build exited 0, validation errors 0.
+Installed the complete build with CharmInv into the isolated savepath. First run `checks-20261111-013833-s4`
+loaded the old paired fixture without refusal, logged seven deletions, showed one personal stash in HD and legacy,
+and showed CharmInv empty. A real grid click placed the new +7 Strength Sunstone. Fresh-process reload
+`checks-20261111-013954-s4` kept that same charm GUID and all properties (ordinary new-item flag excluded), and
+all 860 pre-update survivors. Audits: 867 original -> 860 cleaned -> 861 with new charm -> 861 reloaded;
+no unexpected additions or missing items. Both runs closed normally with zero new crash files. The slot's shared
+files were restored, normal savepath restored and slot 4 unlocked. Only throwaway saves were used.
+Screenshots: `final-first_stash_hd.png`, `final-first_stash_legacy.png`, `final-first_charminv_empty.png`,
+`final-first_charminv_used.png`, `final-reload_charminv_saved.png`; decoded identities and counts in
+`item-lists-retire-*.json` and `final-summary.json`.
+Evidence is outside git in `mxl2012-runs/stashpage/`:
+`audit_retirement.py`, `retire_live.py`, `recovery-item-lists-*.json`, unit/build logs and `runs/checks-*/` screenshots.
+Full builds and game checks use the host-wide heavy lock as well as the slot lock. CharmInv itself supports HD
+layouts only; the stash is checked in both HD and legacy.
+
 ## Waiting
+
+Lane advstats (2026-11-11, slot 3, background input; slot 3's installed mod of 2026-11-01 with only the two built itemstatcost.txt swapped in, which differ from it in `advdisplay` alone): check `advstats` (tools/advstats_checks.py) PARTIAL by design (rows judged on the shots, `mxl2012-runs/advstats/shots/`). Seen: the HD panel lists the 12 always rows, then every worn stat with the worn value (8% life stolen, 100% GF, 53% MF = server stat 80, 15% IAS, 20% FRW, 30% FHR, 20% FCR, 10% CB, 15% DS, Fire Resist +30%, +5% max fire, Fire Absorb 10%, +15% fire spell damage, -12% enemy fire resistance, 10% Bonus to Strength, attacker takes fire damage 25, +20% minion damage, light radius, vendor prices, cannot be frozen, life after kill), worded as the ring's tooltip. The per-level MF stat (240) is 0 on the player (folded into MF), so D2R's per-level rows were taken off the list. Not seen: a release install with the full build (the full build did not finish under the host lock), the rows of Laz's pages 3-4 for a character that has them (apple, minion counts), legacy (no button there).
 
 Lane skills5 (2026-10-29, slot 3, background input, dev DLL): player bugs #490-#493, #496 (docs/bugs.md). Seen with the harness:
 Signet of Gold text (#490) in HD; Bane Hunter's HD overlay (#492) calm after the `firecrown` pick. Still to check: the #490 line in
@@ -293,7 +369,7 @@ Use test-sessions.md to run these checks by character.
 | data | **Median stash size: 14 x 14** (personal and shared pages; inventory.txt Big Bank, HD stash panel with Median's art) | Open the stash: personal tab and the shared tabs. Put items in the far corners (column 14, row 14), switch tabs, leave and reload; check the shared stash still loads for another character | Median's stash art, 14 x 14 grid lined up with it (grid, tabs and gold box confirmed 2026-10-14), items scaled like the inventory; Personal/Shared tabs centred above the grid where Median's gold box was; Median's gold box now at the bottom with D2R's gold button and amount on it; shared-stash arrows and gold withdraw work; items stay put after reload. D2R's Gems/Materials/Runes tabs unchanged. Backup: mxl-manual-backups/all-before-14x14-stash. Also note: since this build the game logs a 'leaked Stats' check when it closes; tell me if anything misbehaves around quitting |
 | data | **Median inventory and cube sizes: 15 x 10** (inventory.txt gridX/gridY; HD panels with Median's own art, tools/ui_panels.py + ui_layouts.py) | Open the inventory (I) and the Horadric Cube in HD. Move items into the new rows/columns, equip items in every slot, swap weapons (W), transmute something; save and reload; press G for classic | Inventory: Median's panel, 15 x 10 grid lined up with the art, equipment slots where Median has them, gold box bottom left. Cube: Median's crafting panel, 15 x 10 grid, transmute button under it. Items stay where they were after reload. Report anything misplaced (a screenshot helps). Press G: classic mode now has Median's art for inventory and cube (15 x 10 on scaled grids; items are smaller than in HD), check I / cube / C / stash (both tabs and shared pages) / a vendor: items on the grid cells, nothing overlapping (screenshot). Backup of all characters: mxl-manual-backups/all-before-15x10-inventory |
 | data | **Median character sheet** (statsheet page 0 as the HD background, D2R stat widgets moved into its boxes; tools/ui_panels.py 'charsheet', tools/ui_layouts.py char_sheet()) | In HD press C; check with points to spend and with a weapon equipped; hover the stat labels | Median's panel with: name and Level / Class in the top bar, Life / Mana / Stamina and experience in the four bars around the circle, Strength / Dexterity / Vitality / Energy (value box left of the label) with the +1 buttons right of the rows, Fire / Cold / Lightning / Poison and Defense in the boxes, damage and attack rating of the left and right skill beside the weapon portraits, stat points remaining at the bottom. Report text outside its box, missing numbers or buttons off the rows (screenshot). Known: pages 2 and 3 of Median's sheet (extra stats) are not built |
-| data | **Median stat pages as Advanced Stats rows** (itemstatcost advdisplay: 96 stats of Median's sheet pages 2-3, descfunc 19 for D2R's printf texts; tools/stat_screen.py, txt_migrate.py advanced_stats; docs/subsystems/stat-screen.md) | In HD press C, click the arrow on the sheet's right edge; scroll the list; equip items with speed / absorb / resist / damage mods | The list starts with thirteen rows shown even at 0 (attack rating, block, five speeds, six resistances), then only the stats the character has, texts like "+30 to Strength" / "+20% Faster Cast Rate" (no raw %d / %+d, no doubled value). Report garbled lines, a row for a stat Median's sheet does not show, or a stat that is missing. Item tooltips of those stats should read the same way |
+| data | **Advanced Stats panel rows** (itemstatcost advdisplay from data/advanced_stats.tsv: Laz's PlugY stat pages + 21 vanilla rows; tools/txt_migrate.py advanced_stats; docs/txt-migrate.md) | `py -3 tools/game_checks.py all advstats` (lane advstats), or by hand: in HD press C, click the arrow on the sheet's right edge, scroll; equip items with speed / absorb / resist / mastery / minion mods | Twelve rows always (leech, GF, MF, the five speeds, open wounds, crushing blow, deadly strike), then only the stats the character has, worded like the item tooltip ("20% Faster Cast Rate", "Fire Resist +30%"). Per-level item stats have no row (their amount is in the target stat, e.g. MF). Legacy graphics has no Advanced Stats button (D2R's legacy layout has none). Report garbled lines or a missing / wrong number |
 | data | **Median trade window, NPC store and in-stash cube sizes** (inventory.txt Trade Page 1/2 = 7 x 15 each, Monster = 15 x 15; HD panels tradelayouthd / vendorpanellayouthd / bankexpansionlayouthd with Median's trade.dc6 and store.dc6 art; materials tab cube view 15 x 10; tools/txt_migrate.py, ui_panels.py, ui_layouts.py) | In HD: (1) trade with a second player (TCP/IP test): open the trade window, move items into both columns, accept; (2) open Gheed, Charsi, Akara and a gambler: all four tabs, buy and sell, repair (Charsi), refresh (gambler); (3) open the stash, Materials tab, put items into the cube view and transmute | (1) Two 7 x 15 grids side by side on Median's trade art, names and accept buttons in the header bars, gold under each grid; check which side is yours (left is 'them', right is 'us' in the layout, swap TRADE_GRIDS/TRADE_BARS in ui_layouts.py if wrong). (2) 15 x 15 store grid on Median's store art, D2R's tabs lined up over the four tab slots (none drawn pressed in the art), gold text in Median's gold bar at the top, repair/refresh buttons under the grid not overlapping it. (3) The cube view is a 15 x 10 grid on pasted art over the old recess (side stubs of D2R's art may show), items match the Horadric Cube panel; transmute button below. Classic (G): the trade window has Median's art and two 7 x 15 grids, untested (needs two players): check names, accept buttons and gold under the grids. Report where the item cells and art disagree (screenshot) |
 | data | **Cold effect on monsters** (coldeffect -20, was read as 236) | Chill monsters (any cold skill or cold damage item) | Chilled monsters slow down (Median: -20%) instead of speeding up |
 | data | **Monster sequence skills** (monstats Sk*mode `mqN` -> sequence names, 1,152 slots) | Fight monsters that raise or revive (Fallen Shamans, Greater Mummies, skeleton-raising casters), charging monsters, Sand Maggots | Shamans revive Fallen, mummies raise, maggots burrow and lay eggs, chargers charge; no monster stands still where it should use a skill |
@@ -898,9 +974,7 @@ for them (the server frames are driven from it). `menu` runs on the UI thread. A
 | `itemroll <code> <n> [q=] [ilvl=]` | makes n items through the generator the way `item` does (quality default 2, item level default 110), reads sockets, the ethereal flag, defence and maximum durability, frees them; prints the socket histogram, the ethereal count, the defence sums and the durability ranges of normal and ethereal ones |
 | `colour <item id\|code>` | the item colour function `0x3710d0` (hooked for stat 368) on an item of the player: the colour byte, the item's colour kind and whether a palette entry came back |
 | `req <ref> [as <class>]` | the item requirement check `0x36bc50` (class lock stat 492, mercenary weapon / shield lists) of every backpack item against the player or the mercenary; `as` swaps the unit's class for the call (character class 0-6, or a hire monster class 271 / 338 / 359 / 561). Prints id, code, usable, lock, weapon / shield flags and the hireclasses list item types the item belongs to |
-| `panelrow <stat>` | the Advanced Stats panel's row functions (`0x14eb1b0` value, `0x14eb250` text, hooked by `stat_columns.cpp`) on a stand-in panel of the player unit for a D2R stat id: prints `panelrow <stat> value=<displayed value> text=[...]` (colour codes removed) and `panelrow weapon strbonus=N dexbonus=N` (or `none`) |
 | `cstat <stat> [layer] [set <value>]` | (client side, UI thread) the stat of the client's copy of the player: what the screen shows, to compare with `stat player` after an update packet; `set` writes the client's copy only (a stat set on the server's unit does not reach it) |
-| `statorder [open\|adv\|close]` | (client side) `statorder` prints the list the Advanced Stats panel built (`ordered`, rebuild count, rows: `[Label]` / stat id); `open` / `close` the character sheet, `adv` presses its Advanced Stats button (WidgetService panel messages) |
 | `bufficons [hover <x> <y> \| hover state <n> \| hover off \| probe [off] \| cstate <state> <0\|1>]` | (client side) counters of the buff icon bar (`on`, frames, icons per group, refused draw requests, rectangles per frame, tooltip state and lines) and one line per drawn icon (`state side slot row secs hover x y size`); `hover` overrides the cursor, `probe` draws a magenta test rectangle, `cstate` sets a state bit on the client's copy of the player |
 | `infopanel [close <n>]` | (client side) the presentation state of Median's help panels (2 = open) and how many opens the plugin message `I` asked for / the UI thread did / failed |
 | `tip [id\|code]`, `tiplog [n\|reset]`, `tipfmt <stat> <value> [layer [mode [flag]]]` | (client side, off words `itemtext`, `tooltipprobe`) `tipfmt` calls D2R's property formatter `0x2d6520` with the given stat, value and layer and prints `ret` and the text (flag 1 = the group line); `tip` prints the lines of an item (client id or a code on the ground) as the item text builder `0x2dc4b0` made them, with `tip build` arguments only after one hover (the check hovers a ring once); `tiplog` lists the last formatter calls of the hovered item (`reset` right before `tip`, the ring floods every frame) |
@@ -911,7 +985,7 @@ for them (the server frames are driven from it). `menu` runs on the UI thread. A
 | `wpobj` | every waypoint object of the game (class, position, distance, level, whether it is within 36 sub-tiles) and the player's level and waypoint number |
 | `travel` | (client side) the hotkey bindings (key and modifier as D2RLoader reports them), counters (waypoints activated, scans, reveals, key presses, transmutes, cube open / closed) and the distinct UI messages seen (`uimsgs`) |
 | `stashprobe <tab>` / `stashprobe result` | queues, on the game thread, a rune created by ItemService in shared stash tab `<tab>` and destroyed again; `result` answers `1 page=<n> create=0 ...` when the tab took the item, `0` when it refused |
-| `stashpage state\|open\|close\|toggle\|msgs\|uia <target> <command> [text]\|widget <panel> [child]\|vis <panel> <child> <0\|1>\|put <code> [x y]\|fill <1\|2>\|drop <code>\|list\|move <id> <1\|2> [x y]\|result` | (client side; put / fill / drop / list / move queue work on the game thread, `result` has the answer) the personal stash page 2: `state` prints `state=<page 2 panel: 1 closed, 2 open> tab=<n> strip=<0\|1>`, `msgs` the last bank / stash UI messages newest first, a native UI message through WidgetService (`uia PanelManager OpenPanel BankExpansionLayout`), a widget rect, items created / listed / moved between page 1 and page 2 in one ItemService transaction |
+| `stashpage state\|open\|close\|toggle\|msgs\|uia <target> <command> [text]\|widget <panel> [child]\|vis <panel> <child> <0\|1>\|put <code> [x y]\|fill <1\|2>\|drop <code>\|list\|move <id> <1\|2> [x y]\|result` | (historical fixture helper; the current build does not register this provider; put / fill / drop / list / move queue work on the game thread, `result` has the answer) the retired personal stash page 2: `state` prints `state=<page 2 panel: 1 closed, 2 open> tab=<n> strip=<0\|1>`, `msgs` the last bank / stash UI messages newest first, a native UI message through WidgetService (`uia PanelManager OpenPanel BankExpansionLayout`), a widget rect, items created / listed / moved between page 1 and page 2 in one ItemService transaction |
 | `padui [on\|off]` | (client side, lane padui) D2R's gamepad UI without a gamepad: hooks PanelManager::RequestInputMethod `0x8a5440` and, while on, answers every input as gamepad input; prints `forced= gamepadUi= pending= device=`. Keys do not open panels in the gamepad UI; use `stashpage uia PanelManager OpenPanel <name>` (docs/controller-support.md) |
 | `pad [on\|off\|press <buttons> [ms]\|hold <buttons>\|release [buttons]\|stick L\|R <x> <y>\|trigger L\|R <0-255>]` | (client side, lane padinput) a scripted gamepad in controller slot 0, no gamepad or driver: the first verb swaps D2R's XInputGetState import (IAT `0x1cb1258`, XINPUT9_1_0.dll) for the harness's own; `off` puts it back. Buttons `a b x y lb rb lt rt ls rs start back up down left right` (`+` joins), sticks in percent (y up); `press` holds for ms (default 120) and at least 3 polls. Prints `on= hooked= polls= packet= buttons= ... gamepadUi= device=`. Scripts: tools/pad_input.py (docs/controller-support.md) |
 
@@ -5475,6 +5549,8 @@ monsters, Nightmare / Hell, a party (two owners).
 
 ## Lane stashpage2: a second personal stash page (bug #537, 2026-11-05, slot 2, background mode)
 
+**Historical checks:** personal page 2 is retired in the CharmInv alpha update. See [current deletion behavior and verification](stash-page-retirement.md).
+
 Owner (2026-11-04): the personal stash gets a second page through D2RLoader 1.3.1's one custom player page (`stash2`, item page 6,
 `<char>.d2rl`), drawn by the panel `StashPage2` (10 x 10). The 2012 port of lane stash-pages' part (see "Stash pages: personal
 page 2" above). Evidence and scratch: `mxl2012-runs/stashpage2/` (outside git): `runs/<run>/` (report, shots, logscan), `run*.log`,
@@ -5680,6 +5756,8 @@ Not checked: the clock (D2R's option is off in the test install and was not chan
 plain D2R in legacy (needs an Expansion character in `legacy169-plain`).
 
 ## Lane stashp2fix: personal stash page 2 inside the stash (bug #543, 2026-11-05, slot 1, background mode)
+
+**Historical checks:** personal page 2 is retired in the CharmInv alpha update. See [current deletion behavior and verification](stash-page-retirement.md).
 
 Owner (0.1.11): page 2 replaced the stash panel (no tabs, empty gold box) and the way back left D2R's large left frame off. Now
 `StashPage2` is drawn over the open stock stash (docs/plugin-plan.md 8.2 "Changed", docs/bugs.md #543). Evidence and scripts:
@@ -6952,3 +7030,173 @@ Rows, page line and status now appear in ordinary background captures, HD and le
 **By hand** (window in front, Ctrl+F12, HD and after G in legacy): search `staff`. Rows should be white beside their arrows, the page line and status gold, inside the panel; click an arrow and the status should say what was spawned. Tell me if a line is cut at your resolution.
 
 Why the loader's overlay is invisible is not established, and the other overlay text (wrong-build notice, belt counts) was not re-tested here.
+
+## Lane devmenu3: typing in the menu's box, one panel, Cornerstone rows, max sockets, uber warps (2026-11-10, slot 2, background input)
+
+Checks `devmenutype` (typing, layout, Cornerstone, sockets, typed level, uber warps), `devmenuuber` (the uber warps alone) and `devmenu`
+(regression), each `MXL_RUN=devmenu3 MXL_SLOT=2 MXL_CHAR=<new name> MXL_CHAR_CLASS=amazon py -3 tools/game_checks.py --slot 2 all <check>`:
+
+| Run | Check | Result |
+|-|-|-|
+| `checks-20261110-135319-s2` | devmenutype | all 37 rows PASS, HD and legacy |
+| `checks-20261110-140610-s2` | devmenuuber | 3 rows PASS: "uber" lists them under the heading; Fauztinville (`cypherpunk`) lands in Stony Tomb Level 1 (area 55), Welcome to Toraja (`macumba`) at the Frigid Highlands waypoint (111) |
+| `checks-20261110-140817-s2` | devmenu | all 19 rows PASS, 0 crash files |
+
+Typing rows: in each mode "a", "A", "75", "staff" and the bound keys "ictqmw1234" type into the box with no game panel opening (side strips
+unchanged), Backspace and Enter edit in the box, a click on a tab gives the keys back (`i` opens the inventory), Esc and Ctrl+F12 close the menu
+from the box, and a typed level is applied (60 HD, 70 legacy). The check types with key messages only, as a keyboard does: the game's message
+loop makes the character (`TranslateMessage`); `game_ctl.type_text` also posts the character, a second copy that landed out of order on slow
+frames ("cocrrnenrstone"). "A" still needs a posted character (posted Shift is not in the thread's key state). The pool lines at exit are the
+usual exit-only ones.
+
+Screenshots (`mxl2012-runs/devmenu3/after/`): `devmenu_type_hd_layout.png`, `devmenu_type_sd_layout.png` (one panel), `devmenu_type_*_bound_keys.png`,
+`devmenu_type_*_level_applied.png`, `devmenu_cornerstone_list.png`, `devmenu_cornerstone_tooltip.png` (+1 to Ghost Arrow), `devmenu_sockets_*_tooltip.png`,
+`devmenu_uber_list.png`, `devmenu_uber_fauztinville_landed.png`, `devmenu_uber_toraja_landed.png`; before: `mxl2012-runs/devmenu3/before/`.
+
+Not checked: a real keyboard (the harness posts messages; rollover of two held keys was not tried), and inserting a gem into a spawned base:
+the bases carry stat 194 = 4 and the tooltip shows "Max Sockets: 4" rather than "Socketed (4)", so whether the socketed flag is set is open.
+(Answered by lane devmenu4 below: the flag was set; the item was unidentified.)
+
+## Lane devmenu4: a wider panel, one-line labels, real sockets (2026-11-10, slot 2, background input)
+
+Layout (docs/dev-menu.md "How the panel is put together"): HD on D2R's wide `PANEL\Options\FrontEndOptionsBG` at 0.92 (1794 x 1504, as tall
+as before), classic 760 x 502; centred tab / category rows with every label on one line, the search label at full width beside its box, rows
+84 (HD) / 108 (classic) characters. Classic buttons use art of the right size (classic art is never scaled; 0.1.18's classic action buttons
+showed their label beside a small button, and a wide two-piece button without a rect size wrapped its label after every letter). Unit tests:
+`tools/tests/test_devmenu_layout.py` (31, class `Geometry`), `devmenu_tests`.
+
+Sockets: every spawned item is created identified. The "Max Sockets: 4" of lane devmenu3 was D2R's tooltip for an unidentified item; the
+item service had set the count and the socketed flag (flag word 0x82800) all along.
+
+Checks, each `MXL_RUN=devmenu4 MXL_SLOT=2 MXL_CHAR=<new name> MXL_CHAR_CLASS=amazon py -3 tools/game_checks.py --slot 2 all <check>`:
+
+| Run | Build | Check | Result |
+|-|-|-|-|
+| `checks-20261110-204130-s2` | sockets read back | devmenutype | 36 of 37 rows PASS: weapon / armour with 4 sockets, flags 0x82810 (socketed, identified), Amethyst into the Balanced Axe ("Gemmed Balanced Axe", +30% attack rating, gem left the backpack, cursor empty); FAIL `sd types bound keys` (typed "icTqmw1234": a capital T, typing code unchanged; the row passed in the run before) |
+| `checks-20261110-205151-s2` | same | devmenulook | all rows PASS: 1600 x 900 and 1280 x 720, HD and legacy, five tabs, Cornerstone search, uber list |
+| (same batch) | same | devmenuuber | 3 rows PASS |
+| (same batch) | same | devmenu | 19 rows PASS |
+| `checks-20261110-205927-s2` | final | devmenutype | the game died at the Toraja uber warp (act 2 to act 5): access violation at D2R+0x1255802, "...without a client..." on the stack |
+| `checks-20261110-211101-s2` | final | devmenulook | all rows PASS |
+| (same batch) | final | devmenu | 19 rows PASS, 0 crash files |
+| `checks-20261110-214235-s2` | final | devmenutype | rows before the uber warps PASS; the same crash at the Toraja warp (D2R+0x1255802) |
+
+Both crashes have one cause, and it is not the layout: the level 1 test character was killed in Stony Tomb Level 1 (screenshots
+`devmenu_uber_fauztinville_landed.png`: "slain by Wracked Soul" / "Azure Drake"), and the check then pressed the Toraja arrow while the character
+was dead. In the passing runs the character was still alive there. The travel code (unchanged in this lane) does not refuse a warp while the
+player is dead.
+
+Before `214235`, slot 2's `ModernSharedStashSoftCoreV2.d2i` (in `mods\mxl2012-s2`) was all zeros, left by a run killed mid-game by a T3
+restart; every new character then stopped at "BadCharVersion". It was renamed to `...d2i.zeroed-devmenu4-20261110` and the game made a new one.
+
+Screenshots (`mxl2012-runs/devmenu4/shots/`): `devmenu_look_<1600|1280>_<hd|sd>_<items|travel|character|unlocks|quests|cornerstone|uber>.png`,
+`devmenu_sockets_weapon_tooltip.png` ("Socketed (4)"), `devmenu_sockets_weapon_gem_tooltip.png` (the gem in), `devmenu_sockets_armour_tooltip.png`.
+New check `devmenulook` (screenshots, judged by eye); `devmenutype` gained the flag / identified readback and the gem row.
+
+Open: a warp while dead crashes the game (travel should refuse it, and `devmenutype` should not stay in Stony Tomb with a level 1 character);
+`sd types bound keys` flaky once; category labels in HD are small at 1280 x 720 (one line at the size that fits 224 units).
+
+## Lane wltree: the Warlock's classic skill tree and the gamepad skill trees (2026-11-10, slot 2, background input)
+
+Build of lane/wltree (full `tools/build.py`, validate 0 errors) with the main checkout's dev plugin built from the same base
+(1b026a4; the lane changes no plugin code). Slot 2's account owns Reign of the Warlock (docs/legacy-graphics.md 8). Characters:
+WltreeWarlock, WltreeSorc, WltreeAma, WltreeNec, WltreePal, WltreeBarb, WltreeDru, WltreeAsn. Evidence (not in git):
+`mxl2012-runs/wltree/after/`, before / after sheets `mxl2012-runs/wltree/SHEET_after_legacy_warlock.png` and
+`SHEET_after_controller.png`; the earlier shots of the old state are in `mxl2012-runs/wltree/ingame/`.
+
+| Check | Result | Shots |
+|-|-|-|
+| Warlock classic tree (G), 3 tabs | **PASS**: tabs CHAOS / ELDRITCH / DEMON top to bottom in Median's lettering, each tab shows its own page's 10 skills, each skill in a Median box with its level box, arrows along the prerequisites, Close button on a free spot of row 6 | `wk_legacy_top.png`, `wk_legacy_mid.png`, `wk_legacy_bottom.png` |
+| Hover 8 Warlock skills in classic | **PASS**: every tooltip names the skill under the cursor (Apocalypse, Abyss, Miasma Bolt, Mirrored Blades, Levitate, Summon Goatman, Bind Demon, Demonic Mastery) | `wk_legacy_hover_*.png` |
+| Classic Close button | **PASS**: one click closes the panel | `wk_legacy_close_after.png` |
+| Gamepad UI trees, 7 Median classes x 3 pages | **PASS**: sockets only under the 10 skills (2 x 5), short arrows only between chained skills, no empty socket, tab titles Median's | `pad_{am,so,ne,pa,ba,dr,as}_tab{0,1,2}.png` |
+| Gamepad UI tree, Warlock | **PASS**: D2R's own trees, unchanged | `pad_wk_tab{0,1,2}.png` |
+| HD (mouse UI) unchanged | **PASS**: Warlock D2R's Chaos page; Sorceress Median's page | `wk_hd_tab0.png`, `so_hd_tab0.png` |
+
+Seen, not a defect: unlearned skills draw dimmed (D2R's `disabledButtonTint`); the small light corner at the right edge of the
+tab column between the middle and bottom tabs is Median's own tab frame (same pixels in every class's art).
+## Lane charminv (2026-11-10, slot 2, HD and legacy)
+
+CharmInv 1.0.1 by Dimentio (docs/bundled-plugins.md "CharmInv"), installed with `tools/install_mod.py --slot 2 --charminv`
+on the branch without stash page 2; a fresh Barbarian `CharmInvTest`, background input only. Driver and evidence:
+`mxl2012-runs/charminv/scripts/charm_inv_live.py`, `mxl2012-runs/charminv/game/` (run folder
+`work/runs/checks-20261110-192741-s2`).
+
+- **Load:** "Charm bonuses from the normal inventory are enabled", "gridX=10, gridY=4, itemTypes=14": the mod's
+  `charminvtypes.txt` / `charminv.txt` (RotW custom tables) replace the plugin's own. mxl2012-core: "other plugins:
+  d2rl-charm-inv.dll", no hook clash.
+- **Open:** the button on the left edge of the inventory panel (HD), `charminv open|close|toggle`, and Open Charm Inventory
+  bound to J in Options > Controls (no key by default; while the game is paused the key answers "could not toggle the
+  panel (result 6)"). Its button over an open stash swaps the stash for CharmInv.
+- **Bonuses, strength 30 at start (`stat player 0`), test charms made with `item <code> inv 0=<n>`:** Sunstone of Fire
+  `x1x` +7 in the inventory 37; moved into CharmInv (page 6) 37; Barbarian reward `x03` +5 in the inventory 42; both in
+  CharmInv 42; `x1x` back in the inventory 42; Sunstone of Ice `x2x` +3 in the inventory 45. Each charm counts once, in
+  either place. The Necromancer reward `x05` gives a Barbarian nothing in either place (Median's `Class` column of
+  `arae`; drawn red), as in the inventory before.
+- **Item types:** `grtz`, `ara*` and the Scroll of Summoning `s0m` (`summ`) go in; a ring stays on the cursor.
+- **Save and Exit, then Play:** the same items on page 6 and in the inventory, strength 45.
+- **Tooltip:** "Keep in Inventory or Charm Inventory to Gain Bonus" (the mod's string over the plugin's).
+- **Stash page 2 gone:** HD and legacy stash without its arrows (`hd_stash.png`, `legacy_stash.png`).
+- **Legacy:** no button, no panel; `charminv open` reserves an empty left panel. Charms already in CharmInv still count
+  (strength 45). Open item: a legacy layout.
+- **Logs:** 0 crash files; the exit-only pool asserts (`_bcObjectPoolBlockListIsEmpty`, `m_freed == 0`) at game stop.
+## HD wall output cache
+
+Full builds run `walls_cache.py build` around `walls_hd.py`. Entries live outside the
+worktrees at `<MXL2012_RUNS>/buildcache/walls_hd` (override with `MXL_BUILD_CACHE`).
+The recipe includes the transitive tools import closure (including conditional imports),
+Python/NumPy/Pillow versions, arguments
+and MXL environment switches. A miss traces file reads, existence/type checks, accessed stat fields (including size gates), and
+directory discovery; replay hashes contents and checks absent fallback candidates too.
+Inputs under the checkout use relative names, allowing identical lanes to share entries.
+The payload includes every file written by the stage, including sprite art, models,
+biomes, LOD index and reports. Entries publish by directory rename; payload hashes are
+checked before restore. Old entries are pruned to an 8 GiB total after a store.
+
+`MXL_NO_BUILD_CACHE=1` bypasses both lookup and storage. `MXL_VERIFY_BUILD_CACHE=1`
+regenerates on a matching entry and compares every cached product against generation.
+`MXL_BUILD_CACHE_PROBE=1` only checks the current inputs (exit 0 hit, 2 miss), with no
+restore or generation; use it before the wall stage, whose writes replace some inputs.
+External/native reads cannot be traced: populate the shared D2R input cache first
+(`lane_setup`), or bypass the output cache. Such reads fail closed rather than cache
+unidentified CASC input. The cache is currently limited to walls; the existing art
+statistics cache already avoids repeated effect-art measurement.
+
+Cache tests: `py -3 -m unittest discover -s tools/tests -p test_walls_cache.py`.
+Full-build verification must use the host-wide heavy lock, including when bypassing
+or verifying the cache. Compare manifests of the whole `work/mod` tree, not only scenes.
+
+Verified on the wallscache lane: two locked full builds produced identical SHA-256
+manifests for all 5,175 files in `work/mod`. Active full-build time was 66m59s cold
+versus 5m28s hit; sampled process-tree peak private memory was 11.79 versus 1.76 GiB.
+The walls stage took 57m41s versus 13s. Changing `MXL2012_BELIAL_TERRAIN` caused a
+probe miss while preserving the output tree.
+
+## Lane charmdup (2026-11-11, slot 2, HD and legacy, CharmInv 1.0.1 installed)
+
+Plugin part `charmdup` (`plugin/src/charm_dup.cpp`, docs/d2r-addresses.md section 22c, docs/bundled-plugins.md "CharmInv"):
+more copies of one carry1 unique may be carried, one gives its bonus. Game check `charmdup` (Butcher's Tooth `a60`, +10 to
+all attributes, level 40; the test character gets `xp`), background input only. Evidence: `mxl2012-runs/charmdup/`
+(`check*.log`, `live1/`, `live2/`), run folders `work/runs/checks-20261111-*-s2`.
+
+- **What D2R and D2RLoader did before the part's last form** (development runs): the backpack took the second copy once the
+  unique half of the carry test `0x473960` was left out; the requirement veto drew the inactive copy red (HD and legacy)
+  and kept its stats out; a copy that stopped being the active one kept its stats until its stat list was detached
+  (`0x2f8290`): NOEQUIP + `0x475020` and `0x2f81a0(..., 0)` left them merged; the client's copy of the stats (`cstat`,
+  the character sheet) needed the same step in its own refresh `0x1c9610`. A second `0x36bc50` hook is refused by
+  D2RLoader (mercequip has one): the part asks through mercequip's hook.
+- **CharmInv refuses a second copy** of a unique when a copy is already carried (in the backpack or in CharmInv): the
+  copy stays on the cursor. A different carry1 unique goes in. The compare slot `0x3e2abb0` replaced by the part does not
+  change it, so D2RLoader's custom page placement has its own carry1 test (D2RCore exports `UniqueItemsShareCarryOneGroup`;
+  not visible in the dump). The backpack takes the copies; open item for D2RLoader.
+- **`charmdup` PASS** (`checks-20261111-021633-s2`): strength 30 + 10 on the server and the client at every step: one copy;
+  it moved into CharmInv; a second copy picked up from the ground into the backpack (the CharmInv one stays active, the
+  backpack one red); Save and Exit, Play with one copy in CharmInv and one in the backpack (both come back, +10 once); the
+  CharmInv copy dropped (the backpack copy gives it); both in the backpack (the new one above takes over); the active one
+  moved below the other (it changes back); Save and Exit, Play. Shots `charmdup_hd_charminv_and_backpack.png`,
+  `charmdup_hd_both_backpack.png`, `charmdup_hd_switch.png`, `charmdup_legacy_backpack.png`.
+- **`uniquecarry` PASS** (the second copy is now placed; with `MXL_CONTROL=charmdup` it expects the refusal);
+  **`rpcharm` PASS** on a level-120 character (a level-1 one fails as before: the Scroll of Summons needs level 6;
+  same result with the part off).
+- **Not covered:** trading between two players (no multiplayer test setup), the tooltip of an inactive copy (no line of
+  its own; its "Keep in Inventory" line still shows).

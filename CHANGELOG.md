@@ -7,6 +7,47 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.19 (2026-11-11)
+
+- Removed personal stash page 2 to make room for Charm Inventory. **Items left on that page are deleted when updating from older alpha builds**; recreate them with the developer menu if needed. Other storage is kept.
+
+- New: **CharmInv** by Dimentio, D2RLoader's author, ships with the mod: a charm inventory of 10 x 4 cells. Open it with
+  the button on the inventory panel or a key you bind (Options > Controls: Open Charm Inventory); HD graphics only for
+  now. It takes every Median charm
+  (small, medium, large and crafted charms, trophies, Sunstones, quest and challenge charms, the Scroll of Summoning) and
+  nothing else. Charms give their bonus there and, as before, in the normal inventory. Settings in
+  `mods\mxl2012\d2rloader\config\charm-inv.toml`.
+
+- You can now carry more than one copy of the same unique charm, relic or quest charm in the inventory (for trading). Only
+  one copy gives its bonus: the one in the charm inventory, otherwise the top-left one in the inventory. The other copies
+  are shown red and give nothing until the active copy leaves. The charm inventory still holds one copy of each.
+
+- The Warlock has its own skill tree in classic graphics (G), in Median's look: Median's stone, skill boxes and arrows laid
+  out on the Warlock's real skill positions and prerequisites, its own skill icons, and tabs named for their pages (Chaos,
+  Eldritch, Demon from top to bottom). Before, it showed the Necromancer's old tree with Druid icons, and the top and bottom
+  tab names were swapped.
+
+- With a controller, the skill trees of the seven Median classes now draw a socket under every skill and arrows only between
+  skills that need each other, instead of the original game's empty sockets and stray arrows.
+
+- Developer menu: the panel is wider and every tab, filter and row fits on one line (long area and Cornerstone of the World
+  rows included). Spawned items with sockets now show "Socketed (N)" and take gems, runes and jewels.
+
+- Legacy graphics: the limit on how many sprites one screen can draw is raised from 3000 to 12000, so walls, monsters and
+  missiles no longer vanish on very crowded screens (heavy proc builds, large packs). This is the new `drawcap` plugin that
+  ships with the mod; settings in `mods\mxl2012\d2rloader\config\drawcap.toml`.
+
+- Stash: on the MEDIAN, ORBS, Materials, Runes and Gems pages the cell frames now sit exactly on their slots, in HD and
+  legacy graphics. Before, neighbouring cells were a few pixels off from each other and from the page art.
+
+- HD: the character sheet's Advanced Stats panel now lists Median's stats (111 of them, in the order of Median's own stat
+  list) with the same wording as item tooltips. Twelve are always shown; the rest appear when the character has them. In
+  legacy graphics there is no button for this panel yet.
+
+- Known issues: the charm inventory has no panel in legacy graphics yet. With a controller, the Send to stash button on
+  the inventory may not be reachable since the charm inventory tab was added (mouse works). The charm inventory page
+  itself takes one copy of each unique charm; extra copies go in the normal inventory.
+
 ### 0.1.18 (2026-11-10)
 
 - New developer menu, single player only: press Ctrl+F12 in a game (rebindable in Options > Controls). Spawn any unique, set item, charm, quest item or base by name, get a runeword kit (the base with sockets and the runes), travel to any area by name, raise your level, unlock every waypoint. See `docs/dev-menu-guide.md`.

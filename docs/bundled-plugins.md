@@ -1,7 +1,7 @@
 # Third-party D2RLoader plugins planned to ship with D2R-XL 2012
 
 Planned 2026-11-04. Shipped so far: D2R Legacy 16:9 and Buff HUD (0.1.12), Auto Belt Refill (0.1.15), PyreFly's Controller QOL
-Updates (0.1.17); add new candidates to
+Updates (0.1.17), CharmInv by Dimentio (next release); add new candidates to
 the tables below. The compatibility work (which plugins
 need changes for Median XL 2012's data)
 starts after release 0.1.11. Each plugin keeps its author's credit in the release notes, the README credits and this file.
@@ -251,6 +251,62 @@ Research of lane beltrefill (2026-11-05, v0.35.8 / v0.35.9):
   column learned `hp5`. With `locked = true` the plugin refuses such routes, so columns keep their exact lists (checked in game with v0.35.9).
   `rvs` / `rvl` are not spawnable in Median. The #541 fix planned in lane beltstack is data only (each non-classic belt
   potion gets its own item type), and the plugin matches item codes, never item types, so it needs no change for it.
+
+## CharmInv by Dimentio (next release)
+
+[CharmInv](https://d2rloader.net/hub/plugins/charm-inventory) 1.0.1 by **Dimentio**, D2RLoader's author: a separate
+charm inventory, a 10 x 4 grid on the left panel, opened by a button on the left edge of the inventory panel, a key
+(Options > Controls > Charm Inventory: Open Charm Inventory; no key by default), the console command
+`charminv open|close|toggle` or a controller tab. Charms in it grant
+their bonus. **Licence:** no source and no licence file are published (the zip holds the signed DLL and its MPQ); CharmInv
+is redistributed with D2RLoader by the owner's decision (author: Dimentio, D2RLoader's author), 2026-11-10. Credit: README,
+CHANGELOG / release notes, NOTICE.md, `third_party/charm-inv/README.md` and this file (lane charminv).
+
+- **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-charm-inv.dll` and its companion `d2rl-charm-inv.mpq` (both
+  unchanged, mod-scoped), and our config `mods\mxl2012\d2rloader\config\charm-inv.toml`, a `preserve` file. The manifest's
+  `bundledPlugins` names it with version, source, author and both SHA-256.
+- **No binaries in git.** The author's two files are pinned by size and SHA-256 in `tools/package_release.py` (`CHARMINV`)
+  and looked up by `--charminv DIR`, `MXL_CHARMINV_DIR`, a git-ignored copy in `third_party/charm-inv/` or
+  `<runs>/shared/charm-inv-1.0.1/`; other bytes are refused (`third_party/charm-inv/README.md` has the update steps).
+- **Config** (`third_party/charm-inv/charm-inv.toml`): `allow_inventory_charms = true` (owner decision 2026-11-10: a charm
+  works in the normal inventory as in Median XL, and in CharmInv; the plugin's own default is `false`),
+  `inactive_charm_tint = "yellow"` (only drawn when a charm does not count), `inject_inventory_button = true` (our mod
+  has no other way in with the mouse).
+- **Median charm types** (`tools/charm_inv.py`, build step after `warlock_scale`): the plugin reads which item types it
+  takes from its table `charminvtypes.txt` (stock: `char`). The build writes the mod's override
+  `data/global/excel/d2rloader/charm-inv/charminvtypes.txt` with every Median type whose `Equiv` chain reaches `char`:
+  `char scha mcha lcha csch summ grtz araa`-`arag` (14; trophies, Sunstones and quest charms are `grtz`, the class
+  challenge charms `ara*`, the Scroll of Summoning `summ`). Jewels are socket fillers in Median and stay out. The grid table
+  `charminv.txt` stays 10 x 4 (the panel art has 10 x 4 cells).
+- **The custom player page.** D2RLoader gives a mod one custom player page (item page 6 of the `.d2s`). It belonged to
+  mxl2012-core's second personal stash page (`stash2`, `plugin/src/stash_pages.cpp`); that page is no longer registered
+  and its arrows are gone from the HD and legacy stash layouts (`tools/ui_layouts.py`, `tools/rotw_stash_legacy.py`).
+  **Old alpha items on stash page 2 are deleted before character select**, rather than imported into CharmInv.
+  mxl2012-core 0.1.19 performs the cleanup and preserves characters already saved with CharmInv;
+  see [stash retirement](stash-page-retirement.md).
+- **Strings.** CharmInv's MPQ sets the charm line to "Keep in Charm Inventory to Gain Bonus"; the mod's string fixes win
+  and say "Keep in Inventory or Charm Inventory to Gain Bonus" (`data/d2r_string_fixes.json`).
+- **Legacy graphics: not usable yet.** The MPQ has HD layouts only (panel, inventory button, controller panel). In legacy
+  no button is drawn and `charminv open` or the key only reserves an empty left panel; the charms in it still count
+  (docs/testing.md "Lane charminv"). A legacy layout of our own (`data/global/ui/layouts/charm-inv/CharmInvPanel.json`,
+  `InventoryButton.json` with classic art) is open.
+- **Duplicate carry1 uniques** (mxl2012-core part `charmdup`, `plugin/src/charm_dup.cpp`, docs/d2r-addresses.md section 22c):
+  Median's 45 carry1 uniques (unique charms, relics, quest charms) give their bonus once per character. A player may carry
+  more copies of one of them (to trade) in the backpack: D2R's carry test no longer refuses the second copy (the unique
+  half of `0x473960` is left out and the carry1 comparison slot `0x3e2abb0` answers "not the same"; the build's own carry1
+  numbers stay). **CharmInv still takes one copy of each:** D2RLoader's custom page placement has its own carry1 test, so a
+  second copy stays on the cursor when one is already carried (open item for D2RLoader; docs/testing.md "Lane charmdup"). Only the active copy gives its stats: the copy in CharmInv, else the
+  top-left copy of the backpack (top row first, then the left column); the choice depends only on where the copies lie, so
+  client, server and a reload agree. The other copies answer D2R's requirement check `0x36bc50` with "not met": D2R draws
+  them red and never merges their stats. When a copy arrives that outranks the active one, the refresh first takes the
+  old copy's stat list out (`0x2f8290`, on the server and in the client's own copy of the stats), then D2R merges the new
+  one. Moving, dropping, picking up, trading and loading all go through D2R's refresh. The items themselves are
+  never changed. The tooltip of an inactive copy has no line of its own (D2R has no native text for it); its requirement
+  lines stay white. `MXL_CONTROL=charmdup` turns the part off (then the second copy is refused, as before). Game check
+  `charmdup`; `uniquecarry` expects the second copy placed while the part is on.
+- **Turn it off:** `inject_inventory_button = false` hides the button; delete the DLL and MPQ to remove it (the items in it
+  stay on page 6 of the save).
+- **Test runs:** a dev install (`tools/install_mod.py`) removes it; `--charminv` installs it as a release does.
 
 ## Checks before shipping (after 0.1.11)
 

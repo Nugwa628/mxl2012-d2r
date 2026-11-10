@@ -55,7 +55,6 @@ from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 import dc6  # noqa: E402
 import fxpaths  # noqa: E402
 import median_stash  # noqa: E402
-import stash_page2  # noqa: E402
 import ui_art  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -126,6 +125,49 @@ def classic_box(hd_rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]
     bw, bh = CELL * cw - 1, CELL * ch - 1
     cx, cy = (x + w / 2) / SX, (y + h / 2) / SY
     return round(cx - bw / 2), round(cy - bh / 2), bw, bh
+
+
+def grid_pitch(slots: list[tuple[str, tuple[int, int, int, int]]]) -> tuple[int, int, int, int]:
+    """(HD pitch x, HD pitch y, classic pitch x, classic pitch y) of a page whose slots stand on one HD grid: the classic pitch
+    is the HD one at the panel scale, rounded to whole pixels."""
+    xs = sorted({r[0] for _c, r in slots})
+    ys = sorted({r[1] for _c, r in slots})
+    hx, hy = xs[1] - xs[0], ys[1] - ys[0]
+    return hx, hy, round(hx / SX), round(hy / SY)
+
+
+def grid_boxes(slots: list[tuple[str, tuple[int, int, int, int]]]) -> list[tuple[str, tuple[int, int, int, int]]]:
+    """The classic [(code, (x, y, w, h))] of a page whose HD slots stand on one grid (the mod's own pages: Runes, Gems,
+    MEDIAN, ORBS, the Median Materials page): the first cell's classic_box, then a whole-pixel pitch per axis. Each HD rect
+    rounded on its own (classic_box) gave uneven 28 / 29 steps, and the cells drifted against each other."""
+    xs0 = min(r[0] for _c, r in slots)
+    ys0 = min(r[1] for _c, r in slots)
+    hx, hy, px, py = grid_pitch(slots)
+    x0, y0, _w, _h = classic_box((xs0, ys0, HD_CELL, HD_CELL))
+    out = []
+    for c, (x, y, w, h) in slots:
+        if (x - xs0) % hx or (y - ys0) % hy:
+            raise ValueError(f"slot {c} at ({x}, {y}) is off its page's {hx} x {hy} grid")
+        _x, _y, bw, bh = classic_box((x, y, w, h))
+        out.append((c, (x0 + px * ((x - xs0) // hx), y0 + py * ((y - ys0) // hy), bw, bh)))
+    return out
+
+
+def on_mod_grid(page: str, slots: list[tuple[str, tuple[int, int, int, int]]]) -> bool:
+    """The page is one the mod redraws (tools/median_stash.py) and its slots stand on that grid."""
+    if page not in median_stash.PAGES:
+        return False
+    xs = set(median_stash.COL_X)
+    ys = set(median_stash.ROW_Y) | set(median_stash.SIDE_Y)
+    return all(x in xs and y in ys for _c, (x, y, _w, _h) in slots)
+
+
+def page_boxes(page: str, slots: list[tuple[str, tuple[int, int, int, int]]]) -> list[tuple[int, int, int, int]]:
+    """The classic box of every slot of a page, in order: the mod's pages on their whole-pixel grid (grid_boxes), D2R's own
+    page where its HD rect lands (classic_box)."""
+    if on_mod_grid(page, slots):
+        return [b for _c, b in grid_boxes(slots)]
+    return [classic_box(r) for _c, r in slots]
 
 
 def cube_grid(hd: dict) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
@@ -246,11 +288,11 @@ def classic_layout(hd: dict, sd: dict, sd_base: dict | None = None, named_tabs: 
                 "notificationIconTemplate": {"filename": f"PANEL\\{NOTIFY}"}}},
             {"type": "Widget", "name": "basicstash_container", "children": [
                 kids["gold_max"], kids["gold_amount"], kids["gold_withdraw"], kids["grid"],
-                stash_page2.stock_strip_sd(),  # personal stash page 2's arrows (under D2R's shared ones; tools/stash_page2.py)
                 kids["SharedStashTabContainer"]]},
             *({"type": "Widget", "name": f"advancedstash_{p}", "children": [
                 {"type": "AdvancedStashSlotWidget", "name": code,
-                 "fields": {"rect": rect(*classic_box(r)), "itemCode": code}} for code, r in pages[p]]} for p in PAGES),
+                 "fields": {"rect": rect(*box), "itemCode": code}}
+                for (code, _r), box in zip(pages[p], page_boxes(p, pages[p]))]} for p in PAGES),
             {"type": "Widget", "name": "advancedstash_horadriccube", "children": [
                 # Median's cube is 10 x 8 and the grid draws every item at its cube cell: the grid holds all 80 cells small
                 # in the 3 x 4 frame, over the cube's own cells (bug #515, as HD: ui_layouts.stash_hd). Classic ignores a
@@ -452,16 +494,20 @@ def named_tab_frames(tabs: list[Image.Image], font: Font, pal) -> list[np.ndarra
 
 def page_picture(d2r: D2R, page: str, slots: list[tuple[str, tuple]], cube: tuple[tuple, tuple]) -> Image.Image:
     """The classic 320 x 432 page (RGBA, before quantising)."""
+    under = None
     if page in median_stash.PAGES:  # the mod's HD page with Median's runes / gems (tools/median_stash.py)
         materials = d2r.sprite(f"panel/stash/additionalstash/{HD_PAGE_ART['materials']}")[0]
         hd = median_stash.page_image(page, d2r.layout(HD_LAYOUT), materials)
+        under = median_stash.page_image(page, d2r.layout(HD_LAYOUT), materials, stone_only=True)
     else:
         hd = d2r.sprite(f"panel/stash/additionalstash/{HD_PAGE_ART[page]}")[0]
     if hd.size != (HD_W, HD_H):
         raise ValueError(f"{HD_PAGE_ART[page]}: {hd.size}, {HD_W} x {HD_H} expected")
-    im = down(hd, ui_art.PANEL_W, ui_art.PANEL_H)
+    # the mod's pages: the stone shrunk, then each slot's own recess on exactly its classic box (the HD page shrunk put the
+    # recesses where the HD rects land, up to a few pixels off the whole-pixel grid of the boxes)
+    im = down(hd if under is None else under, ui_art.PANEL_W, ui_art.PANEL_H)
     im.paste(d2r.classic_panel("expandedstash").crop((0, 0, ui_art.PANEL_W, TAB_BAND)), (0, 0))
-    boxes = [(r, classic_box(r)) for _code, r in slots] + [cube]
+    boxes = [(r, b) for (_code, r), b in zip(slots, page_boxes(page, slots))] + [cube]
     for (hx, hy, hw, hh), (cx, cy, cw, ch) in boxes:
         im.paste(down(hd.crop((hx, hy, hx + hw, hy + hh)), cw, ch), (cx, cy))
     return im

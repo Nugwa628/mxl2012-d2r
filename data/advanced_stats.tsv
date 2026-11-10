@@ -1,0 +1,108 @@
+stat	show	source
+game_craftpoints	nonzero	plugy page 1
+enr_factor	nonzero	plugy page 1
+item_magicbonus	always	plugy page 1
+item_goldbonus	always	plugy page 1
+item_fastercastrate	always	plugy page 1
+item_fasterattackrate	always	plugy page 1
+item_fastergethitrate	always	plugy page 1
+item_fasterblockrate	always	plugy page 1
+lifedrainmindam	always	plugy page 1
+manadrainmindam	always	plugy page 1
+item_fastermovevelocity	always	plugy page 1
+item_reducedprices	nonzero	plugy page 1
+item_addexperience	nonzero	plugy page 1
+item_damagetomana	nonzero	plugy page 1
+manarecoverybonus	nonzero	plugy page 1
+hpregen	nonzero	plugy page 1
+damagepercent	nonzero	plugy page 1
+skill_armor_percent	nonzero	plugy page 1
+thorns_percent	nonzero	plugy page 1
+item_attackertakesfiredamage	nonzero	plugy page 1
+item_attackertakeslightdamage	nonzero	plugy page 1
+item_attackertakescolddamage	nonzero	plugy page 1
+item_freeze	nonzero	plugy page 2
+item_howl	nonzero	plugy page 2
+item_slow	nonzero	plugy page 2
+item_stupidity	nonzero	plugy page 2
+item_freezethorns	nonzero	plugy page 2
+item_howlthorns	nonzero	plugy page 2
+item_slowthorns	nonzero	plugy page 2
+item_stupiditythorns	nonzero	plugy page 2
+item_strength_percent	nonzero	plugy page 2
+item_dexterity_percent	nonzero	plugy page 2
+item_energy_percent	nonzero	plugy page 2
+item_vitality_percent	nonzero	plugy page 2
+passive_fire_mastery	nonzero	plugy page 2
+passive_fire_pierce	nonzero	plugy page 2
+passive_ltng_mastery	nonzero	plugy page 2
+passive_ltng_pierce	nonzero	plugy page 2
+passive_cold_mastery	nonzero	plugy page 2
+passive_cold_pierce	nonzero	plugy page 2
+passive_pois_mastery	nonzero	plugy page 2
+passive_pois_pierce	nonzero	plugy page 2
+passive_pm_mastery	nonzero	plugy page 2
+item_openwounds	always	plugy page 2
+item_crushingblow	always	plugy page 3
+item_deadlystrike	always	plugy page 3
+item_demondamage_percent	nonzero	plugy page 3
+item_undeaddamage_percent	nonzero	plugy page 3
+fireresist	nonzero	plugy page 3
+maxfireresist	nonzero	plugy page 3
+lightresist	nonzero	plugy page 3
+maxlightresist	nonzero	plugy page 3
+coldresist	nonzero	plugy page 3
+maxcoldresist	nonzero	plugy page 3
+poisonresist	nonzero	plugy page 3
+maxpoisonresist	nonzero	plugy page 3
+item_absorbfire_percent	nonzero	plugy page 3
+item_absorbcold_percent	nonzero	plugy page 3
+item_absorblight_percent	nonzero	plugy page 3
+item_poisonlengthresist	nonzero	plugy page 3
+curse_resistance	nonzero	plugy page 3
+damageresist	nonzero	plugy page 3
+normal_damage_reduction	nonzero	plugy page 3
+magic_damage_reduction	nonzero	plugy page 3
+skill_bloodymary_bonus	nonzero	plugy page 3
+skill_paganheart_bonus	nonzero	plugy page 3
+skill_elixirs_synergy	nonzero	plugy page 4
+skill_paganheart_synergy	nonzero	plugy page 4
+profession_duration_mod	nonzero	plugy page 4
+skill_poison_dur	nonzero	plugy page 4
+skill_minion_dmg_percent	nonzero	plugy page 4
+item_minion_attack	nonzero	plugy page 4
+skill_minion_hp_percent	nonzero	plugy page 4
+minion_resist_all	nonzero	plugy page 4
+passive_aura_addmax	nonzero	plugy page 4
+skill_ancientspirits_synergy	nonzero	plugy page 4
+skill_concentration	nonzero	plugy page 4
+item_targettakesdamage	nonzero	plugy page 4
+item_healwhenstruck	nonzero	plugy page 4
+item_faster_potions	nonzero	plugy page 4
+item_lightradius	nonzero	plugy page 4
+item_healafterkill	nonzero	plugy page 4
+item_manaafterkill	nonzero	plugy page 4
+item_healonstriking	nonzero	plugy page 4
+item_manaonstriking	nonzero	plugy page 4
+skill_healonstrikingmelee	nonzero	plugy page 4
+item_manaonstrikingmelee	nonzero	plugy page 4
+staminarecoverybonus	nonzero	d2r
+magicresist	nonzero	d2r
+maxmagicresist	nonzero	d2r
+item_attackertakesdamage	nonzero	d2r
+item_knockback	nonzero	d2r
+item_restinpeace	nonzero	d2r
+item_ignoretargetac	nonzero	d2r
+item_fractionaltargetac	nonzero	d2r
+item_preventheal	nonzero	d2r
+item_halffreezeduration	nonzero	d2r
+item_damagetargetac	nonzero	d2r
+item_healafterdemonkill	nonzero	d2r
+item_absorbfire	nonzero	d2r
+item_absorblight	nonzero	d2r
+item_absorbmagic_percent	nonzero	d2r
+item_absorbmagic	nonzero	d2r
+item_absorbcold	nonzero	d2r
+item_cannotbefrozen	nonzero	d2r
+item_staminadrainpct	nonzero	d2r
+item_pierce	nonzero	d2r

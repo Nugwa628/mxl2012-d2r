@@ -156,7 +156,9 @@ Items draw at D2R's HD size (98 px per cell) whatever `cellSize` says, so the HD
 - **Stash, trade, vendor, hireling, character sheet panels**: sizes equal D2R's, so D2R's HD panels stay. The stash is one 10 x 10
   personal page (no extra pages: PlugY's pages were a repack feature) and D2R's shared pages (2 more by D2RLoader's
   `add_shared_tabs`, bug #535: a data setting, no panel work), so no stash-page work applies.
-- **Warlock keeps D2R's UI**: its skill page (`waskilltree`) and tab strings are untouched. The inventory and cube panels are
+- **Warlock keeps D2R's HD UI**: its HD and gamepad skill pages (`waskilltree`) and tab strings are untouched; its classic
+  tree is the mod's own (tools/warlock_tree.py, docs/legacy-graphics.md 8.5). The gamepad UI's trees of the seven Median
+  classes are the mod's too (tools/pad_skill_trees.py, docs/controller-support.md section 8). The inventory and cube panels are
   one shared layout for all classes, so Warlock gets the mod's 10 x 6 / 10 x 8 grids too (`inventory.txt` has no `Warlock` /
   `Warlock2` row in the mod, D2R has: the tables lane must add them with the mod's 10 x 6, otherwise the grid the layout draws
   and the server's differ for Warlock). See Gaps.

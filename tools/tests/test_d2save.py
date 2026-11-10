@@ -168,14 +168,14 @@ class Items(unittest.TestCase):
         with self.assertRaises(ValueError):
             d2save.write_item(item(stats=[prop(89, -20)]), T)  # light radius -20 with Save Add 5: the trap save_audit reports
 
-    def test_byte_aligned_item_gets_a_padding_byte(self):
+    def test_item_alignment_includes_advanced_stack_presence(self):
         seen = set()
         for n in range(8):
             it = item(stats=[prop(300, 1)] * n)
             w = d2save.BitWriter()
             d2save._item_layout(d2save._Codec(T, it, writer=w))
             data = d2save.write_item(it, T)
-            self.assertEqual(len(data), w.pos // 8 + 1)
+            self.assertEqual(len(data), (w.pos + 7) // 8)
             back, end = d2save.read_item(data + b"\xff", 0, T)
             self.assertEqual(end, len(data) * 8)
             self.assertTrue(same(it, back))
@@ -213,6 +213,21 @@ def synthetic_d2s(items, corpse_items=None, merc=None, golem=None):
     body += b"jf" + (d2save.write_item_list(merc, T) if merc is not None else b"")
     body += b"kf" + (b"\1" + d2save.write_item(golem, T) if golem else b"\0")
     return d2save.fix_header(body)
+
+
+class NormalCharm(unittest.TestCase):
+    def test_game_written_normal_charm_affix_and_guid(self):
+        # Sunstone of Fire made in game and saved in CharmInv, core 0.1.19.
+        raw = bytes.fromhex("102088000505009c7f78708106740e080000aad4c090f73c3f4536fe2a942203aea601005883ff7f")
+        t = copy.deepcopy(T)
+        t.charms = {"x1x"}
+        t.stats[0] = S("strength", 12, 100, csv_bits=12)
+        parsed, end = d2save.read_item(raw, 0, t)
+        self.assertEqual(end, len(raw) * 8)
+        self.assertEqual(parsed["normal_charm_affix"], 0)
+        self.assertEqual(parsed["page"], 7)
+        self.assertEqual(parsed["stats"][0]["value"], 7)
+        self.assertEqual(d2save.write_item(parsed, t), raw)
 
 
 class Saves(unittest.TestCase):
@@ -276,6 +291,23 @@ def write_tsv(d, name, header, rows):
         f.write("\t".join(header) + "\n")
         for r in rows:
             f.write("\t".join(str(c) for c in r) + "\n")
+
+
+class NormalMiscGameRecords(unittest.TestCase):
+    def test_bodypart_and_scroll_roundtrip(self):
+        t = d2save.Tables({}, bodyparts={'hrt'}, tomes={'0sc'})
+        records = [
+            ('hrt', '002088000505141c1f13f292e794020201f7567a93b18e8fe257d904c49fcf7fa7fdff03', 'normal_bodypart_monster', 4),
+            ('0sc', '00208800050518fc9b44583e33450a086302c524451254d3616f59b7520ef3d696ff7f', 'tome', 3),
+        ]
+        for code, raw, field, value in records:
+            with self.subTest(code=code):
+                raw = bytes.fromhex(raw)
+                it, end = d2save.read_item(raw, 0, t)
+                self.assertEqual(it['code'], code)
+                self.assertEqual(it[field], value)
+                self.assertEqual(end, len(raw) * 8)
+                self.assertEqual(d2save.write_item(it, t), raw)
 
 
 class Audit(unittest.TestCase):

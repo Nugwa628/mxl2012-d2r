@@ -325,7 +325,7 @@ auto CmdHelp(Ctx*, const hcmd::Tokens&) noexcept -> bool {
 	Out("verbs: setskill <id> <level> | skill [left|right <id> [<item id>]] | cast <id> [x y|unit <id>|nearest [class]|self] | mcast <id> <mode> unit <id>|nearest [class] [at <id>]");
 	Out("verbs: missile <row> [dx dy [skill level [where]]] | missiles [reset] | missilescan | cltdo <skill> [level] [orig] | cltst <skill> [orig] (client) | slot <table> [index] (client)");
 	Out("verbs: waypoint n <number> [get|set|clear] | waypoint open | objects [class] | object <class> [dx dy] | operate <id> <fn> | objmode <id> <mode> | enter nearest|<id> | dump mon <class> [offset]");
-	Out("verbs: item <code> [normal|magic|rare|set|unique [row]] [q=n] [uniq=row] [set=row] [ilvl=n] [inv|cube|ground] [unid] [stat=value ..] | equip <code> ... <head|rhand|lhand|body|...> | unequip <bodyloc> | identify [all|<item id>] | items");
+	Out("verbs: item <code> [normal|magic|rare|set|unique [row]] [q=n] [uniq=row] [set=row] [ilvl=n] [inv|cube|ground] [unid] [stat=value ..] | equip <code> ... <head|rhand|lhand|body|...> | unequip <bodyloc> | identify [all|<item id>] | items [all|code]");
 	Out("verbs: pkt <hex bytes> | pickup <item id> [inv] | cursor | ground [code] | move <x> <y> [walk] [packet] | packclear | remove <code> [n]|id <item id> | istat <item id> <stat> [layer|scan] | interact nearest|<npc class> | menu list|<line>|cancel (client) | msg nearest|<npc class> <message> | quest <id> dump|<bit> [get|set|clear] | xp <amount> | moveto <id>|nearest [class] | presets [type|rooms] | place <x> <y>");
 	Out("verbs (lane act1start, read only): walkmap <x> <y> <half> <step> [mask] | find <class>");
 	Out("verbs (lane realpath): gold get|set <carried> <bank> | shop [npc class] | gamble | usecheck <item id> | tiles");
@@ -1982,10 +1982,22 @@ auto CmdUnequip(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 }
 
 // `items`: every item of the player (backpack, cube, stash, worn).
-auto CmdItems(Ctx* c, const hcmd::Tokens&) noexcept -> bool {
+auto ItemCodeOf(Ctx* c, Unit* item) noexcept -> uint32_t;
+
+auto CmdItems(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const bool all = t.n > 1 && hcmd::LowerEq(t.tok[1], "all");
+	const bool filtered = t.n > 1 && !all;
+	if (filtered && std::strlen(t.tok[1]) > 4) {
+		return Fail(c, "usage: items [all|code]");
+	}
 	int n = 0;
 	EachItemOf(c->player, [&](Unit* item) {
-		if (n++ < 120) {
+		char code[5];
+		hcmd::DwordToCode(ItemCodeOf(c, item), code);
+		if (filtered && std::strcmp(code, t.tok[1]) != 0) {
+			return;
+		}
+		if (n++ < (all || filtered ? 4096 : 120)) {
 			DescribeItem(c, item);
 		}
 	});
@@ -3001,6 +3013,8 @@ auto CmdDevMenu(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	char status[512];
 	DevMenuStatus(status, sizeof(status));
 	Out("devmenu %s", status);
+	DevMenuSockets(status, sizeof(status));  // its own line: Out keeps 400 characters, and the status line is close to that
+	Out("devmenu sockets %s", status);
 	return true;
 }
 

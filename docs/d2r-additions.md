@@ -108,11 +108,14 @@ D2R-only entries: none left, the uniques / sets / runes tables hold only Median'
 
 Game check (lane qol, 2026-10-28, slot 2): the data loads (no assert at start, `validate.py` 0 errors) and the harness makes
 Median uniques of rows 236 (Queen of Glass), 500 (Snakehair) and 1,500 (Narlant Dream) with no assert or crash file. **The
-Chronicle itself could not be opened**: the game slots' Battle.net account does not own Reign of the Warlock, and without it
-the Esc menu has no Chronicle (nor Loot Filter) button (D2R uses its non-RotW pause layout; `pause.png` in
-`mxl2012-runs/qol/`). Making the button appear by layout would get around a paid-feature gate and was not tried. Still to check
-on a RotW account: the Unique tab lists Median's items by category, a found Median unique is recorded (unique rows above
-511 included: whether D2R's Chronicle store takes 2,479 unique rows is the open risk), runewords show one entry per row.
+Chronicle itself could not be opened** then: the game slots' Battle.net account did not own Reign of the Warlock yet, and without
+it the Esc menu has no Chronicle (nor Loot Filter) button (D2R uses its non-RotW pause layout; `pause.png` in
+`mxl2012-runs/qol/`). Making the button appear by layout would get around a paid-feature gate and was not tried.
+**Update (lane wltree, 2026-11-10): the slot account owns Reign of the Warlock now.** On slot 2 the create screen offers Game
+Version "Reign of the Warlock" and a Warlock (`WltreeWarlock`) was made and entered Act 1 (lane cubeui saw the RotW create
+screen on 2026-11-01). Still to check in a RotW game: the Unique tab lists Median's items by category, a found Median unique is
+recorded (unique rows above 511 included: whether D2R's Chronicle store takes 2,479 unique rows is the open risk), runewords
+show one entry per row.
 
 Not possible by data: a fourth tab (relics, quest items, trophies), new reward tiers, hiding single runeword rows (`complete`
 0 would switch the runeword off). New `itemuicategories.txt` rows (a "Median" sub-category) look possible (a table, Name =

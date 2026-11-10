@@ -30,9 +30,14 @@ RequirementFn g_requirement = nullptr;
 IsItemTypeFn g_isType = nullptr;
 volatile LONG g_checked = 0;
 volatile LONG g_refused = 0;
+bool g_hooked = false;
+RequirementFilter g_filter = nullptr;
 
 uint64_t RequirementHook(void* item, void* unit, int32_t a3, uint32_t* str, uint32_t* dex, uint32_t* level, int32_t a7) noexcept {
 	const uint64_t result = g_requirement(item, unit, a3, str, dex, level, a7);
+	if ((result & 0xff) != 0 && g_filter != nullptr && g_filter(item, unit, a3)) {
+		return 0;
+	}
 	if ((result & 0xff) == 0 || item == nullptr || unit == nullptr || d2r::At<int32_t>(item, d2r::UnitType) != UnitTypeItem ||
 	    d2r::At<int32_t>(unit, d2r::UnitType) != UnitTypeMonster) {
 		return result;
@@ -55,6 +60,7 @@ auto InstallMercEquip(const D2RL::PluginContext* context, char* report, size_t r
 	g_isType = reinterpret_cast<IsItemTypeFn>(context->exeBase + RvaIsItemType);
 	const bool ok = context->InstallInlineHook(RvaRequirement, RequirementEntry, sizeof(RequirementEntry), reinterpret_cast<void*>(&RequirementHook),
 	                                           reinterpret_cast<void**>(&g_requirement));
+	g_hooked = ok;
 	std::snprintf(report, reportSize, "mercenary weapons / shields of 1.13c's WType (Rogue bow, Desert polearm / spear, Iron Wolf sword / shield, "
 	              "Barbarian sword; 0x36bc50 hooked)%s", ok ? "" : " FAILED");
 	return ok ? 1 : 0;
@@ -63,4 +69,12 @@ auto InstallMercEquip(const D2RL::PluginContext* context, char* report, size_t r
 void MercEquipStats(long* checked, long* refused) noexcept {
 	*checked = g_checked;
 	*refused = g_refused;
+}
+
+auto MercEquipAddRequirementFilter(RequirementFilter filter) noexcept -> bool {
+	if (!g_hooked) {
+		return false;
+	}
+	g_filter = filter;
+	return true;
 }

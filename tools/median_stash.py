@@ -14,7 +14,9 @@ gems / skulls. D2R's pages have no room for them (slot recesses painted for its 
   Gems    one column per family, chipped at the top as D2R: D2R's 7, Rainbow Stone, Onyx in the grid; Bloodstone,
           Turquoise and Amber in the side columns x 114, 218, 946 (rows 6-10; the lower band is stone on the sides)
   art     D2R's Materials page (one stone field with the cube plinth): its recesses filled with stone from its own clean
-          side field, then a recess under every slot (D2R's own 1 x 1 recesses of that page, in turn), written as
+          side field, then a recess on every slot (D2R's own 1 x 1 recesses of that page, in turn, each found by
+          its dark inside and cut to the slot's 98 x 98, the inside 3 pixels in: D2R's sit -4 to +5 pixels off their
+          rects), written as
           PANEL\\Stash\\AdditionalStash\\PANEL_AdditionalStash_{Gems,Runes} (+ .lowend): the mod's file replaces D2R's
 
 tools/ui_layouts.py (stash_hd) writes the slots into the HD layout, tools/hd_ui.py build the page art,
@@ -54,7 +56,6 @@ BASE_ART = "panel_additionalstash_consumables"  # D2R's Materials page
 STONE = (100, 725, 355, 1095)                   # a clean stone field of the Materials page (left of the plinth)
 TOP_FIELD = (86, 216, 1077, 716)                # the Materials page's slot field above the plinth
 BAND_SIDES = ((86, 1096, 361, 1203), (800, 1096, 1077, 1203))  # the lower band beside the plinth (gems: a fifth side row)
-RECESS_PAD = 4                                  # stone round a recess taken with it, blended over its outer 2 pixels
 
 
 def slots(page: str, d2r_slots: list[tuple[str, tuple[int, int, int, int]]]) -> list[tuple[str, tuple[int, int, int, int]]]:
@@ -123,13 +124,53 @@ def _stone_fill(im: Image.Image, box: tuple[int, int, int, int], src: Image.Imag
             im.paste(t, (tx, ty))
 
 
-def _recess_mask() -> Image.Image:
-    n = SLOT + 2 * RECESS_PAD
-    m = Image.new("L", (n, n), 0)
-    d = ImageDraw.Draw(m)
-    for i, a in enumerate((90, 180, 255)):
-        d.rectangle((RECESS_PAD - 2 + i, RECESS_PAD - 2 + i, n - 1 - (RECESS_PAD - 2 + i), n - 1 - (RECESS_PAD - 2 + i)), fill=a)
-    return m
+RECESS_IN = 91                                              # a Materials recess's dark inside: 91 x 91, 1 x 2: 91 x 190
+RECESS_LEAD = 3                                             # its frame left of / above the inside: cell 3 + 91 + 4, 3 + 190 + 3
+RECESS_DARK = 28                                            # brightness under which a pixel is recess inside (stone: 40+)
+
+
+def _runs(flags) -> tuple[int, int]:
+    """First and last index of the longest run of True in `flags`."""
+    best, start = (0, -1), None
+    for i, f in enumerate(list(flags) + [False]):
+        if f and start is None:
+            start = i
+        elif not f and start is not None:
+            if i - start > best[1] - best[0] + 1:
+                best = (start, i - 1)
+            start = None
+    return best
+
+
+def recess_inside(lum, rect: tuple[int, int, int, int], margin: int = 10) -> tuple[int, int, int, int]:
+    """(x, y, w, h) of the dark inside of the recess D2R painted for the slot `rect` (`lum`: the page's brightness, rows x
+    columns). D2R's recesses sit -2 to +5 pixels off their layout rects (the Materials page's own slots), so the art is placed
+    by this box, never by the rect: copied by the rect, every cell's frame drifted against its slot and its neighbours."""
+    import numpy as np
+    x, y, w, h = rect
+    dark = np.asarray(lum)[y - margin:y + h + margin, x - margin:x + w + margin] < RECESS_DARK
+    x0, x1 = _runs(dark.mean(0) > 0.6)
+    y0, y1 = _runs(dark.mean(1) > 0.6)
+    return x - margin + x0, y - margin + y0, x1 - x0 + 1, y1 - y0 + 1
+
+
+def recess_tiles(materials, d2r_mat_slots) -> dict[tuple[int, int], list]:
+    """D2R's Materials recesses as cell pictures {(w, h): [RGBA]} of exactly a slot's size (98 x 98, 98 x 196), each cut so its
+    inside starts RECESS_LEAD pixels in: pasted at a slot's rect, every frame sits the same on its slot."""
+    import numpy as np
+    base = materials.convert("RGBA")
+    lum = np.asarray(base.convert("L"), dtype=np.int16)
+    out: dict[tuple[int, int], list] = {(SLOT, SLOT): [], (SLOT, 2 * SLOT): []}
+    for code, (x, y, w, h) in d2r_mat_slots:
+        if (w, h) not in out:
+            continue
+        ix, iy, iw, ih = recess_inside(lum, (x, y, w, h))
+        if (iw, ih) != (RECESS_IN, h - 2 * RECESS_LEAD if h > SLOT else RECESS_IN):
+            raise ValueError(f"Materials recess of {code}: inside {iw} x {ih} at ({ix}, {iy}), {RECESS_IN} wide expected")
+        out[(w, h)].append(base.crop((ix - RECESS_LEAD, iy - RECESS_LEAD, ix - RECESS_LEAD + w, iy - RECESS_LEAD + h)))
+    if not out[(SLOT, SLOT)]:
+        raise ValueError("D2R's Materials page has no 1 x 1 recess")
+    return out
 
 
 def page_art(page: str, materials: Image.Image, materials_slots: list[tuple[str, tuple[int, int, int, int]]],
@@ -145,13 +186,9 @@ def page_art(page: str, materials: Image.Image, materials_slots: list[tuple[str,
     if page == "gems":
         for box in BAND_SIDES:
             _stone_fill(im, box, stone, rng)
-    tiles = [base.crop((x - RECESS_PAD, y - RECESS_PAD, x + SLOT + RECESS_PAD, y + SLOT + RECESS_PAD))
-             for _c, (x, y, w, h) in materials_slots if (w, h) == (SLOT, SLOT)]
-    if not tiles:
-        raise ValueError("no 1 x 1 recess on the Materials page")
-    mask = _recess_mask()
+    tiles = recess_tiles(materials, materials_slots)[(SLOT, SLOT)]
     for i, (_c, (x, y, _w, _h)) in enumerate(page_slots):
-        im.paste(tiles[i % len(tiles)], (x - RECESS_PAD, y - RECESS_PAD), mask)
+        im.paste(tiles[i % len(tiles)], (x, y))  # the recess fills the slot's rect exactly (recess_tiles)
     return im
 
 
@@ -164,10 +201,12 @@ def _rects(children: list[dict]) -> list[tuple[str, tuple[int, int, int, int]]]:
             for c in children if c.get("type") == "AdvancedStashSlotWidget"]
 
 
-def page_image(page: str, d2r_layout: dict, materials: Image.Image) -> Image.Image:
-    """The HD page picture for D2R's layout (`d2r_layout`, unchanged) and D2R's Materials page (`materials`)."""
+def page_image(page: str, d2r_layout: dict, materials: Image.Image, stone_only: bool = False) -> Image.Image:
+    """The HD page picture for D2R's layout (`d2r_layout`, unchanged) and D2R's Materials page (`materials`); `stone_only`: the
+    same page without the recesses (what the classic page shrinks before it puts a recess on each classic box)."""
     mat_slots = _rects(_find(d2r_layout, "advancedstash_materials")["children"])
-    return page_art(page, materials, mat_slots, _rects(widget(page, _find(d2r_layout, f"advancedstash_{page}"))["children"]))
+    slots = [] if stone_only else _rects(widget(page, _find(d2r_layout, f"advancedstash_{page}"))["children"])
+    return page_art(page, materials, mat_slots, slots)
 
 
 def build(d2r_layout: dict, materials: Image.Image, out_dir: Path) -> list[str]:

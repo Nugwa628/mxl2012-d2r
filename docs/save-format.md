@@ -84,6 +84,9 @@ Bit-packed, least significant bit first. Fields marked **ext** differ from retai
 | item id, item level, quality | 32, 7, 4 | quality 1 low, 2 normal, 3 superior, 4 magic, 5 set, 6 rare, 7 unique, 8 crafted. D2R's own writer clamps the item level to 99 (bug #251); with the plugin part `ilvl` (lane ilvl) the field keeps 1-127 and nothing above 127 is written. D2R's reader takes the whole 7-bit range, so saves of either kind load |
 | picture | 1 + 3 | |
 | class-specific affix | 1 + 16 | |
+| normal charm | **ext** 1 + 16 | prefix/suffix selector and affix id, even when zero; identified from the item type Equiv chain, not code naming. Seen on game-saved Sunstone of Fire (`x1x`), including in CharmInv. Retail's 1 + 11 layout is also described by [D2CE](https://github.com/WalterCouto/D2CE/blob/main/d2s_File_Format.md). |
+| normal body part | monster id 10 bits after auto-affix | game-written `hrt` |
+| noncompact scroll / tome | 5 bits before GUID, for both `scro` and `book` types | game-written `0sc` (value 3) |
 | low / superior | 3 | |
 | magic | **ext** 16 + 16 | prefix, suffix (retail 11 + 11); Median 747 / 959 rows |
 | set | **ext** 16 | setitems row (retail 12); Median 300 rows |
@@ -102,7 +105,10 @@ Bit-packed, least significant bit first. Fields marked **ext** differ from retai
 | stats | 16-bit id, **ext** 32-bit parameter when Save Param Bits > 0, value in Save Bits after Save Add; 0xffff ends | paired stats (17/18, 48/49, 50/51, 52/53, 54/55/56, 57/58/59) are written without their own id. The parameter is 32 bits whatever the table says (oskill 712 = Pyroclastic Flow; skill-on-kill 755 << 6 \| 5) |
 | set bonus lists | one stat list per bit of the mask | |
 | runeword list | one stat list | |
-| padding | to the next byte; **ext**: a non-simple item that ends exactly on a byte boundary gets one more zero byte (simple items do not) | seen on starter weapons and on `&01` (simple, no extra byte); without it every later item is misread |
+| Chronicle trailer | flags 0x10000000 / compact 0x20000000: source 16; timestamp 32 and count 4 unless compact (one recipient); up to eight 64-bit recipients | after all stat lists; game-written DevMenuD/H fixtures |
+| advanced stash count (noncompact) | presence 1, then count 8 if present | after Chronicle; this zero presence bit explained the formerly assumed extra padding byte |
+| compact quest difficulty | itemstatcost 356 Save Bits (2), before GUID | misc quest + questdiffcheck; game-written bks/qey |
+| padding | to the next byte | after the final advanced-stash presence/count field |
 
 ### What the widths mean for Median's items (`tools/save_audit.py`, built tables of main 90e4ed2)
 

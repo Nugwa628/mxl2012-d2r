@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(mxl2012_core_tests LANGUAGES CXX)
 
-set(names buildguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests charmlength_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests spiritwarp_tests appleuse_tests vochat_tests reassign_tests savemode_tests rotwstash_tests voidfloor_tests stashpages_tests sendstash_tests medtab_tests mapreveal_tests arealvl_tests stashtip_tests tabflash_tests clearfonts_tests padinput_tests modelcache_tests devmenu_tests)
+set(names buildguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests charmlength_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests spiritwarp_tests appleuse_tests vochat_tests reassign_tests savemode_tests rotwstash_tests voidfloor_tests stashpages_tests sendstash_tests medtab_tests mapreveal_tests arealvl_tests stashtip_tests tabflash_tests clearfonts_tests padinput_tests modelcache_tests devmenu_tests charmdup_tests)
 add_executable(devmenu_tests EXCLUDE_FROM_ALL devmenu_test.cpp)
 add_executable(buildguard_tests EXCLUDE_FROM_ALL build_guard_test.cpp)
 add_executable(otherplugins_tests EXCLUDE_FROM_ALL other_plugins_test.cpp)
@@ -21,6 +21,7 @@ add_executable(whirlwind_tests EXCLUDE_FROM_ALL whirlwind_test.cpp)
 add_executable(charmlength_tests EXCLUDE_FROM_ALL charm_length_test.cpp)
 add_executable(origasserts_tests EXCLUDE_FROM_ALL orig_asserts_test.cpp)
 add_executable(cubedupe_tests EXCLUDE_FROM_ALL cube_dupe_test.cpp)
+add_executable(charmdup_tests EXCLUDE_FROM_ALL charm_dup_test.cpp)
 add_executable(itemlevel_tests EXCLUDE_FROM_ALL item_level_test.cpp)
 add_executable(runeletters_tests EXCLUDE_FROM_ALL rune_letters_test.cpp)
 add_executable(skilltext_tests EXCLUDE_FROM_ALL skill_text_test.cpp)
@@ -61,3 +62,15 @@ foreach(t ${names})
 		set_target_properties(${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 	endif()
 endforeach()
+
+# The save-reader driver is exercised with generated and real byte fixtures by the Python tests.
+add_executable(stash_retire_codec EXCLUDE_FROM_ALL stash_retire_test.cpp ../../launcher/src/core/sha256.cpp)
+target_compile_features(stash_retire_codec PRIVATE cxx_std_17)
+
+add_dependencies(tests stash_retire_codec)
+
+if(WIN32 AND NOT PROJECT_IS_TOP_LEVEL)
+  target_compile_definitions(stash_retire_codec PRIVATE STASH_RETIRE_RUNTIME_TEST)
+  target_sources(stash_retire_codec PRIVATE ../src/stash_retire.cpp ../../launcher/src/core/json.cpp)
+  target_link_libraries(stash_retire_codec PRIVATE D2RLPlugin::D2RLPlugin shell32 ole32)
+endif()

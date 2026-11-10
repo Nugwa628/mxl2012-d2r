@@ -18,7 +18,7 @@ screenshots and logs into the run folder, work/runs/checks-<time>-sN/).
 Checks: mxl2012 cltdostub rockshock cltdo83 srvhit23 frenzy cltnomis srvhit6spawn terrorzones pandewp skillprog classes textnames
 melttrail elixirs uniquecarry whirlwind cubeclasses acts playthrough mercs (docs/plugin-plan.md section 10.1; results in docs/testing.md); lane rulescheck (player-path
 verdicts of docs/median-rules-audit.md): rcbook rcdelay rctoken rclife rcscroll rchire rcdeath rclevels rprunes runeletters rpdarkring rpcharm
-rpnames rpequip; bug #395 load probe: swarm; lane rulescheck2 (a SET-UP character, tools/rc_setup.py): rc2setup rc2quest rc2refund rc2delay rc2death; lane realpath (player-path checks, no god mode, no Tank, no `item ... inv`: docs/testing.md
+rpnames rpequip; bug #395 load probe: swarm; lane drawcap (the drawcap plugin's draw-list fill, launch with MXL_DRAWCAP_PROBE=1): drawcap; lane rulescheck2 (a SET-UP character, tools/rc_setup.py): rc2setup rc2quest rc2refund rc2delay rc2death; lane realpath (player-path checks, no god mode, no Tank, no `item ... inv`: docs/testing.md
 "Player-path checks"): rp_items rp_vendors rp_death rp_areas rp_persist rp_use; lane isinside (bug #242): ins_levels; lane identify (bug #485): identify; lane elvensong (bug #487): elvensong; lane uiplus (bugs #488 / #489): lvlup_ui; lane unported (unported.md item use, ME9 mercenary level): iu_use ml_merc; lane totems (bug #493): totem_spread.
 """
 import collections
@@ -1071,6 +1071,16 @@ def be_class(class_id):
     return switch_character(name, CLASSES[class_id], class_id)
 
 
+def smoke_plugins_ok(line):
+    """Only bundled mod plugins and the explicit global-plugin test probes."""
+    if line == "other plugins: none":
+        return True
+    prefix = "other plugins: "
+    return line.startswith(prefix) and all(re.fullmatch(
+        r"(?:gp-probe-\w+\.dll \(global\)|(?:d2rl-charm-inv|drawcap)\.dll \(mod mxl2012\))", p)
+        for p in line[len(prefix):].split(", "))
+
+
 def check_mxl2012():
     """Console `mxl2012`: version line, every v0.1 part on, no FAILED install, no other plugin, no build number / image stamp."""
     mark = engine_mark()
@@ -1091,10 +1101,10 @@ def check_mxl2012():
             ("ilvl", r"^ilvl item levels 100-127 kept by the item serializer \(clamp 99 -> 127 at 0x37d744\)$"),
             ("runeletter", r"^runeletter on: rune letters without a D2R key drawn from the gems cell"),
             ("skilltext", r"^skilltext skill tooltip labels in 1\.13c's words \(0x287a50 hooked\)"),
-            ("dursync", r"^dursync worn items' durability loss reaches the client \(layer argument stored whole at 0x441c4b\)$"),
-            ("other plugins", r"^other plugins: (none|gp-probe-\w+\.dll \(global\)(, gp-probe-\w+\.dll \(global\))*)$")]  # the
-    # test plugins of lane globalplugins (`slot_share.py probe`) are the only others a run may have
+            ("dursync", r"^dursync worn items' durability loss reaches the client \(layer argument stored whole at 0x441c4b\)$")]
     missing = [n for n, p in want if not any(re.search(p, ln) for ln in lines)]
+    if not any(smoke_plugins_ok(ln) for ln in lines):
+        missing.append("other plugins")
     failed = [ln for ln in lines if "FAILED" in ln]
     leak = [ln for ln in lines if re.search(r"0x6ab3782c|93847", re.sub(r"[A-Za-z]:\\\S+", "<path>", ln))]
     ok = not missing and not failed and not leak
@@ -2550,7 +2560,8 @@ def check_uniquecarry():
     its own number (record index + 1). PASS: the built numbers are distinct, three different carry1 uniques are placed in the
     backpack (D2R's placement test 0x473960, `item ... inv`), a fourth different one lying on the ground is picked up by a
     background click (the player path: the ground pickup 0x471950 with its to-inventory flag), and a second copy of the first is
-    refused (`item: placing failed`), as in 1.13c. Control: a build with Median's 1 in every carry1 cell refuses the second
+    placed (plugin part charmdup: carry1 duplicates are carried, one copy gives its bonus; check `charmdup`), or refused
+    (`item: placing failed`) as in 1.13c when MXL_CONTROL leaves charmdup out. Control: a build with Median's 1 in every carry1 cell refuses the second
     different unique (lane pluginplan2's run with the old plugin part switched off, docs/testing.md)."""
     mark = engine_mark()
     log, shots = [], []
@@ -2576,6 +2587,8 @@ def check_uniquecarry():
         placed[r[2]] = ok and not any("placing failed" in x for x in ln)
     ok2, ln2 = Hl("item %s unique %d inv" % (a[1], a[0]), log)
     second_refused = (not ok2) and any("placing failed" in x for x in ln2)
+    dup_on = "charmdup" not in os.environ.get("MXL_CONTROL", "").lower()
+    second_ok = (ok2 and not any("placing failed" in x for x in ln2)) if dup_on else second_refused
     # the player path: the fourth lies on the ground next to the player; a left click on the item's own spot (the `item` reply has
     # its subtile; screen mapping as click_unit) walks there and picks it up, a few pixel offsets around it in case the label hides it
     n0 = inventory_count(d[1], log)
@@ -2595,10 +2608,152 @@ def check_uniquecarry():
                 break
     log.append("ground item at %s, %s; offset from the player at the last click %s" % (ix, iy, where))
     shots.append(sh("uniquecarry_backpack"))
-    ok = distinct and all(placed.values()) and second_refused and picked
-    note = ("built carry1 numbers of %d rows distinct: %s; three different carry1 uniques placed: %s; a second %s refused: %s; a fourth "
-            "(%s) picked up from the ground by a click: %s" % (len(nums), distinct, placed, a[2], second_refused, d[2], picked))
+    ok = distinct and all(placed.values()) and second_ok and picked
+    note = ("built carry1 numbers of %d rows distinct: %s; three different carry1 uniques placed: %s; a second %s %s: %s; a fourth "
+            "(%s) picked up from the ground by a click: %s" % (len(nums), distinct, placed, a[2],
+                                                               "placed (charmdup on)" if dup_on else "refused (charmdup off)", second_ok,
+                                                               d[2], picked))
     finish("uniquecarry", ok, note, mark, shots, log, partial=None if picked else "the ground pickup (no click reached the item)")
+
+
+# HD inventory grid and CharmInv grid cell centres in a 1600 x 900 window (lane charminv's measured layout)
+def _inv_cell(c, r):
+    return (1048 + 43.8 * (c + .5)) / 1600, (393 + 42.2 * (r + .5)) / 900
+
+
+def _charminv_cell(c, r):
+    return (137 + 40.6 * (c + .5)) / 1600, (518 + 40.6 * (r + .5)) / 900
+
+
+def check_charmdup():
+    """Carry1 duplicates (plugin part charmdup, docs/bundled-plugins.md "CharmInv"): a second copy of one carry1 unique may be
+    carried in the backpack (to trade); only one copy gives its bonus: the copy in CharmInv (page 6), else the top-left copy
+    of the backpack; the others count as "requirements not met" (D2R: red, no stats). Unique: Butcher's Tooth (`a60`, +10 to
+    all attributes, fixed; level 40). Needs CharmInv installed (`install_mod.py --charminv`) and a fresh MXL_CHAR. Strength is
+    read on the server (`stat`) and on the client (`cstat`, what the character sheet draws). PASS: one copy in CharmInv and a
+    second one picked up from the ground into the backpack, +10 once; Save and Exit and Play keeps both copies, +10 once; the
+    CharmInv copy dropped, the backpack copy gives it; both in the backpack (the new one above: the active copy changes), once;
+    the active one moved below the other (it changes back), once; Save and Exit and Play, both copies, once. CharmInv refusing
+    a second copy of a unique it already holds, or one the backpack holds, is D2RLoader's custom page rule (recorded, not
+    judged)."""
+    mark = engine_mark()
+    log, shots, notes = [], [], []
+    rows = [r for r in carry1_rows() if r[2].split(":")[-1] == "ButchersTooth"]
+    if not rows:
+        return add("charmdup", "FAIL", "Butcher's Tooth is not a carry1 row of the built uniqueitems.txt")
+    row, code = rows[0][0], rows[0][1]
+    goto(1)
+    release_held_item()
+    if inventory_count(code, log):
+        Hl("remove %s 9" % code, log)  # throwaway character: copies an earlier run left
+    if (rd("player", 12) or 0) < 40:
+        Hl("xp 2000000000", log)
+        time.sleep(2)
+    lvl = rd("player", 12) or 0
+    log.append("character level %s" % lvl)
+    base = rd("player", 0)
+
+    def strength():
+        s_ = rd("player", 0)
+        _, cl = Hl("cstat 0", log)
+        return s_, stat_of(cl)
+
+    def copies():
+        _, il = Hl("items", log)
+        return [kv(x) for x in il if x.startswith("item ") and ("code=%s " % code) in x]
+
+    def step(name, want_count, want_pages=None):
+        time.sleep(1.5)
+        s_, c_ = strength()
+        cs = copies()
+        pages = sorted(c["page"] for c in cs)
+        ok_ = s_ == base + 10 and c_ == base + 10 and len(cs) == want_count and (want_pages is None or pages == want_pages)
+        notes.append("%s: str %s / client %s (base %s + 10 expected), copies %s -> %s" % (
+            name, s_, c_, base, [(c["id"], c["page"], c["x"], c["y"]) for c in cs], ok_))
+        return ok_, cs
+
+    def click(xy, settle=0.9):
+        g.click_bg(xy[0], xy[1])
+        time.sleep(settle)
+
+    def open_panels():
+        g.press_bg("i")
+        time.sleep(1.5)
+        g.console_bg("charminv open")
+        time.sleep(1.5)
+
+    def close_panels():
+        g.console_bg("charminv close")
+        time.sleep(0.8)
+        g.press_bg("i")
+        time.sleep(0.8)
+
+    results = {}
+    Hl("item %s unique %d inv" % (code, row), log)
+    results["one"] = step("one copy in the backpack", 1)[0]
+    open_panels()
+    _, cs = step("before the move", 1)
+    if cs:
+        click(_inv_cell(int(cs[0]["x"]), int(cs[0]["y"])))
+        click(_charminv_cell(0, 0), 1.2)
+    results["a_in_charminv"] = step("copy A in CharmInv", 1, ["6"])[0]
+    # copy B on the ground, picked up into the backpack (the ground pickup with its to-inventory flag, 0x471950)
+    _, gl = Hl("item %s unique %d ground" % (code, row), log)
+    bid = first(gl, r" id=(\d+) ")
+    if bid is not None:
+        Hl("pickup %d inv" % bid, log)
+    ok, cs = step("copy B picked up next to A (A in CharmInv stays active)", 2, ["0", "6"])
+    results["b_picked"] = ok
+    shots.append(sh("charmdup_hd_charminv_and_backpack"))
+    # B into CharmInv next to A: D2RLoader's custom page refuses a second copy (recorded)
+    b0 = [c for c in cs if c["page"] == "0"]
+    if b0:
+        click(_inv_cell(int(b0[0]["x"]), int(b0[0]["y"])))
+        click(_charminv_cell(5, 0), 1.2)
+        held = held_item()
+        notes.append("B into CharmInv next to A: %s" % ("refused (stays on the cursor)" if held else "taken"))
+        if held:
+            click(_inv_cell(int(b0[0]["x"]), int(b0[0]["y"])), 1.2)
+            if held_item():
+                release_held_item()
+    close_panels()
+    leave_and_reenter()
+    results["reload_split"] = step("after Save and Exit, Play (A in CharmInv, B in the backpack)", 2, ["0", "6"])[0]
+    open_panels()
+    cs = copies()
+    a6 = [c for c in cs if c["page"] == "6"]
+    if a6:
+        click(_charminv_cell(int(a6[0]["x"]), int(a6[0]["y"])))
+        log.append("dropped %s" % (release_held_item(),))
+    ok, cs = step("A dropped, B alone gives it", 1, ["0"])
+    results["a_dropped"] = ok
+    gid = first(Hl("ground %s" % code, log)[1], r"id=(\d+)")
+    if gid is not None:
+        Hl("pickup %d inv" % gid, log)
+    ok, cs = step("both in the backpack", 2, ["0", "0"])
+    results["both_backpack"] = ok
+    shots.append(sh("charmdup_hd_both_backpack"))
+    inv = sorted(cs, key=lambda c: (int(c["y"]), int(c["x"])))
+    if len(inv) == 2:
+        top = inv[0]
+        click(_inv_cell(int(top["x"]), int(top["y"])))
+        click(_inv_cell(0, 3), 1.2)  # below the other copy: the other one becomes the active copy
+        if held_item():
+            release_held_item()
+    ok, cs = step("active copy moved below the other", 2, ["0", "0"])
+    results["switch"] = ok
+    shots.append(sh("charmdup_hd_switch"))
+    g.console_bg("mxl2012")  # the part's counters go to the log
+    if set_graphics("legacy"):
+        time.sleep(2)
+        shots.append(sh("charmdup_legacy_backpack"))
+        set_graphics("hd")
+        time.sleep(2)
+    close_panels()
+    leave_and_reenter()
+    results["reload"] = step("after Save and Exit, Play (both in the backpack)", 2, ["0", "0"])[0]
+    note = "level %s; %s; %s" % (lvl, "; ".join(notes), results)
+    finish("charmdup", all(results.values()), note, mark, shots, log)
 
 
 def check_whirlwind():
@@ -7609,7 +7764,7 @@ CHECKS = [("mxl2012", check_mxl2012), ("cltdostub", check_cltdostub), ("rockshoc
           ("srvhit23", check_srvhit23), ("frenzy", check_frenzy), ("cltnomis", check_cltnomis), ("srvhit6spawn", check_srvhit6spawn),
           ("terrorzones", check_terrorzones), ("pandewp", check_pandewp), ("skillprog", check_skillprog), ("classes", check_classes),
           ("textnames", check_textnames), ("melttrail", check_melttrail), ("elixirs", check_elixirs),
-          ("meltmon", check_meltmon), ("uniquecarry", check_uniquecarry), ("whirlwind", check_whirlwind),
+          ("meltmon", check_meltmon), ("uniquecarry", check_uniquecarry), ("charmdup", check_charmdup), ("whirlwind", check_whirlwind),
           ("cubeclasses", check_cubeclasses)]
 # lane rulescheck: the character rules (rc*) and the item real-path checks RP1-RP6 (rp*) on the player path
 CHECKS += [("rcbook", check_rcbook), ("rcdelay", check_rcdelay), ("rctoken", check_rctoken), ("rclife", check_rclife),
@@ -7893,6 +8048,182 @@ def check_swarm():
 
 
 CHECKS += [("swarm", check_swarm)]  # bug #395
+
+# The drawcap plugin's scenes (drawcap/README.md): (tag, area, monstats Id to spawn, how many). Rogue Encampment quiet, Lut
+# Gholein and the Chaos Sanctuary for walls, the Sanctuary again with a crowd, the Blood Moor with Heretics (skull swarms),
+# and a crowd to need more than the game's 3000 entries in legacy graphics: Siege Beasts (big sprites, about 15 entries each;
+# 271 zombies took only about 1,660) with zombies between them, in the Sanctuary (its walls add; the open Blood Moor gave less).
+DRAWCAP_SCENES = (("town_quiet", 1, None, 0), ("town_walls", 40, None, 0), ("chaos_rest", 108, None, 0),
+                  ("chaos_crowd", 108, "zombie1", 70), ("heretics", 2, SWARM_MONSTER, 10), ("crowd_over", 108, "siegebeast1", 300))
+DRAWCAP_GAME_CAP = 3000
+DRAWCAP_FILL = ("zombie1", 100)  # crowd_over: small monsters between the big ones
+# crowd_over: the live crowd alone fills the view at about 2,800 entries (casting Nova into it added nothing: half the casts
+# were refused and it killed the crowd). Corpses are units without collision: the first crowd is killed where it stands and a
+# second one spawned on the same spots, twice (one layer reached 3,234).
+DRAWCAP_CORPSE_LAYERS = 2
+
+
+def drawcap_files():
+    """The drawcap plugin's own log and stats file: next to the mod's D2RLoader logs (mxl2012-core.log's folder)."""
+    folder = os.path.dirname(g.MXL_LOG)
+    return os.path.join(folder, "drawcap.log"), os.path.join(folder, "drawcap-stats.csv")
+
+
+def drawcap_scene(tag, mode, secs, log, shots):
+    """MXL_DRAWCAP_SECS of the stats file in one graphics mode; a shot at each new peak (up to 3), one a minute in long
+    scenes, and one at the end."""
+    import drawcap_stats
+    _, csv_path = drawcap_files()
+    ok = set_graphics(mode)
+    time.sleep(2.0)
+    n0, peak, taken, dead = len(drawcap_stats.read(csv_path)), 0, 0, 0
+    seen = graphics_mode()
+    t0 = time.time()
+    minute = 1
+    while time.time() - t0 < secs:
+        hdl_tough()  # life refilled every second: a death screen would stop the scene (seen: 70 zombies, 10 Heretics)
+        time.sleep(1.0)
+        dead += player_dead(hstate()["player"])
+        rows = drawcap_stats.read(csv_path)[n0:]
+        top = max((r["max"] for r in rows if r["mode"] == mode), default=0)
+        if top > peak * 1.05 and top > 500 and taken < 3:
+            shots.append(sh("drawcap_%s_%s_peak%d_%d" % (tag, mode, taken, top)))
+            taken += 1
+        peak = max(peak, top)
+        if secs > 120 and time.time() - t0 >= 60 * minute:
+            shots.append(sh("drawcap_%s_%s_min%d_%d" % (tag, mode, minute, top)))
+            minute += 1
+        if not game_alive():
+            log.append("drawcap %s %s: the game died after %d s" % (tag, mode, int(time.time() - t0)))
+            break
+    shots.append(sh("drawcap_%s_%s_end" % (tag, mode)))
+    rows = drawcap_stats.read(csv_path)[n0:]
+    s = drawcap_stats.summary(rows, mode)
+    other = sorted({r["mode"] for r in rows} - {mode})
+    log.append("drawcap %s %s (set %s, lvlbtn %s, other modes in the file %s, dead %d s): %s" % (
+        tag, mode, "ok" if ok else "FAILED", seen, other or "-", dead, drawcap_stats.describe(s)))
+    return {"tag": tag, "mode": mode, "set": ok, "lvlbtn": seen, "other": other, "dead": dead, **s}
+
+
+def drawcap_spread(cls, n, step, offset, reach, passes, log):
+    """Spawns up to n of class cls one by one on a grid `step` subtiles apart (shifted by `offset`) within `reach` of the
+    character, nearest spots first; spawned monsters walk off and free their spots, so up to `passes` rounds. Unit ids."""
+    px, py = player_xy()
+    spots = sorted(((dx, dy) for dx in range(-reach + offset, reach + 1, step) for dy in range(-reach + offset, reach + 1, step) if dx or dy),
+                   key=lambda d: abs(d[0]) + abs(d[1]))
+    made = []
+    for _pass in range(passes):
+        for i, (dx, dy) in enumerate(spots):
+            if len(made) >= n:
+                return made
+            if i % 10 == 0:
+                hdl_tough()
+            _ok, sp = Hl("spawn %d 1 %d %d" % (cls, px + dx, py + dy), log)
+            made += re.findall(r"id=(\d+)", " ".join(sp))
+        hdl_tough()
+        time.sleep(3)
+    return made
+
+
+def check_drawcap():
+    """The drawcap plugin's probe (env MXL_DRAWCAP_PROBE=1 at launch, game_ctl.harness_switch): how full D2R's 3000-entry
+    Wall2 draw list gets per scene (DRAWCAP_SCENES) in legacy and HD graphics, MXL_DRAWCAP_SECS (15) s each; read from the
+    plugin's drawcap-stats.csv (the plugin never talks to the harness), the CSV's mode checked against the panel manager's flag
+    (`lvlbtn`). The stats file and drawcap.log are copied into the run folder. Harness set-up (spawned monsters, Tank).
+    Env MXL_DRAWCAP_SCENES (tags, comma-separated) and MXL_DRAWCAP_MODES ("legacy,hd") narrow it down. With the plugin's cap
+    raise on (the CSV's cap column above 3000) the crowd_over scene must go past 3000 entries in legacy with no frame over the
+    raised cap; with it off (MXL_DRAWCAP_PATCH=0 at launch) the same scene measures the drops."""
+    import shutil
+    import drawcap_stats
+    log_path, csv_path = drawcap_files()
+    mark, log, shots, res, bad = engine_mark(), [], [], [], []
+    secs = int(os.environ.get("MXL_DRAWCAP_SECS", "15"))
+    text = g._read_from(log_path, 0) or ""
+    log.extend("drawcap.log: " + ln.strip()[:200] for ln in text.splitlines()[-40:])
+    if not os.path.isfile(csv_path):
+        return finish("drawcap", False, "no %s: the probe is off (launch with MXL_DRAWCAP_PROBE=1) or refused; drawcap.log: %s" % (
+            os.path.basename(csv_path), " / ".join(ln.strip()[:120] for ln in text.splitlines()[-3:]) or "none"), mark, [], log)
+    only = [s for s in (os.environ.get("MXL_DRAWCAP_SCENES") or "").split(",") if s]
+    modes = [m for m in (os.environ.get("MXL_DRAWCAP_MODES") or "legacy,hd").split(",") if m in ("legacy", "hd")]
+    for tag, area, mon, n in DRAWCAP_SCENES:
+        if only and tag not in only:
+            continue
+        revive_if_dead()
+        goto(1)
+        set_graphics("legacy")
+        goto(area, timeout=60)
+        if hstate()["player"].get("area") != area:
+            bad.append("%s: could not reach area %d" % (tag, area))
+            continue
+        time.sleep(3)
+        with Tank():
+            made = []
+            if mon:
+                row = row_of("monstats", "Id", mon) or row_of("monstats", "Id", SWARM_MONSTER)
+                cls = int(row["*hcIdx"])
+                px, py = player_xy()
+                if n <= 100:
+                    for j, k in enumerate(range(0, n, 10)):  # `spawn` puts 10 in a 5 x 2 grid, 2 subtiles apart: blocks side by side
+                        _ok, sp = Hl("spawn %d %d %d %d" % (cls, min(10, n - k), px - 14 + 10 * (j % 3), py - 10 + 5 * (j // 3)), log)
+                        made += re.findall(r"id=(\d+)", " ".join(sp))
+                else:
+                    # big monsters one by one, 3 subtiles apart around the character (the 2-subtile `spawn` grid collides: 54
+                    # of 320 Siege Beasts), nearest spots first, then DRAWCAP_FILL zombies between them; life refilled on the way
+                    # (the character died while 169 were spawned)
+                    for layer in range(DRAWCAP_CORPSE_LAYERS):
+                        dead = drawcap_spread(cls, n, 3, 0, 24, 1, log)
+                        for u in dead:
+                            H("kill %s" % u)
+                        log.append("drawcap %s: corpse layer %d: %d %s spawned and killed" % (tag, layer + 1, len(dead), mon))
+                    made += drawcap_spread(cls, n, 3, 0, 24, 2, log)
+                    fill = row_of("monstats", "Id", DRAWCAP_FILL[0])
+                    filled = drawcap_spread(int(fill["*hcIdx"]), DRAWCAP_FILL[1], 2, 1, 17, 1, log)
+                    log.append("drawcap %s: %d %s spawned between them" % (tag, len(filled), DRAWCAP_FILL[0]))
+                    made += filled
+                log.append("drawcap %s: %d of %d %s spawned" % (tag, len(made), n, row["Id"]))
+                time.sleep(2)
+            for mode in modes:
+                revive_if_dead()
+                r = drawcap_scene(tag, mode, secs, log, shots)
+                r["spawned"] = len(made)
+                res.append(r)
+                if not game_alive():
+                    bad.append("the game died in %s %s" % (tag, mode))
+                    break
+            for u in made:
+                H("kill %s" % u)
+        if bad and "game died" in bad[-1]:
+            break
+    goto(1)
+    set_graphics("hd")
+    for src in (log_path, csv_path):
+        try:
+            shutil.copy(src, g.current_run())
+        except OSError as e:
+            bad.append("copy %s: %s" % (os.path.basename(src), e))
+    for r in res:
+        if not r["set"] or r["lvlbtn"] != r["mode"]:
+            bad.append("%s %s: graphics mode not set (lvlbtn %s)" % (r["tag"], r["mode"], r["lvlbtn"]))
+        if r["frames"] == 0:
+            bad.append("%s %s: no frames in the stats file" % (r["tag"], r["mode"]))
+        if r["dead"]:
+            bad.append("%s %s: the character was dead %d s of the scene" % (r["tag"], r["mode"], r["dead"]))
+        if r["tag"] == "crowd_over" and r["mode"] == "legacy" and r["cap"] > DRAWCAP_GAME_CAP:
+            if r["max"] <= DRAWCAP_GAME_CAP:
+                bad.append("crowd_over legacy: the list never needed more than %d entries (max %d): the raise is not shown" % (DRAWCAP_GAME_CAP, r["max"]))
+            if r["over"]:
+                bad.append("crowd_over legacy: %d frames over the raised cap %d" % (r["over"], r["cap"]))
+    note = "; ".join("%s %s%s: max %d, mean %.1f, %d of %d frames over %d, %d not drawn, %s fps, view %s" % (
+        r["tag"], r["mode"], " (%d spawned)" % r["spawned"] if r["spawned"] else "", r["max"], r["mean"], r["over"], r["frames"],
+        r["cap"], r["dropped"], "%.1f" % r["fps"] if r["fps"] else "-", " ".join("%dx%d" % v for v in r["views"]) or "-") for r in res)
+    all_rows = drawcap_stats.read(csv_path)
+    note += "; whole launch: " + " / ".join(drawcap_stats.describe(drawcap_stats.summary(all_rows, m))
+                                            for m in sorted({r["mode"] for r in all_rows}))
+    finish("drawcap", bool(res) and not bad, note + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, log,
+           partial="harness load probe (spawned monsters, Tank): a measurement, not a player-path verdict")
+
+
+CHECKS += [("drawcap", check_drawcap)]  # the drawcap plugin's draw-list fill per scene and graphics mode
 
 # --- crash-audit rows that need a game look (docs/crash-audit.md C14, C17, C18) -------------------------------------------------
 CR_MORPHS = [(448, "Trap Rat Form"), (463, "Treewarden Form")]  # the Druid's transform skills (states trapratstate / tritonstate)
@@ -15387,7 +15718,14 @@ def check_medtabclassic():
     medtab_checks.run_classic(sys.modules[__name__])
 
 
-CHECKS += [("medtab", check_medtab), ("medtabclassic", check_medtabclassic)]
+def check_stashgrid():
+    """Every slot of MEDIAN, ORBS, the Median Materials page, Runes and Gems filled, shots HD / legacy at two client sizes
+    (tools/medtab_checks.py run_grid; MXL_GRID_FILL=0 for shots only)."""
+    import medtab_checks
+    medtab_checks.run_grid(sys.modules[__name__])
+
+
+CHECKS += [("medtab", check_medtab), ("medtabclassic", check_medtabclassic), ("stashgrid", check_stashgrid)]
 
 
 def check_stashtip():
@@ -15426,6 +15764,46 @@ def check_devmenu():
 
 
 CHECKS += [("devmenu", check_devmenu)]
+
+
+def check_devmenutype():
+    """Real key messages into the developer menu's search / level box, HD and legacy (tools/devmenu_checks.py; a new level 1 character:
+    MXL_CHAR=<letters only>, MXL_CHAR_CLASS=amazon)."""
+    import devmenu_checks
+    devmenu_checks.run_typing(sys.modules[__name__])
+
+
+CHECKS += [("devmenutype", check_devmenutype)]
+
+
+def check_devmenuuber():
+    """The developer menu's uber level warps alone: the list under its heading, Fauztinville and Welcome to Toraja land in the area right
+    before them (tools/devmenu_checks.py run_uber; a new character, raised to 60 by the menu first)."""
+    import devmenu_checks
+    devmenu_checks.run_uber(sys.modules[__name__])
+
+
+CHECKS += [("devmenuuber", check_devmenuuber)]
+
+
+def check_devmenulook():
+    """The developer menu's panel at 1600 x 900 and 1280 x 720, HD and legacy: every tab, a Cornerstone search and the uber list, screenshotted
+    (tools/devmenu_checks.py run_look)."""
+    import devmenu_checks
+    devmenu_checks.run_look(sys.modules[__name__])
+
+
+CHECKS += [("devmenulook", check_devmenulook)]
+
+
+def check_advstats():
+    """The character sheet's Advanced Stats panel with worn gear: HD (scrolled) and legacy shots, an item tooltip to compare and
+    the client's stat values in the log (tools/advstats_checks.py)."""
+    import advstats_checks
+    advstats_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("advstats", check_advstats)]
 
 # lane hdcombat: player report "damage, hits and chance-to-cast procs work less well in HD than in legacy graphics". The same
 # Barbarian, sword and zombie in each graphics mode: HC_ATTACKS left clicks without procs (hits = clicks after which the zombie

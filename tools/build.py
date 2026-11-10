@@ -12,6 +12,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   shrine_lines.py apply  one extra blue tooltip line per crafting shrine: the stats of its Cube recipes (docs/bugs.md #563)
   chronicle.py       D2R's Chronicle over Median's uniques / sets / runewords: item type UI categories, disableChronicle
                      (docs/d2r-additions.md)
+  charm_inv.py apply  CharmInv's tables (bundled D2RLoader plugin): its 10 x 4 grid and Median's charm item types
+                     -> data/global/excel/d2rloader/charm-inv/ (docs/bundled-plugins.md "CharmInv")
   warlock_scale.py apply  the Warlock's skills on Median's rules and power (data/warlock_rules.tsv, data/warlock_balance.tsv,
                      docs/warlock-balance.md)
   string_gaps.py     keys no .tbl defines: names and description lines have text in words, blank names get a key (docs/text-audit.md)
@@ -126,6 +128,8 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["shrine_lines.py", "apply", str(MOD / "data"), "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
               ["chronicle.py", "--mod", str(ROOT / "work" / "mod"), "--d2r", str(D2R_EXTRACT)],
               ["warlock_scale.py", "apply", "--mod", str(ROOT / "work" / "mod")],
+              ["charm_inv.py", "apply", "--mod", str(MOD)],  # CharmInv's tables: Median's charm types
+              ["stash_retire_data.py"],  # bounded reader widths for the old stash-page cleanup
               ["string_gaps.py", "apply", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"),
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
               ["shared_icons.py", "tables", "--d2r", str(D2R_EXTRACT)],
@@ -145,7 +149,7 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["pet_icons.py", "build", "--mod", str(MOD)],
              ["menu_credit.py"],
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
-             ["walls_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
+             ["walls_cache.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
              ["shrine_colours.py", "art", str(MOD / "data")],  # needs HD jbscross; preserve the ground/drop art
              ["elixir_colours.py", "art", str(MOD / "data")],

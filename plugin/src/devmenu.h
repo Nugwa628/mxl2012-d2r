@@ -13,6 +13,9 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 // One line of counters and state for the `mxl` console line and the harness.
 void DevMenuStatus(char* out, size_t size) noexcept;
 
+// The socket read-back of spawned items (harness line devmenu sockets ...): failures and the last item's native flag word.
+void DevMenuSockets(char* out, size_t size) noexcept;
+
 // Test harness: presses a button by name ("tab1", "row0", "raise", ...), sets the input box text, or opens and closes the panel.
 // Returns false when the part is off. `verb` is one of open, close, press, input.
 auto DevMenuHarness(const char* verb, const char* argument) noexcept -> bool;

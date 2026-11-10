@@ -9,6 +9,8 @@ here unless --plugin is given) it writes into dist/:
                                    mxl2012.mpq/data/...       install_mod.build_data (work/mod/data + the install-time merges)
                                    d2rloader/plugins/mxl2012-core.dll, d2rloader/config/d2rloader.toml + mxl2012-core.toml, d2rloader/patches/,
                                    d2rloader/metadata.json     (modVersion = <version>, website = the GitHub repo)
+                                   d2rloader/plugins/drawcap.dll, d2rloader/config/drawcap.toml (our standalone draw list
+                                   cap plugin, drawcap/, built by tools/build_plugin.ps1 unless --drawcap is given)
                                    d2rloader/plugins/legacy169.dll, d2rloader/config/legacy169.toml (D2R Legacy 16:9 at
                                    the pinned commit, tools/build_legacy169.ps1 unless --legacy169 is given)
                                    d2rloader/plugins/d2rl-buff-panel.dll + .mpq + licences, d2rloader/config/buff-panel.toml
@@ -17,6 +19,9 @@ here unless --plugin is given) it writes into dist/:
                                    d2rloader/plugins/d2rl-auto-belt-refill.dll, d2rloader/config/auto-belt-refill.toml
                                    (Auto Belt Refill by jaycachou-svg at the pinned commit + our patches,
                                    tools/build_beltrefill.ps1 unless --beltrefill is given)
+                                   d2rloader/plugins/d2rl-charm-inv.dll + .mpq, d2rloader/config/charm-inv.toml (CharmInv
+                                   1.0.1 by Dimentio, the author's files checked by sha256: --charminv DIR or
+                                   charminv_dir())
                                    d2rloader/plugins/Controller QOL Updates.dll + licences,
                                    d2rloader/config/controller-qol-updates.toml (PyreFly's controller-qol at the pinned
                                    commit + our patches, the mxl2012 skill seed embedded; tools/build_controllerqol.ps1
@@ -35,7 +40,7 @@ files: D2R reads those from its own install). Without a baseline that check cann
 The release plugin is built by tools/build_plugin.ps1 -Release (CMake on PATH or Visual Studio's, the PluginSDK of
 .mxl-local.json; nothing is downloaded). tools/verify_package.py checks the finished 7z; tools/cut_alpha.ps1 runs it all.
 
-  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
+  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--drawcap DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--charminv DIR] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
   py -3 tools/package_release.py --no-data --plugin build/mxl2012-core.dll   (CI: no game files there; plugin + config only)
 Version: PluginVersion of plugin/src/mxl2012_core.cpp; --version must equal it (only --no-data builds may differ).
 """
@@ -73,6 +78,11 @@ D2RLOADER = {"version": "1.3.1-beta", "url": "https://d2rloader.net/download/D2R
 # the mod starts by itself. The player sets it in the game (Default Mod); the downloader does not write that file. No -txt:
 # D2RLoader 1.3.1 compiles the mod's .txt tables itself at each start (docs/launcher.md "How the player starts the game").
 LAUNCH = {"default_mod": NAME, "launch_arguments": ""}
+# Our own standalone drawcap plugin (drawcap/README.md: D2R's legacy draw list cap; no dependency on mxl2012-core), built from
+# this repository by tools/build_plugin.ps1 into build/drawcap, shipped next to mxl2012-core.dll. One build for dev installs and
+# releases (it has no test harness; its cap raise is on and its probe off unless drawcap.toml or the test switch files drawcap-nopatch.txt and drawcap-probe.txt say otherwise). Its default config
+# is a `preserve` file.
+DRAWCAP = {"name": "Draw List Cap", "dll": "d2rloader/plugins/drawcap.dll", "config": "d2rloader/config/drawcap.toml"}
 # Our own D2R Legacy 16:9 plugin (docs/bundled-plugins.md), shipped in the mod folder: built from its source at the commit
 # the gitlink third_party/D2R-Legacy169 pins (tools/build_legacy169.ps1), unless --legacy169 is given. Its default config goes
 # in too, as a `preserve` file: D2RLoader would write it at the first start, but the downloader removes files the release does
@@ -122,6 +132,20 @@ CONTROLLERQOL_SRC = ROOT / "build" / "controllerqol-src"
 CONTROLLERQOL_OURS = ROOT / "third_party" / "controller-qol-mxl2012"  # the patches
 CONTROLLERQOL_PROFILE = ROOT / "build" / "controllerqol-profile"  # the generated skill seed
 CONTROLLERQOL_FILES = ("dll", "config", "licence", "sdk_licence")
+# CharmInv by Dimentio (D2RLoader's author), docs/bundled-plugins.md and third_party/charm-inv/README.md: the author's DLL and
+# companion MPQ unchanged (no source is published), redistributed with D2RLoader by the owner's decision (2026-11-10). The two
+# files are not in git; charminv_dir() finds them and every byte is checked against `sha256`. Our config (third_party/charm-inv/
+# charm-inv.toml: allow_inventory_charms = true, Median's charms work from the inventory too) is a `preserve` file, as
+# legacy169's. Median's charm types and the grid are mod data (tools/charm_inv.py), not in the plugin's files.
+CHARMINV = {"name": "CharmInv", "version": "1.0.1", "author": "Dimentio",
+            "source": "https://d2rloader.net/hub/plugins/charm-inventory",
+            "dll": "d2rloader/plugins/d2rl-charm-inv.dll", "mpq": "d2rloader/plugins/d2rl-charm-inv.mpq",
+            "config": "d2rloader/config/charm-inv.toml",
+            "sha256": {"dll": "b14f6a0bd4c9df0af9c392ea97dc879ad3760592481517dbdb0983595145d88b",
+                       "mpq": "e01163aac3b0d76c3cbdad56e19350692864b51484d9ad6dfbc41f28023fb0ac"},
+            "size": {"dll": 68952, "mpq": 9591921}}
+CHARMINV_OURS = ROOT / "third_party" / "charm-inv"  # README, our charm-inv.toml (and a git-ignored local copy of the files)
+CHARMINV_FILES = ("dll", "mpq", "config")
 # The player's own settings: the downloader writes these only when they are missing (docs/release.md).
 PRESERVE = ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml"]
 SCHEMA = 2  # 2: the 7z ("archive") replaced the zip; the downloader installs from it or from objects (docs/release.md)
@@ -133,13 +157,73 @@ SEVENZ_NAMES = ("7z", "7zz", "7za", "7zr")
 NO_7Z = ("no 7-Zip found (Program Files\\7-Zip\\7z.exe, or 7z / 7zz / 7za / 7zr on PATH). A release is a .7z only: install "
          "7-Zip (https://www.7-zip.org; Debian / Ubuntu: apt install 7zip) and run again")
 
-FORBIDDEN = re.compile(r"(^|/)(mxl2012-testharness[^/]*|legacy169-testharness[^/]*|mxl2012-core-off\.txt|input-bindings\.toml|imgui\.ini|debugsettings\.json)$"
+FORBIDDEN = re.compile(r"(^|/)(mxl2012-testharness[^/]*|legacy169-testharness[^/]*|mxl2012-core-off\.txt|drawcap-probe\.txt|drawcap-nopatch\.txt|drawcap-stats\.csv|input-bindings\.toml|imgui\.ini|debugsettings\.json)$"
                        r"|\.(d2s|d2i|d2x|d2rl|ctc|ctl|key|map|ma\d|log|dmp|pdb|orig)$", re.I)  # saves: D2R and D2RLoader sidecars
 
 
 def plugin_version() -> str:
     m = re.search(r'PluginVersion = "([^"]+)"', (ROOT / "plugin" / "src" / "mxl2012_core.cpp").read_text("utf-8"))
     return m.group(1)
+
+
+def drawcap_version() -> str:
+    m = re.search(r'PluginVersion = "([^"]+)"', (ROOT / "drawcap" / "src" / "drawcap.cpp").read_text("utf-8"))
+    return m.group(1) if m else "?"
+
+
+def plugin_manifest_abi(data: bytes):
+    """The plugin ABI in a DLL's D2RLoader plugin manifest (RCDATA resource 0x3e9, one DWORD; D2RLoader rejects a DLL without
+    it as "an old alpha plugin"): None when the bytes are not a PE image, 0 when the PE has no manifest."""
+    import struct
+    try:
+        pe = struct.unpack_from("<I", data, 0x3c)[0]
+        if data[pe:pe + 4] != b"PE\0\0":
+            return None
+    except struct.error:
+        return None
+    try:
+        nsec, optsize = struct.unpack_from("<H", data, pe + 6)[0], struct.unpack_from("<H", data, pe + 20)[0]
+        opt = pe + 24
+        dirs = opt + (112 if struct.unpack_from("<H", data, opt)[0] == 0x20b else 96)
+        rsrc = struct.unpack_from("<I", data, dirs + 2 * 8)[0]  # data directory 2: resources
+        secs = [struct.unpack_from("<IIII", data, opt + optsize + 40 * i + 8) for i in range(nsec)]  # vsize, va, rawsize, raw
+
+        def off(rva):
+            return next(raw + rva - va for vsize, va, rawsize, raw in secs if va <= rva < va + max(vsize, rawsize))
+
+        def find(table, want):
+            named, ids = struct.unpack_from("<HH", data, table + 12)
+            for k in range(named + ids):
+                ident, target = struct.unpack_from("<II", data, table + 16 + 8 * k)
+                if ident == want:
+                    return target
+            return None
+
+        if not rsrc:
+            return 0
+        root = off(rsrc)
+        kind = find(root, 10)  # RT_RCDATA
+        name = find(root + (kind & 0x7fffffff), 0x3e9) if kind is not None and kind & 0x80000000 else None
+        if name is None or not name & 0x80000000:
+            return 0
+        entry = struct.unpack_from("<II", data, root + (name & 0x7fffffff) + 16)[1]  # the first language
+        if entry & 0x80000000:
+            return 0
+        rva, size = struct.unpack_from("<II", data, root + entry)
+        return struct.unpack_from("<I", data, off(rva))[0] if size >= 4 else 0
+    except (struct.error, StopIteration):
+        return 0
+
+
+def check_drawcap(dll: Path) -> list:
+    """Problems of a drawcap.dll for a release: it must be the drawcap plugin of this source's version and, a real PE image,
+    carry the D2RLoader plugin manifest (the test fixtures' fake DLLs are not PE images)."""
+    b = dll.read_bytes()
+    if b"Draw List Cap\0" not in b or b"drawcap\0" not in b or drawcap_version().encode() + b"\0" not in b:
+        return [f"{dll} is not drawcap {drawcap_version()} (build it with tools/build_plugin.ps1)"]
+    if plugin_manifest_abi(b) == 0:
+        return [f"{dll} has no D2RLoader plugin manifest, D2RLoader rejects it (drawcap/src/drawcap.rc)"]
+    return []
 
 
 def build_release_plugin() -> Path:
@@ -275,6 +359,32 @@ def check_buffhud(dll: Path) -> list:
     return problems
 
 
+def charminv_dir(given: Path = None) -> Path:
+    """The folder with CharmInv's two files: `given` (--charminv) as it is, else MXL_CHARMINV_DIR, else third_party/charm-inv
+    when it holds both, else <MXL2012_RUNS>/shared/charm-inv-<version>. None when none of them has both files."""
+    if given is not None:
+        return given
+    names = [Path(CHARMINV[k]).name for k in ("dll", "mpq")]
+    env = os.environ.get("MXL_CHARMINV_DIR")
+    for d in (Path(env) if env else None, CHARMINV_OURS, fxpaths.localconfig.shared_dir() / f"charm-inv-{CHARMINV['version']}"):
+        if d is not None and all((d / n).is_file() for n in names):
+            return d
+    return None
+
+
+def check_charminv(folder: Path) -> list:
+    """Problems of CharmInv's DLL and MPQ in `folder` (as they go into the package): both there, the pinned bytes."""
+    problems = []
+    for k in ("dll", "mpq"):
+        f = folder / Path(CHARMINV[k]).name
+        if not f.is_file():
+            problems.append(f"no {f.name} in {folder}")
+        elif f.stat().st_size != CHARMINV["size"][k] or sha256(f) != CHARMINV["sha256"][k]:
+            problems.append(f"{f} is not CharmInv {CHARMINV['version']} (sha256 {sha256(f)[:16]}..., want "
+                            f"{CHARMINV['sha256'][k][:16]}...)")
+    return problems
+
+
 def build_beltrefill() -> Path:
     """tools/build_beltrefill.ps1: d2rl-auto-belt-refill.dll from the pinned commit's source with our patches."""
     shell = shutil.which("pwsh") or shutil.which("powershell")
@@ -318,7 +428,7 @@ def sha256(path: Path) -> str:
 
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
           legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None, controllerqol: Path = None,
-          profile: Path = None) -> None:
+          profile: Path = None, drawcap: Path = None, charminv: Path = None) -> None:
     if data_from is not None:
         legacy_fonts.check_tree(data_from)
     if mod.exists():
@@ -331,7 +441,8 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
     legacy_fonts.check_tree(data)
     install_mod.write_mod_files(mod, NAME, f"{NAME}/", plugin, {
         "modVersion": version, "website": REPO_URL,
-        "description": "D2R-XL 2012: Median XL 2012 (v005) for Diablo II: Resurrected (build %s) through D2RLoader." % install_mod.D2R_BUILD})
+        "description": "D2R-XL 2012: Median XL 2012 (v005) for Diablo II: Resurrected (build %s) through D2RLoader." % install_mod.D2R_BUILD},
+        drawcap)
     if legacy169 is not None:
         stage_legacy169(mod, legacy169)
     if buffhud is not None:
@@ -340,6 +451,8 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
         stage_beltrefill(mod, beltrefill)
     if controllerqol is not None:
         stage_controllerqol(mod, controllerqol, profile)
+    if charminv is not None:
+        stage_charminv(mod, charminv)
 
 
 def stage_legacy169(mod: Path, dll: Path, src: Path = ROOT / "build" / "legacy169-src") -> None:
@@ -402,13 +515,28 @@ def stage_controllerqol(mod: Path, dll: Path, profile: Path, src: Path = CONTROL
     shutil.copy2(src / "PluginSDK-LICENSE", mod / CONTROLLERQOL["sdk_licence"])
 
 
+def stage_charminv(mod: Path, folder: Path, ours: Path = CHARMINV_OURS) -> None:
+    """CharmInv's DLL and companion MPQ (the author's bytes, checked) into d2rloader/plugins/ (mod-scoped) and our
+    charm-inv.toml into d2rloader/config/."""
+    problems = check_charminv(folder)
+    if problems:
+        raise SystemExit("; ".join(problems))
+    for k in ("dll", "mpq"):
+        (mod / CHARMINV[k]).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(folder / Path(CHARMINV[k]).name, mod / CHARMINV[k])
+    (mod / CHARMINV["config"]).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ours / "charm-inv.toml", mod / CHARMINV["config"])
+
+
 def preserve_list(mod: Path) -> list:
     """PRESERVE plus the bundled plugins' configs the package holds."""
-    return PRESERVE + [c for c in (LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"])
+    return PRESERVE + [c for c in (DRAWCAP["config"], LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"],
+                                   CHARMINV["config"])
                        if (mod / c).is_file()]
 
 
-def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, controllerqol: bool = False) -> list:
+def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, controllerqol: bool = False,
+                    charminv: bool = False) -> list:
     """The manifest's bundledPlugins: name, version, repository, source commit and files of each plugin the package holds."""
     out = []
     if legacy169:
@@ -426,6 +554,10 @@ def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, co
         out.append({"name": CONTROLLERQOL["name"], "version": CONTROLLERQOL["version"], "repo": CONTROLLERQOL["repo"],
                     "path": CONTROLLERQOL["path"], "author": CONTROLLERQOL["author"], "commit": controllerqol_commit(),
                     "patches": controllerqol_patches(), "files": [CONTROLLERQOL[k] for k in CONTROLLERQOL_FILES]})
+    if charminv:
+        out.append({"name": CHARMINV["name"], "version": CHARMINV["version"], "source": CHARMINV["source"],
+                    "author": CHARMINV["author"], "sha256": dict(CHARMINV["sha256"]),
+                    "files": [CHARMINV[k] for k in CHARMINV_FILES]})
     return out
 
 
@@ -615,6 +747,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", help="release version (default: PluginVersion)")
     ap.add_argument("--plugin", type=Path, help="a release mxl2012-core.dll (default: build it with -DMXL_RELEASE=ON)")
+    ap.add_argument("--drawcap", type=Path, help="a drawcap.dll of this source (default: build/drawcap/Release/drawcap.dll, "
+                    "built by tools/build_plugin.ps1; --no-data builds leave it out when there is none)")
     ap.add_argument("--legacy169", type=Path, help="a release legacy169.dll of the pinned commit (default: build it with "
                     "tools/build_legacy169.ps1; --no-data builds leave it out unless given)")
     ap.add_argument("--buffhud", type=Path, help="a release d2rl-buff-panel.dll of the pinned fork commit, its .mpq next to it "
@@ -624,8 +758,10 @@ def main() -> int:
     ap.add_argument("--controllerqol", type=Path, help="a release 'Controller QOL Updates.dll' of the pinned commit with our "
                     "patches and this package's skill seed (default: build it with tools/build_controllerqol.ps1; --no-data "
                     "builds leave it out)")
-    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD, Auto Belt Refill and Controller "
-                    "QOL unless given "
+    ap.add_argument("--charminv", type=Path, help="a folder holding CharmInv's d2rl-charm-inv.dll and .mpq (checked by sha256; "
+                    "default: charminv_dir(); --no-data builds leave it out unless given)")
+    ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD, Auto Belt Refill, Controller "
+                    "QOL and CharmInv unless given "
                     "(unit tests; "
                     "tools/verify_package.py refuses such a package)")
     ap.add_argument("--data-from", type=Path, help="copy this finished mxl2012.mpq/data instead of building it")
@@ -667,6 +803,13 @@ def main() -> int:
         print(f"no plugin at {plugin}")
         return 1
     problems = check_release_plugin(plugin, plugin_version())
+    drawcap = a.drawcap or install_mod.DRAWCAP
+    if drawcap.is_file():
+        problems += check_drawcap(drawcap)
+    elif a.no_data and a.drawcap is None:
+        drawcap = None
+    else:
+        problems.append(f"no drawcap.dll at {drawcap} (run tools/build_plugin.ps1)")
     legacy169 = a.legacy169 or (None if a.no_data or a.no_bundled else build_legacy169())
     if legacy169 is not None:
         problems += check_legacy169(legacy169) if legacy169.is_file() else [f"no legacy169.dll at {legacy169}"]
@@ -684,13 +827,18 @@ def main() -> int:
     if controllerqol is not None:
         problems += (check_controllerqol(controllerqol) if controllerqol.is_file()
                      else [f"no 'Controller QOL Updates.dll' at {controllerqol}"])
+    charminv = charminv_dir(a.charminv) if a.charminv or not (a.no_data or a.no_bundled) else None
+    if not (a.no_data or a.no_bundled) and charminv is None:
+        problems.append("CharmInv's d2rl-charm-inv.dll / .mpq not found: pass --charminv DIR (third_party/charm-inv/README.md)")
+    if charminv is not None:
+        problems += check_charminv(charminv)
     if problems:
         print("\n".join(problems))
         return 1
 
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
-    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile)
+    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile, drawcap, charminv)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
@@ -716,7 +864,8 @@ def main() -> int:
     t7 = time.time() - t7
     files = file_list(mod)
     man_path = a.out / "release-manifest.json"
-    bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None, controllerqol is not None)
+    bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None, controllerqol is not None,
+                              charminv is not None)
     man_path.write_text(json.dumps(manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod),
                                             bundled), indent=1) + "\n", encoding="utf-8")
     notes = a.out / f"RELEASE_NOTES-{version}.md"

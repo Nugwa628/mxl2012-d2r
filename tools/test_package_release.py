@@ -307,6 +307,80 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual([b["name"] for b in pr.bundled_plugins(True, True, True, True)],
                          ["D2R Legacy 16:9", "Buff HUD", "Auto Belt Refill", "Controller QOL Updates"])
 
+    def charminv_files(self):
+        """Fake CharmInv DLL / MPQ in a folder, and the pins of package_release.CHARMINV patched to their bytes."""
+        folder = self.tmp / "charminv"
+        folder.mkdir(exist_ok=True)
+        (folder / "d2rl-charm-inv.dll").write_bytes(b"MZ charm-inv\0 1.0.1")
+        (folder / "d2rl-charm-inv.mpq").write_bytes(b"MPQ\x1a charm-inv")
+        pins = mock.patch.dict(pr.CHARMINV, {"sha256": {k: pr.sha256(folder / f"d2rl-charm-inv.{k}") for k in ("dll", "mpq")},
+                                             "size": {k: (folder / f"d2rl-charm-inv.{k}").stat().st_size for k in ("dll", "mpq")}})
+        pins.start()
+        self.addCleanup(pins.stop)
+        return folder
+
+    def test_charminv_pins_the_authors_files(self):
+        self.assertEqual(pr.CHARMINV["dll"], "d2rloader/plugins/d2rl-charm-inv.dll")
+        self.assertEqual(pr.CHARMINV["mpq"], "d2rloader/plugins/d2rl-charm-inv.mpq")
+        self.assertEqual(pr.CHARMINV["config"], "d2rloader/config/charm-inv.toml")  # <plugin id>.toml, id charm-inv
+        self.assertEqual(pr.CHARMINV["sha256"], {"dll": "b14f6a0bd4c9df0af9c392ea97dc879ad3760592481517dbdb0983595145d88b",
+                                                 "mpq": "e01163aac3b0d76c3cbdad56e19350692864b51484d9ad6dfbc41f28023fb0ac"})
+        self.assertEqual((pr.CHARMINV["author"], pr.CHARMINV["version"]), ("Dimentio", "1.0.1"))
+        readme = (pr.CHARMINV_OURS / "README.md").read_text("utf-8")
+        for k in ("dll", "mpq"):
+            self.assertIn(pr.CHARMINV["sha256"][k], readme)
+        self.assertIn("redistributed with D2RLoader by the owner's decision (author: Dimentio, D2RLoader's author)", readme)
+        # our config: charms grant their bonus from the inventory too (owner decision 2026-11-10); the button stays on
+        cfg = (pr.CHARMINV_OURS / "charm-inv.toml").read_text("utf-8")
+        self.assertIn("[charm-inv]", cfg)
+        self.assertIn("\nallow_inventory_charms = true\n", cfg)
+        self.assertIn("\ninject_inventory_button = true\n", cfg)
+        self.assertIn('\ninactive_charm_tint = "yellow"\n', cfg)
+
+    def test_charminv_staged_with_its_config_preserved(self):
+        mod = self.staged()
+        folder = self.charminv_files()
+        self.assertEqual(pr.check_charminv(folder), [])
+        pr.stage_charminv(mod, folder)
+        for k in ("dll", "mpq"):
+            self.assertEqual((mod / pr.CHARMINV[k]).read_bytes(), (folder / f"d2rl-charm-inv.{k}").read_bytes())
+        self.assertIn("allow_inventory_charms = true", (mod / pr.CHARMINV["config"]).read_text("utf-8"))
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, False, False, True))
+        self.assertEqual(m["preserve"], ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml",
+                                         "d2rloader/config/charm-inv.toml"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["author"], entry["version"], entry["source"]),
+                         ("CharmInv", "Dimentio", "1.0.1", "https://d2rloader.net/hub/plugins/charm-inventory"))
+        self.assertEqual(entry["sha256"], pr.CHARMINV["sha256"])
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+        self.assertEqual([b["name"] for b in pr.bundled_plugins(True, True, True, True, True)],
+                         ["D2R Legacy 16:9", "Buff HUD", "Auto Belt Refill", "Controller QOL Updates", "CharmInv"])
+
+    def test_charminv_other_bytes_are_refused(self):
+        mod = self.staged()
+        folder = self.charminv_files()
+        (folder / "d2rl-charm-inv.mpq").write_bytes(b"MPQ\x1a charm-inv 1.0.2")
+        self.assertIn("is not CharmInv 1.0.1", "\n".join(pr.check_charminv(folder)))
+        with self.assertRaises(SystemExit):
+            pr.stage_charminv(mod, folder)
+        self.assertFalse((mod / pr.CHARMINV["dll"]).exists())
+        (folder / "d2rl-charm-inv.mpq").unlink()
+        self.assertIn("no d2rl-charm-inv.mpq", "\n".join(pr.check_charminv(folder)))
+
+    def test_charminv_dir_lookup(self):
+        folder = self.charminv_files()
+        self.assertEqual(pr.charminv_dir(folder), folder)  # --charminv wins as given
+        with mock.patch.dict(os.environ, {"MXL_CHARMINV_DIR": str(folder)}):
+            self.assertEqual(pr.charminv_dir(), folder)
+        empty = self.tmp / "nothing"
+        empty.mkdir()
+        with mock.patch.dict(os.environ, {"MXL_CHARMINV_DIR": str(empty)}), \
+                mock.patch.object(pr, "CHARMINV_OURS", empty), \
+                mock.patch.object(pr.fxpaths.localconfig, "shared_dir", lambda: empty):
+            self.assertIsNone(pr.charminv_dir())
+
     def test_controllerqol_source_of_another_commit_patch_set_or_seed_is_refused(self):
         mod = self.staged()
         for commit, patches in (("0" * 40, None), (None, pr.controllerqol_patches()[:1])):

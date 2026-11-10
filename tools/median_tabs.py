@@ -34,6 +34,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+from median_stash import RECESS_IN, RECESS_LEAD, recess_inside, recess_tiles  # noqa: E402,F401  (the recess art, shared)
 
 ELIXIRS = "eo7 eo8 eo9 ey1 ey2 ey3 ey4 ey5 ey6 ey7 ey8 ey9 et1 0g7 0g8 0g0 0g1 0g2 0g3 0g4 0g5 0g6 b@b".split()
 SIGNETS = "zkw zku zkq zkx zky zkr zka zkb zkc zkd zke zkf quz zog zoh c@c !@B dog".split()
@@ -98,6 +99,11 @@ def orbs_slots() -> list[tuple[str, tuple[int, int, int, int]]]:
 def mat_slots() -> list[tuple[str, tuple[int, int, int, int]]]:
     places = [(x, y) for y in ROW_Y for x in COL_X]
     return [(c, (x, y, SLOT, SLOT)) for c, (x, y) in zip(MAT_MEDIAN, places)]
+
+
+# the new pages: background picture name, HD slots, the HD field the picture covers
+PAGES = [("medtab_median_bg", median_slots(), FIELD), ("medtab_orbs_bg", orbs_slots(), FIELD),
+         ("medtab_mat_bg", mat_slots(), MAT_FIELD)]
 
 
 def slot(code, r):
@@ -198,19 +204,18 @@ def apply_sd(lay: dict) -> dict:
               "disabledFrames": [-1] + list(range(1, HD_TABS)), "textStrings": [""] * HD_TABS,
               "tabSize": {"x": SD_TAB_W, "y": SD_TAB_H}, "tabPadding": {"x": SD_TAB_PAD, "y": 0}})
 
-    def cslot(code, r):
-        x, y, w, h = rsl.classic_box(r)
-        return {"type": "AdvancedStashSlotWidget", "name": layout_code(code),
-                "fields": {"rect": {"x": x, "y": y, "width": w, "height": h}, "itemCode": layout_code(code)}}
+    def cslots(group):
+        return [{"type": "AdvancedStashSlotWidget", "name": layout_code(c),
+                 "fields": {"rect": {"x": x, "y": y, "width": w, "height": h}, "itemCode": layout_code(c)}}
+                for c, (x, y, w, h) in classic_slots(group)]
 
     def tiles(name, box):
-        x0, y0 = round(box[0] / rsl.SX), round(box[1] / rsl.SY)
-        w, h = round((box[2] - box[0]) / rsl.SX), round((box[3] - box[1]) / rsl.SY)
+        x0, y0, w, h = classic_field(box)
         return [image(f"{name}_{i}", x0 + tx, y0 + ty, f"PANEL\\mxl\\{name}_{i}") for i, (tx, ty) in enumerate(_tile_origins(w, h))]
 
-    place(lay, "advancedstash_runes", [cslot(c, r) for c, r in median_slots() + orbs_slots()],
+    place(lay, "advancedstash_runes", cslots(median_slots()) + cslots(orbs_slots()),
           tiles("medtab_median_bg", FIELD) + tiles("medtab_orbs_bg", FIELD), [])
-    place(lay, "advancedstash_materials", [cslot(c, r) for c, r in mat_slots()], tiles("medtab_mat_bg", MAT_FIELD),
+    place(lay, "advancedstash_materials", cslots(mat_slots()), tiles("medtab_mat_bg", MAT_FIELD),
           [selector_sd("medtab_sel_vanilla", "VANILLA"), selector_sd("medtab_sel_median", "MEDIAN")])
     return lay
 
@@ -221,25 +226,63 @@ def _tile_origins(w, h, n=256):
 
 # ---- art ---------------------------------------------------------------------------------------------------------------
 
-def page_art(materials, d2r_mat_slots, slots, box, seed):
-    """`box` of D2R's Materials page: stone, with a recess under every slot (D2R's own recesses of that page)."""
+def stone_art(materials, box, seed):
+    """`box` of D2R's Materials page covered with its own clean stone (no recess)."""
     import median_stash as ms
-    from PIL import Image
     base = materials.convert("RGBA")
     im = base.copy()
-    stone = base.crop(ms.STONE)
-    ms._stone_fill(im, box, stone, random.Random(seed))
-    pad = ms.RECESS_PAD
-    one = [base.crop((x - pad, y - pad, x + w + pad, y + h + pad)) for _c, (x, y, w, h) in d2r_mat_slots if (w, h) == (SLOT, SLOT)]
-    two = [base.crop((x - pad, y - pad, x + w + pad, y + h + pad)) for _c, (x, y, w, h) in d2r_mat_slots if (w, h) == (SLOT, 2 * SLOT)]
-    m1 = ms._recess_mask()
-    m2 = m1.resize((m1.width, 2 * SLOT + 2 * pad), Image.NEAREST)
-    for i, (_c, (x, y, w, h)) in enumerate(slots):
-        if h == SLOT:
-            im.paste(one[i % len(one)], (x - pad, y - pad), m1)
-        else:
-            im.paste(two[i % len(two)], (x - pad, y - pad), m2)
+    ms._stone_fill(im, box, base.crop(ms.STONE), random.Random(seed))
     return im.crop(box)
+
+
+def page_art(materials, d2r_mat_slots, slots, box, seed):
+    """`box` of D2R's Materials page: stone, with one of D2R's recesses of that page filling every slot's rect exactly."""
+    im = stone_art(materials, box, seed)
+    tiles = recess_tiles(materials, d2r_mat_slots)
+    if not tiles[(SLOT, 2 * SLOT)]:
+        raise ValueError("D2R's Materials page has no 1 x 2 recess")
+    for i, (_c, (x, y, w, h)) in enumerate(slots):
+        pick = tiles[(w, h)]
+        im.paste(pick[i % len(pick)], (x - box[0], y - box[1]))
+    return im
+
+
+# ---- classic geometry and art ------------------------------------------------------------------------------------------
+# Classic slots sit on an integer grid (the first slot's classic_box, then a whole-pixel pitch per axis: MEDIAN / ORBS 27 x 28,
+# Median Materials 29 x 28), not on each HD rect rounded on its own: rounding gave 27 / 28 and 28 / 29 steps. The classic
+# picture is drawn at classic size with a recess on exactly each of those boxes (not the HD picture shrunk, whose cells
+# landed up to a pixel off the boxes).
+
+def classic_field(box) -> tuple[int, int, int, int]:
+    """The classic (x, y, w, h) of an HD field box (the background tiles' place)."""
+    import rotw_stash_legacy as rsl
+    return (round(box[0] / rsl.SX), round(box[1] / rsl.SY),
+            round((box[2] - box[0]) / rsl.SX), round((box[3] - box[1]) / rsl.SY))
+
+
+def classic_pitch(slots) -> tuple[int, int, int, int]:
+    """(HD pitch x, HD pitch y, classic pitch x, classic pitch y) of a page's slot grid (rotw_stash_legacy.grid_pitch)."""
+    import rotw_stash_legacy as rsl
+    return rsl.grid_pitch(slots)
+
+
+def classic_slots(slots) -> list[tuple[str, tuple[int, int, int, int]]]:
+    """The classic [(code, (x, y, w, h))] of a page's HD slots on one integer grid (rotw_stash_legacy.grid_boxes)."""
+    import rotw_stash_legacy as rsl
+    return rsl.grid_boxes(slots)
+
+
+def classic_page_art(hd_stone, hd_tiles, slots, box):
+    """The classic picture of `box`: the HD stone shrunk, then a shrunk recess on exactly every classic slot box."""
+    import rotw_stash_legacy as rsl
+    fx, fy, fw, fh = classic_field(box)
+    im = rsl.down(hd_stone, fw, fh)
+    for i, (_c, (x, y, w, h)) in enumerate(classic_slots(slots)):
+        if x < fx or y < fy or x + w > fx + fw or y + h > fy + fh:
+            raise ValueError(f"classic slot {_c} {(x, y, w, h)} outside its field {(fx, fy, fw, fh)}")
+        pick = hd_tiles[(SLOT, SLOT) if h < 2 * rsl.CELL else (SLOT, 2 * SLOT)]
+        im.paste(rsl.down(pick[i % len(pick)], w, h), (x - fx, y - fy))
+    return im
 
 
 def tab_frames(sprite, width=HD_TAB_W):
@@ -277,14 +320,13 @@ def apply_art(data: Path, report: list[str]) -> None:
     sd_dir = data / "global" / "ui" / "panel" / "mxl"
     hd_dir.mkdir(parents=True, exist_ok=True)
     sd_dir.mkdir(parents=True, exist_ok=True)
-    pics = {"medtab_median_bg": (page_art(mat_art, d2r_mat, median_slots(), FIELD, "median"), FIELD),
-            "medtab_orbs_bg": (page_art(mat_art, d2r_mat, orbs_slots(), FIELD, "orbs"), FIELD),
-            "medtab_mat_bg": (page_art(mat_art, d2r_mat, mat_slots(), MAT_FIELD, "mat"), MAT_FIELD)}
-    for name, (im, _box) in pics.items():
+    hd_tiles = recess_tiles(mat_art, d2r_mat)
+    for name, slots, box in PAGES:
+        im = page_art(mat_art, d2r_mat, slots, box, name)
         ui_art.write_sprite(hd_dir / f"{name}.sprite", [im])
         ui_art.write_sprite(hd_dir / f"{name}.lowend.sprite", [ms.lowend(im)])
-        w, h = round(im.width / rsl.SX), round(im.height / rsl.SY)
-        small = rsl.down(im, w, h)
+        small = classic_page_art(stone_art(mat_art, box, name), hd_tiles, slots, box)
+        w, h = small.size
         for i, (tx, ty) in enumerate(_tile_origins(w, h)):
             tile = small.crop((tx, ty, min(w, tx + 256), min(h, ty + 256)))
             (sd_dir / f"{name}_{i}.dc6").write_bytes(rsl.dc6_bytes([rsl.quantise(tile, d2r.pal)]))

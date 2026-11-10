@@ -122,6 +122,19 @@ missing closing brackets appended, negative literals `-N` -> `(0-N)`, non-trivia
 
 A state's stat list reaches the client with each stat cut to its itemstatcost `Send Bits`. `modifierlist_skill` (350) has 9 in D2R and 1.13c, too few for Median's skill ids (up to 1109), and D2R's client skill do dispatcher asserts `nSkillCastId` when the caster's `aurastate` list names another skill (bug #20). `stat_send_bits` raises the column to the bits of the highest skill id (11).
 
+The character sheet's **Advanced Stats panel** lists the itemstatcost rows whose D2R-only column `advdisplay` is set (read in the
+93847 dump: the list builder `0x14eaf40` walks the table in row order and tests the byte at record `+0x140`; 1 = always listed,
+first, 2 = listed while the player's stat at layer 0, shifted by ValShift, is not 0, `0x14eb1b0`). The row text is `0x2d97e0`: the
+value with op 2-5 applied, then the item tooltip formatter `0x2d6520`, so a row reads like the stat's tooltip line and needs a
+descfunc. Never shown: stats with a parameter (skill on hit, auras) and per-level item stats (the player holds them at 0; their
+amount is in the target stat: a ring with 50 MF and 8 MF per level gave stat 80 = 53 at level 1, the panel showed 53%). Median's
+rows had none (the column is neutral by default; only 9 rows D2R alone has kept D2R's 2), so the panel was empty.
+`advanced_stats` sets the column from `data/advanced_stats.tsv`: the 86 stats of Laz's PlugY stat pages (`plugy/statsinterface.txt`
+of the v005 MPQ, by stat id) plus 21 rows D2R lists that mean the same in Median (flat absorbs, magic resist, knockback, cannot be
+frozen ...; D2R's per-level rows left out, see above). Always listed (12): MF, GF, the five speeds, life and mana leech,
+crushing blow, deadly strike, open wounds. A listed stat missing from the table, not Median's, or without a descfunc fails the
+step. The order is the table's (D2R has no order column).
+
 A misc item spell whose timed state 1.13c skipped in silence (a state name states.txt lacks, emptied above, or a `len` <= 0)
 makes D2R assert `spellState > 0` (SkillItem.cpp:545 / :823) or `len` > 0 (:548 / :826) on the drink (bug #191). After
 `clean_references`, `item_spell_states` gives such a pSpell 6 row (cures, then the state step) the empty state `healthpot`

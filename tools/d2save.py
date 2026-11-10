@@ -143,9 +143,12 @@ class Tables:
     # stats saved right after another one, without their own id (D2's fixed pairs)
     PAIRS = {17: [18], 48: [49], 50: [51], 52: [53], 54: [55, 56], 57: [58, 59]}
 
-    def __init__(self, stats, armor=(), weapons=(), stackable=(), tomes=("tbk", "ibk"), char_stats=None):
+    def __init__(self, stats, armor=(), weapons=(), stackable=(), tomes=("tbk", "ibk"), char_stats=None, charms=(), bodyparts=(), questdiff=()):
         self.stats = stats  # id -> dict(name, bits, add, par, csv_bits, csv_par)
         self.armor, self.weapons, self.stackable = set(armor), set(weapons), set(stackable)
+        self.charms = set(charms)
+        self.bodyparts = set(bodyparts)
+        self.questdiff = set(questdiff)
         self.tomes = set(tomes)
         self.char_stats = char_stats or {i: s for i, s in stats.items() if s.get("csv_bits")}
 
@@ -162,7 +165,20 @@ class Tables:
         stack = set()
         for f in ("armor.txt", "weapons.txt", "misc.txt"):
             stack |= {r["code"] for r in _rows(os.path.join(excel, f)) if r.get("code") and r.get("stackable") == "1"}
-        t = cls(stats, armor, weapons, stack)
+        # Normal-quality charms carry a prefix/suffix selector plus a 16-bit
+        # affix id in extended mode, even when both are zero.
+        if __package__:
+            from .charm_inv import charm_types
+        else:
+            from charm_inv import charm_types
+        types_file = os.path.join(excel, "itemtypes.txt")
+        charm_types_set = set(charm_types(_rows(types_file))) if os.path.exists(types_file) else {"char", "scha", "mcha", "lcha"}
+        charms = {r["code"] for r in _rows(os.path.join(excel, "misc.txt")) if r.get("type") in charm_types_set}
+        misc = list(_rows(os.path.join(excel, "misc.txt")))
+        bodyparts = {r["code"] for r in misc if r.get("type") == "body"}
+        tomes = {r["code"] for r in misc if r.get("type") in ("book", "scro")}
+        questdiff = {r["code"] for r in misc if _int(r.get("quest")) and r.get("questdiffcheck") == "1"}
+        t = cls(stats, armor, weapons, stack, charms=charms, bodyparts=bodyparts, tomes=tomes, questdiff=questdiff)
         t.char_stats = {i: s for i, s in stats.items() if s["saved"] and s["csv_bits"]}
         return t
 
@@ -266,6 +282,8 @@ def _item_layout(c):
     c.code()
     it = c.it
     if flags & 0x200000:  # simple
+        if it["code"] in c.t.questdiff:
+            c.f("quest_difficulty", c.t.stats[356]["bits"])
         c.opt("guid", 128)
         if c.f("filled", 1):  # set on the RotW advanced stash page's stacks: their count follows (docs/save-format.md)
             c.f("stack", 8)
@@ -278,6 +296,11 @@ def _item_layout(c):
     c.opt("autoaffix", 16)
     if q == 1:
         c.f("lowq", 3)
+    elif q == 2 and it["code"] in c.t.charms:
+        c.f("normal_charm_prefix", 1)
+        c.f("normal_charm_affix", 16)
+    elif q == 2 and it["code"] in c.t.bodyparts:
+        c.f("normal_bodypart_monster", 10)
     elif q == 3:
         c.f("superior", 3)
     elif q == 4:
@@ -332,6 +355,16 @@ def _item_layout(c):
                 c.props(f"set_stats{i}")
     if flags & 0x4000000:
         c.props("runeword_stats")
+    if flags & 0x10000000:
+        c.f("chronicle_source", 16)
+        if not flags & 0x20000000:
+            c.f("chronicle_timestamp", 32)
+            count = min(c.f("chronicle_count", 4), 8)
+        else:
+            count = 1
+        for i in range(count):
+            c.f(f"chronicle_recipient{i}", 64)
+    c.opt("advanced_stack", 8)
 
 
 def read_item(data, bitpos, tables):
@@ -341,9 +374,8 @@ def read_item(data, bitpos, tables):
         _item_layout(_Codec(tables, it, reader=r))
     except (IndexError, KeyError, ValueError) as e:
         raise ValueError(f"item at byte {bitpos // 8:#x} (code {it.get('code', '?')!r}): {e}") from None
-    # padding to the next byte; a non-simple item that ends exactly on a byte boundary gets a whole zero byte (simple items
-    # do not: docs/save-format.md)
-    end = (r.pos + 7) // 8 * 8 + (8 if r.pos % 8 == 0 and not it["flags"] & 0x200000 else 0)
+    # The advanced-stack presence bit is part of the layout, then ordinary byte alignment.
+    end = (r.pos + 7) // 8 * 8
     it["_raw"] = data[bitpos // 8:end // 8]
     return it, end
 
@@ -351,7 +383,7 @@ def read_item(data, bitpos, tables):
 def write_item(it, tables):
     w = BitWriter()
     _item_layout(_Codec(tables, it, writer=w))
-    return w.tobytes() + (bytes(1) if w.pos % 8 == 0 and not it["flags"] & 0x200000 else b"")
+    return w.tobytes()
 
 
 def read_item_list(data, off, tables):

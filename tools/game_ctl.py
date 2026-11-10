@@ -798,11 +798,21 @@ def harness_switch(on: bool) -> None:
     then reports the serial of C:, the same for every slot, so the word has no per-slot value),
     `tag=sN` (distinct per slot: window title "Diablo II: Resurrected [s2]", so other tools never pick this window), `nocookie` (hide
     the cookie instead) and `diag` (env MXL_HARNESS_WORDS sets the words by hand, e.g. "volserial tag=s2 diag").
-    Env MXL_CONTROL ("afford hcdeath") also writes those words to mxl2012-core-off.txt: a control run with those parts left out."""
+    Env MXL_CONTROL ("afford hcdeath") also writes those words to mxl2012-core-off.txt: a control run with those parts left out.
+    Env MXL_DRAWCAP_PROBE=1 also writes drawcap-probe.txt: the standalone drawcap plugin's probe is on for this launch (it reads
+    the file itself; drawcap does not use the harness), and MXL_DRAWCAP_PATCH=0 writes drawcap-nopatch.txt: its cap raise is
+    off for this launch (the before/after runs). Both are removed again with the harness (whatever the env then says)."""
     folder = os.path.join(GAME_DIR, "mods", "mxl2012", "d2rloader", "plugins")
     p = os.path.join(folder, "mxl2012-testharness.txt")
     off = os.path.join(folder, "mxl2012-core-off.txt")
+    probe = os.path.join(folder, "drawcap-probe.txt")
+    nopatch = os.path.join(folder, "drawcap-nopatch.txt")
     try:
+        for path, want in ((probe, os.environ.get("MXL_DRAWCAP_PROBE") == "1"), (nopatch, os.environ.get("MXL_DRAWCAP_PATCH") == "0")):
+            if on and want:
+                open(path, "w").close()
+            elif os.path.exists(path):
+                os.remove(path)
         if on:
             words = os.environ.get("MXL_HARNESS_WORDS")  # explicit override, e.g. "diag" for investigations
             if words is None:  # slot 1 runs from the drive its Battle.net session was made on: no volserial fix

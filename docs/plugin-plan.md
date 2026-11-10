@@ -29,7 +29,7 @@ Effort: XS < 1 h, S < 1 day, M a few days, L a week or more (same scale as engin
 | G | Dev test harness (for the game checks) | - | dev builds only, a small verb set | `testharness.cpp`, part of `harness_cmds.cpp` | copy, cut down | S-M | yes (dev only) |
 | H | Pandemonium 2 waypoint index 17 (shared with Valley of the Kings) | D2R's panel lists actinfo levels; a number maps to one level | game check; same as 1.13c expected, nothing to build | fallback `waypoints.cpp` `InstallWaypointPanel` | none / fallback change | XS (M fallback) | check only |
 | I | Stat unassign (Laz's PlugY ini forces it) | no per-point unassign in D2R | **optional, owner**: new part | starting point `stat_rules.cpp` `StatClickHook` (`0x4b3c70`) | new | M | no |
-| J | Extra stash pages | 1 personal page + 3 shared tabs | **optional, owner**: shared tabs are data (`add_shared_tabs`); personal page 2 is plugin (owner 2026-11-04: one page, done by lane stashpage2) | `stash_pages.cpp`, `mxl_stash_page.h` | change (size 10x10) | XS data / M plugin | no (0.1.11) |
+| J | Extra stash pages | 1 personal page + 3 shared tabs | Shared tabs are data (`add_shared_tabs`); one personal page remains and CharmInv owns the custom page ([retirement](stash-page-retirement.md)) | `stash_pages.cpp`, `mxl_stash_page.h` | change (size 10x10) | XS data / M plugin | no (0.1.11) |
 | K | D2R additions that conflict with Median | see section 9 | data first (lane d2radds); a hook only if data cannot switch it off | data only (`tools/d2r_adds.py`) | - | XS-S | check only |
 
 **mxl2012-core v0.1 = E + F + A + D (+ G in dev builds).** Effort for v0.1 on top of the skeleton: about 1.5-2 days
@@ -293,10 +293,12 @@ multiplayer/anti-cheat question. **M**. Game check `statunassign`.
 
 ### 8.2 J: extra stash pages
 
+**Historical implementation, retired in the CharmInv alpha update:** the current build has one personal page; CharmInv owns custom player page 6. Old page-2 items are deleted before loading, while other storage and new CharmInv items are preserved. See [retirement and verification](stash-page-retirement.md). The implementation notes below describe earlier releases.
+
 PlugY's multi-page stash was a repack extra. **D2R today:** 1 personal stash page + 3 shared tabs. Known design:
 (1) shared tabs are **data**: `tools/install_mod.py` writes `d2rcore.stash.add_shared_tabs = N` into
 the mod's `d2rloader.toml`, no plugin. (2) One extra **personal** page through D2RLoader's single custom player page
-(`InventoryService::registerPlayerPage`, logical id `stash2`, item page 6 + `<char>.d2rl`, max 16 x 16), drawn by the plugin
+(`InventoryService::registerPlayerPage`, logical id `stash2`, item page 6 in `<char>.d2s` plus `<char>.d2rl` registration metadata, max 16 x 16), drawn by the plugin
 panel `StashPage2` (`stash_pages.cpp`, generated `mxl_stash_page.h`, layout from `tools/ui_layouts.py`). D2RLoader allows
 exactly one such page; ten personal pages are not safely possible. Caveat: a character with items on page 2 refuses to load
 without the plugin ("protected page"). For 2012: shared tabs = XS (data); personal page 2 = copy `stash_pages.cpp` with the
@@ -359,7 +361,7 @@ new assert in `d2rloader.log`.
 | `terrorzones` | K | with the mod's desecratedzones.json, no tremor message and no boosted zone over a forced schedule tick (or a long idle); no Herald spawn |
 | `wrongbuild` | E | unit test only (`build_guard_test`): stamp/build combinations, screen text has "3.3" and no build number |
 | `statunassign` | I (optional) | Alt+click removes one point, refunds statpts, never below the start value, Grit-like passives refresh |
-| `stashpage2` | J (optional) | page 2 opens, items saved and restored across a restart, the protected-page refusal without the plugin |
+| `stashpage2` | J (historical fixture helper) | retired page-2 checks; current alpha deletion and CharmInv preservation: [stash retirement](stash-page-retirement.md) |
 
 ### 10.1 Game-check spec for v0.1 (lane plugin, 2026-10-28)
 

@@ -19,7 +19,10 @@ run starts mod mxl2012 without anything of ours in it.
 tools/package_release.py builds the same folder for a player release (build_data + write_mod_files).
 The stash layouts with the MEDIAN / ORBS tabs (tools/median_tabs.py) and the plugin part medtab ship together: write_mod_files
 refuses data with those layouts and no plugin, or a plugin without the part (tab 6 would assert and crash the game).
-Usage: MXL_SLOT=2 MXL_RUN=<lock owner> python tools/install_mod.py [--slot 1|2|3|4|5|all] [--name mxl2012] [--placeholder]
+--charminv also installs the bundled CharmInv plugin (d2rl-charm-inv.dll + .mpq, the pinned bytes from
+package_release.charminv_dir(), and third_party/charm-inv/charm-inv.toml) into mods\\<name>\\d2rloader\\, as a release has it;
+without it an install removes those three files, so a dev install stays without bundled plugins (docs/bundled-plugins.md).
+Usage: MXL_SLOT=2 MXL_RUN=<lock owner> python tools/install_mod.py [--slot 1|2|3|4|5|all] [--name mxl2012] [--placeholder] [--charminv]
 (`all` = those of slots 2 to 5 that exist; a named slot that is missing is refused; slot 1, the owner's own game in Program Files, only by name. A write the folder refuses ends the
 install with a message: nothing is elevated or retried another way.)
 """
@@ -43,6 +46,10 @@ MXL_GLOBAL = fxpaths.MXL
 PLUGIN = Path(os.environ.get("MXL_PLUGIN") or ROOT / "build" / "plugin" / "Release" / "mxl2012-core.dll")
 # The plugin's own settings ([mapreveal] exclude, [fonts], ...): installed when missing, never overwritten (the player's changes stay).
 CORE_CONFIG = ROOT / "plugin" / "mxl2012-core.toml"
+# The standalone drawcap plugin (drawcap/README.md: the legacy draw list cap; built by tools/build_plugin.ps1 next to the core
+# plugin) and its default settings (installed when missing, never overwritten). It ships with the mod in the same plugins folder.
+DRAWCAP = Path(os.environ.get("MXL_DRAWCAP") or ROOT / "build" / "drawcap" / "Release" / "drawcap.dll")
+DRAWCAP_CONFIG = ROOT / "drawcap" / "drawcap.toml"
 D2R_FILELIST = fxpaths.D2R_FILELIST
 
 
@@ -178,6 +185,7 @@ def main() -> int:
     ap.add_argument("--slot", default=os.environ.get("MXL_SLOT"), help="game slot 1 to 5, or 'all' (slots 2 to 5 that exist); default MXL_SLOT, no other default; overrides --game")
     ap.add_argument("--savepath", help="save folder name written to modinfo.json (default <name>/, slots: <name>-sN/)")
     ap.add_argument("--placeholder", action="store_true", help="an empty mod: modinfo.json only (no data, no plugin)")
+    ap.add_argument("--charminv", action="store_true", help="also install the bundled CharmInv plugin (otherwise its files are removed)")
     args = ap.parse_args()
 
     if not args.placeholder and not (SRC / "global" / "excel").exists():
@@ -190,13 +198,15 @@ def main() -> int:
         if n is None:
             print("no game slot: pass --slot 1|2|3|4|5|all or set MXL_SLOT (only the folders of the game slots are installed into)")
             return 2
-        return install_one(Path(args.game), args.name, args.savepath or f"{args.name}-s{n}/", placeholder=args.placeholder)
+        return install_one(Path(args.game), args.name, args.savepath or f"{args.name}-s{n}/", placeholder=args.placeholder,
+                           charminv=args.charminv)
     slots = game_slots.present_set() if args.slot == "all" else [game_slots.require_present(args.slot, "install_mod")]
     rc, first = 0, None
     for n in slots:
         savepath = args.savepath or f"{args.name}-s{n}/"
         print(f"== slot {n}: {game_slots.slot_dir(n)} (saves {savepath})")
-        rc = install_one(Path(game_slots.slot_dir(n)), args.name, savepath, first, placeholder=args.placeholder)
+        rc = install_one(Path(game_slots.slot_dir(n)), args.name, savepath, first, placeholder=args.placeholder,
+                         charminv=args.charminv)
         if rc:
             return rc
         first = None if args.placeholder else first or Path(game_slots.slot_dir(n)) / "mods" / args.name / f"{args.name}.mpq" / "data"
@@ -204,7 +214,8 @@ def main() -> int:
     return rc
 
 
-def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = None, placeholder: bool = False) -> int:
+def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = None, placeholder: bool = False,
+                charminv: bool = False) -> int:
     """Install into one game folder. copy_data_from: the data folder of an install made a moment ago (skips the
     ds1 renumbering and the file merging, copies the finished tree). A game slot is installed into only by the holder of
     its lock (MXL_RUN) and never while its game runs; another mod's folder (machine.json protected_mod_folders) is never a target."""
@@ -223,7 +234,7 @@ def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = Non
             print(f"refusing install: {game} still has a running game")
             return 1
     try:
-        return install_checked(game, name, savepath, copy_data_from, placeholder, slot)
+        return install_checked(game, name, savepath, copy_data_from, placeholder, slot, charminv)
     except PermissionError as e:  # a write refused half way (the check above passed): stop, never elevate or retry
         print(f"install failed: no write access to {e.filename} ({e.strerror}); {game_slots.ELEVATION_NOTE}")
         return 1
@@ -233,7 +244,7 @@ def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = Non
 
 
 def install_checked(game: Path, name: str, savepath: str, copy_data_from: Path = None, placeholder: bool = False,
-                    slot: int = None) -> int:
+                    slot: int = None, charminv: bool = False) -> int:
     import game_slots
     if not (game / "D2R.exe").exists() or not (game / "D2RLoader.exe").exists():
         print(f"{game} does not look like a D2R folder with D2RLoader installed")
@@ -252,7 +263,7 @@ def install_checked(game: Path, name: str, savepath: str, copy_data_from: Path =
         shutil.copytree(copy_data_from, data)
     else:
         build_data(data, game)
-    return finish_install(game, name, savepath, mod, mpq, data)
+    return finish_install(game, name, savepath, mod, mpq, data, charminv)
 
 
 def build_data(data: Path, game: Path) -> None:
@@ -349,9 +360,11 @@ def medtab_pair_problem(data: Path, plugin: Path) -> str:
     return ""
 
 
-def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, metadata: dict = None) -> None:
+def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, metadata: dict = None,
+                    drawcap: Path = DRAWCAP) -> None:
     """Everything of the mod folder except <name>.mpq/data: modinfo.json, d2rloader/{metadata.json, plugins, config, patches}.
     metadata: modVersion / description / website for d2rloader/metadata.json (default: the dev install's).
+    drawcap: the drawcap plugin DLL put next to mxl2012-core.dll (None or a missing file: left out, with a note).
     Refuses (SystemExit) when <name>.mpq/data and `plugin` are not a pair (medtab_pair_problem)."""
     mpq = mod / f"{name}.mpq"
     problem = medtab_pair_problem(mpq / "data", plugin)
@@ -376,6 +389,13 @@ def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, 
         print(f"plugin {plugin.name} ({plugin.stat().st_size // 1024} KB)")
     else:
         print(f"no plugin at {plugin} (run tools/build_plugin.ps1); installing data only")
+    if drawcap is not None and drawcap.exists():
+        shutil.copy2(drawcap, d2rl / "plugins" / "drawcap.dll")
+        print(f"plugin drawcap.dll ({drawcap.stat().st_size // 1024} KB)")
+        if not (d2rl / "config" / "drawcap.toml").exists():
+            shutil.copy2(DRAWCAP_CONFIG, d2rl / "config" / "drawcap.toml")
+    elif drawcap is not None:
+        print(f"no drawcap plugin at {drawcap} (run tools/build_plugin.ps1); left out")
     core_config = d2rl / "config" / "mxl2012-core.toml"
     if CORE_CONFIG.is_file() and not core_config.exists():
         shutil.copy2(CORE_CONFIG, core_config)
@@ -403,10 +423,26 @@ def install_placeholder(mod: Path, name: str, savepath: str) -> int:
     return 0
 
 
-def finish_install(game: Path, name: str, savepath: str, mod: Path, mpq: Path, data: Path) -> int:
+def install_charminv(mod: Path, on: bool) -> str:
+    """CharmInv's DLL, MPQ and our config into mod/d2rloader/ (on: checked as package_release does) or out of it (off)."""
+    import package_release as pr
+    if not on:
+        gone = [k for k in pr.CHARMINV_FILES if (mod / pr.CHARMINV[k]).is_file()]
+        for k in gone:
+            (mod / pr.CHARMINV[k]).unlink()
+        return "CharmInv: removed" if gone else "CharmInv: not installed"
+    folder = pr.charminv_dir()
+    if folder is None:
+        raise SystemExit("--charminv: CharmInv's d2rl-charm-inv.dll / .mpq not found (third_party/charm-inv/README.md)")
+    pr.stage_charminv(mod, folder)
+    return f"CharmInv {pr.CHARMINV['version']}: installed from {folder}"
+
+
+def finish_install(game: Path, name: str, savepath: str, mod: Path, mpq: Path, data: Path, charminv: bool = False) -> int:
     # The game-wide <game>\d2rloader\config\input-bindings.toml is not migrated here (migrate_hotkey_bindings is for a
     # player's own D2R): on a test slot it is shared with the other mod and every run's own changes are undone by slot_share.py.
     write_mod_files(mod, name, savepath)
+    print(install_charminv(mod, charminv))
 
     for rel in ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json"):
         ns_file = data / "local" / "lng" / (rel % NAMESPACE)

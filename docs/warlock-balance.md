@@ -88,9 +88,11 @@ its life was 2-2.5x Median's).
 5. Kept from round 1 (no same-stat Median skill): Psychic Ward's absorb, Sigil Lethargy's -50 % attack speed, Hex Siphon's
    -33 % enemy damage, Sigil Rancor / Death percentages.
 
-### Playtest checks once an account with Reign of the Warlock exists
+### Playtest checks on a Reign of the Warlock account
 
-No game run was possible here (the game accounts don't own Reign of the Warlock).
+No game run was possible when these numbers were made (the game accounts did not own Reign of the Warlock then). **They do
+now** (lane wltree, 2026-11-10): on slot 2 a Warlock (`WltreeWarlock`) was created and entered the game, so the checks below
+can be run on the test slots.
 
 1. **Flat damage on the weapon skills:** Cleave's tooltip "Damage: +x" and Mirrored Blades' "Magic Damage: x-y". Does a hit
    deal them (Cleave: compare a hit with the skill against a normal attack; Mirrored Blades: magic damage numbers on the

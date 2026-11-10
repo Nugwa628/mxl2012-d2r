@@ -55,6 +55,8 @@
 //      pets keep D2R's placement (pet_spread.cpp, off word petspread, #493);
 //   +  misc pSpell 10 items other than the Book of Skill (Median's Apple) cast skill 47 `Apple Healing Spell` on the user as
 //      1.13c's item spell 10, where D2R runs its Book of Skill and refuses them (apple_use.cpp, off word appleuse, #499);
+//   +  more copies of one carry1 unique (unique charms, relics, quest charms) may be carried; one copy gives its bonus (CharmInv
+//      first, then the top-left one), the others count as items whose requirements are not met (charm_dup.cpp, off word charmdup);
 //   +  "Baal says: ..." (the voice file baallaugh1, which Median gives to many skills and missiles) goes into the chat at most
 //      once every 30 s; the laugh itself still plays (vo_chat.cpp, off word vochat, #508);
 //   +  the stash wires its RotW pages (Gems, Materials, Runes) in classic graphics too, as D2R does in HD (its own RotW rule
@@ -68,8 +70,8 @@
 //      not fill it and assert (model_cache.cpp, off word modelcache, docs/maps-hd.md "Model cache");
 //   +  a Barbarian spirit (Guardian, Defender, Protector) farther than 20 sub-tiles from its owner is warped to it by D2R's pet
 //      warp, unless it is fighting a target in reach within 40 (spirit_warp.cpp, off word spiritwarp, #534);
-//   +  a second personal stash page on D2RLoader's one custom player page (item page 6 + <char>.d2rl, 10 x 10), drawn by the
-//      plugin panel StashPage2 and reached by arrows in the stock stash (stash_pages.cpp, off word stashpage2);
+//   (personal stash page 2, stash_pages.cpp, is not registered: D2RLoader's one custom player page, item page 6, belongs
+//      to the bundled CharmInv plugin, docs/bundled-plugins.md "CharmInv");
 //   +  a RotW stash of 7 tabs: MEDIAN and ORBS run as the Runes page with their own slots, a Vanilla / Median selector on the
 //      Materials tab, the 9 item codes with "@" restored in their slots (median_tabs.cpp, off word medtab: tabs 6 and 7 hidden);
 //   +  a Ctrl-click deposit flashes the stash tab the item went to, MEDIAN and ORBS too, not RUNES (tab_flash.cpp, off word
@@ -90,6 +92,7 @@
 #include "build_guard.h"
 #include "build_guard_logic.h"
 #include "client_skills.h"
+#include "charm_dup.h"
 #include "cube_dupe.h"
 #include "dodge_list.h"
 #include "dur_sync.h"
@@ -115,6 +118,7 @@
 #include "skill_text.h"
 #include "spirit_warp.h"
 #include "stash_pages.h"
+#include "stash_retire.h"
 #include "sound_guard.h"
 #include "state_lists.h"
 #include "testharness.h"
@@ -140,7 +144,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.18";
+constexpr const char* PluginVersion = "0.1.19";
 constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -185,7 +189,7 @@ char g_wrongBuild[256] = "";  // the message for a player on another build, empt
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse vochat reassign savemode rotwstash medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -464,6 +468,7 @@ char g_lvlUpUiReport[192] = "";
 char g_petSpreadReport[192] = "";
 char g_spiritWarpReport[192] = "";
 char g_appleUseReport[192] = "";
+char g_charmDupReport[192] = "";
 char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
 char g_rotwStashReport[384] = "";
@@ -517,7 +522,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
-	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"vochat", g_voChatReport},
+	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"charmdup", g_charmDupReport}, {"vochat", g_voChatReport},
 	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport}, {"modelcache", g_modelCacheReport},
 	             {"arealvl", g_areaLevelReport}, {"clearfonts", g_clearFontsReport}, {"cltdostub", g_stubReport}};
 	for (const auto& p : parts) {
@@ -751,6 +756,10 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	AppleUseCounts(&appleCasts, &appleRefused, &appleBooks);
 	std::snprintf(line, sizeof(line), "%s; casts %ld, refused %ld, Books of Skill left to D2R %ld", g_appleUseReport, appleCasts, appleRefused, appleBooks);
 	SayPart(command, "appleuse", line);
+	long dupCarry = 0, dupInactive = 0, dupDisabled = 0;
+	CharmDupCounts(&dupCarry, &dupInactive, &dupDisabled);
+	std::snprintf(line, sizeof(line), "%s; carry tests %ld, inactive copies answered %ld, taken out %ld", g_charmDupReport, dupCarry, dupInactive, dupDisabled);
+	SayPart(command, "charmdup", line);
 	long voPrinted = 0, voDropped = 0;
 	VoChatCounts(&voPrinted, &voDropped);
 	std::snprintf(line, sizeof(line), "%s; Baal laugh lines printed %ld, left out %ld", g_voChatReport, voPrinted, voDropped);
@@ -851,6 +860,8 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	              ImageStamp(context), BuildMatches(context) ? "" : "; not the expected image, engine hooks stay off",
 	              g_selfPath[0] ? g_selfPath : "?");
 	context->LogInfo(line);
+	if (BuildMatches(context))
+		RetireStashPage(context, g_selfPath);
 	if (!BuildMatches(context)) {
 		// Another game build: no hook, patch or harness at all (their addresses are build 93847's). Say why, and keep `mxl2012`.
 		build_guard::Message(g_wrongBuild, sizeof(g_wrongBuild), PluginVersion);
@@ -1017,6 +1028,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_appleUseReport);
 		context->LogInfo(line);
 	}
+	if (!Off("charmdup")) {
+		InstallCharmDup(context, g_charmDupReport, sizeof(g_charmDupReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: charmdup %s", g_charmDupReport);
+		context->LogInfo(line);
+	}
 	if (!Off("vochat")) {
 		InstallVoChat(context, g_voChatReport, sizeof(g_voChatReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_voChatReport);
@@ -1056,13 +1072,10 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_modelCacheReport);
 		context->LogInfo(line);
 	}
-	if (Off("stashpage2")) {
-		StashPagesOff(context);  // the stock stash's page 2 arrows stay hidden
-	} else {
-		InstallStashPages(context, g_stashPageReport, sizeof(g_stashPageReport));
-		std::snprintf(line, sizeof(line), "mxl2012-core: stashpage2 %s", g_stashPageReport);
-		context->LogInfo(line);
-	}
+	// Personal stash page 2 is not registered: D2RLoader gives a mod ONE custom player page (item page 6) and it belongs to
+	// the bundled CharmInv plugin (d2rl-charm-inv.dll, docs/bundled-plugins.md "CharmInv"). stash_pages.cpp stays for the
+	// harness and the history; the stock stash layouts no longer have its arrows (tools/ui_layouts.py, rotw_stash_legacy.py).
+	std::snprintf(g_stashPageReport, sizeof(g_stashPageReport), "removed: D2RLoader's custom player page belongs to CharmInv");
 	if (!Off("sendstash")) {
 		InstallSendStash(context, g_sendStashReport, sizeof(g_sendStashReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_sendStashReport);

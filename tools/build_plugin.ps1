@@ -1,5 +1,7 @@
 # Builds the mxl2012-core D2RLoader plugin: the dev DLL (test harness) into build\plugin\Release\mxl2012-core.dll (installed
 # by tools\install_mod.py) and, with -Release, the player DLL (-DMXL_RELEASE=ON, no harness) into build\plugin-release\Release.
+# Also the standalone drawcap plugin (drawcap\, its own CMake project, no harness: the same DLL for dev installs and releases)
+# into build\drawcap\Release\drawcap.dll; -Tests runs its unit tests too.
 # PluginSDK: -Sdk DIR, else env MXL2012_PLUGINSDK_DIR, else MXL2012_PLUGINSDK_DIR of .mxl-local.json (tools\lane_setup.py puts the
 # shared <runs>\shared\native\src\PluginSDK there), else the submodule third_party\PluginSDK; an empty submodule stops the
 # script with the way to fill it (nothing is downloaded here).
@@ -24,6 +26,10 @@ $sdkArg = "-DMXL2012_PLUGINSDK_DIR=$($Sdk -replace '\\', '/')"
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 & $cmake --build build\plugin --config Release
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
+& $cmake -S drawcap -B build\drawcap -A x64 "-DDRAWCAP_PLUGINSDK_DIR=$($Sdk -replace '\\', '/')"
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
+& $cmake --build build\drawcap --config Release --target drawcap
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
 if ($Release) {
     & $cmake -S plugin -B build\plugin-release -A x64 -DMXL_RELEASE=ON $sdkArg
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -38,4 +44,8 @@ if ($Tests) {
         & $t.FullName
         if ($LASTEXITCODE) { Write-Host "FAILED: $($t.Name)"; exit $LASTEXITCODE }
     }
+    & $cmake --build build\drawcap --config Release --target drawcap_tests
+    if ($LASTEXITCODE) { exit $LASTEXITCODE }
+    & build\drawcap\tests\Release\drawcap_tests.exe
+    if ($LASTEXITCODE) { Write-Host "FAILED: drawcap_tests.exe"; exit $LASTEXITCODE }
 }
