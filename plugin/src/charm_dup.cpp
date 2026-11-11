@@ -8,9 +8,11 @@
 //    out, the base half (items record +0x13a) is kept;
 //  - requirement check 0x36bc50 (item, unit, equipping, &str, &dex, &lvl, x; hooked by mercequip, this part adds a veto to that hook,
 //    or hooks it itself when mercequip is off) answers false for a carry1 unique stored in the
-//    backpack or CharmInv (page 6) of `unit` that is not the active copy of its unique (charm_dup_logic.h): D2R then treats it as
-//    an item whose requirements are not met. The server's refresh 0x470ca0 merges a stored charm's stats only when this passes
-//    (0x475760), and the client grid draws such an item red;
+//    backpack or the charm area of the custom page (page 6) of `unit` that is not the active copy of its unique, and for one on
+//    page 6 outside the charm area (charm_dup_logic.h): D2R then treats it as an item whose requirements are not met. The charm
+//    area is the whole page with CharmInv, invtabs' charm tab when invtabs.dll exports InvTabsCharmTab (docs/invtabs.md). The
+//    server's refresh 0x470ca0 merges a stored charm's stats only when this passes (0x475760), and the client grid draws such
+//    an item red;
 //  - refresh 0x470ca0 (game, player, x): first, a copy whose stats are merged but that is no longer the active one has its stat
 //    list detached from the player (0x2f8290; in the game neither the equipped-item sequence NOEQUIP + 0x475020 nor 0x2f81a0
 //    with bType 0 removed them); then D2R's refresh merges the active copy. The client's refresh 0x1c9610 (unit), which runs
@@ -86,6 +88,7 @@ ReqFn g_req = nullptr;
 RefreshFn g_refresh = nullptr;
 ClientRefreshFn g_clientRefresh = nullptr;
 volatile LONG g_carryPassed = 0;   // carry tests that ran without the unique half
+volatile LONG g_carryRefused = 0;  // of those, refused all the same (the base half, items record +0x13a)
 volatile LONG g_inactive = 0;      // requirement checks answered "not met" for an inactive copy
 volatile LONG g_disabled = 0;      // merged copies taken out by the refresh
 
@@ -121,23 +124,65 @@ auto CopyOf(Unit* item, int32_t index) noexcept -> charm_dup::Copy {
 	        (loc[2] >> 16) & 0xffff};
 }
 
-// The copies of `index` that `owner` carries on counting pages; `items[i]` is the unit of `copies[i]`.
-auto Collect(Unit* owner, int32_t index, charm_dup::Copy* copies, Unit** items) noexcept -> size_t {
+// invtabs (docs/invtabs.md) owns the custom page at 16 x 16 and exports its charm tab's rectangle; looked up when the game first
+// asks (every plugin is loaded by then) and kept: absent (CharmInv) = the whole custom page is charm inventory.
+using CharmTabFn = int(__cdecl*)(int*, int*, int*, int*);
+
+auto CharmTab() noexcept -> CharmTabFn {
+	static const CharmTabFn fn = []() noexcept -> CharmTabFn {
+		HMODULE invtabs = GetModuleHandleW(L"invtabs.dll");
+		return invtabs != nullptr ? reinterpret_cast<CharmTabFn>(GetProcAddress(invtabs, "InvTabsCharmTab")) : nullptr;
+	}();
+	return fn;
+}
+
+auto CharmAreaNow() noexcept -> charm_dup::CharmArea {
+	const CharmTabFn fn = CharmTab();
+	if (fn == nullptr) {
+		return {};
+	}
+	int x = 0, y = 0, w = 0, h = 0;
+	const int found = fn(&x, &y, &w, &h);
+	return charm_dup::TabArea(found, x, y, w, h);
+}
+
+auto PlaceOf(const charm_dup::Copy& copy, const charm_dup::CharmArea& area) noexcept -> charm_dup::Place {
+	return charm_dup::PlaceOf(copy.page, copy.x, copy.y, area);
+}
+
+// True when `item` is in `owner`'s inventory list.
+auto Carries(Unit* owner, Unit* item) noexcept -> bool {
+	void* inv = Fn<InventoryFn>(RvaInventory)(owner, "charm_dup", __LINE__);
+	int guard = 0;
+	for (Unit* it = inv != nullptr ? Fn<InvFirstFn>(RvaInvFirst)(inv) : nullptr; it != nullptr && guard++ < 4000; it = Fn<InvNextFn>(RvaInvNext)(it)) {
+		if (it == item) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// The copies of `index` that `owner` carries in the backpack or the charm area; `items[i]` is the unit of `copies[i]`.
+auto Collect(Unit* owner, int32_t index, const charm_dup::CharmArea& area, charm_dup::Copy* copies, Unit** items) noexcept -> size_t {
 	void* inv = Fn<InventoryFn>(RvaInventory)(owner, "charm_dup", __LINE__);
 	size_t n = 0;
 	int guard = 0;
 	for (Unit* it = inv != nullptr ? Fn<InvFirstFn>(RvaInvFirst)(inv) : nullptr; it != nullptr && guard++ < 4000 && n < MaxCopies;
 	     it = Fn<InvNextFn>(RvaInvNext)(it)) {
 		if (Carry1Index(it) == index) {
-			copies[n] = CopyOf(it, index);
-			items[n] = it;
-			++n;
+			const charm_dup::Copy copy = CopyOf(it, index);
+			if (PlaceOf(copy, area) == charm_dup::Place::Charm) {
+				copies[n] = copy;
+				items[n] = it;
+				++n;
+			}
 		}
 	}
 	return n;
 }
 
-// True when `item` is a carry1 copy in `owner`'s backpack or CharmInv that is not the active copy of its unique.
+// True when `item` is a carry1 copy in `owner`'s backpack or charm area that is not the active copy of its unique, or a carry1
+// copy on the custom page outside the charm area (another invtabs tab: not charm inventory, never gives its bonus).
 auto IsInactiveCopy(Unit* item, Unit* owner) noexcept -> bool {
 	if (owner == nullptr || At<int32_t>(owner, d2r::UnitType) != 0) {
 		return false;
@@ -146,9 +191,14 @@ auto IsInactiveCopy(Unit* item, Unit* owner) noexcept -> bool {
 	if (index < 0) {
 		return false;
 	}
+	const charm_dup::CharmArea area = CharmAreaNow();
+	const charm_dup::Place place = PlaceOf(CopyOf(item, index), area);
+	if (place != charm_dup::Place::Charm) {
+		return place == charm_dup::Place::OutsideTab && Carries(owner, item);
+	}
 	charm_dup::Copy copies[MaxCopies];
 	Unit* items[MaxCopies];
-	const size_t n = Collect(owner, index, copies, items);
+	const size_t n = Collect(owner, index, area, copies, items);
 	if (n < 2) {
 		return false;
 	}
@@ -184,7 +234,11 @@ auto WriteSlot(uint64_t* slot, uint64_t value) noexcept -> bool {
 auto CarryHook(Unit* item, uint16_t* uniques, uint16_t* uniquesEnd, void* bases, void* basesEnd) noexcept -> bool {
 	(void)uniquesEnd;
 	InterlockedIncrement(&g_carryPassed);
-	return g_carry(item, uniques, uniques, bases, basesEnd);
+	const bool refuse = g_carry(item, uniques, uniques, bases, basesEnd);
+	if (refuse) {
+		InterlockedIncrement(&g_carryRefused);
+	}
+	return refuse;
 }
 
 // "Not met" for an inactive copy (asked after D2R said "met").
@@ -258,14 +312,24 @@ auto InstallCharmDup(const D2RL::PluginContext* context, char* report, size_t re
 	const bool client = context->InstallInlineHook(RvaClientRefresh, ClientRefreshEntry, sizeof(ClientRefreshEntry),
 	                                               reinterpret_cast<void*>(&ClientRefreshHook), reinterpret_cast<void**>(&g_clientRefresh));
 	std::snprintf(report, reportSize,
-	              "carry1 duplicates carried, one copy active (CharmInv first, then top-left): compare slot 0x3e2abb0%s, carry test 0x473960%s, requirements 0x36bc50%s%s, refresh 0x470ca0%s, client refresh 0x1c9610%s",
+	              "carry1 duplicates carried, one copy active (charm page or tab first, then top-left): compare slot 0x3e2abb0%s, carry test 0x473960%s, requirements 0x36bc50%s%s, refresh 0x470ca0%s, client refresh 0x1c9610%s",
 	              compare ? "" : " FAILED", carry ? "" : " FAILED", viaMerc ? " (through mercequip's hook)" : "", req ? "" : " FAILED", refresh ? "" : " FAILED",
 	              client ? "" : " FAILED");
 	return (compare ? 1 : 0) + (carry ? 1 : 0) + (req ? 1 : 0) + (refresh ? 1 : 0) + (client ? 1 : 0);
 }
 
-void CharmDupCounts(long* carryPassed, long* inactive, long* disabled) noexcept {
+void CharmDupArea(char* text, size_t size) noexcept {
+	const charm_dup::CharmArea area = CharmAreaNow();
+	if (area.wholePage) {
+		std::snprintf(text, size, "the whole custom page (%s)", CharmTab() != nullptr ? "invtabs has no charm tab" : "no invtabs");
+	} else {
+		std::snprintf(text, size, "invtabs charm tab %dx%d at %d,%d", area.w, area.h, area.x, area.y);
+	}
+}
+
+void CharmDupCounts(long* carryPassed, long* inactive, long* disabled, long* carryRefused) noexcept {
 	*carryPassed = g_carryPassed + g_compares;
+	*carryRefused = g_carryRefused;
 	*inactive = g_inactive;
 	*disabled = g_disabled;
 }

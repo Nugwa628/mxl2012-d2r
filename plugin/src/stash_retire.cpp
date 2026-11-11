@@ -160,8 +160,8 @@ void RetireStashFolder(const D2RL::PluginContext *ctx,
             (std::string("D2R-XL 2012 stash retirement: skipped ") +
              std::string(name.begin(), name.end()) +
              "; pair unchanged; do not load this character until repaired "
-             "(loader may refuse it, or old page-6 items may appear in "
-             "CharmInv): " +
+             "(loader may refuse it, or old page-6 items may appear on the "
+             "charm page): " +
              e.what())
                 .c_str());
       }

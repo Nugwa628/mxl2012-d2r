@@ -11,9 +11,33 @@
 
 namespace charm_dup {
 
-// D2R item pages: 0 is the backpack; D2RLoader gives the mod's one custom player page number 6 (CharmInv's grid).
+// D2R item pages: 0 is the backpack; D2RLoader gives the mod's one custom player page number 6 (CharmInv's grid, or invtabs'
+// 16 x 16 page whose charm tab is one rectangle of it).
 inline constexpr int32_t BackpackPage = 0;
 inline constexpr int32_t CharmInvPage = 6;
+inline constexpr int32_t PageCells = 16;  // the custom page's cells per side at most (x and y are four bits in the .d2s)
+
+// The part of the custom page that is charm inventory: the whole page (CharmInv, or no invtabs charm tab), or invtabs' charm
+// tab rectangle (its export InvTabsCharmTab, docs/invtabs.md). Items elsewhere on the page (other tabs) are not charms here.
+struct CharmArea {
+	bool wholePage = true;
+	int32_t x = 0, y = 0, w = 0, h = 0;
+};
+
+// The area from InvTabsCharmTab's answer: `found` 0 (no tab) or a rectangle that is not on the page gives the whole page, the
+// old CharmInv behaviour (a bad answer never takes a charm's bonus away).
+constexpr auto TabArea(int found, int32_t x, int32_t y, int32_t w, int32_t h) noexcept -> CharmArea {
+	if (found == 0 || x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > PageCells || y + h > PageCells) {
+		return {};
+	}
+	return {false, x, y, w, h};
+}
+
+// True when an item whose top-left cell is x,y on the custom page lies in the charm area (invtabs: an item belongs to the area
+// holding its top-left cell).
+constexpr auto InCharmArea(const CharmArea& area, int32_t x, int32_t y) noexcept -> bool {
+	return area.wholePage || (x >= area.x && x < area.x + area.w && y >= area.y && y < area.y + area.h);
+}
 
 // One stored copy of a carry1 unique on a page whose charms count.
 struct Copy {
@@ -23,7 +47,8 @@ struct Copy {
 	int32_t x, y;          // grid cell
 };
 
-// Ordering of the copies of one unique: CharmInv first, then the backpack; on a page the top row first, then the left column;
+// Ordering of the copies of one unique (each PlaceOf Charm): the custom page's charm area (CharmInv, invtabs' charm tab) first,
+// then the backpack; on a page the top row first, then the left column;
 // the unit id breaks ties (two copies never share a cell). The order depends only on where the copies lie, so a reload, which
 // gives the items new unit ids, picks the same copy.
 constexpr auto Before(const Copy& a, const Copy& b) noexcept -> bool {
@@ -68,6 +93,23 @@ constexpr auto IsCarry1(int32_t carry1Cell) noexcept -> bool {
 // True when a page's charms count (CharmInv's policy for the mod: the backpack and the custom player page).
 constexpr auto CountingPage(int32_t page) noexcept -> bool {
 	return page == BackpackPage || page == CharmInvPage;
+}
+
+// Where a stored carry1 copy lies, for the duplicate rule.
+enum class Place {
+	Other,       // not on a counting page (cube, stash, ...): not a copy of the rule
+	Charm,       // the backpack or the charm area of the custom page: a copy that may be the active one
+	OutsideTab,  // the custom page outside the charm area (another invtabs tab): never the active one, never gives its bonus
+};
+
+constexpr auto PlaceOf(int32_t page, int32_t x, int32_t y, const CharmArea& area) noexcept -> Place {
+	if (page == BackpackPage) {
+		return Place::Charm;
+	}
+	if (page != CharmInvPage) {
+		return Place::Other;
+	}
+	return InCharmArea(area, x, y) ? Place::Charm : Place::OutsideTab;
 }
 
 }  // namespace charm_dup

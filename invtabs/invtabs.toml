@@ -1,0 +1,31 @@
+# D2R-XL 2012 inventory tabs. At most 12; each side 1..16; all must pack into 16 x 16.
+[invtabs]
+# Master switch; restart after changing configuration.
+enabled = true
+# Charms also grant bonuses from the normal inventory in this mod.
+inventory_charms = true
+# Keyboard virtual-key code: I (73); 0 disables the shortcut.
+open_key = 73
+# Show an inventory button for mouse users.
+open_button = true
+# Expose the tab through the controller inventory navigation.
+controller_button = true
+# RGBA bytes used to tint inactive charms (requirements or duplicate rule).
+inactive_charm_tint = [128, 128, 128, 160]
+
+[tabs.charms]
+# Number of item cells horizontally (1..16).
+columns = 10
+# Number of item cells vertically (1..16).
+rows = 6
+# TSV basename inside data/global/excel/d2rloader/invtabs/.
+types = "types_charms.txt"
+# Visible tab label (printable ASCII in generated tables).
+label = "Charms"
+
+# Future tab: create its type TSV with header itemType, then enable this section.
+# [tabs.consumables]
+# columns = 6
+# rows = 6
+# types = "types_consumables.txt"
+# label = "Consumables"

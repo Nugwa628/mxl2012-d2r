@@ -255,7 +255,6 @@ Launcher::View Launcher::Inspect() {
 	v.feedOk = feedChecked_;
 	v.latest = feed_.version;
 	v.latestComplete = feed_.complete;
-	v.requiredVersion = !GameVersion(feed_.d2rVersion).empty() ? GameVersion(feed_.d2rVersion) : std::string(RequiredGameVersion);
 	v.loaderNeeded = !feed_.d2rloader.version.empty() ? feed_.d2rloader.version : LoaderVersionDefault;
 	if (!FindD2R(e)) {
 		v.d2rError = e;
@@ -266,7 +265,7 @@ Launcher::View Launcher::Inspect() {
 	v.d2rDir = d2rDir_;
 	v.d2rSource = d2rSource_;
 	D2RInstall d = InspectD2R(d2rDir_, d2rSource_);
-	v.build = CheckBuild(d.infoVersion, d.exeVersion, v.requiredVersion);
+	v.game = DescribeGame(d.infoVersion, d.exeVersion);
 	std::wstring loader = JoinPath(d2rDir_, L"D2RLoader.exe");
 	if (FileExists(loader))
 		v.loaderFound = ExeFileVersion(loader);
@@ -299,7 +298,7 @@ Launcher::View Launcher::Inspect() {
 	v.gameRunning = !ProcessesUnder(d2rDir_).empty();
 	PlayInputs in;
 	in.d2rFound = true;
-	in.buildMismatch = v.build.verdict == BuildVerdict::Older || v.build.verdict == BuildVerdict::Newer;
+	in.gameVersion = v.game.version;
 	in.loaderOk = v.loaderOk;
 	in.loaderFound = !v.loaderFound.empty();
 	in.installed = !v.installed.empty() && !v.foreignMod;
@@ -316,13 +315,10 @@ std::string Launcher::StatusText(const View& v) const {
 	std::string out;
 	if (!v.d2rFound)
 		return "!" + (!v.d2rError.empty() ? v.d2rError : std::string("D2R not found: press D2R folder and choose the Diablo II Resurrected folder."));
-	std::string found = v.build.version.empty() ? "version unknown"
-	                                            : v.build.version + (v.build.build ? ", build " + std::to_string(v.build.build) : "");
-	if (v.build.verdict == BuildVerdict::Ok)
-		out += "D2R: " + Utf8(v.d2rDir) + " (" + found + ")\n";
-	else
-		out += "!D2R " + found + ": D2R-XL 2012 needs D2R " + v.requiredVersion +
-		       (v.build.verdict == BuildVerdict::Newer ? ". Wait for a D2R-XL 2012 update." : ". Update D2R in Battle.net or Steam.") + "\n";
+	// the version found is information: no D2R version or build number blocks Install or Play
+	std::string found = v.game.version.empty() ? "version unknown"
+	                                           : v.game.version + (v.game.build ? ", build " + std::to_string(v.game.build) : "");
+	out += "D2R: " + Utf8(v.d2rDir) + " (" + found + ")\n";
 	if (v.loaderOk)
 		out += "D2RLoader: " + v.loaderFound + " (OK)\n";
 	else if (v.loaderFound.empty())

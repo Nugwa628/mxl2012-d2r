@@ -26,7 +26,10 @@ save size/checksum and player item count. Shared `.d2i` files are never opened b
 
 Origin is character-level, never guessed from item code, charm type or coordinates:
 
-- A sidecar recording `d2rl-charm-inv.dll` is already a CharmInv character: preserve every page-6 item, even non-charms.
+- A sidecar recording a page-6 owner is already a charm-page character: preserve every page-6 item, even non-charms.
+  The owners (`stash_retire_logic.h` `PageOwners`) are `d2rl-charm-inv.dll` (Dimentio's CharmInv 1.0.1) and
+  `invtabs.dll` (docs/invtabs.md, which replaces CharmInv and adopts its page-6 items; its 16 x 16 page can hold items
+  of other tabs). Matched as D2RLoader's length-prefixed file-name field, so a name that only ends the same is no owner.
 - A sidecar recording mxl2012-core **0.1.19 or newer** also preserves page 6. This is the one-time completion marker
   in D2RLoader's existing plugin-version field. It survives the loader rewriting the provider list after a refused
   load with CharmInv temporarily absent. Keep this threshold fixed in future releases.

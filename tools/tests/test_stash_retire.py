@@ -18,10 +18,13 @@ def item(code='r01',page=1,**kw):
 def save(items,other=b'JM\0\0jfJM\0\0kf\0'):
     head=bytearray(0x340);struct.pack_into('<II',head,0,d2save.SIG,0x44520005);head[0x18]=4;head[0x1b]=1
     return d2save.fix_header(bytes(head)+d2save.write_char_stats([dict(id=0,value=20)],T)+b'if'+bytes(30)+d2save.write_item_list(items,T)+other)
-def sidecar(data,charm=False,version="0.1.18"):
+def sidecar(data,charm=False,version="0.1.18",owner=None):
+    """A D2RL v2 sidecar for `data` recording mxl2012-core `version` and, with `charm`, CharmInv; `owner` names another
+    page-6 owner DLL (invtabs.dll) recorded instead."""
     body=bytearray(0x154-0x2c)
     struct.pack_into('<II',body,8,struct.unpack_from('<I',data,12)[0],len(data));body[16:48]=hashlib.sha256(data).digest()
-    for s in (b'mxl2012-core.dll',)+( (b'd2rl-charm-inv.dll',) if charm else () ):
+    owners=((b'd2rl-charm-inv.dll',) if charm else ())+((owner.encode(),) if owner else ())
+    for s in (b'mxl2012-core.dll',)+owners:
         body+=struct.pack('<I',len(s))+s
         if s==b'mxl2012-core.dll':
             v=version.encode();body+=struct.pack('<I',len(v))+v
@@ -71,6 +74,17 @@ class Retire(unittest.TestCase):
         self.run_plan(a,b[:-1],False);self.run_plan(a,sidecar(save([])),False)
         damaged=bytearray(a);damaged[-1]^=1;self.run_plan(damaged,b,False)
         unknown=bytearray(b);unknown[-15:]=b'unknown-file.xx';unknown[12:44]=hashlib.sha256(unknown[44:]).digest();self.run_plan(a,unknown,False)
+    def test_page6_owners_charminv_and_invtabs_and_neither(self):
+        # both page-6 owners keep every page-6 item (charms and anything else); with neither and an old core, page 6 is the
+        # retired personal stash page 2 and goes
+        a=save([item('x1x',page=7),item(page=7,x=12,y=15),item(page=5)])
+        for owner in ('d2rl-charm-inv.dll','invtabs.dll'):
+            with self.subTest(owner=owner):
+                b=sidecar(a,owner=owner);c,d,out=self.run_plan(a,b);self.assertEqual((c,d),(a,b));self.assertIn('charmOrigin=1',out)
+        c,d,out=self.run_plan(a,sidecar(a));self.assertEqual(c,save([item(page=5)]));self.assertIn('removed=2 charmOrigin=0',out)
+        self.assertEqual(d2save.check_sidecar(c,d),[])
+        # a name that only ends like an owner is not one (length-prefixed field match)
+        c,_,out=self.run_plan(a,sidecar(a,owner='notinvtabs.dll'));self.assertIn('removed=2',out)
     def test_updated_core_marker_survives_absent_charminv_record(self):
         a=save([item('x1x',page=7)])
         for version in ('0.1.19','0.1.20','0.2.0','1.0.0'):

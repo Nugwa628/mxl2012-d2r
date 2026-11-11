@@ -53,6 +53,37 @@ int main() {
 	Check(IsCarry1(1) && IsCarry1(46) && !IsCarry1(0), "carry1 cell above 0");
 	Check(CountingPage(0) && CountingPage(6) && !CountingPage(3) && !CountingPage(4), "backpack and CharmInv count, cube and stash do not");
 
+	// CharmInv (no InvTabsCharmTab export): the whole custom page is charm inventory, as before
+	const CharmArea whole{};
+	Check(whole.wholePage && InCharmArea(whole, 0, 0) && InCharmArea(whole, 9, 3) && InCharmArea(whole, 15, 15), "no invtabs: whole page");
+	Check(PlaceOf(CharmInvPage, 9, 3, whole) == Place::Charm && PlaceOf(BackpackPage, 0, 0, whole) == Place::Charm, "no invtabs: page 6 and backpack");
+	Check(PlaceOf(3, 0, 0, whole) == Place::Other && PlaceOf(4, 0, 0, whole) == Place::Other, "cube and stash are no copies");
+
+	// invtabs: the charm tab 10 x 6 at 0,0 of the 16 x 16 page; other tabs elsewhere on the page are not charm inventory
+	const CharmArea tab = TabArea(1, 0, 0, 10, 6);
+	Check(!tab.wholePage && tab.w == 10 && tab.h == 6, "invtabs tab taken");
+	Check(InCharmArea(tab, 0, 0) && InCharmArea(tab, 9, 5) && !InCharmArea(tab, 10, 0) && !InCharmArea(tab, 0, 6) && !InCharmArea(tab, 15, 15),
+	      "tab edges");
+	Check(PlaceOf(CharmInvPage, 9, 2, tab) == Place::Charm, "CharmInv's 10 x 4 cells are inside the pinned tab");
+	Check(PlaceOf(CharmInvPage, 12, 0, tab) == Place::OutsideTab && PlaceOf(CharmInvPage, 0, 10, tab) == Place::OutsideTab, "other tab");
+	Check(PlaceOf(BackpackPage, 12, 3, tab) == Place::Charm, "the backpack still counts with invtabs");
+	const CharmArea moved = TabArea(1, 6, 10, 10, 6);
+	Check(PlaceOf(CharmInvPage, 0, 0, moved) == Place::OutsideTab && PlaceOf(CharmInvPage, 6, 10, moved) == Place::Charm &&
+	          PlaceOf(CharmInvPage, 15, 15, moved) == Place::Charm,
+	      "a tab not at 0,0");
+
+	// a missing tab or a rectangle off the page: the old whole-page behaviour (never takes a bonus away)
+	Check(TabArea(0, 0, 0, 10, 6).wholePage, "no tab: whole page");
+	Check(TabArea(1, 0, 0, 0, 6).wholePage && TabArea(1, -1, 0, 10, 6).wholePage && TabArea(1, 7, 0, 10, 6).wholePage &&
+	          TabArea(1, 0, 11, 10, 6).wholePage,
+	      "bad rectangle: whole page");
+	Check(!TabArea(1, 0, 0, 16, 16).wholePage && TabArea(1, 0, 0, 16, 16).w == 16, "a 16 x 16 tab is fine");
+
+	// the rule with invtabs: only copies whose place is Charm take part; an active copy in the tab beats the backpack, a copy in
+	// another tab is never chosen (charm_dup.cpp leaves it out of the walk and answers it "not met")
+	const Copy withTab[] = {{80, 7, BackpackPage, 0, 0}, {81, 7, CharmInvPage, 3, 1}};
+	Check(PickActive(withTab, 2) == 1, "invtabs: the tab copy is active");
+
 	if (failures == 0) {
 		std::printf("charm_dup: all checks passed\n");
 	}

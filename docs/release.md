@@ -115,7 +115,7 @@ manifest's `launcher` as a self-update). `package_release.py` writes the fields 
 |---|---|
 | `version` | the release (tag `v<version>`); `pluginVersion` is the plugin's own PluginVersion (normally equal) |
 | `complete` | `false` only for a CI `--no-data` package (no `mxl2012.mpq/data`): never install it for a player |
-| `d2r.build` | the D2R build the private copy must be at. `imageTimestamp` is the PE TimeDateStamp of that `D2R.exe` (the plugin checks it, `plugin/src/build_guard_logic.h`) |
+| `d2r` | information only since 2026-11-12, kept so that older downloaders still read the manifest: `build` and `version` are the D2R build the release's data was made from, `imageTimestamp` is the PE TimeDateStamp of the game image the plugin's fixed addresses are for (`plugin/src/image_guard_logic.h`). The downloader shows the D2R version it finds and never blocks for it; a manifest without `d2r` is read as well |
 | `d2rloader` | the D2RLoader the release needs. The downloader compares `version` with `<D2R folder>\D2RLoader.exe` and, when it is missing or another version, shows "D2R-XL 2012 needs D2RLoader <version>" with **Install D2RLoader**: after the player confirms, it downloads `url` (https on d2rloader.net only), checks `size` and `sha256`, and puts the ZIP's files into the D2R folder (docs/launcher.md "Install D2RLoader"). Without a usable block, or after a failed install, the button opens https://d2rloader.net/download.html. D2RLoader is never in the package |
 | `launch` | what the game folder's own `d2rloader/config/d2rloader.toml` (section `[d2rloader]`) needs: `default_mod` = `mxl2012`. The player sets it in the game (gear on the character screen, Default Mod); the downloader does not write that file. `-txt` is not needed: D2RLoader 1.3.1 compiles the mod's `.txt` tables itself at each start (tested 2026-10-27, docs/launcher.md), except on the start that builds its base compiler snapshot (first start after installing or updating D2RLoader or D2R): that start has D2R's own sounds table with or without `-txt`, the plugin says so on screen and the next start is right (docs/bugs.md #46) |
 | `modFolder` | every `files[].path` is relative to `<game>/mods/<modFolder>/`, with `/` separators |
@@ -237,20 +237,22 @@ damaged file, an object with a wrong sha256, a missing object, an entry that is 
 list, bad paths, old schema; the channel written last; re-runs; temp-file cleanup; the 7z it builds equals the packager's).
 Both use 7-Zip when it is installed, else `tools/fake_7z.py`.
 
-## Wrong game build
+## Another game image
 
-The plugin (plugin/src/mxl2012_core.cpp, `build_guard_logic.h`, unit test
-`plugin/tests/build_guard_test.cpp`): the plugin goes on only when the `D2R.exe` PE timestamp is `0x6ab3782c` and
-D2RLoader's build name (when it gives one) is `93847`. Otherwise it installs nothing (no hook, patch or harness), writes
-an ERROR line to `d2rloader.log`, draws the line at the top of the screen through D2RLoader's overlay service, and `mxl`
-prints it:
+The plugin is never tied to a game build or version (docs/plugin-plan.md 1.1). The plugin (plugin/src/mxl2012_core.cpp,
+`image_guard_logic.h`, unit test `plugin/tests/image_guard_test.cpp`) uses its fixed addresses only when the running
+image is the one they were taken from: PE timestamp `0x6ab3782c` (the game program in D2RLoader 1.3.1) and the expected
+bytes at five code probes. The game's version and D2RLoader's build name are logged, never compared: the same image runs
+on D2R 3.3 (build name 93847) and D2R 3.4 (build name 95032). On another image it installs nothing (no hook, patch or
+harness), writes an ERROR line to `d2rloader.log`, draws the line at the top of the screen through D2RLoader's overlay
+service, and `mxl2012` prints it:
 
-    D2R-XL 2012 0.1.0 needs D2R build 93847; this is 94100. The mod's engine changes are off.
+    D2R-XL 2012 0.1.0: this D2RLoader version is not supported by the mod yet. The mod's engine changes are off.
 
-(For a different `D2R.exe` with the same build number: `this is 93847 with another D2R.exe (image 0x...)`.)
 D2RLoader 1.3.1 itself checks the game build at start (`D2RCore.dll build compatibility verified`, `Loaded build
-configuration for <hash>` in `d2rloader.log`); a build it has no configuration for may not start at all. Not tested in
-game: no other D2R build is installed here; the decision is covered by the unit test.
+configuration for <hash>` in `d2rloader.log`); a build it has no configuration for may not start at all, and on a D2R
+newer than it was tested with (3.4) it shows its own notice first (docs/port-3.4.md section 2). The other-image case is
+not tested in game: no other D2RLoader image is installed here; the decision is covered by the unit test.
 
 ## Making a release
 
@@ -258,7 +260,10 @@ game: no other D2R build is installed here; the decision is covered by the unit 
    `maps_hd` (`--game`, default `MXL_D2R_GAME` or the slot 1 folder; only read).
 2. `py -3 tools/package_release.py [--version X]`: builds the release plugin (`tools/build_plugin.ps1 -Release`: CMake on PATH or Visual Studio's, the PluginSDK of `.mxl-local.json`; nothing is downloaded), stages, leaves out byte copies of D2R's files (the baseline extraction and the shared D2R cache; without a baseline the run stops), checks, writes
    `dist/`. `--plugin DLL` uses a release DLL built elsewhere (it is checked); `--data-from <mods\mxl2012\mxl2012.mpq\data>`
-   copies a finished data folder instead of rebuilding it.
+   copies a finished data folder instead of rebuilding it. The charm inventory is the one of `tools/charm_inventory.py`
+   (invtabs; docs/invtabs.md "Packaging"): the build of step 1 makes its data, the package takes
+   `build\invtabs\Release\invtabs.dll` (`tools/build_plugin.ps1` builds it; `--invtabs DLL` names another) and refuses
+   data built for the other charm inventory. A `--no-data` package carries no charm inventory plugin.
 
    **One version number.** The release version is `PluginVersion` in `plugin/src/mxl2012_core.cpp`. That number appears in:
    - the release name;

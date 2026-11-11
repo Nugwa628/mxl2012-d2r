@@ -1,7 +1,8 @@
-// The wrong-build notice (build_guard_logic.h): on a D2R other than build 93847 the plugin installs no hook and draws one
-// line at the top of the screen through D2RLoader's overlay service, which needs no game address. The environment
+// The other-image notice (image_guard_logic.h): on a game image other than the one its addresses are for, the plugin
+// installs no hook and draws one line at the top of the screen through D2RLoader's overlay service, which needs no game
+// address. The environment
 // warning (env_guard_logic.h, docs/bugs.md #53) uses the same line.
-#include "build_guard.h"
+#include "image_guard.h"
 
 #include <D2RLPlugin/overlay.h>
 
@@ -53,7 +54,7 @@ void __cdecl DrawNotice(const D2RL::PluginContext* context, const D2RL::Overlay:
 
 }  // namespace
 
-auto ShowWrongBuildNotice(const D2RL::PluginContext* context, const char* text) noexcept -> bool {
+auto ShowOtherImageNotice(const D2RL::PluginContext* context, const char* text) noexcept -> bool {
 	return ShowNotice(context, text);
 }
 

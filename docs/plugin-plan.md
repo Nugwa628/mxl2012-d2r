@@ -24,7 +24,7 @@ Effort: XS < 1 h, S < 1 day, M a few days, L a week or more (same scale as engin
 | B | Missile server hit 6 (102 rows) | D2R's own hit 6 (`0x45ce90`) spawns monstats row sHitPar1: **the same job** | data (idmap of sHitPar1) + game check; plugin only if the check fails | fallback `missile_hits.cpp` `HitSpawnCorpse` (slot 65), **not** hit 68 | none / fallback copy | XS (S fallback) | check only |
 | C | Unused-in-vanilla slots: cltdo 83, srvprg 22/119/51, cltprg 25/28, srvhit 23 | D2R has a function in each slot (not verified to be 1.13c's) | one game check; plugin port per slot only if it fails | none | new if needed | S check, M per failed slot | check only |
 | D | Empty missile function slots (crash guard) | D2R calls client do / server hit table entries with no null check | stubs in every empty slot | `missile_hits.cpp` empty-slot stubs | copy as-is | XS | yes |
-| E | Build guard, wrong-version notice | - | image stamp 0x6ab3782c + build name 93847; player text says "3.3" | `build_guard.cpp`, `build_guard_logic.h`, `mxl2012_core.cpp` | change the text | XS | yes |
+| E | Image guard, other-image notice | - | the running image (stamp 0x6ab3782c + code probes) gates the fixed addresses; never a game build or version (1.1) | `image_guard.cpp`, `image_guard_logic.h`, `mxl2012_core.cpp` | change the text | XS | yes |
 | F | Other-plugin guard | another engine plugin and mxl2012-core would write the same table slots | refuse to install next to it | `other_plugins_logic.h`, `mxl2012_core.cpp` `LogOtherPluginsLater` | copy, change ids | XS | yes |
 | G | Dev test harness (for the game checks) | - | dev builds only, a small verb set | `testharness.cpp`, part of `harness_cmds.cpp` | copy, cut down | S-M | yes (dev only) |
 | H | Pandemonium 2 waypoint index 17 (shared with Valley of the Kings) | D2R's panel lists actinfo levels; a number maps to one level | game check; same as 1.13c expected, nothing to build | fallback `waypoints.cpp` `InstallWaypointPanel` | none / fallback change | XS (M fallback) | check only |
@@ -37,35 +37,47 @@ Effort: XS < 1 h, S < 1 day, M a few days, L a week or more (same scale as engin
 
 ## 1. Plugin rules
 
-### 1.1 Build guard (image stamp, build 93847)
+### 1.1 Image guard: never tied to a game build or version
 
-Every RVA in this file is an address of the dumped D2R.exe of **D2R 3.3.0 build 93847** (PE `TimeDateStamp` **0x6ab3782c**,
-D2RLoader 1.3.1). The rule (`plugin/src/build_guard_logic.h` `build_guard::Matches`, unit test
-`plugin/tests/build_guard_test.cpp`):
+**Rule (owner, 2026-11-12): plugins are never tied to a game build or version. A part installs when the code it needs is
+what it expects (expected bytes or signature), and turns itself off with a log line when it is not.**
 
-- Hooks and patches go in only when the image stamp is `0x6ab3782c` **and** D2RLoader's `buildName` (when its context has
-  the field) is `"93847"`. An empty / missing build name with the right stamp is accepted.
-- On any other image the plugin installs **nothing** (no hook, no patch, no table write, no harness), logs one ERROR line,
-  draws one line at the top of the screen through D2RLoader's overlay service (`build_guard.cpp` `ShowWrongBuildNotice`,
+How mxl2012-core follows it (`plugin/src/image_guard_logic.h`, unit test `plugin/tests/image_guard_test.cpp`):
+
+- **No comparison of the game's version or of the build name D2RLoader reports, anywhere.** Both are logged for diagnosis
+  (the load line and the `mxl2012` log line) and decide nothing.
+- **Hooks and patches check what they overwrite.** Table slots are written with `PatchWriteU64` and an expected old value
+  (0 for an empty slot, the D2R function for a wrapped slot), inline hooks with `InstallInlineHook` and the expected entry
+  bytes, byte patches with `PatchBytes` and the old bytes. A mismatch turns that part off and its status line says so.
+- **Addresses that are only called or read have no bytes of their own, so one check of the running image stands in front of
+  them** (`image_guard::Decide`): the image the addresses were taken from, which is the game program D2RLoader 1.3.1 runs
+  (PE `TimeDateStamp` **0x6ab3782c**), plus 12 expected bytes inside each of five functions the plugin calls
+  (`image_guard::Probes`: GetSkillRecord, EvalSkillCalc, CreateMissile, MissileRecord, UnitDataFlag; each probe starts
+  16 bytes after the entry, so another plugin's jump at the entry does not change it). The gate is about the code that
+  runs, not about a version: D2RLoader 1.3.1 carries the game program itself, so this one image runs on a D2R 3.3 and on
+  a D2R 3.4 install alike (docs/port-3.4.md section 3.3), with build names `93847` and `95032`.
+- On another image the plugin installs **nothing** (no hook, no patch, no table write, no harness), logs one ERROR line,
+  draws one line at the top of the screen through D2RLoader's overlay service (`image_guard.cpp` `ShowOtherImageNotice`,
   registered at load, `Overlay::Phase::AfterGameUi`), and keeps only its console command (`mxl2012`) so a player can read why.
-- Each part also checks what it overwrites: table slots are written with `PatchWriteU64` and an expected old value (0 for an
-  empty slot, the D2R function for a wrapped slot), inline hooks with `InstallInlineHook` and the expected entry bytes. A
-  mismatch turns that part off and its status line says so. This is a second guard under the image stamp, not a substitute.
+- **Later step, not started:** looking the addresses up by signature at load (docs/port-3.4.md section 6, step 6) makes the
+  parts independent of the loader image too; the image gate then goes away part by part. drawcap and the invtabs plugin
+  already work this way and have no image or build test at all.
 - Every part has an off word in `mxl2012-core-off.txt` next to the DLL (read by
   `ReadOffList` / `Off()` in `mxl2012_core.cpp`), and a status line in the `mxl2012` console command.
 
-### 1.2 Player-facing requirement: "3.3", never a build number
+### 1.2 What a player reads
 
-- Whatever a player reads (release notes, README, downloader/launcher, the plugin's on-screen notice, the `PluginInfo`
-  description) names the requirement as **Diablo II: Resurrected 3.3** (and D2RLoader 1.3.1), never "build 93847".
-- The build number and image stamp are internal: the guard compares them, and the **log line** may carry them for support
-  (`image 0x6ab3782c`, `buildName 93847`) because players send logs, not because they need to understand them.
-- So `build_guard::Message` names no build number. The mxl2012 text:
+- Nothing a player reads (release notes, README, downloader, the plugin's on-screen notice, the `PluginInfo`
+  description) states a game build number as a requirement, and neither the plugin nor the downloader refuses a game
+  version. The requirement is **D2RLoader 1.3.1**; D2R 3.3 and 3.4 are the versions the mod was tested on.
+- The image stamp, the game version and the build name are internal: the **log line** carries them for support
+  (`image 0x6ab3782c`, `D2R 3.4.0`, `build name 95032`) because players send logs, not because they need to understand them.
+- So `image_guard::Message` names no version, build number or stamp. The mxl2012 text on another image:
 
-      D2R-XL 2012 <version> needs Diablo II: Resurrected 3.3; this game is a different version. The mod's engine changes are off.
+      D2R-XL 2012 <version>: this D2RLoader version is not supported by the mod yet. The mod's engine changes are off.
 
-  and the log gets a second line with the stamp and build name found. The unit test asserts the screen text contains
-  `"3.3"` and no digit run of 5 (no build number).
+  and the log gets a second line with the stamp found and expected and, as information, the version and build name. The
+  unit test asserts the screen text names no game version and has no digit run of 5 (no build number).
 - PluginInfo: `id "mxl2012-core"`, `name "D2R-XL 2012 core"`, flags `Shared | ModScopedOnly | NativeHooks`,
   description e.g. "Engine support for D2R-XL 2012, the Median XL 2012 port (D2R 3.3)". `PluginVersion` starts at 0.1.0
   (bumping is the coordinator's call).
@@ -359,7 +371,7 @@ new assert in `d2rloader.log`.
 | `cltdostub` | D | `missilescan` lists 0 rows on an empty slot after the stubs; firing the 2 rows with blank pCltDoFunc outside town does not crash; `cltdostub` off word as control is NOT run (it crashes by design) |
 | `pandewp` | H | in Pandemonium 2 operate the waypoint: bit 17 set; the panel opens; Valley of the Kings listed once and reachable; standing in the Valley, the bit is shared (Pande 2's activation unlocked it, as 1.13c); no crash. Compare with the 1.13c expectation in section 7 |
 | `terrorzones` | K | with the mod's desecratedzones.json, no tremor message and no boosted zone over a forced schedule tick (or a long idle); no Herald spawn |
-| `wrongbuild` | E | unit test only (`build_guard_test`): stamp/build combinations, screen text has "3.3" and no build number |
+| `wrongbuild` | E | unit test only (`image_guard_test`): the image with any build name installs, another image does not; screen text has no game version and no build number |
 | `statunassign` | I (optional) | Alt+click removes one point, refunds statpts, never below the start value, Grit-like passives refresh |
 | `stashpage2` | J (historical fixture helper) | retired page-2 checks; current alpha deletion and CharmInv preservation: [stash retirement](stash-page-retirement.md) |
 
@@ -394,7 +406,7 @@ Every check FAILs on a new crash file, a new assert in `d2rloader.log`, an `h: .
 
 | Check | Steps | PASS when |
 |---|---|---|
-| `mxl2012` | console `mxl2012` | line 1 `mxl2012-core 0.1.0 (dev) \| game: Diablo II: Resurrected 3.3, engine changes on`; `pluginguard ok: no conflicting plugin in the game`; `cltdo22 cltdofunc 113 client wall ...` without FAILED; `cltdostub empty slots skipped: missile client do 14 of 91, server hit 10 of 71` (D2R's own empties; other numbers = another table state, investigate); `other plugins: none`; no line shows `0x6ab3782c` or `93847` (those are in the log line `mxl2012-core: D2R ... image ...`) |
+| `mxl2012` | console `mxl2012` | line 1 `mxl2012-core 0.1.0 (dev) \| game: Diablo II: Resurrected 3.3.0, engine changes on` (the version is D2RLoader's word for the game, shown only); `pluginguard ok: no conflicting plugin in the game`; `cltdo22 cltdofunc 113 client wall ...` without FAILED; `cltdostub empty slots skipped: missile client do 14 of 91, server hit 10 of 71` (D2R's own empties; other numbers = another table state, investigate); `other plugins: none`; no line shows `0x6ab3782c` or `93847` (those are in the log line `mxl2012-core: D2R ... image ...`) |
 | `rockshock` | `h slot cltdo 22`, `h slot cltdo 113` (113 = plugin); outside town `h spawn <class>` a monster; `h setskill 28 1` (Rock Shock has no charclass: if the game refuses the point, skip to `cltdo`), `h missiles reset`, `h cast 28 nearest`, `h missiles`, `h state`; `h cltdo 28` and `h cltdo 408`; a monster owning ParasiteSkill (408, from monstats Skill1-8): `h mcast 408 <its mode> nearest` | `cltdo 28` / `cltdo 408`: `cltdofunc=113 ... entry=plugin`, `wall calls +1`; `state` client wall calls > 0 after the cast; the server half damages (monster life drops); missiles seen include `rockshock` / `purgestrike`; no row on cltdofunc 22 (tables lane validate). Then the two controls of section 2.1 (blank cltdofunc; `cltdo22` off word last) with screenshots of the three visuals for the owner |
 | `srvhit6spawn` | outside town: `h missile 1330` (treewardenspawner), `h missile 1610` (edy1summon), `h missile 1613` (darkonesummon), `h missile 1301` (demon seed on ground, sHitPar2 0) one at a time, each followed by `h state` | a new monster of class = the **idmapped** sHitPar1 (1107 / 1222 / 1221 / 1 -> their D2R rows) near the impact; `dump mon <class>` is a real row; no monster of the unmapped number; one spawn per hit; mode for sHitPar2 1 vs 0 noted |
 | `srvhit23` | lane triage version: `h slot srvhit 23`; a spear (`137`) with Bloodspeakers Mark (658) as oskill; per way (left clicks, right clicks, `cast 658 unit`) a fresh zombie, `h watch srvhit 23`, 3 uses; then `h missile <leapingjumper> 6 0` under the watch | the slot is `exe+0x4533c0`, it is reached with last missile bloodspeakerbolt, bloodspeakerpets appear (one per hit: no petmax in srvdo 119), no new assert (#270 is tagged known) |
@@ -404,7 +416,7 @@ Every check FAILs on a new crash file, a new assert in `d2rloader.log`, an `h: .
 | `cltdostub` | `h missilescan`; outside town `h missile 83` (stuckarrow) and `h missile 84` (footprint), wait 3 s, `h state` | `missilescan`: 0 rows on an empty client do / client hit / server hit slot; no crash; `state` stub counters show the client do stub ran (`client do` >= 1) and the log has `missile row 83 has client do slot 0 ... skipped`. The `cltdostub` off word control is NOT run (it crashes by design) |
 | `pandewp` | reach Pandemonium 2 (level 134 in 2012 numbering: `h level <id>` or the uber portals with `enter`), `h objects` (the waypoint object), `h operate <id> <its OperateFn>`, `h waypoint n 17 get`, `h waypoint open`; `h level 46` (Valley of the Kings), `h waypoint n 17 get` | bit 17 set by Pandemonium 2's waypoint; the panel opens; the Valley is listed once and reachable; standing in the Valley the bit is the same one (1.13c behaviour); no crash |
 | `terrorzones` | the mod's desecratedzones.json installed (lane d2radds); idle 10 min in a field level with `h state` every minute; scan the game log and chat capture | no terror-zone / tremor message, no boosted zone, no monster with a Herald / desecrated flag. No harness verb reads the zone scheduler (its address is not known): this check is data + observation only |
-| `wrongbuild` | unit test `buildguard_tests` (plugin/tests) | passes: screen text "needs Diablo II: Resurrected 3.3", no 5-digit run, no image stamp; the log line carries both |
+| `wrongbuild` | unit test `imageguard_tests` (plugin/tests) | passes: the image installs with build name 93847, 95032, none or a made-up one; another image does not; screen text "this D2RLoader version is not supported by the mod yet", no game version, no 5-digit run, no image stamp; the log line carries stamp, version and build name |
 
 ## 11. Parts NOT to bring over (later Median / D2Sigma)
 
@@ -438,10 +450,10 @@ it would change 2012's rules or write slots 2012's data never uses.
   `state_trace.cpp`, `sound_guard.cpp` (fix for a later Median goblin sound; copy later only if 2012 data shows a -1 sound),
   the 5,000 lines of Sigma verbs in `harness_cmds.cpp`.
 
-Generic parts that **do** come over: `build_guard*`, `env_guard_logic.h` (wrong mod folder / stray DLL warning;
+Generic parts that **do** come over: the image guard (`image_guard*`; `build_guard*` until 2026-11-12), `env_guard_logic.h` (wrong mod folder / stray DLL warning;
 optional XS), `other_plugins_logic.h`, the entry/off-list/console skeleton, a trimmed `d2r.h` / `d2r.cpp`,
 `CltDoWall`, the missile empty-slot stubs, `testharness.cpp` + a trimmed harness (dev only), `CMakeLists.txt` with
-`MXL_RELEASE`, the version resource, and the unit tests of these (`build_guard_test`, `other_plugins_test`, `env_guard_test`,
+`MXL_RELEASE`, the version resource, and the unit tests of these (`image_guard_test`, `other_plugins_test`, `env_guard_test`,
 `harness_cmds_test` trimmed).
 
 Watch-list (copy only if the first game runs show the symptom; each is XS, as-is): `sigma_skills.cpp` `CltDoCurse` (curse rows
@@ -453,7 +465,7 @@ copied as part `cltnomis` (section 13). Lane monitems (2026-10-28): "nRadius > 0
 
 ## 12. Order of work
 
-1. Skeleton lane: entry, off list, `mxl2012` console, build guard with the "3.3" text, other-plugin guard (E, F).
+1. Skeleton lane: entry, off list, `mxl2012` console, image guard (then a build guard with the "3.3" text), other-plugin guard (E, F).
 2. v0.1 parts: `CltDoWall` at 113 + data remap (A), empty-slot stubs (D), dev harness subset (G).
 3. Static step for C (name the D2R and 1.13c functions per slot).
 4. First game pass: `mxl2012 rockshock srvhit6spawn srvhit23 cltdo83 skillprog cltdostub pandewp terrorzones`.
@@ -467,7 +479,7 @@ PluginVersion 0.1.0. Build: `cmake -S plugin -B build/plugin -A x64 -DMXL2012_PL
 
 | Item | File(s) | Off word | Notes |
 |---|---|---|---|
-| E build guard | `build_guard_logic.h` (`Message`, `LogDetail`), `mxl2012_core.cpp` | - | screen / `mxl2012`: "needs Diablo II: Resurrected 3.3"; image stamp and build name only in log lines (`wrong game: image ...`, and `mxl2012-core: D2R ... image ...` each time `mxl2012` runs) |
+| E image guard | `image_guard_logic.h` (`Decide`, `Message`, `LogDetail`), `mxl2012_core.cpp` | - | screen / `mxl2012`: "this D2RLoader version is not supported by the mod yet"; image stamp, version and build name only in log lines (`game image 0x...: another image ...`, and `mxl2012-core: D2R ... image ...` each time `mxl2012` runs) |
 | F plugin guard | `other_plugins_logic.h` (`IsConflictingPlugin`, `ConflictNotice`), `mxl2012_core.cpp` `FindConflictingPlugin` | `pluginguard` | refuses (installs nothing, keeps `mxl2012`) when a loaded module has the PluginInfo id or file name of a conflicting plugin, or that DLL waits in `<game>\d2rloader\plugins` (loads after the mod's plugins) or next to our DLL. A conflicting plugin that appears later under another file name is only reported (error log + notice) by the 15 s check: the parts are in by then |
 | A client do 113 | `client_skills.cpp`, `client_skills_logic.h` | `cltdo22` | written only if slot 113 is below the bound and empty; see 2.1 for the open question |
 | D empty slot stubs | `missile_stubs.cpp`, `missile_stubs_logic.h` | `cltdostub` | missile client do (bound 91) and server hit (bound 71); installed after A |
@@ -494,7 +506,7 @@ PluginVersion 0.1.0. Build: `cmake -S plugin -B build/plugin -A x64 -DMXL2012_PL
 | G harness (dev) | `harness_cmds.cpp`, `harness_cmds_logic.h` (`ParseSlotTable`, `WatchableTable`), `testharness.cpp` | - | verbs of 10.1 (lane triage: `watch`, a counting wrapper on one cltdo / srvhit entry, written and restored with `PatchWriteU64` and its expected old value); the harness runs on the server frame `0x406550` through the shared hook of `server_frame.cpp` (section 30) |
 | `d2r.h` | trimmed to the v0.1 calls and the five function tables | - | summon / pet / melee / seed helpers of the skeleton removed |
 
-Off words now take letters **and digits** (`cltdo22`); the skeleton's reader kept letters only. Unit tests: `buildguard_tests`
+Off words now take letters **and digits** (`cltdo22`); the skeleton's reader kept letters only. Unit tests: `imageguard_tests`
 (= check `wrongbuild`), `otherplugins_tests` (plugin guard), `clientskills_tests`, `missilestubs_tests`, `envguard_tests`,
 `harness_tests` (`ParseSlotTable` added; lane triage: `WatchableTable`; lane harness: `CallsEmptySlot`, `UseNpcTravel`), `clientskills_tests` (`HasClientMissile`), `itemeffect_tests` (`SkipsEventSkill`, lane fixes2), `skillremove_tests` (`SkipsRemove`, lane states), `dodgelist_tests` (patch bytes, lane states), `statelists_tests` (12 blocks, lane statefaith), `melttrail_tests` (ids, decision, step table, spot, entry bytes; lane melttrail), `cubedupe_tests` (slot layout, `ExtraCopies`, pages; lane cube2). `uniquecarry_tests` (row + 1, rewrite pass, D2R's comparison before / after),
 `whirlwind_tests` (1.13c table edges, both speed terms, the whole rule; lane pluginplan), `origasserts_tests` (3 blocks: shape, reporter, where D2R goes on; lane fixes4), `runeletters_tests` (call site bytes, both thunk calls, key test, fallback rule, cell copy; lane runeletters), `itemlevel_tests` (patch bytes, the clamp before / after, write and read back 1-127; lane ilvl), `soundguard_tests`, `transguard_tests` (crash-audit C17 / C14 guards; lane realpath), `skilltext_tests` (conversions, the cut before / after, every occurrence, a formatted line left alone; lane skilltips).

@@ -156,7 +156,7 @@ std::string SetDefaultMod(const std::string& text, const std::string& ourMod);
 
 struct PlayInputs {
 	bool d2rFound = false;
-	bool buildMismatch = false;    // the D2R version is known and is not the one the release needs
+	std::string gameVersion;       // the D2R version found ("3.4"; "" when unreadable): information, never a reason to block
 	bool loaderOk = false;         // D2RLoader.exe at the required version
 	bool loaderFound = false;      // a D2RLoader.exe, of any version
 	bool installed = false;        // our install (the marker) of some release

@@ -109,7 +109,7 @@ D2RInstall InspectD2R(const std::wstring& dir, const std::string& source) {
 	if (ReadWholeFile(JoinPath(d.dir, L".build.info"), info))
 		d.infoVersion = BuildInfoVersion(info);
 	d.exeVersion = ExeFileVersion(JoinPath(d.dir, L"D2R.exe"));
-	d.build = CheckBuild(d.infoVersion, d.exeVersion);
+	d.game = DescribeGame(d.infoVersion, d.exeVersion);
 	return d;
 }
 
@@ -164,7 +164,7 @@ std::vector<D2RInstall> FindD2RInstalls() {
 			out.push_back(InspectD2R(dir, src));
 	}
 	std::stable_sort(out.begin(), out.end(), [](const D2RInstall& a, const D2RInstall& b) {
-		return (a.build.verdict == BuildVerdict::Ok) > (b.build.verdict == BuildVerdict::Ok);
+		return a.game.known > b.game.known;  // folders whose version can be read first
 	});
 	return out;
 }

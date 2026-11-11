@@ -81,6 +81,17 @@ text is published; it is redistributed with D2RLoader by the owner's decision (a
 2026-11-10. Our part is its config and the Median XL 2012 charm-type table the build writes. It is credited to Dimentio in
 the README, the release notes and docs/bundled-plugins.md.
 
+**invtabs** (`invtabs/`, the inventory tabs plugin; in the package when `CHARM_INVENTORY = "invtabs"` in
+`tools/charm_inventory.py`, the default, instead of CharmInv) is built from wild-healer's Player Page Host 1.0.2
+and Wild Healer's Charm Inventory (<https://github.com/wild-healer/D2R-Tools>, commit `6722cc5`,
+`plugins/aaa-player-page-host` and `plugins/wild-healers-charm-inventory`): the page registration and policies, the panel
+and grid layout, the procedural panel background and sprite writer, the grid widget wrappers and the area packing are
+adapted from his code. His repository has no licence file, so all rights stay with wild-healer; he approved this use
+with credit on 2026-11-11. Not taken: his `frame_art.inc` and `mold.inc` (art from other mods). It is credited to wild-healer in
+`invtabs/README.md`, the file headers, docs/invtabs.md, the README and the release manifest's `bundledPlugins` entry.
+invtabs uses no game-icons.net picture (its buttons are drawn by the plugin or cut from Median's own item pictures), so
+no CC BY 3.0 attribution is needed; one would go here, with author and licence, if such an icon is added.
+
 ## The downloader's 7z decoder (`launcher/third_party/lzma`)
 
 `D2R-XL-2012-Downloader.exe` unpacks the release's `.7z` with the C 7z decoder of the

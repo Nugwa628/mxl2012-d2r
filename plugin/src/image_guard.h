@@ -1,10 +1,10 @@
-// Wrong game build (build_guard.cpp, decision in build_guard_logic.h).
+// The notice line on the screen (image_guard.cpp; the image decision is in image_guard_logic.h).
 #pragma once
 
 #include <D2RLPlugin/api.h>
 
 // Draws `text` at the top of the screen for the whole session; false when D2RLoader has no overlay service.
-auto ShowWrongBuildNotice(const D2RL::PluginContext* context, const char* text) noexcept -> bool;
+auto ShowOtherImageNotice(const D2RL::PluginContext* context, const char* text) noexcept -> bool;
 // The same line for any other notice (the environment warning, docs/bugs.md #53); a later call replaces the text.
 auto ShowNotice(const D2RL::PluginContext* context, const char* text) noexcept -> bool;
 // Registers the notice line's draw callback with no text yet. Called at plugin load: a registration from the later worker thread

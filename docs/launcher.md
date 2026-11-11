@@ -19,10 +19,12 @@ The release `.7z` is the manual-install fallback.
   folders are checked too. Discovery is read-only.
 - **D2R folder** or `--game-dir` chooses a folder containing `D2R.exe` and `Data`. The
   choice is saved. Official Median XL and classic Diablo II folders are refused.
-- D2R **3.3** is required. `.build.info`'s active row is preferred, with the executable's
-  FileVersion as fallback (`detect.cpp`). The check compares major/minor versions, not
-  individual build numbers; 3.3.93847 is the port's baseline. A mismatch shows a warning
-  and the GUI asks before installing anyway. The plugin has its own build guard.
+- No D2R version or build number is required (owner rule 2026-11-12: nothing is tied to a game build or
+  version). The downloader reads the version (`.build.info`'s active row, with the executable's
+  FileVersion as fallback, `detect.cpp` `DescribeGame`) and shows it in the status line as plain
+  information (`D2R: <folder> (3.4, build 95032)`). It never warns, asks or blocks Install or Play for
+  it; a release manifest's `d2r` block is information too. The plugin checks the running code itself
+  (docs/plugin-plan.md 1.1).
 - `<D2R>\D2RLoader.exe`'s version resource must match **1.3.1** (or the release manifest's
   required version). Numeric equivalents `1.3.1`, `1.3.1.0`, and `1.3.1-beta` match.
   A missing or different version shows a warning and **Install D2RLoader** in Uninstall's place
@@ -69,7 +71,7 @@ writes D2RLoader's config; the Default mod warning and action stay for players w
 refuses `-mod` only inside `launch_arguments` of its config, not on its command line.)
 
 Play is on only when all of these hold (`PlayBlocked`, paths.h; the line under the panel says `Play: <reason>.` otherwise):
-the D2R folder is known, its version is not a known other one (a D2R version that cannot be read does not block), D2RLoader
+the D2R folder is known (its D2R version never blocks: newer, older or unreadable all play), D2RLoader
 is there at the required version, `mods\mxl2012` is our install (marker), no update is waiting on the channel, the last install,
 update or repair finished (the state's `mod_pending`, set when the folder starts to change and cleared when it ends well),
 and no D2R / D2RLoader runs from the D2R folder. A 3-second timer notices when the game ends and turns Play on again. When the

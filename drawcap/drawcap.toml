@@ -1,4 +1,4 @@
-# drawcap: the legacy draw list cap of Diablo II: Resurrected 3.3. D2R still draws the classic scene from a fixed list of
+# drawcap: the legacy draw list cap of Diablo II: Resurrected. D2R still draws the classic scene from a fixed list of
 # 3000 entries (walls, floors, units, shadows, missiles); what does not fit is silently not drawn, which crowds and heavy
 # on-hit procs reach. This plugin raises that cap and can measure how full the list gets. Changes apply at the next game start.
 [drawcap]

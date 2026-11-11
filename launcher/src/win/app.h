@@ -16,7 +16,7 @@
 namespace mxl {
 
 #ifndef MXL_LAUNCHER_VERSION
-#define MXL_LAUNCHER_VERSION "0.1.3"  // the downloader version; CMake reads it from here for the version resource
+#define MXL_LAUNCHER_VERSION "0.1.4"  // the downloader version; CMake reads it from here for the version resource
                                       // (cmake -DMXL_LAUNCHER_VERSION=x.y.z overrides both, for tests of the self-update)
 #endif
 constexpr const char* LauncherVersion = MXL_LAUNCHER_VERSION;
@@ -63,8 +63,7 @@ public:
 		std::string d2rError;    // why not (FindD2R's message)
 		std::wstring d2rDir;
 		std::string d2rSource;   // "Battle.net", "Steam", "default folder", "chosen", "saved"
-		BuildCheck build;        // against the release's d2r.build (RequiredBuild until the feed is read)
-		std::string requiredVersion = RequiredGameVersion;  // "3.3": the release's d2r.version, major.minor
+		GameInfo game;           // the D2R version found: shown as information, never a reason to block
 		std::string loaderFound;   // D2RLoader.exe's file version, "" when missing
 		std::string loaderNeeded;  // the release's d2rloader.version
 		bool loaderOk = false;

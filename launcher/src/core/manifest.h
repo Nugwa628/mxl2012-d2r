@@ -31,8 +31,8 @@ struct Manifest {
 	std::string version;        // the release, shown to the player
 	std::string pluginVersion;
 	bool complete = false;      // false: a package without game data (a --no-data build): only from a test channel
-	int d2rBuild = 0;           // d2r.build: the build the plugin's addresses were taken from (93847); shown only
-	std::string d2rVersion;     // d2r.version ("3.3.0"): its major.minor ("3.3") is what the player's D2R must be
+	int d2rBuild = 0;           // d2r.build: the build the release's data was made from (93847); information, never compared
+	std::string d2rVersion;     // d2r.version ("3.3.0"): information, never compared with the player's D2R
 	uint32_t imageTimestamp = 0;  // d2r.imageTimestamp: of the unpacked image in memory, not the file (0 = not given)
 	struct Loader {
 		std::string version, url, sha256, signerThumbprint;

@@ -54,7 +54,7 @@ shared lock folder come from the machine-local config (docs/setup.md; key `share
   `dcc.py`, `d2r_model.py` / `d2r_mesh.py` / `d2r_texture.py`, `animdata_merge.py`, `ds1_remap.py`, `objpreset.py`, `save/`, the Ghidra
   scripts, `fake_*` test doubles, `launcher_*`, `sprite3d/`, the HD/graphics pipeline scripts and their tests. Main's versions are
   kept for `tbl2json.py`, `strings_*`, `native.py`, `vanilla113.py` and the inventory / audit tools.
-- `plugin/`: `mxl2012_core.cpp` (entry/off-list/console skeleton), `d2r.h` / `d2r.cpp`, `build_guard*`,
+- `plugin/`: `mxl2012_core.cpp` (entry/off-list/console skeleton), `d2r.h` / `d2r.cpp`, `build_guard*` (now `image_guard*`),
   `env_guard_logic.h`, `other_plugins_logic.h`, `testharness*` (+ a `harness_cmds.cpp` with an empty verb table and `help`, `echo`,
   `frames`), `harness_cmds_logic.h`, version resource, CMake with `MXL_RELEASE`, unit tests of these. The PluginSDK path is the cache
   variable `MXL2012_PLUGINSDK_DIR` (default `third_party/PluginSDK`).
@@ -111,7 +111,7 @@ Docs that needed a pass by the lane owning the area: `porting-playbook.md` (refe
   `test_dl_sync` 15, `test_sign_launcher` 6: all OK.
 - Downloader unit tests (`cmake -S launcher/tests`, MSVC): 202 checks, 0 failures. The full downloader exe
   (`cmake -S launcher`) builds as `D2R-XL-2012-Downloader.exe`.
-- Plugin unit tests (`cmake -S plugin/tests`): buildguard, otherplugins, envguard, harness all pass. `mxl2012-core.dll` builds
+- Plugin unit tests (`cmake -S plugin/tests`): buildguard (now imageguard), otherplugins, envguard, harness all pass. `mxl2012-core.dll` builds
   (`cmake -S plugin -DMXL2012_PLUGINSDK_DIR=<PluginSDK checkout>`), Release; not loaded in a game.
 - Not run: any game (no slot lock was taken).
 

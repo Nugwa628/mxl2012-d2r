@@ -46,6 +46,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game_slots  # noqa: E402
+import loader_notice  # noqa: E402
 
 SHARED_DIRS = ("d2rloader/config",)  # restored exactly after every run
 GLOBAL_EXT = ("d2rloader/plugins", "d2rloader/patches")  # must hold no plugin of either project
@@ -402,7 +403,9 @@ def compare(a, b):
 def bootcheck(n, owner, timeout=90):
     """Start the slot's loader with launch_args() (no window, focus or input calls at all: SW_SHOWMINNOACTIVE), wait
     until d2rloader.log names the active mod and the mod's archive mount, kill the processes of this launch, restore the
-    shared files and verify them. Returns (ok, log excerpt lines, restore message)."""
+    shared files and verify them. On a D2R that this D2RLoader has not been tested with (3.4 with D2RLoader 1.3.1) the
+    loader first shows a notice and waits: it is answered in the background (loader_notice.py).
+    Returns (ok, log excerpt lines, restore message)."""
     import subprocess
     n = game_slots.require_slot(n)
     game = game_slots.slot_dir(n)
@@ -420,8 +423,12 @@ def bootcheck(n, owner, timeout=90):
         args = launch_args(n)
         subprocess.Popen([loader] + args, cwd=game, startupinfo=si)
         print("launched " + os.path.basename(loader) + " " + " ".join(args))
+        notice = loader_notice.Watch(log, started=t0)
         while time.time() - t0 < timeout:
             time.sleep(0.5)
+            said = notice.poll([pid for pid, _ in game_slots.slot_processes(game)])
+            if said:
+                print(said)
             try:
                 if os.stat(log).st_mtime < t0 - 1:
                     continue

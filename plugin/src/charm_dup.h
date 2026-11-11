@@ -9,5 +9,7 @@
 // "requirements not met"). The report gets one entry. Returns the number of the four hooks installed (4 = on).
 auto InstallCharmDup(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int;
 // Since load: carry tests run without the unique half, requirement checks answered "not met" for an inactive copy, merged
-// copies taken out by the refresh.
-void CharmDupCounts(long* carryPassed, long* inactive, long* disabled) noexcept;
+// copies taken out by the refresh, carry tests refused all the same (the base half).
+void CharmDupCounts(long* carryPassed, long* inactive, long* disabled, long* carryRefused) noexcept;
+// The charm inventory on the custom page now: "invtabs charm tab WxH at X,Y" or "the whole custom page (...)".
+void CharmDupArea(char* text, size_t size) noexcept;

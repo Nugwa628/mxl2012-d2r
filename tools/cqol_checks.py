@@ -34,8 +34,10 @@ TAB_NAMES = mt.TABS
 # LB + L3 as a player presses it: LB held first, then the stick clicked
 DEPOSIT_ALL = os.environ.get("MXL_CQOL_DEPOSIT", "hold:lb wait:0.5 ls wait:3.0 release")
 # the inventory's focus walk (pad_input words, `shot:<name>` takes a shot): from the panel menu's start focus round the gloves,
-# the send buttons and the grid, then the boots, gold and the grid; an `a` on the send button sends the backpack to the stash
-INV_NAV = os.environ.get("MXL_CQOL_INV_NAV", "shot:open up up up left left down down shot:gloves down shot:send down shot:send_down "
+# the send buttons and the grid, then the boots, gold and the grid; an `a` on the send button sends the backpack to the stash.
+# One `left` only (head to the right weapon): a second one is the panel boundary, which leads into the backpack grid while a
+# plugin's controller route (CharmInv) is registered (docs/invtabs-pad.md)
+INV_NAV = os.environ.get("MXL_CQOL_INV_NAV", "shot:open up up up left shot:weapon down shot:gloves down shot:send down shot:send_down "
                                              "up shot:send_up a wait:1.5 shot:send_a b wait:1.2 start wait:2.0 shot:reopen right "
                                              "right shot:belt4 right shot:gold up shot:boots down shot:boots_down down shot:gold_down")
 

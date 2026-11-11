@@ -7,6 +7,47 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.20 (2026-11-12)
+
+- The mod runs on Diablo II: Resurrected 3.4 as well as 3.3, with the same D2RLoader 1.3.1 and the same download. On D2R 3.4
+  D2RLoader 1.3.1 shows its own notice "This D2R version hasn't been fully tested yet" at each start: click OK, or tick
+  "Don't remind me again for D2R 3.4" once. Characters made on 3.3 load on 3.4.
+
+- The mod and the downloader no longer require a game version or build number. The plugin checks the game code that is
+  running instead; with a D2RLoader version it does not know yet it shows "this D2RLoader version is not supported by the
+  mod yet" and turns its engine changes off. The downloader shows the D2R version it finds and never blocks Install or Play
+  for it. Update the downloader: older ones refuse to start the game on D2R 3.4.
+
+- **Downloader 0.1.4.** Your downloader offers this update when it starts: say Yes. Downloaders up to 0.1.3 refuse to start the game on D2R 3.4.
+
+- **New charm inventory: Inventory Tabs replaces CharmInv.** The charm inventory is now our own plugin, built on
+  wild-healer's Player Page Host and Charm Inventory (<https://github.com/wild-healer/D2R-Tools>), used with his
+  permission. Thanks to Dimentio for CharmInv, which the mod shipped in 0.1.19.
+  - **Your charms stay.** Charms you kept in CharmInv's inventory are in the new one, in the same cells. Nothing to do,
+    nothing is moved or lost.
+  - **Bigger: 10 x 6** cells instead of 10 x 4.
+  - **Charm summary** at the top of the charm inventory: the total bonuses of the charms that count, in the game's own
+    wording. Charms you cannot use yet (level requirement) are left out. Scroll it with the mouse wheel (HD graphics) or
+    Page Up / Page Down (classic graphics).
+  - **Classic graphics** have their own charm panel now (the Charms button on the classic inventory, X to close).
+  - **Gamepad:** "Charm Inventory" is a tab of the gamepad menu after Inventory, with the summary on top. Move charms to
+    and from your backpack with A. The gamepad summary shows its first 20 lines, and there is no one-button transfer
+    like CharmInv's LB + X yet.
+  - **Ctrl+click** a charm in your backpack while the charm inventory is open to move it in, and a charm in the charm
+    inventory to move it back.
+  - **Multiplayer (TCP/IP):** the charm inventory works for players who join a game: the hosting game carries out every
+    move. If the host's charm inventory is set up differently from yours (another size in the settings file), yours is
+    take-out only in that game and says so at its top: you can take charms out, but not put them in.
+  - Charms still work from the normal inventory too, as in Median XL 2012.
+  - Settings: `mods\mxl2012\d2rloader\config\invtabs.toml` (the size, the inventory button, and a key you can bind
+    under Options > Controls).
+  - **Updating by hand** (unpacking the 7z over an older install): delete `d2rl-charm-inv.dll` and `d2rl-charm-inv.mpq`
+    in `mods\mxl2012\d2rloader\plugins` and `charm-inv.toml` in `mods\mxl2012\d2rloader\config`. The downloader does
+    this for you.
+  - Not there yet: a second copy of the same unique charm (for example two Butcher's Tooth) cannot be put into the
+    charm inventory, as before; the first one counts. More tabs (maps, potions and so on) are prepared but not switched
+    on.
+
 ### 0.1.19 (2026-11-11)
 
 - Removed personal stash page 2 to make room for Charm Inventory. **Items left on that page are deleted when updating from older alpha builds**; recreate them with the developer menu if needed. Other storage is kept.

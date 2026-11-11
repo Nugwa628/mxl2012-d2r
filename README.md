@@ -1,7 +1,7 @@
 # D2R-XL 2012
 
-A fan port of **Median XL 2012 (v005) by Brother Laz** to **Diablo II: Resurrected 3.3**, running through
-**D2RLoader 1.3.1**. Mod folder `mods\mxl2012`.
+A fan port of **Median XL 2012 (v005) by Brother Laz** to **Diablo II: Resurrected**, running through
+**D2RLoader 1.3.1** (tested on D2R 3.3 and 3.4). Mod folder `mods\mxl2012`.
 
 ## Credits
 
@@ -30,10 +30,14 @@ exactly the potion at its bottom, a completely empty column stays empty until yo
 each column shows how many of that potion you have left; elixirs are never moved. Set fixed columns, or turn it off with
 `enabled = false`, in `mods\mxl2012\d2rloader\config\auto-belt-refill.toml`.
 
-Shipped with the mod: **CharmInv** by **Dimentio**, D2RLoader's author (<https://d2rloader.net/hub/plugins/charm-inventory>,
-redistributed with D2RLoader by the owner's decision): a charm inventory of 10 x 4 cells, opened by its button on the
-inventory panel or a key you bind (Options > Controls: Open Charm Inventory). Median charms work there and, as before, in
-the normal inventory. HD graphics only for now. Settings: `mods\mxl2012\d2rloader\config\charm-inv.toml`.
+Shipped with the mod: **Inventory Tabs** (`invtabs`), our charm inventory of 10 x 6 cells with a summary of the charms'
+bonuses, a classic-graphics panel and a gamepad tab, built on **wild-healer**'s Player Page Host and Charm Inventory
+(<https://github.com/wild-healer/D2R-Tools>, used with his permission). Open it with the Charms button on the inventory
+panel or a key you bind under Options > Controls. Median charms work there and, as before, in the normal inventory;
+players who join a TCP/IP game can use it too. Settings: `mods\mxl2012\d2rloader\config\invtabs.toml`.
+
+It replaces **CharmInv** by **Dimentio**, D2RLoader's author (<https://d2rloader.net/hub/plugins/charm-inventory>), which
+the mod shipped in 0.1.19; charms kept in CharmInv's inventory are in the new one, in the same cells.
 
 Shipped with the mod: our own plugin **D2R Legacy 16:9** (`legacy169.dll`, <https://github.com/Nugwa628/D2R-Legacy169>, MIT), the
 classic graphics in 16:9 (1066x600 / 853x480). Turn it off with `enabled = false` in
@@ -44,7 +48,7 @@ Diablo II and Diablo II: Resurrected belong to Blizzard Entertainment. D2RLoader
 
 ## Playing it
 
-You need your own Diablo II: Resurrected 3.3 and D2RLoader 1.3.1. Each release's notes (on the Releases page)
+You need your own Diablo II: Resurrected and D2RLoader 1.3.1 (tested on D2R 3.3 and 3.4). Each release's notes (on the Releases page)
 explain the install step by step; the D2R-XL 2012 Downloader keeps the mod up to date. Characters live in their own save
 folder and do not touch your normal D2R characters.
 

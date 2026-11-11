@@ -1,6 +1,7 @@
 # drawcap (Draw List Cap)
 
-A standalone D2RLoader plugin for Diablo II: Resurrected 3.3 (build 93847). It raises D2R's fixed 3000-entry legacy draw
+A standalone D2RLoader plugin for Diablo II: Resurrected (written on 3.3 build 93847; it finds its places by signature and
+is not tied to a game build or version). It raises D2R's fixed 3000-entry legacy draw
 list cap to 12000 (configurable). Big crowds and heavy on-hit procs need more than 3000 entries, and whatever does not fit is
 not drawn. The patch is **on by default**. A read-only probe that measures how full the list gets is **off by default**.
 
@@ -39,9 +40,9 @@ There are two test switch files. Each takes effect for one launch when it sits n
 
 D2R-XL 2012's test tools create and remove them, and packaging refuses to ship them.
 
-## Build guard
+## Signature guard
 
-Nothing is hooked or patched unless every signature below matches in the loaded `.text` of the running game, exactly as
+drawcap is not tied to a game build, version or image. Nothing is hooked or patched unless every signature below matches in the loaded `.text` of the running game, exactly as
 stated. Any miss turns the plugin off with the reason in the log ("signature 'X' did not match ... nothing hooked or
 patched") and the game runs as without the plugin. The hook's expected bytes are the 25 bytes read at the found address, so D2RLoader also refuses the hook
 when another plugin already changed them.

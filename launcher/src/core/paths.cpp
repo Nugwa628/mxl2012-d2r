@@ -595,8 +595,6 @@ std::string RemovedPluginPath(const std::string& dataDir, const std::string& dat
 std::string PlayBlocked(const PlayInputs& in) {
 	if (!in.d2rFound)
 		return "choose the D2R folder first";
-	if (in.buildMismatch)
-		return "D2R is not the version D2R-XL 2012 needs";
 	if (!in.loaderFound)
 		return "install D2RLoader first";
 	if (!in.loaderOk)

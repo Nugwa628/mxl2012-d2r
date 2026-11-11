@@ -31,6 +31,7 @@ import os
 import re
 import shutil
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -936,11 +937,13 @@ def engine_asserts(mark):
     return list(zip(msgs, locs + [""] * (len(msgs) - len(locs))))
 
 
-def engine_issues(mark, lines=()):
-    """What makes any check FAIL, since the mark: (blocking issues, notes about known open asserts)."""
+def engine_issues(mark, lines=(), harness=None):
+    """What makes any check FAIL, since the mark: (blocking issues, notes about known open asserts). `harness`: asserts a
+    check knows its own harness set-up raises ({message part: note}), reported like the known ones."""
     bad, known = [], []
+    table = dict(KNOWN_ASSERTS, **(harness or {}))
     for msg, loc in engine_asserts(mark):
-        tag = next((b for k, b in KNOWN_ASSERTS.items() if k in msg), None)
+        tag = next((b for k, b in table.items() if k in msg), None)
         (known if tag else bad).append("%s%s (%s)" % ("%s: " % tag if tag else "", msg[:90], loc.split("\\")[-1]))
     mx = g._read_from(g.MXL_LOG, mark["mxl"]) or ""
     bad += ["log: " + ln.strip()[:120] for ln in mx.splitlines() if "mxl2012-core" in ln and "FAILED" in ln]
@@ -950,10 +953,11 @@ def engine_issues(mark, lines=()):
     return bad, known
 
 
-def finish(name, ok, note, mark, shots=(), log=(), partial=None):
-    """add() with the engine verdict folded in: FAIL on a new assert / crash, PARTIAL when `partial` names what was not judged."""
+def finish(name, ok, note, mark, shots=(), log=(), partial=None, harness=None):
+    """add() with the engine verdict folded in: FAIL on a new assert / crash, PARTIAL when `partial` names what was not judged.
+    `harness`: asserts of the check's own harness set-up (engine_issues), noted instead of failing the check."""
     log = list(log)
-    bad, known = engine_issues(mark, log)
+    bad, known = engine_issues(mark, log, harness)
     if known:
         note += "; known open asserts: %s" % ", ".join(sorted(set(known)))
     if bad:
@@ -1077,7 +1081,7 @@ def smoke_plugins_ok(line):
         return True
     prefix = "other plugins: "
     return line.startswith(prefix) and all(re.fullmatch(
-        r"(?:gp-probe-\w+\.dll \(global\)|(?:d2rl-charm-inv|drawcap)\.dll \(mod mxl2012\))", p)
+        r"(?:gp-probe-\w+\.dll \(global\)|(?:d2rl-charm-inv|drawcap|invtabs)\.dll \(mod mxl2012\))", p)
         for p in line[len(prefix):].split(", "))
 
 
@@ -1088,7 +1092,7 @@ def check_mxl2012():
         return add("mxl2012", "BLOCKED", "not in a game")
     txt = mxl_text()
     lines = txt.splitlines()
-    want = [("version line", r"^mxl2012-core \d+\.\d+\.\d+ \(dev\) \| game: Diablo II: Resurrected 3\.3, engine changes on"),
+    want = [("version line", r"^mxl2012-core \d+\.\d+\.\d+ \(dev\) \| game: Diablo II: Resurrected [\d.]+, engine changes on"),
             ("environment ok", r"^environment ok"),
             ("pluginguard", r"^pluginguard ok: no conflicting plugin in the game"),
             ("cltdo22", r"^cltdo22 cltdofunc 113 client wall"),
@@ -2754,6 +2758,779 @@ def check_charmdup():
     results["reload"] = step("after Save and Exit, Play (both in the backpack)", 2, ["0", "0"])[0]
     note = "level %s; %s; %s" % (lvl, "; ".join(notes), results)
     finish("charmdup", all(results.values()), note, mark, shots, log)
+
+
+# --- invtabs (docs/invtabs.md): the charm tab of the invtabs plugin on page 6 ----------------------------------------------
+# The charm tab's grid in the HD panel (10 x 6, the shipped size): `_invtabs_hd_cell` below has the panel's geometry (the
+# stage 1 panel had its grid at the top; the stock-art panel of stage 2 has it under the summary).
+INVTABS_CHARM_GRID = (10, 6)
+
+
+# The harness `item` generator raises `wPrefix != 0 || wSuffix != 0` (Items.cpp:906, bug #35) for some test charms: a harness
+# artefact reported in the note, never the plugin's result (stage 2 runs failed on it although every sub-check passed).
+INVTABS_HARNESS = {"wPrefix != 0 || wSuffix != 0": "bug #35 (the harness item generator, not the plugin)"}
+
+
+def _invtabs_cell(c, r):
+    """Cell c, r of the charm tab's HD grid (10 x 6) as a fraction of the 1600 x 900 client."""
+    return _invtabs_hd_cell(INVTABS_CHARM_GRID[0], INVTABS_CHARM_GRID[1], c, r)
+
+
+INVTABS_BUTTON = (1119 / 1600, 670 / 900)  # the Charms button right of the stock back-arrow button of the HD inventory
+
+
+def _invtabs_status(log):
+    """The charm tab's state ("open" / "closed") from a fresh `invtabs` status line in invtabs.log, else None."""
+    path = os.path.join(g.GAME_DIR, r"mods\mxl2012\d2rloader\logs\invtabs.log")
+    size = os.path.getsize(path) if os.path.exists(path) else 0
+    g.console_bg("invtabs")
+    time.sleep(1)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            f.seek(size)
+            lines = [x for x in f.read().splitlines() if "invtabs: status:" in x]
+    except OSError:
+        return None
+    log.extend(lines)
+    m = re.search(r"\((open|closed)\)", lines[-1]) if lines else None
+    return m.group(1) if m else None
+
+
+def _invtabs_strength(log):
+    s_ = rd("player", 0)
+    _, cl = Hl("cstat 0", log)
+    return s_, stat_of(cl)
+
+
+def _invtabs_page6(log, code=None):
+    _, il = Hl("items", log)
+    items = [kv(x) for x in il if x.startswith("item ")]
+    return [c for c in items if c.get("page") == "6" and (code is None or c.get("code") == code)]
+
+
+def _invtabs_backpack(log, code):
+    _, il = Hl("items", log)
+    return [c for c in (kv(x) for x in il if x.startswith("item ")) if c.get("page") == "0" and c.get("code") == code]
+
+
+def _invtabs_unique(name):
+    """(row, code) of the carry1 unique named `name` (uniqueitems.txt index without the namespace), else None. Median XL 2012's
+    charms are such uniques of type grtz (Equiv char); its cm1..cm3 rows are switched off (0 x 0)."""
+    rows = [r for r in carry1_rows() if r[2].split(":")[-1] == name]
+    return (rows[0][0], rows[0][1]) if rows else None
+
+
+def check_invtabs_seed():
+    """Seeds a throwaway character with CharmInv 1.0.1 page-6 items for `invtabs` (run with `install_mod.py --charminv`):
+    Butcher's Tooth (carry1 unique charm, 1 x 1, +10 all attributes, level 40) at CharmInv 0,0 and the Sacred Worldstone Key
+    (1 x 2) at 9,2 (CharmInv's last column, down to its last row), then Save and Exit and Play. PASS: both on page 6 where
+    put, after the reload."""
+    mark = engine_mark()
+    log, shots = [], []
+    tooth_u, key_u = _invtabs_unique("ButchersTooth"), _invtabs_unique("SacredWorldstoneKey")
+    if not tooth_u or not key_u:
+        return add("invtabs_seed", "FAIL", "Butcher's Tooth or the Sacred Worldstone Key is not a carry1 row of uniqueitems.txt")
+    (row, code), (krow, kcode) = tooth_u, key_u
+    goto(1)
+    release_held_item()
+    if (rd("player", 12) or 0) < 40:
+        Hl("xp 2000000000", log)
+        time.sleep(2)
+    if _invtabs_page6(log):
+        return finish("invtabs_seed", False, "page 6 is not empty: use a fresh MXL_CHAR", mark, shots, log, harness=INVTABS_HARNESS)
+    Hl("item %s unique %d inv" % (code, row), log)
+    Hl("item %s unique %d inv" % (kcode, krow), log)
+    time.sleep(1)
+    tooth = _invtabs_backpack(log, code)
+    grand = _invtabs_backpack(log, kcode)
+    g.press_bg("i")
+    time.sleep(1.5)
+    g.console_bg("charminv open")
+    time.sleep(1.5)
+    for item, cell in ((tooth, (0, 0)), (grand, (9, 2.5))):  # a held item centres on the cursor: aim at its footprint
+        if item:
+            g.click_bg(*_inv_cell(int(item[0]["x"]), int(item[0]["y"])))
+            time.sleep(0.9)
+            g.click_bg(*_charminv_cell(*cell))
+            time.sleep(1.2)
+            if held_item():
+                release_held_item()
+    shots.append(sh("invtabs_seed_charminv"))
+    g.console_bg("charminv close")
+    time.sleep(0.8)
+    g.press_bg("i")
+    time.sleep(0.8)
+    before = [(c["code"], c["x"], c["y"]) for c in _invtabs_page6(log)]
+    leave_and_reenter()
+    after = [(c["code"], c["x"], c["y"]) for c in _invtabs_page6(log)]
+    want = sorted([(code, "0", "0"), (kcode, "9", "2")])
+    ok = sorted(after) == want
+    finish("invtabs_seed", ok, "page 6 before Save and Exit %s, after %s (want %s)" % (before, after, want), mark, shots, log, harness=INVTABS_HARNESS)
+
+
+def check_invtabs():
+    """invtabs stage 1 (docs/invtabs.md), with invtabs.dll installed instead of CharmInv, on the character `invtabs_seed` made.
+    The plugin loads and owns the page (`invtabs` console status line); CharmInv's page-6 items are there at their places and
+    Butcher's Tooth gives +10 Strength from the charm tab; the tab opens at 10 x 6 (`invtabs open`, screenshot); the Jolly
+    Roger (2 x 2 charm) is clicked from the backpack into the tab at 2,2 (taken, page 6); a rune is refused; a second Butcher's Tooth is clicked into the tab next to
+    the first (D2RLoader's custom-page carry1 rule: recorded, not judged); Save and Exit and Play keeps every page-6 item and the
+    +10 once."""
+    mark = engine_mark()
+    log, shots, notes, results = [], [], [], {}
+    tooth_u, key_u, roger_u = (_invtabs_unique(n) for n in ("ButchersTooth", "SacredWorldstoneKey", "JollyRoger"))
+    if not tooth_u or not key_u or not roger_u:
+        return add("invtabs", "FAIL", "a test charm is not a carry1 row of the built uniqueitems.txt")
+    (row, code), (_, kcode), (rrow, rcode) = tooth_u, key_u, roger_u
+    goto(1)
+    release_held_item()
+    g.console_bg("invtabs")
+    time.sleep(1)
+    page = [(c["code"], c["x"], c["y"]) for c in _invtabs_page6(log)]
+    results["adopted"] = (code, "0", "0") in page and (kcode, "9", "2") in page
+    notes.append("page 6 at start: %s" % page)
+    # Strength with the tooth in the tab vs. its base without it: the tooth gives +10 once.
+    s_with, c_with = _invtabs_strength(log)
+    notes.append("strength with the tab charms: %s / client %s" % (s_with, c_with))
+    g.press_bg("i")
+    time.sleep(1.5)
+    before = _invtabs_status(log)
+    g.click_bg(*INVTABS_BUTTON)
+    time.sleep(1.5)
+    after = _invtabs_status(log)
+    results["button"] = (before, after) == ("closed", "open")
+    notes.append("Charms button: tab %s -> %s" % (before, after))
+    if after != "open":
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+    shots.append(sh("invtabs_tab_open"))
+    # the tooth out of the tab onto the cursor and back: strength drops by 10 while it is held
+    g.click_bg(*_invtabs_cell(0, 0))
+    time.sleep(1.2)
+    held = held_item()
+    s_held, _ = _invtabs_strength(log)
+    if held:
+        g.click_bg(*_invtabs_cell(0, 0))
+        time.sleep(1.2)
+    s_back, c_back = _invtabs_strength(log)
+    results["bonus"] = bool(held) and s_held == s_with - 10 and s_back == s_with and c_back == s_with
+    notes.append("tooth lifted %s: strength %s, put back: %s / client %s" % (held, s_held, s_back, c_back))
+    if held_item():
+        release_held_item()
+    # the Jolly Roger (2 x 2) from the backpack into the tab at 2,2
+    Hl("item %s unique %d inv" % (rcode, rrow), log)
+    time.sleep(1)
+    small = _invtabs_backpack(log, rcode)
+    if small:
+        g.click_bg(*_inv_cell(int(small[0]["x"]), int(small[0]["y"])))
+        time.sleep(0.9)
+        g.click_bg(*_invtabs_cell(2.5, 2.5))  # the 2 x 2 footprint 2,2..3,3
+        time.sleep(1.2)
+        if held_item():
+            notes.append("Jolly Roger refused by the tab")
+            release_held_item()
+    results["charm_in"] = any(c["code"] == rcode and (c["x"], c["y"]) == ("2", "2") for c in _invtabs_page6(log))
+    # a non-charm (a rune) into the tab: refused
+    Hl("item r01 inv", log)
+    time.sleep(1)
+    rune = _invtabs_backpack(log, "r01")
+    if rune:
+        g.click_bg(*_inv_cell(int(rune[0]["x"]), int(rune[0]["y"])))
+        time.sleep(0.9)
+        g.click_bg(*_invtabs_cell(4, 4))
+        time.sleep(1.2)
+        notes.append("rune into the tab: %s" % ("refused" if held_item() else "TAKEN"))
+        if held_item():
+            g.click_bg(*_inv_cell(int(rune[0]["x"]), int(rune[0]["y"])))
+            time.sleep(1)
+            if held_item():
+                release_held_item()
+    results["rune_refused"] = not any(c["code"] == "r01" for c in _invtabs_page6(log))
+    # second carry1 copy: from the ground into the backpack, then into the tab next to the first (recorded)
+    _, gl = Hl("item %s unique %d ground" % (code, row), log)
+    bid = first(gl, r" id=(\d+) ")
+    if bid is not None:
+        Hl("pickup %d inv" % bid, log)
+        time.sleep(1)
+    second = _invtabs_backpack(log, code)
+    if second:
+        g.click_bg(*_inv_cell(int(second[0]["x"]), int(second[0]["y"])))
+        time.sleep(0.9)
+        g.click_bg(*_invtabs_cell(5, 0))
+        time.sleep(1.2)
+        taken = not held_item()
+        notes.append("second carry1 copy into the tab: %s" % ("taken" if taken else "refused (stays on the cursor)"))
+        if not taken:
+            g.click_bg(*_inv_cell(int(second[0]["x"]), int(second[0]["y"])))
+            time.sleep(1)
+            if held_item():
+                release_held_item()
+    else:
+        notes.append("second carry1 copy: not picked up")
+    shots.append(sh("invtabs_tab_filled"))
+    g.console_bg("invtabs all")
+    time.sleep(1.5)
+    shots.append(sh("invtabs_all"))
+    g.console_bg("invtabs all")
+    time.sleep(0.8)
+    g.console_bg("invtabs close")
+    time.sleep(0.8)
+    g.press_bg("i")
+    time.sleep(0.8)
+    s_pre, _ = _invtabs_strength(log)
+    pre = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    leave_and_reenter()
+    post = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    s_post, c_post = _invtabs_strength(log)
+    results["reload"] = pre == post and s_post == s_pre and c_post == s_pre
+    notes.append("page 6 before Save and Exit %s, after %s; strength %s -> %s / client %s" % (pre, post, s_pre, s_post, c_post))
+    g.press_bg("i")
+    time.sleep(1.5)
+    g.console_bg("invtabs open")
+    time.sleep(1.5)
+    shots.append(sh("invtabs_after_reload"))
+    g.console_bg("invtabs close")
+    time.sleep(0.8)
+    g.press_bg("i")
+    finish("invtabs", all(results.values()), "%s; %s" % ("; ".join(notes), results), mark, shots, log, harness=INVTABS_HARNESS)
+
+
+def _charmdup_line(log):
+    """The `charmdup` line of the `mxl2012` console report, '' when there is none."""
+    lines = [x.strip() for x in (mxl_text() or "").splitlines() if x.strip().startswith("charmdup ")]
+    log.extend(lines)
+    return lines[-1] if lines else ""
+
+
+def _charmdup_counts(log):
+    """(carry tests, of them refused) from the `charmdup` line, (None, None) without one."""
+    m = re.search(r"carry tests (\d+) \(refused (\d+)\)", _charmdup_line(log))
+    return (int(m.group(1)), int(m.group(2))) if m else (None, None)
+
+
+def _charm_area(log):
+    m = re.search(r"charm inventory: (.*)$", _charmdup_line(log))
+    return m.group(1).strip() if m else None
+
+
+def _new_lines(path, size, pattern):
+    """Lines of `path` after byte `size` that match `pattern` (case-insensitive)."""
+    return [x.strip()[:200] for x in (g._read_from(path, size) or "").splitlines() if re.search(pattern, x, re.I)]
+
+
+def _sidecar_field(side, old, new):
+    """The D2RL v2 sidecar `side` with the length-prefixed field `old` replaced by `new` (body length and hash redone), or
+    None when `old` is not in it (stash_retire_logic.h HasField's match)."""
+    body = side[0x2c:]
+    pat = struct.pack("<I", len(old)) + old
+    i = body.find(pat)
+    if i < 0:
+        return None
+    body = body[:i] + struct.pack("<I", len(new)) + new + body[i + len(pat):]
+    return side[:8] + struct.pack("<I", len(body)) + hashlib.sha256(body).digest() + body
+
+
+def _sidecar_core_version(side, version):
+    """`side` with mxl2012-core's recorded version (the field after its DLL name) set to `version`, or None."""
+    body = side[0x2c:]
+    pat = struct.pack("<I", 16) + b"mxl2012-core.dll"
+    i = body.find(pat)
+    if i < 0:
+        return None
+    j = i + len(pat)
+    n = struct.unpack_from("<I", body, j)[0]
+    body = body[:j] + struct.pack("<I", len(version)) + version + body[j + 4 + n:]
+    return side[:8] + struct.pack("<I", len(body)) + hashlib.sha256(body).digest() + body
+
+
+def _retire_plan(save, side, folder, name):
+    """Runs the native retirement codec (stash_retire_codec.exe, plugin/tests) on a copy of a save pair in the run folder: its
+    output ('removed=N charmOrigin=M') or the error. Nothing is written beside the real save."""
+    exe = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), r"build\plugin\tests\Release\stash_retire_codec.exe")
+    if not os.path.exists(exe):
+        return "no codec (build_plugin.ps1 -Tests)"
+    os.makedirs(folder, exist_ok=True)
+    paths = [os.path.join(folder, "%s.%s" % (name, s)) for s in ("d2s", "d2rl", "out.d2s", "out.d2rl")]
+    for p, data in zip(paths, (save, side)):
+        with open(p, "wb") as f:
+            f.write(data)
+    r = subprocess.run([exe] + paths, capture_output=True, text=True)
+    return (r.stdout + r.stderr).strip()
+
+
+def _retire_check(notes, results):
+    """Stash retirement on the character's real pair (as last saved): the sidecar records invtabs.dll; with mxl2012-core's
+    version set back to 0.1.18 (no core marker) the codec keeps page 6 for the invtabs record alone, and deletes the page-6
+    items once that record is renamed too (control)."""
+    try:
+        with open(os.path.join(g.SAVES, g.CHAR_NAME + ".d2s"), "rb") as f:
+            save = f.read()
+        with open(os.path.join(g.SAVES, g.CHAR_NAME + ".d2rl"), "rb") as f:
+            side = f.read()
+    except OSError as e:
+        notes.append("retirement: pair not read (%s)" % e)
+        results["retire_owner"] = results["retire_control"] = False
+        return
+    folder = os.path.join(g.current_run(), "retire")
+    recorded = _sidecar_field(side, b"invtabs.dll", b"invtabs.dll") is not None
+    nocore = _sidecar_core_version(side, b"0.1.18")
+    control = _sidecar_field(nocore, b"invtabs.dll", b"invtabz.dll") if nocore else None
+    kept = _retire_plan(save, nocore, folder, "owner") if nocore else "no core record"
+    gone = _retire_plan(save, control, folder, "control") if control else "no invtabs record"
+    results["retire_owner"] = recorded and "removed=0 charmOrigin=1" in kept
+    results["retire_control"] = re.search(r"removed=[1-9]\d* charmOrigin=0", gone) is not None
+    notes.append("retirement: sidecar records invtabs.dll %s; core 0.1.18 + invtabs: %s; core 0.1.18 + no owner: %s" % (
+        recorded, kept, gone))
+
+
+def _teeth(code, log):
+    _, il = Hl("items", log)
+    return [kv(x) for x in il if x.startswith("item ") and ("code=%s " % code) in x]
+
+
+def _where(cs):
+    return sorted((c["page"], c["x"], c["y"]) for c in cs)
+
+
+def _click_wait(xy, settle=0.9):
+    g.click_bg(xy[0], xy[1])
+    time.sleep(settle)
+
+
+def _put_back(item):
+    """The held item back to its backpack cell, else dropped."""
+    if held_item():
+        _click_wait(_inv_cell(int(item["x"]), int(item["y"])), 1.2)
+    if held_item():
+        release_held_item()
+
+
+def check_invtabscore():
+    """mxl2012-core with invtabs (docs/invtabs.md decision 7, docs/d2r-addresses.md 22c, docs/stash-page-retirement.md),
+    invtabs.dll installed instead of CharmInv with its default config (charm tab 10 x 6 at 0,0), on a fresh MXL_CHAR.
+    Butcher's Tooth (`a60`, carry1 unique charm, +10 to all attributes, level 40; the character gets `xp`), Strength on the
+    server and the client. Followed by `invtabscore_outside` with the charm tab set to 10 x 4.
+    - charmdup's charm area: the `mxl2012` line says `charm inventory: invtabs charm tab 10x6 at 0,0` (InvTabsCharmTab found).
+    - Target H (recorded, not judged): copy A in the tab, copy B clicked from the backpack into the tab next to it, charmdup's
+      carry test counters (tests, refused) before and after; A moved back to the backpack and B clicked into the empty tab.
+      Control: the Jolly Roger (another carry1 unique) clicked into the tab is taken.
+    - For `invtabscore_outside`: every tooth removed, one copy X clicked into the tab at 9,5 (its last row): +10 from it;
+      Save and Exit and Play keeps it there.
+    - Stash retirement on the real pair: the sidecar records invtabs.dll; with mxl2012-core's version set back to 0.1.18 the
+      native codec keeps page 6 for the invtabs record (`removed=0 charmOrigin=1`) and deletes it without (control).
+    PASS: the area line, A in the tab +10, the Jolly Roger taken, X at 9,5 +10 before and after the reload, both codec results."""
+    mark = engine_mark()
+    log, shots, notes, results, seen = [], [], [], {}, {}
+    tooth_u, roger_u = _invtabs_unique("ButchersTooth"), _invtabs_unique("JollyRoger")
+    if not tooth_u or not roger_u:
+        return add("invtabscore", "FAIL", "a test charm is not a carry1 row of the built uniqueitems.txt")
+    (row, code), (rrow, rcode) = tooth_u, roger_u
+    goto(1)
+    release_held_item()
+    if _invtabs_page6(log):
+        return finish("invtabscore", False, "page 6 is not empty: use a fresh MXL_CHAR", mark, shots, log, harness=INVTABS_HARNESS)
+    if inventory_count(code, log):
+        Hl("remove %s 9" % code, log)
+    if (rd("player", 12) or 0) < 40:
+        Hl("xp 2000000000", log)
+        time.sleep(2)
+    base = rd("player", 0)
+    notes.append("level %s, base strength %s" % (rd("player", 12), base))
+    area = _charm_area(log)
+    results["area"] = area == "invtabs charm tab 10x6 at 0,0"
+    notes.append("charmdup area: %s" % area)
+
+    # A into the tab at 0,0
+    Hl("item %s unique %d inv" % (code, row), log)
+    time.sleep(1)
+    g.press_bg("i")
+    time.sleep(1.5)
+    g.console_bg("invtabs open")
+    time.sleep(1.5)
+    a = [c for c in _teeth(code, log) if c["page"] == "0"]
+    if a:
+        _click_wait(_inv_cell(int(a[0]["x"]), int(a[0]["y"])))
+        _click_wait(_invtabs_cell(0, 0), 1.2)
+    s_, c_ = _invtabs_strength(log)
+    results["a_in_tab"] = _where(_teeth(code, log)) == [("6", "0", "0")] and s_ == base + 10 and c_ == base + 10
+    notes.append("A into the tab: %s, strength %s / client %s" % (_where(_teeth(code, log)), s_, c_))
+    # H: B into the backpack (charmdup), then clicked into the tab next to A
+    Hl("item %s unique %d inv" % (code, row), log)
+    time.sleep(1)
+    b = [c for c in _teeth(code, log) if c["page"] == "0"]
+    if b:
+        b0 = b[0]
+        n0 = _charmdup_counts(log)
+        lsize = g._size(g.LOADER_LOG)
+        ipath = os.path.join(g.GAME_DIR, r"mods\mxl2012\d2rloader\logs\invtabs.log")
+        isize = g._size(ipath)
+        _click_wait(_inv_cell(int(b0["x"]), int(b0["y"])))
+        lifted = held_item()
+        n1 = _charmdup_counts(log)
+        _click_wait(_invtabs_cell(5, 0), 1.2)
+        held = held_item()
+        n2 = _charmdup_counts(log)
+        seen["B_into_tab_A_in_tab"] = "%s%s; carry tests (tests, refused): before the lift %s, held %s, after the drop click %s" % (
+            "" if lifted else "NOT LIFTED; ", "REFUSED (on the cursor)" if held else "taken", n0, n1, n2)
+        if held:
+            shots.append(sh("invtabscore_h_refused"))
+        _put_back(b0)
+        seen["loader_log"] = _new_lines(g.LOADER_LOG, lsize, r"polic|reject|refus|page|charm|unique|carry")[:8]
+        seen["invtabs_log"] = _new_lines(ipath, isize, r".")[:8]
+    # A back to the backpack, B into the empty tab
+    a6 = [c for c in _teeth(code, log) if c["page"] == "6"]
+    if len(a6) == 1:
+        _click_wait(_invtabs_cell(int(a6[0]["x"]), int(a6[0]["y"])))
+        _click_wait(_inv_cell(9, 3), 1.2)
+        if held_item():
+            release_held_item()
+    b = [c for c in _teeth(code, log) if c["page"] == "0"]
+    if len(b) == 2:
+        b0 = sorted(b, key=lambda c: (int(c["y"]), int(c["x"])))[0]
+        n0 = _charmdup_counts(log)
+        _click_wait(_inv_cell(int(b0["x"]), int(b0["y"])))
+        _click_wait(_invtabs_cell(5, 0), 1.2)
+        seen["B_into_empty_tab_A_in_backpack"] = "%s; carry tests %s -> %s" % (
+            "REFUSED (on the cursor)" if held_item() else "taken", n0, _charmdup_counts(log))
+        _put_back(b0)
+    seen["after"] = _where(_teeth(code, log))
+    # control: another carry1 unique (Jolly Roger, 2 x 2) into the tab at 2,2
+    Hl("item %s unique %d inv" % (rcode, rrow), log)
+    time.sleep(1)
+    small = _invtabs_backpack(log, rcode)
+    if small:
+        n0 = _charmdup_counts(log)
+        _click_wait(_inv_cell(int(small[0]["x"]), int(small[0]["y"])))
+        _click_wait(_invtabs_cell(2.5, 2.5), 1.2)
+        seen["roger_into_tab"] = "carry tests %s -> %s" % (n0, _charmdup_counts(log))
+        if held_item():
+            release_held_item()
+    results["roger_taken"] = any(c["code"] == rcode and (c["x"], c["y"]) == ("2", "2") for c in _invtabs_page6(log))
+    # X: the only tooth, into the tab's last row (9,5): outside the tab once it is 10 x 4 (`invtabscore_outside`)
+    Hl("remove %s 9" % code, log)
+    time.sleep(1)
+    Hl("item %s unique %d inv" % (code, row), log)
+    time.sleep(1)
+    x = [c for c in _teeth(code, log) if c["page"] == "0"]
+    if x:
+        _click_wait(_inv_cell(int(x[0]["x"]), int(x[0]["y"])))
+        _click_wait(_invtabs_cell(9, 5), 1.2)
+        _put_back(x[0])
+    s_, c_ = _invtabs_strength(log)
+    results["x_in_tab"] = _where(_teeth(code, log)) == [("6", "9", "5")] and s_ == base + 10 and c_ == base + 10
+    notes.append("X at 9,5: %s, strength %s / client %s" % (_where(_teeth(code, log)), s_, c_))
+    shots.append(sh("invtabscore_tab"))
+    g.console_bg("invtabs close")
+    time.sleep(0.8)
+    g.press_bg("i")
+    time.sleep(0.8)
+    leave_and_reenter()
+    s_, c_ = _invtabs_strength(log)
+    results["x_reload"] = _where(_teeth(code, log)) == [("6", "9", "5")] and s_ == base + 10 and c_ == base + 10
+    notes.append("reload: %s, strength %s / client %s" % (_where(_teeth(code, log)), s_, c_))
+    _retire_check(notes, results)
+    finish("invtabscore", all(results.values()), "%s; H (recorded): %s; %s" % ("; ".join(notes), seen, results), mark, shots, log, harness=INVTABS_HARNESS)
+
+
+def check_invtabscore_outside():
+    """After `invtabscore` on the same MXL_CHAR, with invtabs' charm tab set to 10 x 4 (`[tabs.charms] rows = 4`): the tooth X
+    saved at page cell 9,5 is now on the page outside the charm tab (invtabs leaves it there). charmdup treats only the tab as
+    charm inventory: X gives nothing, a second copy Y in the backpack gives +10 (with the whole page as charm inventory X would
+    be the active copy and Y would add nothing); Save and Exit and Play keeps both, +10 once. PASS: the area line says
+    `invtabs charm tab 10x4 at 0,0`, Y adds exactly 10 on the server and the client, before and after the reload."""
+    mark = engine_mark()
+    log, shots, notes, results = [], [], [], {}
+    tooth_u = _invtabs_unique("ButchersTooth")
+    if not tooth_u:
+        return add("invtabscore_outside", "FAIL", "Butcher's Tooth is not a carry1 row of the built uniqueitems.txt")
+    row, code = tooth_u
+    goto(1)
+    release_held_item()
+    area = _charm_area(log)
+    results["area"] = area == "invtabs charm tab 10x4 at 0,0"
+    notes.append("charmdup area: %s" % area)
+    teeth = _where(_teeth(code, log))
+    results["x_outside"] = teeth == [("6", "9", "5")]
+    s_x, c_x = _invtabs_strength(log)
+    notes.append("X outside the tab: %s, strength %s / client %s" % (teeth, s_x, c_x))
+    Hl("item %s unique %d inv" % (code, row), log)
+    time.sleep(1.5)
+    s_y, c_y = _invtabs_strength(log)
+    results["y_adds_10"] = s_x is not None and s_y == s_x + 10 and c_y == s_y and c_x == s_x and len(_teeth(code, log)) == 2
+    notes.append("Y in the backpack: %s, strength %s / client %s" % (_where(_teeth(code, log)), s_y, c_y))
+    g.press_bg("i")
+    time.sleep(1.5)
+    g.console_bg("invtabs all")
+    time.sleep(1.5)
+    shots.append(sh("invtabscore_outside_all"))
+    g.console_bg("invtabs all")
+    time.sleep(0.8)
+    g.press_bg("i")
+    time.sleep(0.8)
+    pre = _where(_teeth(code, log))
+    leave_and_reenter()
+    post = _where(_teeth(code, log))
+    s_r, c_r = _invtabs_strength(log)
+    results["reload"] = pre == post and ("6", "9", "5") in post and s_r == s_y and c_r == s_y
+    notes.append("reload: %s -> %s, strength %s / client %s" % (pre, post, s_r, c_r))
+    notes.append("charmdup: %s" % _charmdup_line(log).split("; ", 1)[-1])
+    finish("invtabscore_outside", all(results.values()), "%s; %s" % ("; ".join(notes), results), mark, shots, log, harness=INVTABS_HARNESS)
+
+
+# --- invtabs with tabs (docs/invtabs.md "Tabs"): a test config with a second tab, potions 4 x 3 next to the charm tab -------
+# HD tab panel: $LeftPanelRect (236, -651) from the left anchor (0, 857 layout units), 98-unit cells under the stash's
+# columns (grid x 89 in the panel, bottom 1418), 0.41667 px per unit at 1600 x 900. Tab buttons of 195 x 72 at 82 + 195 i, 146.
+INVTABS_HD_SCALE, INVTABS_HD_PANEL = 900 / 2160, (236, 857.4 - 651)
+
+
+def _invtabs_hd(x, y):
+    """A point of the HD tab panel (layout units) as a fraction of the 1600 x 900 client."""
+    s = INVTABS_HD_SCALE
+    return (INVTABS_HD_PANEL[0] + x) * s / 1600, (INVTABS_HD_PANEL[1] + y) * s / 900
+
+
+def _invtabs_hd_cell(cols, rows, c, r):
+    """Cell c, r of a tab grid of cols x rows (98-unit cells, centred under the stash columns, bottom 1418)."""
+    gx, gy = 89 + (980 - cols * 98) / 2, 1418 - rows * 98
+    return _invtabs_hd(gx + 98 * (c + .5), gy + 98 * (r + .5))
+
+
+def _invtabs_hd_tab(i):
+    return _invtabs_hd(82 + 195 * i + 97, 146 + 36)
+
+
+def _invtabs_log():
+    return os.path.join(g.GAME_DIR, r"mods\mxl2012\d2rloader\logs\invtabs.log")
+
+
+def _invtabs_log_since(size):
+    try:
+        with open(_invtabs_log(), encoding="utf-8", errors="replace") as f:
+            f.seek(size)
+            return f.read().splitlines()
+    except OSError:
+        return []
+
+
+def _invtabs_size():
+    p = _invtabs_log()
+    return os.path.getsize(p) if os.path.exists(p) else 0
+
+
+def _invtabs_status_line(log):
+    size = _invtabs_size()
+    g.console_bg("invtabs")
+    time.sleep(1)
+    lines = [x for x in _invtabs_log_since(size) if "invtabs: status:" in x]
+    log.extend(lines)
+    return lines[-1] if lines else ""
+
+
+def _invtabs_open_state(line, tab):
+    """'open' / 'closed' for the charm tab (tab None) or a named tab from a status line."""
+    m = re.search(r"charm tab \S+ at \S+ \((open|closed)\)" if tab is None else r"tab %s \S+ at \S+ \((open|closed)\)" % tab, line)
+    return m.group(1) if m else None
+
+
+def _invtabs_summary(log):
+    """(counted, left out, lines) from `invtabs summary`."""
+    size = _invtabs_size()
+    g.console_bg("invtabs summary")
+    time.sleep(1)
+    got = _invtabs_log_since(size)
+    log.extend(x for x in got if "summary" in x)
+    head = [re.search(r"summary: (on|off), (\d+) counted, (\d+) left out", x) for x in got]
+    head = [m for m in head if m]
+    lines = [re.sub(r"^.*summary line \d+: ", "", x) for x in got if "summary line " in x]
+    return (int(head[-1].group(2)), int(head[-1].group(3)), lines) if head else (None, None, lines)
+
+
+def _invtabs_ctrl(item, log):
+    """Ctrl+click a backpack item (a page-0 `items` row)."""
+    g.click_bg(*_inv_cell(int(item["x"]), int(item["y"])), mods=("ctrl",))
+    time.sleep(1.5)
+    if held_item():
+        log.append("Ctrl+click left the item on the cursor")
+        release_held_item()
+
+
+def _invtabs_visible(name, want, log, shots, results):
+    """Screenshot `name` and assert the tab is really on screen: the plugin's status line names the tab whose grid the
+    game drew in the last 300 ms (`drawn <tab> hd|classic`), and that must be `want` (e.g. "charms hd")."""
+    hover_px(800, 560)  # empty game world between the two panels: no item tooltip over either panel in the shot
+    st = _invtabs_status_line(log)
+    m = re.search(r"; drawn ([^;]+)", st)
+    drawn = m.group(1).strip() if m else "?"
+    shots.append(sh(name))
+    results["shown_" + name] = drawn == want
+    return drawn
+
+
+def check_invtabs_tabs():
+    """invtabs with two tabs (charms 10 x 6 at 0,0 and the test config's potions 4 x 3 next to it) on a fresh MXL_CHAR:
+    status lists both; the inventory's Charms button opens the charm tab (HD screenshot beside the stock inventory);
+    Ctrl+click moves charms from the backpack into the charm tab and a rune stays; the summary at level 1 leaves Butcher's
+    Tooth out (level 40), after levelling one tooth counts and its second copy does not, with Strength = the charms' sum;
+    the summary refreshes by itself after each move; a charm moved back to the backpack still counts once; the HD list
+    scrolls to its end with the wheel; the potions tab opens from its tab button (screenshot at 4 x 3), takes a potion by
+    Ctrl+click and refuses a charm; legacy graphics show both tabs, the summary scrolls to its end (keys and command);
+    Save and Exit and Play keeps the page."""
+    mark = engine_mark()
+    log, shots, notes, results = [], [], [], {}
+    tooth_u = _invtabs_unique("ButchersTooth")
+    if not tooth_u:
+        return add("invtabs_tabs", "FAIL", "Butcher's Tooth is not a carry1 row of the built uniqueitems.txt")
+    trow, tcode = tooth_u
+    goto(1)
+    release_held_item()
+    if _invtabs_page6(log):
+        return finish("invtabs_tabs", False, "page 6 is not empty: use a fresh MXL_CHAR", mark, shots, log, harness=INVTABS_HARNESS)
+    st = _invtabs_status_line(log)
+    results["status"] = "2 tab(s)" in st and "charm tab 10x6 at 0,0" in st and "tab potions 4x3 at 10,0" in st
+    notes.append("status: %s" % st[st.find("status:"):][:160])
+    # the charms of the summary lane's proof (docs/invtabs-summary.md) plus two Butcher's Tooth, two potions and a rune
+    specs = [("a55", "0=5 1=5 39=10 41=10"), ("a56", "0=3 43=10 45=10"), ("a57", "1=-5 48=5 49=10"), ("a58", "7=5120 16=30 31=100")]
+    for code, stats in specs:
+        Hl("item %s normal inv %s" % (code, stats), log)
+    for _ in range(2):
+        Hl("item %s unique %d inv" % (tcode, trow), log)
+    for code in ("hpo", "mpo", "r01"):
+        Hl("item %s inv" % code, log)
+    time.sleep(1)
+    g.press_bg("i")
+    time.sleep(1.5)
+    shots.append(sh("invtabs_hd_inventory"))
+    before = _invtabs_open_state(_invtabs_status_line(log), None)
+    g.click_bg(*INVTABS_BUTTON)
+    time.sleep(1.5)
+    after = _invtabs_open_state(_invtabs_status_line(log), None)
+    results["button"] = (before, after) == ("closed", "open")
+    notes.append("Charms button: %s -> %s" % (before, after))
+    if after != "open":
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+    _invtabs_visible("invtabs_hd_charms_10x6_empty", "charms hd", log, shots, results)
+    # Ctrl+click: the charms in, the rune stays, the summary refreshes by itself
+    size = _invtabs_size()
+    for code, _ in specs:
+        it = _invtabs_backpack(log, code)
+        if it:
+            _invtabs_ctrl(it[0], log)
+    auto = [x for x in _invtabs_log_since(size) if "summary:" in x and "looked at" in x]
+    results["refresh"] = len(auto) >= len(specs)
+    notes.append("summary refreshes after %d moves: %d" % (len(specs), len(auto)))
+    for it in _invtabs_backpack(log, tcode):
+        _invtabs_ctrl(it, log)  # backpack rows shift as items leave: re-read each time
+    for _ in range(2):
+        it = _invtabs_backpack(log, tcode)
+        if it:
+            _invtabs_ctrl(it[0], log)
+    rune = _invtabs_backpack(log, "r01")
+    if rune:
+        _invtabs_ctrl(rune[0], log)
+    page = _invtabs_page6(log)
+    inside = [(c["code"], c["x"], c["y"]) for c in page]
+    results["ctrl_charms"] = sorted(c["code"] for c in page) == sorted([s[0] for s in specs] + [tcode, tcode]) and all(int(c["x"]) < 10 and int(c["y"]) < 6 for c in page)
+    results["rune_stays"] = bool(_invtabs_backpack(log, "r01"))
+    notes.append("page 6 after Ctrl+clicks: %s" % inside)
+    counted, skipped, lines = _invtabs_summary(log)
+    results["level_rule"] = counted == 4  # the two teeth (level 40) left out; "left out" also counts non-charms
+    notes.append("summary at level %s: %s counted, %s left out" % (rd("player", 12), counted, skipped))
+    Hl("xp 2000000000", log)
+    time.sleep(3)
+    s_base = rd("player", 0)
+    counted, skipped, lines = _invtabs_summary(log)
+    strength = [x for x in lines if x.endswith("to Strength")]
+    results["sum"] = counted == 5 and strength == ["+18 to Strength"]  # one tooth active, its second copy not
+    notes.append("summary at level %s: %s counted, %s left out, strength line %s, %d lines: %s" % (rd("player", 12), counted, skipped, strength, len(lines), lines))
+    _invtabs_visible("invtabs_hd_charms_10x6", "charms hd", log, shots, results)
+    # one charm back to the backpack (D2RLoader's own Ctrl+click from a custom page): still counted once
+    a55 = [c for c in _invtabs_page6(log) if c["code"] == "a55"]
+    if a55:
+        g.click_bg(*_invtabs_hd_cell(10, 6, int(a55[0]["x"]), int(a55[0]["y"])), mods=("ctrl",))
+        time.sleep(1.5)
+        if held_item():
+            release_held_item()
+    back = bool(_invtabs_backpack(log, "a55"))
+    c2, s2, lines2 = _invtabs_summary(log)
+    results["once"] = back and c2 == 5 and [x for x in lines2 if x.endswith("to Strength")] == ["+18 to Strength"]
+    notes.append("a55 back in the backpack %s: %s counted, %s left out" % (back, c2, s2))
+    # the HD list: wheel down over the band to its end
+    band = _invtabs_hd(89 + 490, 232 + 120)
+    g.wheel_bg(*band, notches=-3)
+    shots.append(sh("invtabs_hd_summary_wheel3"))
+    g.wheel_bg(*band, notches=-30)
+    shots.append(sh("invtabs_hd_summary_end"))
+    # the potions tab from its tab button
+    g.click_bg(*_invtabs_hd_tab(1))
+    time.sleep(1.5)
+    st = _invtabs_status_line(log)
+    results["tab_button"] = _invtabs_open_state(st, "potions") == "open"
+    if not results["tab_button"]:
+        g.console_bg("invtabs open potions")
+        time.sleep(1.5)
+    for code in ("hpo", "a55"):
+        it = _invtabs_backpack(log, code)
+        if it:
+            _invtabs_ctrl(it[0], log)
+    page = _invtabs_page6(log)
+    pot = [c for c in page if c["code"] == "hpo"]
+    results["potion_in"] = bool(pot) and 10 <= int(pot[0]["x"]) < 14 and int(pot[0]["y"]) < 3
+    results["charm_refused"] = bool(_invtabs_backpack(log, "a55"))
+    notes.append("potions tab: hpo %s, a55 stays in the backpack %s" % ([(c["x"], c["y"]) for c in pot], results["charm_refused"]))
+    _invtabs_visible("invtabs_hd_potions_4x3", "potions hd", log, shots, results)
+    g.click_bg(*_invtabs_hd_tab(0))
+    time.sleep(1.5)
+    notes.append("charm tab button back: %s" % _invtabs_open_state(_invtabs_status_line(log), None))
+    # legacy graphics: both tabs, the summary window scrolled by PageDown and by the command
+    g.console_bg("invtabs close")
+    g.console_bg("invtabs close potions")
+    time.sleep(0.8)
+    if set_graphics("legacy"):
+        time.sleep(2)
+        shots.append(sh("invtabs_sd_inventory"))
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+        _invtabs_visible("invtabs_sd_charms_top", "charms classic", log, shots, results)
+        g.press_bg("pgdn")
+        time.sleep(0.8)
+        shots.append(sh("invtabs_sd_charms_pgdn"))
+        g.console_bg("invtabs scroll 100")
+        time.sleep(0.8)
+        _invtabs_visible("invtabs_sd_charms_end", "charms classic", log, shots, results)
+        g.console_bg("invtabs open potions")
+        time.sleep(1.5)
+        shots.append(sh("invtabs_sd_potions"))
+        g.console_bg("invtabs close potions")
+        time.sleep(0.8)
+        results["legacy"] = True
+        set_graphics("hd")
+        time.sleep(2)
+    else:
+        results["legacy"] = False
+    g.press_bg("i")
+    time.sleep(0.8)
+    pre = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    leave_and_reenter()
+    post = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    results["reload"] = pre == post and bool(pre)
+    notes.append("page 6 before Save and Exit %s, after %s; strength base %s" % (pre, post, s_base))
+    finish("invtabs_tabs", all(results.values()), "%s; %s" % ("; ".join(notes), results), mark, shots, log, harness=INVTABS_HARNESS)
+
+
+def check_invtabs_refused():
+    """With the charm tab shrunk to 10 x 4 in the config while items lie in its rows 4 and 5 (left by `invtabs_tabs`), the
+    plugin refuses the config: the status still says 10 x 6 and invtabs.log says why; no page item moved."""
+    mark = engine_mark()
+    log = []
+    goto(1)
+    before = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    st = _invtabs_status_line(log)
+    with open(_invtabs_log(), encoding="utf-8", errors="replace") as f:
+        why = [x for x in f.read().splitlines() if "refused" in x and "tab" in x]
+    log.extend(why[-6:])
+    after = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    ok = "charm tab 10x6 at 0,0" in st and bool(why) and before == after
+    finish("invtabs_refused", ok, "status %s; log %s; page %s" % (st[st.find("status:"):][:120], why[-2:], after), mark, [], log, harness=INVTABS_HARNESS)
 
 
 def check_whirlwind():
@@ -7772,6 +8549,10 @@ CHECKS += [("rcbook", check_rcbook), ("rcdelay", check_rcdelay), ("rctoken", che
            ("rprunes", check_rprunes), ("rpdarkring", check_rpdarkring), ("rpcharm", check_rpcharm), ("rpnames", check_rpnames),
            ("rpequip", check_rpequip)]
 CHECKS += [("runeletters", check_runeletters)]  # lane runeletters: bug #334
+CHECKS += [("invtabs_pad", lambda: __import__("invtabs_pad_checks").run(sys.modules[__name__]))]  # tools/invtabs_pad_checks.py
+CHECKS += [("invtabs_seed", check_invtabs_seed), ("invtabs", check_invtabs), ("invtabs_tabs", check_invtabs_tabs),
+           ("invtabs_refused", check_invtabs_refused), ("invtabscore", check_invtabscore),
+           ("invtabscore_outside", check_invtabscore_outside)]  # docs/invtabs.md
 CHECKS += [("rpsignets", check_rpsignets)]  # lane phase3: engine-triage #24, signets (pSpell 3) and the Apple (pSpell 10)
 CHECKS += [("apple_use", check_apple_use)]  # lane apple: bug #499, the Apple bought, used, Save and Exit
 CHECKS += [("acts", check_acts)]

@@ -7200,3 +7200,156 @@ all attributes, level 40; the test character gets `xp`), background input only. 
   same result with the part off).
 - **Not covered:** trading between two players (no multiplayer test setup), the tooltip of an inactive copy (no line of
   its own; its "Keep in Inventory" line still shows).
+
+## Lane invtabs-corefix: mxl2012-core with invtabs (2026-11-11, slot 1, HD, background input)
+
+Stash retirement and charmdup with invtabs (docs/invtabs.md decision 7; docs/stash-page-retirement.md; docs/d2r-addresses.md
+22c "The charm area with invtabs" and "Why the charm page refuses a second copy"). No data build: the main checkout's finished
+`work/mod` copied. Plugin build and unit tests: `tools/build_plugin.ps1 -Tests` (all pass, `charm_dup` with the area cases),
+`py -3 -m unittest tools.tests.test_stash_retire` (16 pass, new: both page-6 owners and neither). Session driver
+`mxl2012-runs/invtabs/corefix/scripts/session.py` (slot lock, install, checks, main's developer install back, unlock) under
+`heavy_lock.py game invtabs-corefix`; evidence and run copies in `mxl2012-runs/invtabs/corefix/`.
+
+- **`invtabscore` PASS** (`checks-20261111-153157-s1`, fresh CfxCoreB, invtabs default config): `mxl2012` says
+  `charm inventory: invtabs charm tab 10x6 at 0,0`; a tooth in the tab +10; the Jolly Roger taken; a tooth at the tab's last
+  row 9,5 +10 before and after Save and Exit, Play. Retirement on the real save pair: the sidecar records `invtabs.dll`;
+  with mxl2012-core's version set back to 0.1.18 the native codec gives `removed=0 charmOrigin=1`; with the invtabs record
+  also renamed `removed=2 charmOrigin=0` (control).
+- **`invtabscore_outside` PASS** (`checks-20261111-153421-s1`, the same character, `[tabs.charms] rows = 4`): area
+  `invtabs charm tab 10x4 at 0,0`; the tooth at 9,5 is outside the tab and gives nothing (Strength 30 / client 30); a second
+  copy in the backpack gives +10 (40 / 40), the same after Save and Exit, Play (with the whole page as charm inventory the page
+  copy would be active and the second add nothing).
+- **Target H, recorded:** a second Butcher's Tooth is refused into the tab next to the first and into the empty tab while the
+  first is in the backpack; charmdup's carry test counter does not move on the refused drop (430 -> 430, refused 0) and moves
+  on the accepted Jolly Roger drop (594 -> 622). The refusal is D2RCore's own custom-page carry1 test (`0x317b70`, 22c),
+  before the game's placement. Open item for D2RLoader.
+- **Regression PASS** (CharmInv 1.0.1 installed, `checks-20261111-154611-s1`, `-155016-s1`): `mxl2012`, `charmdup` (fresh
+  CfxDup; CharmInv still refuses B next to A, recorded), `invtabs_seed` (CfxSeed); then invtabs installed:
+  `invtabs` PASS (`checks-20261111-155228-s1`, CfxSeed adopted).
+- Only the exit-only `s_StatsPool.IsEmpty()` pool assert (known); no crash file. A harness `pkt 18 ... 6` (cursor to page 6)
+  is not taken by the server (page 6 is no packet page): not a way to place page items.
+
+## Lane invtabs stage 3: the controller tab and the two-tab check (2026-11-11, slot 2, HD, background input)
+
+Driver `mxl2012-runs/invtabs/stage3/scripts/session.py` under `heavy_lock.py game invtabs` (slot lock, `install_mod.py
+--invtabs`, checks, main's developer install back, unlock); evidence in `mxl2012-runs/invtabs/stage3/`. docs/invtabs.md
+"Stage 3".
+
+- **`invtabs_pad` PARTIAL, all rows pass** (`checks-20261111-194228-s2`, fresh Itabspadd; tools/invtabs_pad_checks.py):
+  the gamepad menu's Charm Inventory tab after Inventory (RB / LB in a dev install; RT / LT with Controller QOL Updates),
+  focus on our grid at open, charms moved both ways across the panel boundary with A, the summary on the controller panel,
+  Send to stash still empties the backpack. The harness `pickup` puts items into the backpack while the gamepad UI is on,
+  not on the cursor; a carry1 unique cannot fill the backpack for this test (the page refuses a second copy).
+- **`invtabs_tabs` PASS** (`checks-20261111-193524-s2`, fresh Itabstabb): the first full PASS. The harness item
+  generator's `wPrefix != 0 || wSuffix != 0` (bug #35) is a harness note in every invtabs check now
+  (`finish(..., harness=INVTABS_HARNESS)`); "left out" counts charms only (2 at level 1).
+- Open: in classic graphics another tab's item is still drawn above the charm grid (an off-screen item rect did not help).
+
+## Lane invtabs stage 4: build wiring, package, stash retirement, TCP/IP (2026-11-12, slots 2 and 5, HD, background input)
+
+The new charm inventory made shippable (docs/invtabs.md "Packaging", "Build wiring", "Stage 4"; docs/invtabs-mp.md
+section 6). No full data build: the main checkout's finished `work/mod` copied, the four invtabs build steps run on it
+through `build.run` (twice, same bytes; `strings_check.py` and `validate.py` 0 errors). Evidence, logs, session drivers
+and the throwaway characters: `mxl2012-runs\invtabs\stage4\` (`scripts\session.py`, `mp_session.py`, `retire_run.py`,
+`smoke.py`; every game start under `heavy_lock.py game`, slots locked for the run, main's developer install put back).
+
+Unit tests: `py -3 -m unittest discover -s tools/tests` 1443 OK (12 skipped), `-s tools -p "test_*.py"` 587 OK (1 skipped),
+`tools/build_plugin.ps1 -Release -Tests` all pass (the mp protocol's 76 checks are part of it now). After the merge of
+main (the core plugin's image guard in place of the build guard) and with invtabs as the default: 1449 OK (12 skipped),
+587 OK (1 skipped), `build_plugin.ps1 -Release -Tests` all pass.
+
+**Package.** Switch off (`--charm-inventory charminv`): every path, size and sha256 of main's 0.1.19 manifest except
+`drawcap.dll` and `mxl2012-core.dll` (rebuilt from this branch), compared manifest against manifest
+(`off-vs-main-0.1.19.txt`). Switch on (`dist-final`, 5121 files): `invtabs.dll`, `invtabs.toml`, the seven invtabs data
+files and the classic Charms button in both classic inventory layouts; none of CharmInv's three files or two tables;
+`bundledPlugins` credits wild-healer (repository, commit), NOTICE.md too; `verify_package.py` OK
+(`verify-final.log`). Installed into slot 2 with `release_install.py install --package`, smoke run, `restore`
+(`smoke1.log`, `checks-20261112-020206-s2`): `fonts` PASS and `invtabscore` PASS (fresh character, the package's own
+charm inventory); `mxl2012`, `tabflash`, `medtab`, `sendstash` and `cqol` FAIL on exactly the rows that failed in the
+0.1.19 release smoke (`mxl2012-runs\rel0119\game\checks-20261111-042157-s2`: the plugin list of this branch's
+`mxl2012` check does not know the bundled plugins, the classic-graphics stash steps, four gamepad rows); no row fails
+that passed there.
+
+**Game checks on the final build** (session `session3.log`):
+
+| check | result | run (`stage4\runs\`) |
+|-|-|-|
+| `invtabs_seed` (CharmInv 1.0.1 installed, seeds the page-6 items) | PASS | `checks-20261112-011709-s2` |
+| `invtabs` (the CharmInv save adopted, button, bonus, charm in, rune refused, reload) | PASS | `checks-20261112-011849-s2` |
+| `invtabscore` (charm area, tab bonus, retirement codec on the real pair) | PASS | `checks-20261112-012039-s2` |
+| `invtabscore_outside` (charm tab 10 x 4: a charm outside the tab gives nothing) | PASS | `checks-20261112-012300-s2` |
+| `invtabs_tabs` (test config with a potions tab, Ctrl+click, summary) | PASS | `checks-20261112-012415-s2` |
+| `invtabs_refused` (a config that would leave items outside a tab is refused) | PASS | `checks-20261112-012713-s2` |
+| `invtabs_pad` (controller tab) | PARTIAL: every judged row ok; the tab strip order and the summary text are judged on the screenshots | `checks-20261112-012752-s2` |
+
+Before the last fix (`session2.log`) `invtabs` and `invtabscore_outside` failed on a game assert of the whole-page view
+(`invtabs all`: `TypeDesc.cpp:197`, the panel did not open; its cell size is written as x / y now), and `invtabs_seed`
+on the known tooltip assert of an item that names a skill without a skilldesc row (the Sacred Worldstone Key's random
+skill, with CharmInv installed, not the plugin). The first pass (`session1.log`) failed on the checks' own stale click
+geometry (`_invtabs_cell`).
+
+**Classic Charms button.** `ui_layouts.py` added it to the classic inventory layouts in every build, also with CharmInv
+(a button that opens nothing). It is made by the invtabs build step now; tests `ClassicButton`, `check_buttons`.
+
+**Second copy of a carry-once charm.** CharmInv 1.0.1 (`charmdup`, `checks-20261111-225159-s2`): "B into CharmInv next to
+A: refused (stays on the cursor)". invtabs (`invtabs`, `invtabscore`): "second carry1 copy into the tab: refused (stays
+on the cursor)". The same refusal (D2RCore's custom-page test); invtabs is not worse.
+
+**Stash retirement with invtabs as the page owner** (`stage4\retire\retire-report.md`, saves before / after start-up /
+after, `diff-*.txt`; nested save folder `mxl2012-s2/invtabs-s4/`): 12 of 12 rows PASS. The old-core fixture
+(StashMigrate) loses exactly its seven old page-2 items at start-up, keeps the other 860 (the original pair is kept
+beside it), shows an empty tab in the game and takes a new charm that is saved. A character saved with invtabs
+(MpJoinsv) and one saved with CharmInv (Ifiveseed), both with the core record set back to 0.1.18 so that only the owner
+record protects them, are byte-identical after start-up and show their page-6 items where they were; no item lost,
+new or moved in the save diffs.
+
+**TCP/IP, two clients** (host slot 2, joined player slot 5, the same build; `tools/invtabs_mp_checks.py run --scenario
+invtabs`; screenshots of both windows per step, the host's server reads of the joined player, save diffs of both
+characters; final build, session `mp-session4.log`):
+
+| scenario | result | run (`stage4\runs\`) |
+|-|-|-|
+| the shipped settings on both sides, fresh characters: joined player drags a charm in, Ctrl+clicks one in, drags out, Ctrl+clicks out, rune refused by drag and by Ctrl+click, held charm refused outside the grid; the host does the same; both Save and Exit, new game, rejoin: items where they were | 24 of 24 PASS | `invtabs-mp-20261112-013307` |
+| a joined player saved with CharmInv: items where CharmInv saved them, Ctrl+click out and in, rejoin | 16 of 16 PASS | `invtabs-mp-20261112-014133` |
+| a joined player with another tab size (4 rows): take-out only with the plain notice, charm out, drag in refused, Ctrl+click in refused, rejoin | 15 of 15 PASS | `invtabs-mp-20261112-014939` |
+
+The same three passed on the build before the notice wording changed (`invtabs-mp-20261111-234403`,
+`invtabs-mp-20261112-000020`, `invtabs-mp-20261112-003203`). On the build after the merge of main (session
+`session4.log`, `mp-session5.log`): `invtabscore` PASS (`checks-20261112-024658-s2`; the core's log line "image
+0x6ab3782c (expects 0x6ab3782c, match)") and the shipped-settings two-client scenario 24 of 24 PASS
+(`invtabs-mp-20261112-025143`). The other checks and the two other scenarios were not repeated after the merge. Not run: a host without invtabs (the channel is refused; the
+same take-out-only path as the other tab size), three or more players, a joined player on a gamepad.
+
+## Lane port34: D2R 3.4 build 95032 with D2RLoader 1.3.1-beta, scope only (2026-11-11, slot 1, background only)
+
+Slot 1 was updated to D2R 3.4 (build 95032) on 2026-11-11; its D2RLoader is still 1.3.1-beta. This lane measured what the
+port needs and changed no guard, launcher or version. Findings: [port-3.4.md](port-3.4.md). Evidence outside git:
+`mxl2012-runs/port34/`.
+
+- **Why `slot_share.py bootcheck` times out on 3.4:** D2RLoader opens a task dialog (class `#32770`, title `D2RLoader`,
+  "This D2R version hasn't been fully tested yet", check box "Don't remind me again for D2R 3.4", button OK) before it
+  starts the game, and waits. The log ends at the `[WARN] This D2R version hasn't been fully tested yet. ...` line until OK.
+- **Past it without the foreground:** post `TDM_CLICK_BUTTON` (`WM_USER + 102`, `wParam` 1) to that dialog of the launch's
+  own process. `mxl2012-runs/port34/loader_run.py NAME --mod mxl2012 --ok-dialog` does it (lock, `slot_share` begin / end,
+  windows sent to the bottom without activation, `PrintWindow` pictures, close by `WM_CLOSE`, logs copied, restore
+  verified). `bootcheck` and `game_ctl.py start` have the step since 2026-11-12 (`tools/loader_notice.py`, port-3.4.md 8.2). No configuration key exists for the notice;
+  the check box is the install owner's choice and was not ticked.
+- **Three starts** (`MXL_RUN=port34`): `run1-mxl2012-observe` (the dialog, left open, then closed with its process),
+  `run2-mxl2012-ok` (`-mod mxl2012`: main menu after 14 s; `drawcap` patched at 7 sites; `mxl2012-core 0.1.19` loaded and
+  installed nothing: `wrong game: image 0x6ab3782c, buildName 95032 (another build)`), `run3-plain` (`legacy169-plain`
+  with an empty plugin folder: main menu, no plugin). No crash, no crash report; shared files restored each time.
+- **The running image on 3.4 is the 3.3 image** (`loader_run.py --textdiff`: `.text` equals the 3.3 dump except the 7
+  hook jumps the dump itself holds; stamp `0x6ab3782c`): `D2RLoader.exe` carries the game program, so the plugins'
+  addresses hold on 3.4 as long as D2RLoader stays 1.3.1.
+- **Data:** `extract_95032.py` (read-only CASC read of slot 1 under the lock) and `diff_extracts.py`: 86 of 91 tables
+  identical, 5 with changed rows, no column change; `tools/build.py` against the 3.4 files passes and changes 16 art
+  definition files of the mod.
+- **Not covered:** no game was entered on 3.4 (the engine parts are off there), so nothing in play was tested.
+- **2026-11-12, the port for D2RLoader 1.3.1** (port-3.4.md section 8): the build-name test is gone (image guard), the
+  downloader no longer blocks for the game's version, `bootcheck` and `game_ctl.py start` answer the notice (slot 1:
+  BOOTCHECK PASS). Smoke with one package built against the 3.3 files, `game_checks.py all ...`, evidence
+  `mxl2012-runs/port34/smoke/`: slot 1 (3.4) `mxl2012` PASS (`3.4.0, engine changes on`, 50 lines) and `devmenu` PASS
+  (opens with Ctrl+F12, 19 rows); `apple_use` and `apple_save` PASS (Save and Exit and back in); a character saved on
+  3.3 (`DmFourH`, copied from slot 2's save folder) enters a game on 3.4; slot 2 (3.3) `mxl2012` and `devmenu` PASS.
+  Seen and not looked into: one last-resort record at the game's close in the `apple_use` run, and the foreground
+  window changing twice per 3.4 start (most likely D2RLoader's notice until it is answered; no cursor change).

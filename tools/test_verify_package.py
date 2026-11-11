@@ -30,11 +30,15 @@ class VerifyPackageTests(unittest.TestCase):
         drawcap = self.tmp / "drawcap.dll"
         drawcap.write_bytes(b"MZ Draw List Cap" + bytes(1) + b"drawcap" + bytes(1) + pr.drawcap_version().encode() + bytes(1))
         pr.stage(self.mod, pr.plugin_version(), self.dll, self.tmp, data_from=data, drawcap=drawcap)
+        # this fixture is a CharmInv package; the default is invtabs, which a test sets back where it is its subject
+        switch = mock.patch.object(pr, "CHARM_INVENTORY", "charminv")
+        switch.start()
+        self.addCleanup(switch.stop)
         src = self.tmp / "legacy169-src"  # what tools/build_legacy169.ps1 exports
         src.mkdir()
         (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\n", encoding="utf-8")
         (src / "PINNED_COMMIT").write_text(pr.legacy169_commit(), encoding="ascii")
-        (self.tmp / "legacy169.dll").write_bytes(b"MZ legacy169\0 0.1.1\0")
+        (self.tmp / "legacy169.dll").write_bytes(b"MZ legacy169\0 0.1.2\0")
         pr.stage_legacy169(self.mod, self.tmp / "legacy169.dll", src)
         buff = self.tmp / "buffhud-src"  # what tools/build_buffhud.ps1 exports
         (buff / "external" / "PluginSDK").mkdir(parents=True)
@@ -71,6 +75,53 @@ class VerifyPackageTests(unittest.TestCase):
         self.addCleanup(pins.stop)
         pr.stage_charminv(self.mod, ci)
 
+    def test_invtabs_replaces_charminv_only_when_present(self):
+        dll = self.tmp / "invtabs.dll"
+        dll.write_bytes(b"MZ invtabs\0")
+        for k in pr.CHARMINV_FILES:
+            (self.mod / pr.CHARMINV[k]).unlink()
+        pr.stage_invtabs(self.mod, dll)
+        missing = vp.check_mod_folder(self.mod, pr.plugin_version())
+        self.assertEqual(len(missing), len(pr.INVTABS_DATA))  # invtabs' mod data is required with it
+        for rel in pr.INVTABS_DATA:
+            (self.mod / f"{pr.NAME}.mpq" / "data" / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.mod / f"{pr.NAME}.mpq" / "data" / rel).write_bytes(b"x")
+        self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
+        (self.mod / pr.CHARMINV["dll"]).write_bytes(b"MZ")
+        self.assertIn("invtabs and CharmInv cannot be staged together", vp.check_mod_folder(self.mod, pr.plugin_version()))
+        (self.mod / pr.CHARMINV["dll"]).unlink()
+        (self.mod / pr.INVTABS["config"]).unlink()
+        self.assertIn(pr.INVTABS["config"]+" is missing", vp.check_mod_folder(self.mod, pr.plugin_version()))
+
+    def test_the_data_must_be_built_for_the_charm_inventory_in_the_package(self):
+        import charm_inventory as ci
+        import invtabs_legacy as il
+        data = self.mod / f"{pr.NAME}.mpq" / "data"
+        layout = '{"type": "Panel", "children": [\n    {"type": "ButtonWidget", "name": "close"}\n]}\n'
+        (data / ci.CLASSIC_INVENTORY[0]).parent.mkdir(parents=True, exist_ok=True)
+        (data / ci.CLASSIC_INVENTORY[0]).write_text(il.add_button_to_layout(layout), "utf-8")
+        # a CharmInv package with the classic Charms button: the button would open nothing
+        problems = vp.check_mod_folder(self.mod, pr.plugin_version())
+        self.assertEqual(len(problems), 1)
+        self.assertIn("opens nothing with CharmInv", problems[0])
+        # the same data with invtabs instead of CharmInv, and invtabs' files: fine; without the button: refused
+        for k in pr.CHARMINV_FILES:
+            (self.mod / pr.CHARMINV[k]).unlink()
+        dll = self.tmp / "invtabs.dll"
+        dll.write_bytes(b"MZ invtabs\0")
+        pr.stage_invtabs(self.mod, dll)
+        for rel in ci.INVTABS_DATA:
+            (data / rel).parent.mkdir(parents=True, exist_ok=True)
+            (data / rel).write_bytes(b"x")
+        self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
+        (data / ci.CLASSIC_INVENTORY[0]).write_text(layout, "utf-8")
+        self.assertIn("has no Charms button", "; ".join(vp.check_mod_folder(self.mod, pr.plugin_version())))
+
+    def test_switch_on_requires_invtabs(self):
+        with mock.patch.object(pr, "CHARM_INVENTORY", "invtabs"):
+            self.assertIn(pr.INVTABS["dll"] + " is missing (package_release.CHARM_INVENTORY is invtabs)",
+                          vp.check_mod_folder(self.mod, pr.plugin_version()))
+
     def test_a_staged_package_is_a_player_mod_folder(self):
         self.assertEqual(vp.check_mod_folder(self.mod, pr.plugin_version()), [])
 
@@ -78,7 +129,7 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / "modinfo.json").write_text(json.dumps({"name": "mxl2012", "savepath": "mxl2012-s2/"}))
         (self.mod / "d2rloader" / "plugins" / "mxl2012-core.dll").write_bytes(b"MZ mxl2012-testharness.txt\0")
         (self.mod / "Hero.d2s").write_bytes(b"x")
-        (self.mod / pr.LEGACY169["dll"]).write_bytes(b"MZ legacy169\0 0.1.1-test\0")
+        (self.mod / pr.LEGACY169["dll"]).write_bytes(b"MZ legacy169\0 0.1.2-test\0")
         (self.mod / pr.LEGACY169["config"]).unlink()
         (self.mod / pr.BUFFHUD["mpq"]).write_bytes(b"PK")
         (self.mod / pr.BUFFHUD["licence"]).unlink()

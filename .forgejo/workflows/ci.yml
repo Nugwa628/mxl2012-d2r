@@ -49,7 +49,7 @@ jobs:
           set -e
           cmake -S plugin/tests -B build-tests -DCMAKE_BUILD_TYPE=Release
           cmake --build build-tests -j6 --target tests
-          for t in harness_tests buildguard_tests otherplugins_tests envguard_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests; do ./build-tests/$t; done
+          for t in harness_tests imageguard_tests otherplugins_tests envguard_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests; do ./build-tests/$t; done
       - name: Build and run drawcap tests
         run: |
           cmake -S drawcap/tests -B build-drawcap-tests -DCMAKE_BUILD_TYPE=Release

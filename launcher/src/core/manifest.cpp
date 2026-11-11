@@ -112,8 +112,8 @@ bool ParseManifest(const std::string& text, Manifest& out, std::string& error) {
 		error = "missing or bad objectsBase, or a bad archive.path";
 		return false;
 	}
-	if (m.version.empty() || (m.d2rBuild <= 0 && m.d2rVersion.empty())) {
-		error = "the manifest lacks version or d2r.version";
+	if (m.version.empty()) {  // the d2r block is information: a manifest without it is read as well
+		error = "the manifest lacks version";
 		return false;
 	}
 	for (const Json& d : j["emptyDirs"].items()) {

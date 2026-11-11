@@ -265,21 +265,23 @@ void TestDetect() {
 	Check(mxl::BuildInfoVersion(real) == "3.3.93847", "real .build.info of build 93847");
 	Check(mxl::BuildNumber("3.3.93847") == 93847 && mxl::BuildNumber("1.0.0.93847") == 93847 && mxl::BuildNumber("") == 0, "build numbers");
 
-	// The requirement is the game version (major.minor), never the build number (D2RLoader's author, 2026-10-27).
+	// The game's version and build are read and shown, never compared: no version blocks Install or Play.
 	Check(mxl::GameVersion("3.3.93847") == "3.3" && mxl::GameVersion("3.3.0") == "3.3" && mxl::GameVersion("1.0.0.93847") == "1.0" &&
 	          mxl::GameVersion("").empty() && mxl::GameVersion("93847").empty(), "game version is major.minor");
-	auto ok = mxl::CheckBuild("3.3.93847", "3.3.93847");
-	Check(ok.verdict == mxl::BuildVerdict::Ok && ok.version == "3.3" && ok.build == 93847, "3.3.93847 is ok");
-	auto steam = mxl::CheckBuild("", "3.3.94995");  // Steam: no .build.info, another 3.3 build (bugs.md #41)
-	Check(steam.verdict == mxl::BuildVerdict::Ok && steam.build == 94995, "any 3.3 build is ok (Steam 94995)");
-	Check(mxl::CheckBuild("3.3.99999", "").verdict == mxl::BuildVerdict::Ok, "a later 3.3 hotfix build is ok");
-	auto newer = mxl::CheckBuild("3.4.95000", "3.3.93847");
-	Check(newer.verdict == mxl::BuildVerdict::Newer && newer.message.find("Waiting for a D2R-XL 2012 update") != std::string::npos,
-	      "3.4: waiting message (.build.info decides)");
-	Check(mxl::CheckBuild("3.2.91000", "").verdict == mxl::BuildVerdict::Older, "older version");
-	Check(mxl::CheckBuild("3.10.1", "").verdict == mxl::BuildVerdict::Newer, "3.10 is newer than 3.3");
-	Check(mxl::CheckBuild("", "").verdict == mxl::BuildVerdict::Unknown, "unknown version");
-	Check(mxl::CheckBuild("", "3.3.93847").verdict == mxl::BuildVerdict::Ok, "exe version alone");
+	auto neutral = [](const mxl::GameInfo& g) {  // a plain line: no requirement, no advice to wait or to update
+		return g.message.find("needs") == std::string::npos && g.message.find("Wait") == std::string::npos &&
+		       g.message.find("Update") == std::string::npos;
+	};
+	auto base = mxl::DescribeGame("3.3.93847", "3.3.93847");
+	Check(base.known && base.version == "3.3" && base.build == 93847 && base.message == "D2R 3.3 (build 93847)", "3.3.93847 is described");
+	auto steam = mxl::DescribeGame("", "3.3.94995");  // Steam: no .build.info, another 3.3 build (bugs.md #41)
+	Check(steam.known && steam.build == 94995 && neutral(steam), "Steam's 3.3 build is described (exe version alone)");
+	auto newer = mxl::DescribeGame("3.4.95032", "3.3.93847");
+	Check(newer.known && newer.version == "3.4" && newer.build == 95032 && newer.message == "D2R 3.4 (build 95032)" && neutral(newer),
+	      "3.4: a plain information line (.build.info is preferred)");
+	Check(mxl::DescribeGame("3.2.91000", "").known && neutral(mxl::DescribeGame("3.2.91000", "")), "an older version: information only");
+	Check(mxl::DescribeGame("3.10.1", "").version == "3.10" && neutral(mxl::DescribeGame("3.10.1", "")), "3.10: information only");
+	Check(!mxl::DescribeGame("", "").known && mxl::DescribeGame("", "").message.find("Cannot read") != std::string::npos, "unknown version");
 
 	std::string vdf = R"("libraryfolders"
 {
@@ -779,7 +781,11 @@ void TestPlay() {
 		return mxl::PlayBlocked(in).find(part) != std::string::npos;
 	};
 	Check(blocked([](mxl::PlayInputs& in) { in.d2rFound = false; }, "D2R folder"), "play: no D2R folder");
-	Check(blocked([](mxl::PlayInputs& in) { in.buildMismatch = true; }, "version"), "play: another D2R version");
+	for (const char* version : {"3.3", "3.4", "3.10", "3.2", "9.9", ""}) {  // a newer, older or unreadable D2R version plays
+		mxl::PlayInputs in = ready;
+		in.gameVersion = version;
+		Check(mxl::PlayBlocked(in).empty(), "play: no D2R version blocks");
+	}
 	Check(blocked([](mxl::PlayInputs& in) { in.loaderFound = in.loaderOk = false; }, "install D2RLoader"), "play: no D2RLoader");
 	Check(blocked([](mxl::PlayInputs& in) { in.loaderOk = false; }, "D2RLoader is not the version"), "play: another D2RLoader version");
 	Check(blocked([](mxl::PlayInputs& in) { in.installed = false; }, "Install"), "play: not installed");

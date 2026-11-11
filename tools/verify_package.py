@@ -18,13 +18,18 @@ it must be inside the project root R or the repo, and only its own unpacked/ and
    D2R cache, package_release.baselines()); the package has no file the reference lacks except the bundled plugins' files
    (legacy169.dll / legacy169.toml, Buff HUD's DLL, MPQ, licences and buff-panel.toml, Auto Belt Refill's DLL and
    auto-belt-refill.toml, Controller QOL's files, and CharmInv's DLL, MPQ and charm-inv.toml; checked in step 2: present, a
-   release build of the pinned version, CharmInv the author's pinned bytes with allow_inventory_charms = true).
+   release build of the pinned version, CharmInv the author's pinned bytes with allow_inventory_charms = true). The charm
+   inventory (tools/charm_inventory.py): a package holds CharmInv or invtabs (invtabs.dll + invtabs.toml), never both, and
+   its data is the one built for it (invtabs: its tables, art and the classic Charms button, no CharmInv tables; CharmInv:
+   nothing of invtabs). When package_release.CHARM_INVENTORY is invtabs, a package without invtabs is refused
+   (MXL2012_CHARM_INVENTORY=charminv checks a CharmInv package then).
 
 unpacked/ and reference/ are deleted at the end unless --keep (or a check failed). Exit 0 = the package installs the same game
 as install_mod.py. Reads the build (work/mod/data) and the baselines; writes only into DIR.
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -43,6 +48,7 @@ DIFFERS_BY_DESIGN = {"d2rloader/plugins/mxl2012-core.dll", "d2rloader/metadata.j
 BUNDLED = ({pr.LEGACY169["dll"], pr.LEGACY169["config"]} | {pr.BUFFHUD[k] for k in pr.BUFFHUD_FILES}
            | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES} | {pr.CONTROLLERQOL[k] for k in pr.CONTROLLERQOL_FILES}
            | {pr.CHARMINV[k] for k in pr.CHARMINV_FILES})
+OPTIONAL = {pr.INVTABS["dll"], pr.INVTABS["config"]}
 STRING_FILES = ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json")
 
 
@@ -133,12 +139,28 @@ def check_mod_folder(mod: Path, version: str) -> list:
     for k in pr.CONTROLLERQOL_FILES:
         if not (mod / pr.CONTROLLERQOL[k]).is_file():
             problems.append(f"{pr.CONTROLLERQOL[k]} is missing")
-    problems += pr.check_charminv(mod / Path(pr.CHARMINV["dll"]).parent)
-    cfg = mod / pr.CHARMINV["config"]
-    if not cfg.is_file():
-        problems.append(f"{pr.CHARMINV['config']} is missing")
-    elif "allow_inventory_charms = true" not in cfg.read_text("utf-8"):
-        problems.append(f"{pr.CHARMINV['config']} lacks allow_inventory_charms = true (charms work from the inventory too)")
+    invtabs = mod / pr.INVTABS["dll"]
+    if invtabs.exists() or (mod / pr.INVTABS["config"]).exists():
+        problems += pr.check_invtabs(invtabs)
+        if not (mod / pr.INVTABS["config"]).is_file():
+            problems.append(f"{pr.INVTABS['config']} is missing")
+        if any((mod / pr.CHARMINV[k]).exists() for k in pr.CHARMINV_FILES):
+            problems.append("invtabs and CharmInv cannot be staged together")
+        data = mod / f"{NAME}.mpq" / "data"
+        if data.is_dir():  # a --no-data package has none
+            problems += [f"{NAME}.mpq/data/{w}" for w in pr.charm_inventory.data_problems(data, "invtabs")]
+    elif pr.CHARM_INVENTORY == "invtabs" and os.environ.get(pr.charm_inventory.ENV) != "charminv":
+        problems.append(f"{pr.INVTABS['dll']} is missing (package_release.CHARM_INVENTORY is invtabs)")
+    else:
+        data = mod / f"{NAME}.mpq" / "data"
+        if data.is_dir():  # a CharmInv package holds nothing of invtabs: no data of it, no classic Charms button
+            problems += [f"{NAME}.mpq/data/{w}" for w in pr.charm_inventory.data_problems(data, "charminv")]
+        problems += pr.check_charminv(mod / Path(pr.CHARMINV["dll"]).parent)
+        cfg = mod / pr.CHARMINV["config"]
+        if not cfg.is_file():
+            problems.append(f"{pr.CHARMINV['config']} is missing")
+        elif "allow_inventory_charms = true" not in cfg.read_text("utf-8"):
+            problems.append(f"{pr.CHARMINV['config']} lacks allow_inventory_charms = true (charms work from the inventory too)")
     if not (mod / "d2rloader" / "patches").is_dir():
         problems.append("d2rloader/patches/ is missing")
     data = mod / f"{NAME}.mpq" / "data"
@@ -214,7 +236,7 @@ def compare_reference(mod: Path, ref: Path, extract: Path = pr.EXTRACT, cache: P
     rf = {p.relative_to(ref).as_posix() for p in ref.rglob("*") if p.is_file()}
     roots = pr.baselines(extract, cache)
     problems, blizzard = [], 0
-    for rel in sorted(pkg - rf - BUNDLED):
+    for rel in sorted(pkg - rf - BUNDLED - OPTIONAL):
         problems.append(f"the package has {rel}, install_mod.py does not install it")
     data = f"{NAME}.mpq/data/"
     for rel in sorted(rf - pkg):

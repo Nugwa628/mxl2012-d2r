@@ -49,6 +49,7 @@ CORE_CONFIG = ROOT / "plugin" / "mxl2012-core.toml"
 # The standalone drawcap plugin (drawcap/README.md: the legacy draw list cap; built by tools/build_plugin.ps1 next to the core
 # plugin) and its default settings (installed when missing, never overwritten). It ships with the mod in the same plugins folder.
 DRAWCAP = Path(os.environ.get("MXL_DRAWCAP") or ROOT / "build" / "drawcap" / "Release" / "drawcap.dll")
+INVTABS = {"dll": "d2rloader/plugins/invtabs.dll", "config": "d2rloader/config/invtabs.toml"}
 DRAWCAP_CONFIG = ROOT / "drawcap" / "drawcap.toml"
 D2R_FILELIST = fxpaths.D2R_FILELIST
 
@@ -186,7 +187,11 @@ def main() -> int:
     ap.add_argument("--savepath", help="save folder name written to modinfo.json (default <name>/, slots: <name>-sN/)")
     ap.add_argument("--placeholder", action="store_true", help="an empty mod: modinfo.json only (no data, no plugin)")
     ap.add_argument("--charminv", action="store_true", help="also install the bundled CharmInv plugin (otherwise its files are removed)")
+    ap.add_argument("--invtabs", type=Path, help="opt in to invtabs DLL")
+    ap.add_argument("--no-charminv", action="store_true", help="omit CharmInv (already the install default)")
     args = ap.parse_args()
+    if args.invtabs is not None and args.charminv:
+        ap.error("invtabs and CharmInv cannot be staged together")
 
     if not args.placeholder and not (SRC / "global" / "excel").exists():
         print("work/mod/data is missing: run tools/build.py first")
@@ -199,14 +204,14 @@ def main() -> int:
             print("no game slot: pass --slot 1|2|3|4|5|all or set MXL_SLOT (only the folders of the game slots are installed into)")
             return 2
         return install_one(Path(args.game), args.name, args.savepath or f"{args.name}-s{n}/", placeholder=args.placeholder,
-                           charminv=args.charminv)
+                           charminv=args.charminv, invtabs=args.invtabs)
     slots = game_slots.present_set() if args.slot == "all" else [game_slots.require_present(args.slot, "install_mod")]
     rc, first = 0, None
     for n in slots:
         savepath = args.savepath or f"{args.name}-s{n}/"
         print(f"== slot {n}: {game_slots.slot_dir(n)} (saves {savepath})")
         rc = install_one(Path(game_slots.slot_dir(n)), args.name, savepath, first, placeholder=args.placeholder,
-                         charminv=args.charminv)
+                         charminv=args.charminv, invtabs=args.invtabs)
         if rc:
             return rc
         first = None if args.placeholder else first or Path(game_slots.slot_dir(n)) / "mods" / args.name / f"{args.name}.mpq" / "data"
@@ -215,10 +220,12 @@ def main() -> int:
 
 
 def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = None, placeholder: bool = False,
-                charminv: bool = False) -> int:
+                charminv: bool = False, invtabs: Path = None) -> int:
     """Install into one game folder. copy_data_from: the data folder of an install made a moment ago (skips the
     ds1 renumbering and the file merging, copies the finished tree). A game slot is installed into only by the holder of
     its lock (MXL_RUN) and never while its game runs; another mod's folder (machine.json protected_mod_folders) is never a target."""
+    if invtabs is not None and charminv:
+        raise SystemExit("invtabs and CharmInv cannot be staged together")
     import game_slots
     owner = os.environ.get("MXL_RUN")
     slot = game_slots.slot_of_game_dir(str(game))
@@ -234,7 +241,7 @@ def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = Non
             print(f"refusing install: {game} still has a running game")
             return 1
     try:
-        return install_checked(game, name, savepath, copy_data_from, placeholder, slot, charminv)
+        return install_checked(game, name, savepath, copy_data_from, placeholder, slot, charminv, invtabs)
     except PermissionError as e:  # a write refused half way (the check above passed): stop, never elevate or retry
         print(f"install failed: no write access to {e.filename} ({e.strerror}); {game_slots.ELEVATION_NOTE}")
         return 1
@@ -244,7 +251,14 @@ def install_one(game: Path, name: str, savepath: str, copy_data_from: Path = Non
 
 
 def install_checked(game: Path, name: str, savepath: str, copy_data_from: Path = None, placeholder: bool = False,
-                    slot: int = None, charminv: bool = False) -> int:
+                    slot: int = None, charminv: bool = False, invtabs: Path = None) -> int:
+    if invtabs is not None:
+        import package_release as pr
+        if charminv:
+            raise SystemExit("invtabs and CharmInv cannot be staged together")
+        problems = pr.check_invtabs(invtabs)
+        if problems:
+            raise SystemExit("\n".join(problems))
     import game_slots
     if not (game / "D2R.exe").exists() or not (game / "D2RLoader.exe").exists():
         print(f"{game} does not look like a D2R folder with D2RLoader installed")
@@ -263,7 +277,7 @@ def install_checked(game: Path, name: str, savepath: str, copy_data_from: Path =
         shutil.copytree(copy_data_from, data)
     else:
         build_data(data, game)
-    return finish_install(game, name, savepath, mod, mpq, data, charminv)
+    return finish_install(game, name, savepath, mod, mpq, data, charminv, invtabs)
 
 
 def build_data(data: Path, game: Path) -> None:
@@ -438,11 +452,31 @@ def install_charminv(mod: Path, on: bool) -> str:
     return f"CharmInv {pr.CHARMINV['version']}: installed from {folder}"
 
 
-def finish_install(game: Path, name: str, savepath: str, mod: Path, mpq: Path, data: Path, charminv: bool = False) -> int:
+def finish_install(game: Path, name: str, savepath: str, mod: Path, mpq: Path, data: Path, charminv: bool = False, invtabs: Path = None) -> int:
     # The game-wide <game>\d2rloader\config\input-bindings.toml is not migrated here (migrate_hotkey_bindings is for a
     # player's own D2R): on a test slot it is shared with the other mod and every run's own changes are undone by slot_share.py.
+    if invtabs is not None and charminv:
+        raise SystemExit("invtabs and CharmInv cannot be staged together")
     write_mod_files(mod, name, savepath)
+    if invtabs is None:
+        for rel in INVTABS.values():
+            target = mod / rel
+            if target.is_file():
+                target.unlink()
     print(install_charminv(mod, charminv))
+    if invtabs is not None:
+        import package_release as pr
+        pr.stage_invtabs(mod, invtabs)
+        print(f"invtabs: installed from {invtabs}")
+    # the data is built for one charm inventory (tools/build.py --charm-inventory); say when this install's plugin is the other
+    import charm_inventory
+    built = charm_inventory.built_for(data)
+    for line in charm_inventory.data_problems(data, "invtabs") if invtabs is not None else (
+            charm_inventory.data_problems(data, "charminv") if charminv else []):
+        print(f"WARNING: {line}")
+    if invtabs is None and not charminv and built == "invtabs":
+        print("note: the data is built for invtabs (classic Charms button, invtabs' art) and no charm inventory plugin is "
+              "installed: pass --invtabs build/invtabs/Release/invtabs.dll to install what the package ships")
 
     for rel in ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json"):
         ns_file = data / "local" / "lng" / (rel % NAMESPACE)

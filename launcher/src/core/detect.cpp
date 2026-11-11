@@ -175,35 +175,15 @@ std::string GameVersion(const std::string& version) {
 	return std::to_string(major) + "." + std::to_string(minor);
 }
 
-static int CompareGameVersions(const std::string& a, const std::string& b) {
-	int am = 0, an = 0, bm = 0, bn = 0;
-	am = std::atoi(a.c_str()); an = a.find('.') == std::string::npos ? 0 : std::atoi(a.c_str() + a.find('.') + 1);
-	bm = std::atoi(b.c_str()); bn = b.find('.') == std::string::npos ? 0 : std::atoi(b.c_str() + b.find('.') + 1);
-	return am != bm ? (am < bm ? -1 : 1) : (an == bn ? 0 : (an < bn ? -1 : 1));
-}
-
-BuildCheck CheckBuild(const std::string& infoVersion, const std::string& exeVersion, const std::string& required) {
-	BuildCheck c;
+GameInfo DescribeGame(const std::string& infoVersion, const std::string& exeVersion) {
+	GameInfo c;
 	c.build = BuildNumber(!infoVersion.empty() ? infoVersion : exeVersion);
 	c.version = GameVersion(!infoVersion.empty() ? infoVersion : exeVersion);
 	if (c.version.empty())
 		c.version = GameVersion(exeVersion);
-	std::string shown = c.version.empty() ? std::string() : "D2R " + c.version + (c.build ? " (build " + std::to_string(c.build) + ")" : "");
-	if (c.version.empty()) {
-		c.message = "Cannot read the D2R version (.build.info and D2R.exe)";
-		return c;
-	}
-	int cmp = CompareGameVersions(c.version, required);
-	if (cmp == 0) {
-		c.verdict = BuildVerdict::Ok;
-		c.message = shown;
-	} else if (cmp > 0) {
-		c.verdict = BuildVerdict::Newer;
-		c.message = "D2R-XL 2012 needs D2R " + required + "; this is " + shown + ". Waiting for a D2R-XL 2012 update for the new version.";
-	} else {
-		c.verdict = BuildVerdict::Older;
-		c.message = "D2R-XL 2012 needs D2R " + required + "; this is " + shown + ". Update D2R in Battle.net or Steam first.";
-	}
+	c.known = !c.version.empty();
+	c.message = c.known ? "D2R " + c.version + (c.build ? " (build " + std::to_string(c.build) + ")" : "")
+	                    : std::string("Cannot read the D2R version (.build.info and D2R.exe)");
 	return c;
 }
 

@@ -38,7 +38,7 @@ constexpr D2RL::PluginInfo Info{
     .flags = D2RL::PluginFlags::Client | D2RL::PluginFlags::NativeHooks,
 };
 
-constexpr uint32_t Image93847 = 0x6ab3782cU;
+constexpr uint32_t LoaderImage131 = 0x6ab3782cU;  // the game image in D2RLoader 1.3.1; only names it in the log line, decides nothing
 
 const D2RL::PluginContext* g_context = nullptr;
 char g_status[400] = "not loaded";
@@ -455,7 +455,7 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	const uint32_t stamp = context->exeBase != 0 ? Nt(context->exeBase)->FileHeader.TimeDateStamp : 0;
 	std::snprintf(line, sizeof(line), "drawcap %s loaded (%s scope, mod %s, D2R %s, image 0x%08x%s)", PluginVersion,
 	              context->loadScope == D2RL::LoadScope::Mod ? "mod" : "global", context->activeMod ? context->activeMod : "-",
-	              context->buildVersion ? context->buildVersion : "?", stamp, stamp == Image93847 ? ", 3.3 build 93847" : "");
+	              context->buildVersion ? context->buildVersion : "?", stamp, stamp == LoaderImage131 ? ", the D2RLoader 1.3.1 image" : "");
 	Log(line);
 	char text[2048];
 	uint32_t need = 0;

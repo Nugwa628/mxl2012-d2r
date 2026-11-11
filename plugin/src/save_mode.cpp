@@ -5,7 +5,7 @@
 // red line on the screen for every save it cancelled, so a save is never dropped without the player seeing it.
 #include "save_mode.h"
 
-#include "build_guard.h"
+#include "image_guard.h"
 #include "save_mode_logic.h"
 
 #include <windows.h>

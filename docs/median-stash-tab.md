@@ -65,8 +65,8 @@ name no item. So:
   or hidden; the getter cap stays harmless (tabs 0-4 only).
 - The off word `medtab` keeps the hooks (the layout needs them) and hides tabs 6 and 7 in every game, with D2R's Materials
   page only.
-- On another D2R build (`build_guard`) or different bytes at the hooked sites the part installs nothing; that game is not
-  93847, which the mod does not run on anyway.
+- On another game image (`image_guard`, docs/plugin-plan.md 1.1) or different bytes at the hooked sites the part installs
+  nothing.
 
 ## Saves
 

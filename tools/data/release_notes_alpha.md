@@ -8,11 +8,13 @@ The download is `{archive}` ({archive_mb} MB; {file_count} files, {unpacked_mb} 
 
 ## What you need
 
-- **Diablo II: Resurrected at build {build}** (D2R {d2rver}) exactly. On any other build the mod's engine part switches
-  itself off and shows a red line at the top of the screen: "D2R-XL 2012 {plugin} needs D2R build {build}; this is ...".
-  Keeping your D2R at that build is up to you.
+- **Diablo II: Resurrected.** No game version or build is required; the mod was tested on D2R 3.3 and 3.4.
+  On D2R 3.4, D2RLoader {loader} shows its own notice "This D2R version hasn't been fully tested yet" at each start:
+  click OK, or tick "Don't remind me again for D2R 3.4" once.
 - **D2RLoader {loader}** exactly (not an older or newer one), from https://d2rloader.net/download.html.
-  The file is `{loader_url}`; its SHA-256 is `{loader_sha}`.
+  The file is `{loader_url}`; its SHA-256 is `{loader_sha}`. With another D2RLoader version the mod's engine part switches
+  itself off and shows a red line at the top of the screen: "D2R-XL 2012 {plugin}: this D2RLoader version is not supported
+  by the mod yet. The mod's engine changes are off."
 - About {unpacked_mb} MB of free space in the D2R folder.
 - 7-Zip (https://www.7-zip.org) if your Windows does not open .7z files (Windows 11 does).
 

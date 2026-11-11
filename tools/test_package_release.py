@@ -47,6 +47,98 @@ class PackageReleaseTests(unittest.TestCase):
         pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data)
         return self.mod
 
+    def test_invtabs_cli_conflict_is_early(self):
+        r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--charm-inventory", "charminv", "--invtabs", "missing.dll"],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("invtabs and CharmInv cannot be staged together", r.stderr)
+
+    def test_invtabs_opt_in_paths_and_conflict(self):
+        mod = self.staged()
+        self.assertFalse((mod / pr.INVTABS["dll"]).exists())
+        dll = self.tmp / "invtabs.dll"
+        dll.write_bytes(b"MZ invtabs\0")
+        pr.stage_invtabs(mod, dll)
+        self.assertEqual((mod / pr.INVTABS["dll"]).read_bytes(), dll.read_bytes())
+        self.assertEqual((mod / pr.INVTABS["config"]).read_bytes(), (pr.ROOT / "invtabs/invtabs.toml").read_bytes())
+        self.assertIn(pr.INVTABS["config"], pr.preserve_list(mod))
+        with self.assertRaisesRegex(SystemExit, "invtabs and CharmInv cannot be staged together"):
+            pr.stage_charminv(mod, self.tmp)
+        with self.assertRaisesRegex(SystemExit, "invtabs and CharmInv cannot be staged together"):
+            pr.stage(mod, "1", self.dll, self.tmp, no_data=True, invtabs=dll, charminv=self.tmp)
+        self.assertTrue((mod / pr.INVTABS["dll"]).exists())  # rejected before clearing stage
+        (mod / pr.INVTABS["dll"]).unlink()
+        (mod / pr.CHARMINV["dll"]).write_bytes(b"MZ")
+        with self.assertRaisesRegex(SystemExit, "invtabs and CharmInv cannot be staged together"):
+            pr.stage_invtabs(mod, dll)
+
+    def test_charm_inventory_switch_off_leaves_the_package_as_it_was(self):
+        self.assertEqual(pr.CHARM_INVENTORY, "invtabs")  # the default since the release after 0.1.19; CharmInv by request
+        mod = self.staged()
+        self.assertFalse(any((mod / pr.INVTABS[k]).exists() for k in ("dll", "config")))
+        self.assertFalse(any((mod / f"{pr.NAME}.mpq" / "data" / rel).exists() for rel in pr.INVTABS_DATA))
+        self.assertNotIn(pr.INVTABS["config"], pr.preserve_list(mod))
+
+    def test_charm_inventory_switch_on_ships_invtabs_and_no_charminv(self):
+        dll = self.tmp / "invtabs.dll"
+        dll.write_bytes(b"MZ invtabs\0")
+        data = self.tmp / "data"
+        for rel in ("global/excel/armor.txt",) + pr.INVTABS_DATA:
+            (data / rel).parent.mkdir(parents=True, exist_ok=True)
+            (data / rel).write_bytes(b"x")
+        pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data, invtabs=dll)
+        for k in ("dll", "config"):
+            self.assertTrue((self.mod / pr.INVTABS[k]).is_file())
+        for rel in pr.INVTABS_DATA:
+            self.assertTrue((self.mod / f"{pr.NAME}.mpq" / "data" / rel).is_file(), rel)
+        self.assertFalse(any((self.mod / pr.CHARMINV[k]).exists() for k in pr.CHARMINV_FILES))
+        entry = pr.invtabs_entry()
+        self.assertIn("wild-healer", entry["author"])
+        self.assertEqual(entry["upstreamCommit"], "6722cc545f52a012460f5e9a825632a7f5e38eb5")
+        self.assertEqual(entry["files"], [pr.INVTABS["dll"], pr.INVTABS["config"]])
+        # the build's invtabs steps did not run: refused, naming the file
+        (data / pr.INVTABS_DATA[0]).unlink()
+        with self.assertRaisesRegex(SystemExit, "tabs.txt is missing"):
+            pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data, invtabs=dll)
+        # a --no-data package (CI) has no data to check
+        pr.stage(self.mod, "1.2.3", self.dll, self.tmp, no_data=True, invtabs=dll)
+        self.assertTrue((self.mod / pr.INVTABS["dll"]).is_file())
+
+    def test_data_built_for_the_other_charm_inventory_is_refused(self):
+        import charm_inventory as ci
+        import invtabs_legacy as il
+        layout = '{"type": "Panel", "children": [\n    {"type": "ButtonWidget", "name": "close"}\n]}\n'
+        dll = self.tmp / "invtabs.dll"
+        dll.write_bytes(b"MZ invtabs\0")
+        data = self.tmp / "data"
+        for rel in ("global/excel/armor.txt",) + ci.INVTABS_DATA + ci.CLASSIC_INVENTORY:
+            (data / rel).parent.mkdir(parents=True, exist_ok=True)
+            (data / rel).write_text(il.add_button_to_layout(layout) if rel in ci.CLASSIC_INVENTORY else "x", "utf-8")
+        pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data, invtabs=dll)  # an invtabs build: fine with invtabs
+        # ... and refused for a CharmInv package: invtabs' files and a Charms button that opens nothing
+        with self.assertRaisesRegex(SystemExit, "built for invtabs.*opens nothing with CharmInv"):
+            pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data)
+        # a CharmInv build (no button, CharmInv's tables) is refused for an invtabs package
+        for rel in ci.CLASSIC_INVENTORY:
+            (data / rel).write_text(layout, "utf-8")
+        with self.assertRaisesRegex(SystemExit, "has no Charms button"):
+            pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data, invtabs=dll)
+        for rel in ci.CLASSIC_INVENTORY:
+            (data / rel).write_text(il.add_button_to_layout(layout), "utf-8")
+        (data / ci.CHARMINV_DATA[0]).parent.mkdir(parents=True)
+        (data / ci.CHARMINV_DATA[0]).write_text("x", "utf-8")
+        with self.assertRaisesRegex(SystemExit, "is CharmInv's table"):
+            pr.stage(self.mod, "1.2.3", self.dll, self.tmp, data_from=data, invtabs=dll)
+
+    def test_charm_inventory_cli(self):
+        r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--charm-inventory", "invtabs", "--charminv", "x"],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("invtabs and CharmInv cannot be staged together", r.stderr)
+        r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--charm-inventory", "other"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertEqual(pr.INVTABS_DLL, pr.ROOT / "build" / "invtabs" / "Release" / "invtabs.dll")
+
     def test_layout_matches_install_mod(self):
         mod = self.staged()
         self.assertEqual(json.loads((mod / "mxl2012.mpq" / "modinfo.json").read_text()), {"name": "mxl2012", "savepath": "mxl2012/"})
@@ -100,7 +192,7 @@ class PackageReleaseTests(unittest.TestCase):
         (src / "legacy169.toml").write_text("[legacy169]\nenabled = true\nreset_screen = true\n", encoding="utf-8")
         (src / "PINNED_COMMIT").write_text((commit or pr.legacy169_commit()) + "\n", encoding="ascii")
         dll = self.tmp / "legacy169.dll"
-        dll.write_bytes(b"MZ...legacy169\0...0.1.1\0...")
+        dll.write_bytes(b"MZ...legacy169\0...0.1.2\0...")
         return src, dll
 
     def test_legacy169_is_pinned(self):
@@ -406,7 +498,7 @@ class PackageReleaseTests(unittest.TestCase):
     def test_legacy169_test_builds_are_refused(self):
         _src, dll = self.legacy169_src()
         self.assertEqual(pr.check_legacy169(dll), [])
-        for body, words in ((b"MZ legacy169\0 0.1.1-test\0", "test build"), (b"MZ legacy169-testharness.txt 0.1.1\0", "test build"),
+        for body, words in ((b"MZ legacy169\0 0.1.2-test\0", "test build"), (b"MZ legacy169-testharness.txt 0.1.2\0", "test build"),
                             (b"MZ legacy169\0 0.0.9\0", "version")):
             dll.write_bytes(body)
             problems = pr.check_legacy169(dll)
@@ -523,8 +615,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("PluginVersion", r.stdout)
         r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll),
-                            "--data-from", str(data), "--out", str(out), "--no-bundled"], capture_output=True,
-                           text=True, env=self.baseline_env())
+                            "--data-from", str(data), "--out", str(out), "--no-bundled", "--charm-inventory", "charminv"],
+                           capture_output=True, text=True, env=self.baseline_env())  # this small data tree has nothing of invtabs
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         seven = out / f"D2R-XL-2012-{v}.7z"
         self.assertEqual(sorted(p.name for p in out.iterdir()),
@@ -553,6 +645,8 @@ class PackageReleaseTests(unittest.TestCase):
         man = json.loads((out / "release-manifest.json").read_text())
         self.assertFalse(man["complete"])
         self.assertEqual(man["archive"]["name"], "D2R-XL-2012-1.2.3-nodata.7z")
+        # code only: the charm inventory plugin (invtabs by default) is not taken from this machine's build folder
+        self.assertFalse([f["path"] for f in man["files"] if "invtabs" in f["path"] or "charm-inv" in f["path"]])
 
     @unittest.skipUnless(SEVEN, "no 7-Zip on this machine")
     def test_notes_template_and_missing_baseline(self):
@@ -562,7 +656,7 @@ class PackageReleaseTests(unittest.TestCase):
         clear_fonts(data)
         out = self.tmp / "dist"
         args = [sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll), "--data-from", str(data),
-                "--out", str(out), "--no-bundled"]
+                "--out", str(out), "--no-bundled", "--charm-inventory", "charminv"]  # this small data tree has nothing of invtabs
         env = {**os.environ, "MXL_D2R_EXTRACT": str(self.tmp / "nothing-here")}
         r = subprocess.run(args, capture_output=True, text=True, env=env)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
@@ -575,7 +669,11 @@ class PackageReleaseTests(unittest.TestCase):
         notes = (out / f"RELEASE_NOTES-{v}.md").read_text("utf-8")
         self.assertIn(f"# D2R-XL 2012 {v} (alpha)", notes)
         self.assertIn(f"`D2R-XL-2012-{v}.7z`", notes)
-        self.assertIn("build 93847", notes)
+        self.assertNotIn("93847", notes)  # no game build or version is required (docs/plugin-plan.md 1.1)
+        self.assertNotIn("needs D2R build", notes)
+        self.assertIn("tested on D2R 3.3 and 3.4", notes)
+        self.assertIn("Don't remind me again for D2R 3.4", notes)
+        self.assertIn("this D2RLoader version is not supported", notes)
         self.assertIn("D2RLoader 1.3.1-beta", notes)
         self.assertIn("mods\\mxl2012/", notes)
         self.assertNotIn("{", notes)

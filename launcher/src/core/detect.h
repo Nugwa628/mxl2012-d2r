@@ -1,4 +1,4 @@
-// Finding D2R and checking its build: the parsers (testable without Windows). The registry / file system side is in
+// Finding D2R and reading its version: the parsers (testable without Windows). The registry / file system side is in
 // src/win/game.cpp.
 #pragma once
 
@@ -7,12 +7,10 @@
 
 namespace mxl {
 
-// The game version D2R-XL 2012 needs: major.minor of D2R's version ("3.3" of "3.3.93847"). Never the build number: builds of
-// one game version differ by platform (Steam 3.3.94995, Battle.net 3.3.93847) and hotfix, and D2RLoader supports the
-// game version (D2RLoader's author, 2026-10-27). The plugin itself still checks the game image at run time and stays off
-// on one it was not made for (plugin/src/build_guard_logic.h).
-constexpr const char* RequiredGameVersion = "3.3";
-constexpr int RequiredBuild = 93847;  // the build the plugin's addresses were taken from (docs/d2r-baseline.md); info only
+// The downloader never refuses to install or to start the game because of D2R's version or build number: the plugins are
+// not tied to a game build or version (docs/plugin-plan.md 1.2). Each part of a plugin checks the running code itself and
+// turns itself off when it is not what it expects (plugin/src/image_guard_logic.h). The version found is shown as
+// information only.
 
 // "major.minor" of a version string: "3.3.93847" -> "3.3", "3.3.0" -> "3.3", "1.0.0.93847" -> "1.0"; "" when none.
 std::string GameVersion(const std::string& version);
@@ -33,16 +31,15 @@ std::string AcfValue(const std::string& acf, const std::string& key);
 // True when an appmanifest names D2R (its name or install folder).
 bool AcfIsD2R(const std::string& acf);
 
-enum class BuildVerdict { Ok, Older, Newer, Unknown };
-struct BuildCheck {
-	BuildVerdict verdict = BuildVerdict::Unknown;
+// What was read about the D2R version: information for the status line, never a reason to block.
+struct GameInfo {
+	bool known = false;   // a version could be read
 	int build = 0;
-	std::string version;  // the game version found ("3.3"), "" when unknown
-	std::string message;  // one line for the status bar
+	std::string version;  // the game version found ("3.3", "3.4"), "" when unknown
+	std::string message;  // one neutral line for the status bar
 };
-// `infoVersion` from .build.info, `exeVersion` the file version of D2R.exe ("" when unreadable). The game version
-// (major.minor) of .build.info (else of D2R.exe) must equal `required` ("3.3"); the build number is only shown.
-BuildCheck CheckBuild(const std::string& infoVersion, const std::string& exeVersion,
-                      const std::string& required = RequiredGameVersion);
+// `infoVersion` from .build.info, `exeVersion` the file version of D2R.exe ("" when unreadable). .build.info is
+// preferred, D2R.exe is the fallback.
+GameInfo DescribeGame(const std::string& infoVersion, const std::string& exeVersion);
 
 }  // namespace mxl

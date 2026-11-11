@@ -30,7 +30,7 @@
 // result), so a check can tell whether a silent sound stopped before the load or asked for a path the mod does not have.
 #include "sound_guard.h"
 
-#include "build_guard.h"
+#include "image_guard.h"
 #include "sound_guard_logic.h"
 
 #include <windows.h>

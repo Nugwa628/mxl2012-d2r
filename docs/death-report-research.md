@@ -89,7 +89,7 @@ caller passed an already reduced block. `+0x134` is the total actually taken in 
 | `server_frame.cpp` (`0x406550`, 4 callback slots, 2 used: harness, spiritwarp) | the per-frame life sample for DoT (section 3.2) takes the third slot |
 | `dodge_list.cpp` | a byte patch inside `0x44ad9a` (SUnitDmg), no hook on `0x44ce80`; no conflict |
 | `harness_cmds.cpp` | `kill` calls `0x44db20`; has `RvaGetStat` / `RvaMonStats` / mode helpers to reuse; `watch srvhit` already counts missile server hits |
-| `build_guard.cpp` | already draws text over the game with the Overlay service (`AfterGameUi`), the model for an in-game panel |
+| `image_guard.cpp` | already draws text over the game with the Overlay service (`AfterGameUi`), the model for an in-game panel |
 | lane leech (#540) | reads the same function (`0x450c90` is called from `0x44d038`); coordinate if both add hooks on `0x44ce80` |
 | scaffold `death_event.cpp` / `combat.cpp` (mxl2012-runs/scaffold-src, not in this plugin) | hooked `0x44db20`, `0x4523e0`, `0x450670`, `0x44ef70` in game with the same entry-byte checks; proves the hooks install |
 

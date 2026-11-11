@@ -12,8 +12,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   shrine_lines.py apply  one extra blue tooltip line per crafting shrine: the stats of its Cube recipes (docs/bugs.md #563)
   chronicle.py       D2R's Chronicle over Median's uniques / sets / runewords: item type UI categories, disableChronicle
                      (docs/d2r-additions.md)
-  charm_inv.py apply  CharmInv's tables (bundled D2RLoader plugin): its 10 x 4 grid and Median's charm item types
-                     -> data/global/excel/d2rloader/charm-inv/ (docs/bundled-plugins.md "CharmInv")
+  charm_inv.py apply  (charm inventory `charminv`) CharmInv's tables (bundled D2RLoader plugin): its 10 x 4 grid and Median's
+                     charm item types -> data/global/excel/d2rloader/charm-inv/ (docs/bundled-plugins.md "CharmInv")
   warlock_scale.py apply  the Warlock's skills on Median's rules and power (data/warlock_rules.tsv, data/warlock_balance.tsv,
                      docs/warlock-balance.md)
   string_gaps.py     keys no .tbl defines: names and description lines have text in words, blank names get a key (docs/text-audit.md)
@@ -54,6 +54,10 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   walls_hd.py build work/mod/data  wall scenes of D2R's own wall models for Median's 17 own maps (docs/maps-hd.md
                      "Walls"; D2R's scenes come from the shared cache, MXL_SLOT=2..5 fills it once)
   legacy_art.py      Median's classic (legacy-mode, Alt+G) art files -> work/mod/data/global (docs/legacy-graphics.md)
+  invtabs_tables.py build, invtabs_hdart.py build, invtabs_art.py build, invtabs_legacy.py button
+                     (charm inventory `invtabs`, after legacy_art.py: the classic panel reuses its tiles) the Inventory Tabs
+                     plugin's data: tab type tables, the HD grid cells, the classic panel / tab / button art, and the Charms
+                     button in the two classic inventory layouts (docs/invtabs.md "Build wiring")
   ds1_paths.py build  Median's edits of D2R's own maps (.ds1 at a path D2R's CASC has, which D2R would read instead)
                      moved to data/global/tiles/mxl2012/..., their lvlprest cells and HD scenes along (bug #525)
   sounds_port.py     Median's own sounds (the sounds.txt rows on Median-only audio, taunt/*.wav) -> .flac in
@@ -102,7 +106,14 @@ the D2R baseline: MXL_D2R_EXTRACT (> extract/d2r/93847 > the machine's extract_d
 is 1. A failing data step always stops the build (the art steps need its tables).
 Each step's whole output is in work/build-logs/<n>-<step>.log.
 
-Usage: python tools/build.py [--fetch-assets] [--data-only] [--keep-going]   (exit code = validate.py's: 1 if there are errors)
+The charm inventory (tools/charm_inventory.py: `charminv` = Dimentio's CharmInv, `invtabs` = our Inventory Tabs plugin) decides
+a few steps, because only one plugin can own the custom player page: `charminv` runs charm_inv.py and none of the invtabs steps
+(so the classic inventory has no Charms button, which would open nothing); `invtabs` runs the invtabs steps and not
+charm_inv.py. Default: charm_inventory.CHARM_INVENTORY; --charm-inventory NAME (or MXL2012_CHARM_INVENTORY) for one build.
+package_release.py refuses data built for the other one.
+
+Usage: python tools/build.py [--fetch-assets] [--data-only] [--keep-going] [--charm-inventory charminv|invtabs]
+       (exit code = validate.py's: 1 if there are errors)
 """
 import os
 import shutil
@@ -115,6 +126,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import fxpaths  # noqa: E402
 import localconfig  # noqa: E402  (.mxl-local.json defaults: written by tools/lane_setup.py; every step inherits them)
+import charm_inventory  # noqa: E402  (the one switch between CharmInv and invtabs)
 SRC = Path(os.environ.get("MXL2012_SRC") or fxpaths.MXL_EXCEL)
 D2R_EXTRACT = Path(os.environ.get("MXL_D2R_EXTRACT") or fxpaths.D2R)
 MOD = ROOT / "work" / "mod"
@@ -128,7 +140,7 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["shrine_lines.py", "apply", str(MOD / "data"), "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
               ["chronicle.py", "--mod", str(ROOT / "work" / "mod"), "--d2r", str(D2R_EXTRACT)],
               ["warlock_scale.py", "apply", "--mod", str(ROOT / "work" / "mod")],
-              ["charm_inv.py", "apply", "--mod", str(MOD)],  # CharmInv's tables: Median's charm types
+              ["charm_inv.py", "apply", "--mod", str(MOD)],  # CharmInv's tables: Median's charm types (CHARMINV_STEP below)
               ["stash_retire_data.py"],  # bounded reader widths for the old stash-page cleanup
               ["string_gaps.py", "apply", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"),
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
@@ -164,7 +176,32 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              # after median_tabs: the gamepad UI's inventory and stash from the finished PC layouts (bugs #556, #557)
              ["pad_ui.py", "build", str(MOD / "data")],
              ["legacy_fonts.py", "--mod", str(MOD)]]  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
-STEPS = [*DATA_STEPS, *ART_STEPS, *STRING_MERGE, ["devmenu_catalog.py"], ["validate.py"]]
+# The steps that depend on the charm inventory (tools/charm_inventory.py). DATA_STEPS / ART_STEPS above are the `charminv` build.
+CHARMINV_STEP = ["charm_inv.py", "apply", "--mod", str(MOD)]
+INVTABS_STEPS = [["invtabs_tables.py", "build", "--out", str(MOD)],  # tabs.txt, types_<tab>.txt from invtabs/invtabs.toml
+                 ["invtabs_hdart.py", "build", "--out", str(MOD / "data")],  # the HD grid cells, from D2R's stash panel
+                 ["invtabs_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # classic panel, tab, button
+                 # the classic inventory's Charms button into the two layouts hd_ui.py wrote (checked: once each, never in HD)
+                 ["invtabs_legacy.py", "button", "--out", str(MOD / "data")]]
+INVTABS_AFTER = "legacy_art.py"  # the classic panel art reuses Median's classic tiles, which that step writes and checks
+
+
+def steps_for(charm_inv: str, data_only: bool = False) -> list:
+    """The build's steps for a charm inventory: `charminv` is the lists above as they are; `invtabs` leaves out CharmInv's
+    tables and adds the invtabs steps after legacy_art.py."""
+    data, art = list(DATA_STEPS), list(ART_STEPS)
+    if charm_inv == "invtabs":
+        data.remove(CHARMINV_STEP)
+        at = next(i for i, s in enumerate(art) if s[0] == INVTABS_AFTER) + 1
+        art[at:at] = INVTABS_STEPS
+    elif charm_inv != "charminv":
+        raise SystemExit(f"charm inventory {charm_inv!r}: one of {', '.join(charm_inventory.CHARM_INVENTORIES)}")
+    if data_only:
+        return [*data, STRING_MERGE[0], ["devmenu_catalog.py"], ["validate.py"]]
+    return [*data, *art, *STRING_MERGE, ["devmenu_catalog.py"], ["validate.py"]]
+
+
+STEPS = steps_for("charminv")
 LOGS = ROOT / "work" / "build-logs"
 
 
@@ -224,9 +261,23 @@ def preflight() -> None:
         raise SystemExit(f"build: Median XL 2012's extracted tables are not at {SRC} (MXL2012_SRC); {localconfig.SETUP_HINT}")
 
 
+def charm_inventory_arg(argv: list) -> str:
+    """--charm-inventory NAME / --charm-inventory=NAME from the command line, else the environment, else the default."""
+    value = None
+    for i, a in enumerate(argv):
+        if a == "--charm-inventory":
+            if i + 1 >= len(argv):
+                raise SystemExit("--charm-inventory needs a name: " + ", ".join(charm_inventory.CHARM_INVENTORIES))
+            value = argv[i + 1]
+        elif a.startswith("--charm-inventory="):
+            value = a.split("=", 1)[1]
+    return charm_inventory.chosen(value)
+
+
 def main() -> int:
     sys.stdout.reconfigure(errors="replace")  # a console code page (cp932, cp1252) without some of the steps' characters
     data_only = "--data-only" in sys.argv[1:]
+    charm_inv = charm_inventory_arg(sys.argv[1:])  # before anything is deleted
     preflight()
     keep_going = "--keep-going" in sys.argv[1:]
     rc = 0 if data_only else ensure_assets("--fetch-assets" in sys.argv[1:])
@@ -236,7 +287,8 @@ def main() -> int:
         shutil.rmtree(d, ignore_errors=True)
     rc = 0
     failed = []
-    steps = [*DATA_STEPS, STRING_MERGE[0], ["devmenu_catalog.py"], ["validate.py"]] if data_only else STEPS
+    steps = steps_for(charm_inv, data_only)
+    print(f"== charm inventory: {charm_inv}", flush=True)
     for n, step in enumerate(steps, 1):
         rc = run(step, n)
         if rc and step[0] != "validate.py":

@@ -476,13 +476,6 @@ void RunAction(int id) {
 		if (MessageBoxW(g.wnd, q.c_str(), L"Uninstall D2R-XL 2012", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
 			return;
 	}
-	if (id == IdInstall && g.view.build.verdict != BuildVerdict::Ok) {  // allowed, after a clear warning
-		std::wstring q = L"Your D2R is " + (g.view.build.version.empty() ? std::wstring(L"of an unknown version") : L"version " + Wide(g.view.build.version)) +
-		                 L", but D2R-XL 2012 works only on D2R " + Wide(g.view.requiredVersion) +
-		                 L". It will not start until D2R is at that version.\n\nInstall D2R-XL 2012 anyway?";
-		if (MessageBoxW(g.wnd, q.c_str(), L"D2R-XL 2012 Downloader", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
-			return;
-	}
 	if (id == IdDefaultMod) {
 		std::wstring q = Wide(g.launcher->EnvironmentWarnings(g.view).front()) + L"\n\nMake D2R-XL 2012 the default mod? The downloader sets only "
 		                 L"default_mod = \"mxl2012\" in " + g.view.loaderConfig + L"; nothing else in it changes. You can pick another mod "

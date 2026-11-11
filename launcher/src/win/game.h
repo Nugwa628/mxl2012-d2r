@@ -14,12 +14,12 @@ struct D2RInstall {
 	std::wstring dir;
 	std::string source;  // "Battle.net", "Steam", "default folder", "chosen"
 	std::string infoVersion, exeVersion;
-	BuildCheck build;
+	GameInfo game;  // the version found: shown, never compared
 };
 
 bool LooksLikeD2R(const std::wstring& dir);
 D2RInstall InspectD2R(const std::wstring& dir, const std::string& source);
-// Every install found (duplicates removed), best first: a build-93847 Battle.net install, then other matches.
+// Every install found (duplicates removed), best first: those whose D2R version could be read, in the order found.
 std::vector<D2RInstall> FindD2RInstalls();
 
 std::string ExeFileVersion(const std::wstring& exe);

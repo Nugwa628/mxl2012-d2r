@@ -39,6 +39,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game_slots  # noqa: E402
+import loader_notice  # noqa: E402
 import slot_share  # noqa: E402
 import winapi  # noqa: E402
 
@@ -375,7 +376,7 @@ KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE = 1, 2, 8
 SC = {"esc": (0x01, 0), "enter": (0x1C, 0), "tab": (0x0F, 0), "space": (0x39, 0), "backspace": (0x0E, 0),
       "ctrl": (0x1D, 0), "shift": (0x2A, 0), "alt": (0x38, 0), "`": (0x29, 0), "-": (0x0C, 0), "=": (0x0D, 0),
       "up": (0x48, 1), "down": (0x50, 1), "left": (0x4B, 1), "right": (0x4D, 1),
-      ".": (0x34, 0), ",": (0x33, 0), "/": (0x35, 0), ";": (0x27, 0), "'": (0x28, 0)}
+      ".": (0x34, 0), ",": (0x33, 0), "/": (0x35, 0), ";": (0x27, 0), "'": (0x28, 0), "pgup": (0x49, 1), "pgdn": (0x51, 1)}
 for i, c in enumerate("qwertyuiop"):
     SC[c] = (0x10 + i, 0)
 for i, c in enumerate("asdfghjkl"):
@@ -402,7 +403,7 @@ WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP = 0x200
 # name -> virtual key (background mode)
 VK = {"esc": 0x1B, "enter": 0x0D, "tab": 0x09, "space": 0x20, "backspace": 0x08, "ctrl": 0x11, "shift": 0x10,
       "alt": 0x12, "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28, "`": 0xC0, "-": 0xBD, "=": 0xBB,
-      ".": 0xBE, ",": 0xBC, "/": 0xBF, ";": 0xBA, "'": 0xDE}
+      ".": 0xBE, ",": 0xBC, "/": 0xBF, ";": 0xBA, "'": 0xDE, "pgup": 0x21, "pgdn": 0x22}
 for _i in range(1, 13):
     VK[f"f{_i}"] = 0x6F + _i
 for _c in "abcdefghijklmnopqrstuvwxyz0123456789":
@@ -564,6 +565,23 @@ def click_bg(fx, fy, button="left", move_only=False, mods=()):
     log(f"click(bg) {fx:.3f},{fy:.3f} -> client {x},{y} {button}")
 
 
+def wheel_bg(fx, fy, notches=-1):
+    """Mouse wheel over a point without the real mouse: the virtual cursor moves there (click_bg's hover), then
+    WM_MOUSEWHEEL with `notches` x 120 (negative = towards the user, i.e. scroll down) and the point in screen
+    coordinates, as Windows sends it."""
+    click_bg(fx, fy, move_only=True)
+    h = need_window()
+    cr = wt.RECT()
+    user32.GetClientRect(h, ctypes.byref(cr))
+    pt = wt.POINT(int(fx * cr.right), int(fy * cr.bottom))
+    user32.ClientToScreen(h, ctypes.byref(pt))
+    step = 1 if notches > 0 else -1
+    for _ in range(abs(notches)):
+        user32.PostMessageW(h, 0x020A, ((120 * step) & 0xFFFF) << 16, ((pt.y & 0xFFFF) << 16) | (pt.x & 0xFFFF))
+        time.sleep(0.15)
+    log(f"wheel(bg) {fx:.3f},{fy:.3f} {notches}")
+
+
 def click(fx, fy, button="left", move_only=False, mods=()):
     if BG:
         return click_bg(fx, fy, button, move_only, mods)
@@ -658,13 +676,21 @@ def logscan(update=True):
 # ---------------------------------------------------------------- start / stop / console
 
 
-def _keep_out_of_front(prev_fg, wait=60):
+def _keep_out_of_front(prev_fg, wait=60, notice=None):
     """D2R activates its window as soon as it is created, whatever the launch flags. Right after it appears,
     send it to the bottom of the z-order (no activation) and hand the foreground back to the window that had it
     before the launch. The hand-back is the old behaviour and only runs with MXL_INPUT=sendinput (not BG): the default
-    background path never calls SetForegroundWindow, it only sends the window to the bottom without activating it."""
+    background path never calls SetForegroundWindow, it only sends the window to the bottom without activating it.
+    `notice`: a loader_notice.Watch; D2RLoader's notice for a D2R version it has not tested comes before the game
+    window and is answered here, in the background."""
     t0 = time.time()
+    polled = 0.0
     while time.time() - t0 < wait:
+        if notice is not None and time.time() - polled >= 0.5:
+            polled = time.time()
+            said = notice.poll(game_pids())
+            if said:
+                log(said)
         h = find_window()
         if h:
             user32.SetWindowPos(h, 1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010)  # HWND_BOTTOM, NOSIZE|NOMOVE|NOACTIVATE
@@ -707,6 +733,7 @@ def start(timeout=120):
         snapshot_marks()
         off = _size(LOADER_LOG)
         since = time.strftime("%Y-%m-%d %H:%M:%S")
+        launched = time.time()
         prev_fg = None if BG else user32.GetForegroundWindow()  # only the sendinput path hands focus back
         harness_switch(BG)  # background mode needs the plugin test harness; foreground runs keep it off
         si = subprocess.STARTUPINFO()
@@ -724,7 +751,7 @@ def start(timeout=120):
             game_slots.mark_launch(SLOT, LOCK_OWNER, proc.pid)
         log("launched D2RLoader " + " ".join(args))
         if BG:
-            _keep_out_of_front(prev_fg)
+            _keep_out_of_front(prev_fg, notice=loader_notice.Watch(LOADER_LOG, started=launched))
         if not wait_log("D2R startup complete.", timeout, off, since):
             log("TIMEOUT waiting for startup line")
             return False

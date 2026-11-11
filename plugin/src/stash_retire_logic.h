@@ -214,8 +214,20 @@ inline bool HasField(const Bytes &b, const std::string &s) {
   return std::search(b.begin() + 0x154, b.end(), pattern.begin(),
                      pattern.end()) != b.end();
 }
+// Plugins that own D2RLoader's one custom player page (native page 6):
+// Dimentio's CharmInv 1.0.1 and invtabs (docs/invtabs.md), which replaces it
+// and adopts CharmInv's page-6 items. A sidecar recording one of them belongs
+// to a character whose page 6 is that plugin's, not the retired stash page 2.
+inline constexpr const char *PageOwners[] = {"d2rl-charm-inv.dll",
+                                             "invtabs.dll"};
+inline bool PageOwnerRecorded(const Bytes &side) {
+  for (const char *file : PageOwners)
+    if (HasField(side, file))
+      return true;
+  return false;
+}
 // The first cleanup release is also a persistent origin marker in D2RLoader's
-// existing per-plugin version field. A refused load without CharmInv can
+// existing per-plugin version field. A refused load without its page owner can
 // rewrite the provider list, but this core version remains. Never reclaim its
 // page again.
 inline bool RetiredCore(const Bytes &side) {
@@ -257,9 +269,9 @@ inline Plan MakePlan(const Bytes &save, const Bytes &side,
       U(side, 0x38) != save.size() || Digest(side, 0x3c) != Hash(save))
     throw std::runtime_error("invalid or mismatched sidecar");
   Plan p{save, side};
-  // Conservative: a recorded CharmInv DLL always wins, regardless of page
-  // contents or coordinates.
-  if (!inspect && (HasField(side, "d2rl-charm-inv.dll") || RetiredCore(side))) {
+  // Conservative: a recorded page-6 owner DLL (CharmInv or invtabs) always
+  // wins, regardless of page contents or coordinates.
+  if (!inspect && (PageOwnerRecorded(side) || RetiredCore(side))) {
     p.charmOrigin = true;
     return p;
   }
@@ -324,7 +336,7 @@ inline Plan MakePlan(const Bytes &save, const Bytes &side,
   SetDigest(p.sidecar, 12, Hash(p.sidecar, 0x2c));
   return p;
 }
-// A stale journal must never roll back a newer, valid CharmInv save. Recover
+// A stale journal must never roll back a newer, valid page-owner save. Recover
 // only the two possible half-written pairs from this exact conversion.
 inline bool NeedsRollback(const Bytes &original, const Bytes &originalSide,
                           const Bytes &current, const Bytes &currentSide) {

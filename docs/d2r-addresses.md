@@ -1129,6 +1129,42 @@ the equipped-item sequence above (NOEQUIP + `0x475020`) nor `0x2f81a0(player, it
 then merges the active one. The client refresh `0x1c9610` gets the same step (its own stat copy), and the compare slot
 `0x3e2abb0` answers "not the same" for any carry1 record (also for the cube executor's test).
 
+**The charm area with invtabs (lane invtabs-corefix, 2026-11-11).** invtabs (docs/invtabs.md) owns the custom page at 16 x 16 and
+shows only a rectangle of it as the charm tab; other tabs on the page will hold other item kinds. charmdup looks up
+`InvTabsCharmTab(int* x, int* y, int* w, int* h)` with `GetProcAddress(GetModuleHandleW(L"invtabs.dll"), ...)` the first time
+the game asks (every plugin is loaded by then) and keeps the pointer; it calls it for the rectangle at each check. Without the
+export (CharmInv), or when it answers 0 or a rectangle off the 16 x 16 page, the whole page is charm inventory as before.
+`charm_dup_logic.h` `PlaceOf`: the backpack and page-6 items whose top-left cell is in the rectangle are copies of the rule
+(the charm area before the backpack, then top row, left column); a carry1 unique on page 6 **outside** the rectangle is never
+the active copy and `0x36bc50` answers "not met" for it (D2RLoader's page charm policy would otherwise count it: a copy in
+another tab would give a second bonus). The `mxl2012` line ends `charm inventory: invtabs charm tab 10x6 at 0,0` (or
+`the whole custom page (no invtabs)`), and its counters add `(refused N)`: carry tests refused by the base half.
+
+**Why the charm page refuses a second copy (target H; D2RLoader 1.3.1-beta `D2RCore.dll`, image base `0xc0de5000000`, md5
+`fb865ba3054039c9392874e4c40a3136`, the same file in slot 1 and the loader zip).** The refusal is D2RLoader's own, not the game's,
+not charmdup's and not the page owner's (CharmInv or invtabs). D2RCore RVAs:
+
+| What | D2RCore RVA | Notes |
+|-|-|-|
+| Custom-page carry1 duplicate test `(inventory, item, page 6, pageFilter)` | `0x317b70` | for a unique (quality 7) whose UniqueItems record (`table +0x13c8`, `0x15c` bytes each) has `+0x30 > 0`, walks every item of the owner's inventory list (item data `+0xa0` owner, `+0xb0` next); for each item on a page `pageFilter(page byte +0x55)` accepts, `0x317de0` reads its carry1 number; equal numbers return 1 (duplicate). Reads the records directly: the game's compare slot `0x3e2abb0` (which charmdup replaces) is never used |
+| Its two callers | `0x31acdf`, `0x31c05a` | the custom-page placement paths (cursor to page and the other transfer); both pass `r8b = 6` and `pageFilter = 0x41edc0`; result 1 sets `r13d` / `esi` = 11, `Inventory::Result::PolicyRejected`, before the game's placement `0x471500` runs |
+| Page filter | `0x41edc0(page)` | the pages whose charms count under the page's charm policy (`StockInventoryAndPlayerPage`: the backpack and page 6); also called by D2RCore's `UniqueItemsShareCarryOneGroup` (`0x816810`, the target of slot `0x3e2abb0`) |
+| Client put | `PutItemInInventoryGridWidget` `0x815210` -> `0x45c9f0` -> `0x41f810` | on result 11 the client calls its refusal (`r8w = 0x13`) and the item stays on the cursor |
+
+In the game (check `invtabscore`, run `checks-20261111-153157-s1`): charmdup's carry test counter does not move on the refused
+drop (430 -> 430, refused 0), while the accepted Jolly Roger drop runs 28 carry tests (the game's layout); a second Butcher's Tooth
+is refused both next to the first in the tab and into the empty tab while the first lies in the backpack; invtabs logs no
+refusal. So the 0.1.19 known issue "the charm page takes one copy of each unique" is this D2RCore test.
+
+What it should be, by charmdup's rule: every copy may be carried in the backpack and in the charm area; one copy, the active
+one (charm area first, then the top row, then the left column), gives its bonus, the others count as "requirements not met".
+The charm tab should take the second copy, and charmdup already handles two copies in the tab (the top-left one is active).
+The fix belongs in D2RLoader, not in mxl2012-core: patching a private, unexported D2RCore function from another plugin is
+bound to one D2RCore build and outside what D2RLoader lets a plugin patch (its patch API targets the game). Request for
+D2RLoader (Dimentio): let the page owner switch the custom-page carry1 test off (a `PlayerPageItemPolicy` flag, or deciding it
+in the item policy callback with the duplicate as a field of `ItemPolicyRequest`), or route it through the game's compare
+(slot `0x3e2abb0` / `UniqueItemsShareCarryOneGroup`), which plugins can already replace.
+
 ## 23. Model and texture index: why new asset paths were invisible (lane new-asset-paths, 2026-10-23; tools/model_lod_desc.py)
 
 Read from the memory dump (`tools/d2r_find.py`, RVA = file offset); format and the in-game proof in hd-models.md section 3c.

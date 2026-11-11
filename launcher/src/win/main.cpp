@@ -116,7 +116,7 @@ int RunCli(Cli& c) {
 		if (found.empty())
 			Log("no D2R install found");
 		for (const auto& d : found)
-			Log(Utf8(d.dir) + " | " + d.source + " | .build.info " + d.infoVersion + " | D2R.exe " + d.exeVersion + " | " + d.build.message);
+			Log(Utf8(d.dir) + " | " + d.source + " | .build.info " + d.infoVersion + " | D2R.exe " + d.exeVersion + " | " + d.game.message);
 		return found.empty() ? 1 : 0;
 	}
 	Launcher l(c.opt);

@@ -1,12 +1,14 @@
-// mxl2012-core: the D2RLoader plugin of D2R-XL 2012 (Median XL 2012 v005 on Diablo II: Resurrected 3.3).
+// mxl2012-core: the D2RLoader plugin of D2R-XL 2012 (Median XL 2012 v005 on Diablo II: Resurrected).
 //
-// It loads with the mxl2012 mod, logs the game build it runs on and adds the console command "mxl2012". Engine changes are
-// tied to one game image (RVAs from the dump of the D2R image D2RLoader runs), so the plugin records which image it expects
-// (the PE header timestamp; it changes with D2R patches and D2RLoader releases) and changes nothing on any other
-// (build_guard_logic.h). The player is told "needs Diablo II: Resurrected 3.3"; stamp and build name go to the log only.
+// It loads with the mxl2012 mod, logs the game it runs on and adds the console command "mxl2012". The plugin is never
+// tied to a game build or version: a part installs when the code it needs is what it expects. Hooks and patches carry their
+// expected bytes; the addresses that are only called or read (RVAs from the dump of the image D2RLoader runs) are behind one
+// check of the running image itself, its PE time stamp and a few code bytes (image_guard_logic.h). On another image the
+// plugin changes nothing and tells the player that this D2RLoader version is not supported yet; stamp, version and build
+// name go to the log only.
 //
 // v0.1 (docs/plugin-plan.md "mxl2012-core v0.1 = E + F + A + D (+ G in dev builds)"):
-//   E  build guard and its screen notice;
+//   E  image guard and its screen notice;
 //   F  plugin guard: with a conflicting plugin in the game nothing is installed (other_plugins_logic.h), plus the
 //      environment check (a second or old copy of mxl2012-core, D2RLoader's default_mod naming another mod);
 //   A  client do 113 = 1.13c's client do 22 for Rock Shock / ParasiteSkill (client_skills.cpp, off word cltdo22);
@@ -89,8 +91,8 @@
 
 #include "apple_use.h"
 #include "area_level.h"
-#include "build_guard.h"
-#include "build_guard_logic.h"
+#include "image_guard.h"
+#include "image_guard_logic.h"
 #include "client_skills.h"
 #include "charm_dup.h"
 #include "cube_dupe.h"
@@ -144,8 +146,8 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.19";
-constexpr uint32_t ExpectedImage = build_guard::ExpectedImage;  // TimeDateStamp of the dumped image (D2R 3.3.0 build 93847, D2RLoader 1.3.1)
+constexpr const char* PluginVersion = "0.1.20";
+constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
 #else
@@ -162,7 +164,7 @@ constexpr D2RL::PluginInfo Info {
 	.name        = "D2R-XL 2012 core",
 	.version     = PluginVersion,
 	.author      = "mxl2012-d2r",
-	.description = "Engine support for D2R-XL 2012, the Median XL 2012 port (Diablo II: Resurrected 3.3).",
+	.description = "Engine support for D2R-XL 2012, the Median XL 2012 port for Diablo II: Resurrected.",
 	.flags       = D2RL::PluginFlags::Shared | D2RL::PluginFlags::ModScopedOnly | D2RL::PluginFlags::NativeHooks,
 };
 
@@ -175,17 +177,38 @@ auto ImageStamp(const D2RL::PluginContext* context) noexcept -> uint32_t {
 	return nt->FileHeader.TimeDateStamp;
 }
 
-// D2RLoader's build name ("93847"), null when its context is too old to carry the field.
+// D2RLoader's build name ("93847" on D2R 3.3, "95032" on 3.4), null when its context is too old to carry the field.
+// For the log only: nothing is decided by it.
 auto BuildName(const D2RL::PluginContext* context) noexcept -> const char* {
 	return context->contextSize >= offsetof(D2RL::PluginContext, buildName) + sizeof(context->buildName) ? context->buildName : nullptr;
 }
 
-// Every hook and patch belongs to the dumped image (build_guard_logic.h); on any other build none goes in.
-auto BuildMatches(const D2RL::PluginContext* context) noexcept -> bool {
-	return context->exeBase != 0 && build_guard::Matches(ImageStamp(context), BuildName(context));
+// What runs: the image's stamp and bytes, and D2RLoader's words for the game (logged, never compared).
+auto RunningGame(const D2RL::PluginContext* context) noexcept -> image_guard::Running {
+	image_guard::Running game;
+	if (context->exeBase != 0) {
+		const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(context->exeBase);
+		const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(context->exeBase + dos->e_lfanew);
+		game.stamp = nt->FileHeader.TimeDateStamp;
+		game.image = reinterpret_cast<const uint8_t*>(context->exeBase);
+		game.imageSize = nt->OptionalHeader.SizeOfImage;
+	}
+	game.buildVersion = context->buildVersion;
+	game.buildName = BuildName(context);
+	return game;
 }
 
-char g_wrongBuild[256] = "";  // the message for a player on another build, empty on build 93847
+// The gate for the fixed addresses (image_guard_logic.h): the running image is the one they were taken from. Decided once,
+// at load, before any hook of this plugin is in the image.
+auto ImageSupported(const D2RL::PluginContext* context) noexcept -> bool {
+	static int decided = -1;
+	if (decided < 0) {
+		decided = image_guard::Supported(RunningGame(context)) ? 1 : 0;
+	}
+	return decided == 1;
+}
+
+char g_otherImage[256] = "";  // the message for a player on another game image, empty on the supported one
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
@@ -434,7 +457,7 @@ void CheckEnvironment(bool atLoad) noexcept {
 	char line[sizeof(g_envReport) + 32];
 	std::snprintf(line, sizeof(line), "mxl2012-core: environment %s", detail);
 	g_context->LogWarn(line);
-	if (g_wrongBuild[0] == '\0' && g_conflict[0] == '\0') {
+	if (g_otherImage[0] == '\0' && g_conflict[0] == '\0') {
 		char notice[256];
 		env_guard::Notice(notice, sizeof(notice), v, PluginVersion, mod);
 		if (!ShowNotice(g_context, notice)) {
@@ -468,7 +491,7 @@ char g_lvlUpUiReport[192] = "";
 char g_petSpreadReport[192] = "";
 char g_spiritWarpReport[192] = "";
 char g_appleUseReport[192] = "";
-char g_charmDupReport[192] = "";
+char g_charmDupReport[256] = "";
 char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
 char g_rotwStashReport[384] = "";
@@ -625,15 +648,17 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	}
 	char line[640];
 	{
-		// What the player reads names the game version only (docs/plugin-plan.md 1.2); stamp and build name go to the log.
+		// What the player reads: the game's version as D2RLoader names it (information) and whether the engine changes are
+		// on (docs/plugin-plan.md 1.2); stamp and build name go to the log.
 		char first[384 + sizeof(g_selfPath)];
-		std::snprintf(first, sizeof(first), "mxl2012-core %s (%s) | game: %s | mod %s | file %s", PluginVersion, BuildKind,
-		              BuildMatches(g_context) ? "Diablo II: Resurrected 3.3, engine changes on" : "a different version, engine changes off",
+		std::snprintf(first, sizeof(first), "mxl2012-core %s (%s) | game: Diablo II: Resurrected %.24s, engine changes %s | mod %s | file %s",
+		              PluginVersion, BuildKind, g_context->buildVersion && g_context->buildVersion[0] ? g_context->buildVersion : "?",
+		              ImageSupported(g_context) ? "on" : "off",
 		              g_context->activeMod ? g_context->activeMod : "?", g_selfPath[0] ? g_selfPath : "?");
 		Say(command, first);
 		std::snprintf(line, sizeof(line), "mxl2012-core: D2R %s | image 0x%08x (expects 0x%08x, %s) | buildName %s | exe base 0x%llx",
 		              g_context->buildVersion ? g_context->buildVersion : "?", ImageStamp(g_context), ExpectedImage,
-		              BuildMatches(g_context) ? "match" : "MISMATCH, hooks off", BuildName(g_context) ? BuildName(g_context) : "(none)",
+		              ImageSupported(g_context) ? "match" : "MISMATCH, hooks off", BuildName(g_context) ? BuildName(g_context) : "(none)",
 		              static_cast<unsigned long long>(g_context->exeBase));
 		g_context->LogInfo(line);
 		char env[sizeof(g_envReport) + 16];
@@ -653,8 +678,8 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		g_context->LogInfo(line);  // also in the log, for crash reports
 		Say(command, g_clashReport[0] != '\0' ? g_clashReport : "plugin clashes: not read yet (about 15 s after the start)");
 	}
-	if (g_wrongBuild[0] != '\0') {
-		Say(command, g_wrongBuild);
+	if (g_otherImage[0] != '\0') {
+		Say(command, g_otherImage);
 		return D2RL::ConsoleCommandResult::Handled;  // nothing below was installed
 	}
 	std::snprintf(line, sizeof(line), "pluginguard %s", Off("pluginguard") ? OffNote : (g_conflict[0] != '\0' ? g_conflict : "ok: no conflicting plugin in the game"));
@@ -756,9 +781,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	AppleUseCounts(&appleCasts, &appleRefused, &appleBooks);
 	std::snprintf(line, sizeof(line), "%s; casts %ld, refused %ld, Books of Skill left to D2R %ld", g_appleUseReport, appleCasts, appleRefused, appleBooks);
 	SayPart(command, "appleuse", line);
-	long dupCarry = 0, dupInactive = 0, dupDisabled = 0;
-	CharmDupCounts(&dupCarry, &dupInactive, &dupDisabled);
-	std::snprintf(line, sizeof(line), "%s; carry tests %ld, inactive copies answered %ld, taken out %ld", g_charmDupReport, dupCarry, dupInactive, dupDisabled);
+	long dupCarry = 0, dupInactive = 0, dupDisabled = 0, dupRefused = 0;
+	CharmDupCounts(&dupCarry, &dupInactive, &dupDisabled, &dupRefused);
+	char dupArea[96] = {};
+	CharmDupArea(dupArea, sizeof(dupArea));
+	std::snprintf(line, sizeof(line), "%s; carry tests %ld (refused %ld), inactive copies answered %ld, taken out %ld; charm inventory: %s",
+	              g_charmDupReport, dupCarry, dupRefused, dupInactive, dupDisabled, dupArea);
 	SayPart(command, "charmdup", line);
 	long voPrinted = 0, voDropped = 0;
 	VoChatCounts(&voPrinted, &voDropped);
@@ -855,22 +883,22 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		ModulePathUtf8(self, g_selfPath, sizeof(g_selfPath));
 	}
 	char line[256 + sizeof(g_selfPath)];
-	std::snprintf(line, sizeof(line), "mxl2012-core %s loaded (mod %s, D2R %s, image 0x%08x%s) from %s", PluginVersion,
+	std::snprintf(line, sizeof(line), "mxl2012-core %s loaded (mod %s, D2R %s, build name %.40s, image 0x%08x%s) from %s", PluginVersion,
 	              context->activeMod ? context->activeMod : "?", context->buildVersion ? context->buildVersion : "?",
-	              ImageStamp(context), BuildMatches(context) ? "" : "; not the expected image, engine hooks stay off",
-	              g_selfPath[0] ? g_selfPath : "?");
+	              BuildName(context) && BuildName(context)[0] ? BuildName(context) : "(none)", ImageStamp(context),
+	              ImageSupported(context) ? "" : "; not the image the addresses are for, engine hooks stay off", g_selfPath[0] ? g_selfPath : "?");
 	context->LogInfo(line);
-	if (BuildMatches(context))
+	if (ImageSupported(context))
 		RetireStashPage(context, g_selfPath);
-	if (!BuildMatches(context)) {
-		// Another game build: no hook, patch or harness at all (their addresses are build 93847's). Say why, and keep `mxl2012`.
-		build_guard::Message(g_wrongBuild, sizeof(g_wrongBuild), PluginVersion);
-		CheckEnvironment(true);  // logged and in `mxl2012`; the screen keeps the wrong-build notice
-		context->LogError(g_wrongBuild);
-		build_guard::LogDetail(line, sizeof(line), ImageStamp(context), BuildName(context));
+	if (!ImageSupported(context)) {
+		// Another game image: no hook, patch or harness at all (their addresses are the known image's). Say why, and keep `mxl2012`.
+		image_guard::Message(g_otherImage, sizeof(g_otherImage), PluginVersion);
+		CheckEnvironment(true);  // logged and in `mxl2012`; the screen keeps the other-image notice
+		context->LogError(g_otherImage);
+		image_guard::LogDetail(line, sizeof(line), RunningGame(context));
 		context->LogError(line);
-		if (!ShowWrongBuildNotice(context, g_wrongBuild)) {
-			context->LogWarn("mxl2012-core: no overlay service, the wrong-build notice is in this log only");
+		if (!ShowOtherImageNotice(context, g_otherImage)) {
+			context->LogWarn("mxl2012-core: no overlay service, the other-image notice is in this log only");
 		}
 		return context->RegisterConsoleCommand("mxl2012", Mxl2012Command, "D2R-XL 2012 core plugin status.");
 	}

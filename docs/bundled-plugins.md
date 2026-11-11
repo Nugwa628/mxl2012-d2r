@@ -18,7 +18,7 @@ PC); lane legacy169ship, docs/testing.md "Lane legacy169ship".
   embedded in the DLL), but the downloader removes files the release does not list, so the package lists it as a `preserve`
   file: written when missing, never overwritten, and a player's `enabled = false` survives Update and Repair. The manifest's
   `bundledPlugins` names the plugin, version, repository and commit.
-- **Reproducible build:** the gitlink `third_party/D2R-Legacy169` pins the commit (v0.1.1, `d6fe85d`: v0.1.0 plus #544's fix).
+- **Reproducible build:** the gitlink `third_party/D2R-Legacy169` pins the commit (v0.1.2, `c1ec651`: v0.1.1 plus the game-build tie removed, D2R 3.4).
   `tools/build_legacy169.ps1` exports exactly that commit (`git archive`) from the submodule, or from `MXL_LEGACY169_DIR`
   (a local clone, `.mxl-local.json`), builds it with release options (no test harness, no bad-bytes table) against the
   PluginSDK of `tools/build_plugin.ps1` and runs its unit tests. `tools/package_release.py` runs it (or takes `--legacy169
@@ -253,6 +253,10 @@ Research of lane beltrefill (2026-11-05, v0.35.8 / v0.35.9):
   potion gets its own item type), and the plugin matches item codes, never item types, so it needs no change for it.
 
 ## CharmInv by Dimentio (next release)
+
+Shipped in 0.1.19. From the release after it the package carries our own charm inventory, invtabs, in its place
+(docs/invtabs.md "Packaging: the charm inventory switch"); `--charm-inventory charminv` still builds and packages
+CharmInv as described here.
 
 [CharmInv](https://d2rloader.net/hub/plugins/charm-inventory) 1.0.1 by **Dimentio**, D2RLoader's author: a separate
 charm inventory, a 10 x 4 grid on the left panel, opened by a button on the left edge of the inventory panel, a key
