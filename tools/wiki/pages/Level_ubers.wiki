@@ -1,0 +1,315 @@
+== Uberlevels ==
+
+The ultimate challenge of Median XL, these levels are much harder than any regular level and will challenge even the strongest heroes. Your reward on Destruction difficulty is a unique charm!
+
+== Kurast 3000 BA ==
+{{Uber
+|name=Kurast 3000 BA
+|difficulty=Easy
+|hatred=60
+|terror=115
+|destruction=120
+|location=Arachnid Lair (Spider Forest)
+|reward=Hammer of the Taan Judges
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L1.gif -->
+
+
+
+'''Lore.''' This uberlevel is a recreation of the city of Kurast located at the Kehjistani frontier, 3000 years before the birth of the prophet Akarat and during the Mage Clan Wars between the Ennead, Annuit and Vizjerei clans. Kurast, a neutral town allied with the Taan, was seized by the Ennead and used as a necromantic military outpost. Can you destroy the magical fortifications and liberate the town?
+
+'''Enemies.''' The town is well defended by armies of skeletons undead. Around the town square you will find the Ennead shadowgate totems, which periodically raise additional skeletons and emit a magical field that grants invulnerability to nearby units. The necromantic army is tended to by a contingent of Ennead Necromancers.
+
+'''Bosses.''' Your targets are the Ennead Necromancers spread out around town. They summon more skeletons and cast the powerful Nightmare curse, slowing you down and disabling magical healing.
+
+'''Reward.''' Defeat the Ennead Necromancers on Destruction difficulty to get the Hammer of the Taan Judges (1/12 chance).
+
+{{Item|store=no|name=Hammer of the Taan Judges|quality=unique|lvlreq=40|meta=Keep in Inventory to Gain Bonus|stats=+50 Crafting Points
++[21-25] Energy Factor to Spell Damage
+Total Character Damage Plus (0.25 per level)% (Based on Character Level)}}
+
+On any difficulty, the Ennead Necromancers drop a random class charm in addition to their regular drop. You need your class charm for other challenges and uberquests.
+
+Class charms
+
+Sacred Sunstone: [[Amazon]] class charm<br>Shadow Vortex: [[Assassin]] class charm<br>Worldstone Orb: [[Barbarian]] class charm<br>Caoi Dulra Fruit: [[Druid]] class charm<br>Soulstone Shard: [[Necromancer]] class charm<br>Eye of Divinity: [[Paladin]] class charm<br>Nexus Crystal: [[Sorceress]] class charm
+
+A new class charm has the following bonuses.
+
++1 to Light Radius<br>Maximum Skill Level Increased by 1
+
+More bonuses can be added with the Horadric Cube after completing further challenges.
+
+'''Drop Bias.''' Increased chance to drop set items.
+<div style="clear:both"></div>
+
+== Island of the Sunless Sea ==
+{{Uber
+|name=Island of the Sunless Sea
+|difficulty=Moderate
+|hatred=65
+|terror=115
+|destruction=120
+|location=Drifter Cavern (Glacial Trail)
+|reward=Six Angel Bag
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L2.gif -->
+
+
+
+'''Lore.''' The place where angels watch, once the staging ground of the heavenly host for their crusades into the abyss, is an underground cave miraculously illuminated by sunlight. When the holy legions were defeated and forced out of the dimension by the forces of Hell, a few human worshippers remained behind to stand vigil. But heavenly magic is too powerful for mortals to tolerate for long. The mutated, wretched remains of the human defenders were found and embraced by the mighty Lucion, son of Mephisto.
+
+'''Enemies.''' The Island is defended by the demented priests and their escorts of warrior nuns. The nuns wield holy weapons which grant them divine invulnerability if they keep attacking, while the priests conjure the holy spirit in the form of a slow moving wraith projectile which should be avoided at all costs. Near them are Lucion's overseers, the Feyrs, and their unholy Nightmare curse.
+
+'''Bosses.''' A short distance from the entrance is Lucion's high priest, Malic, wielding fire spells and a deadly homing chaos bolt. Lucion himself has a powerful poison attack, 50% resistance to all damage and emits an unholy aura that makes nearby enemies invulnerable.
+
+'''Reward.''' Defeat Malic on Destruction difficulty to get the Six Angel Bag.
+
+{{Item|store=no|name=Six Angel Bag|quality=unique|lvlreq=60|meta=Keep in Inventory to Gain Bonus|stats=Adds (101-150)-(151-250) Fire Damage
+Adds (101-150)-(151-250) Lightning Damage
+Adds (101-150)-(151-250) Cold Damage
+Fire Resist +[21-25]%
+Lightning Resist +[21-25]%
+Cold Resist +[21-25]%}}
+
+Defeat Lucion on Destruction difficulty to get the Sunless Crystal Bird.
+
+{{Item|store=no|name=Sunless Crystal Bird|quality=unique|lvlreq=60|meta=Keep in Inventory to Gain Bonus|stats=-[6-15]% to Enemy Fire Resistance
+-[6-15]% to Enemy Cold Resistance
+-[6-15]% to Enemy Lightning Resistance
+-[6-15]% to Enemy Poison Resistance
+5% Chance of Crushing Blow
+-5 to Light Radius}}
+
+'''Drop Bias.''' Increased chance to drop gold.
+<div style="clear:both"></div>
+
+== Khalimgrad ==
+{{Uber
+|name=Khalimgrad
+|difficulty=Moderate
+|hatred=70
+|terror=115
+|destruction=120
+|location=Infernal Pit (Frozen Tundra)
+|reward=Zakarum's Ear
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L3.gif -->
+
+
+
+'''Lore.''' Heaven. Nirvana. Celestia. Call it what you will. Home of the heavenly host, which almost destroyed the taint on creation that is the mortal plane twice and allowed it to get overrun by the forces of Hell. Far from being the beings of love they are believed to be by the common folk, the angels of the High Heavens present a clear and present danger to Sanctuary. It may be better to strike first.
+
+'''Enemies.''' Ethereals are the physical manifestations of common angels. They attack furiously, but when you kill one of them, it shatters, reducing all resistances of other nearby enemies to -100% but inspiring them with righteous zeal. The glowing Orbitals and the Lightwell gargoyles with their deadly poison bolts are impossible for mortals to destroy and should best be avoided. Keep a close eye on the health of your minions: the death of a minion releases its soul to heaven, healing all Ethereals and Avatars. Casting Nightmare or deploying a Void Archon nearby will stop this healing.
+
+'''Bosses.''' Zakarum's Avatars watch over the battle on wings of light. They are divine and immortal, but when an Ethereal dies nearby, the backlash temporarily makes them vulnerable, reducing all resistances to 0%. Strike while it lasts, and strike several times, because their divine grace enable them to ignore a percentage of all incoming attacks.
+
+'''Reward.''' Defeat Zakarum's Avatars on Destruction difficulty to get the Zakarum's Ear (1/12 chance).
+
+{{Item|store=no|name=Zakarum's Ear|quality=unique|lvlreq=80|meta=Keep in Inventory to Gain Bonus|stats=+[16-25]% to Experience Gained
+[6-10]% Bonus to All Attributes
++2 to Light Radius}}
+
+'''Drop Bias.''' Increased chance to drop rare items.
+<div style="clear:both"></div>
+
+== Tran Athulua ==
+{{Uber
+|name=Tran Athulua
+|difficulty=Tricky
+|hatred=60 (location of a Hatred challenge)
+|terror=115
+|destruction=120
+|location=Halls of the Dead Level 3 (Dry Hills)
+|reward=Sunstone of Fire
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L4.gif -->
+
+
+
+'''Lore.''' The jungle capital of the [[Amazon]] nation, Tran Athulua, is almost impossible to take by land or sea. After a humiliating defeat, a band of pirates hired you to assassinate the high priestesses and plunder the treetop city during the confusion.
+
+'''Enemies.''' Tran Athulua is heavily guarded by bow-wielding [[Amazon]] warriors, whose numbers and seeking arrows may overwhelm a weaker hero. Beware the jungle snakes: while seldom directly lethal, their debilitating poison will burden you for a long time, slowing you to a crawl.
+
+'''Bosses.''' The priestesses of the three elements, Philios, Skovos and Lycander watch over the city and can be distinguished by their heavy armour. They are dangerous targets due to their Phalanx spell and the ability to call an earthquake which deals magic damage based on a percentage of your current health and is therefore nearly impossible to mitigate. Expect to spend most of the fight at a fraction of your health.
+
+'''Reward.''' Defeat the elemental priestesses on Hatred difficulty to get the Sunstone of Fire, Sunstone of Ice and Sunstone of Thunder.
+
+<div class="d2-item-row">
+{{Item|inline=yes|store=no|name=Sunstone of Fire|quality=unique|lvlreq=50|meta=Keep in Inventory to Gain Bonus|stats=Adds 15-20 Fire Damage
+-[6-10]% to Enemy Fire Resistance
++10 Defense}}
+
+{{Item|inline=yes|store=no|name=Sunstone of Ice|quality=unique|lvlreq=50|meta=Keep in Inventory to Gain Bonus|stats=Adds 15-20 Cold Damage
+-[6-10]% to Enemy Cold Resistance
++10 Defense}}
+
+{{Item|inline=yes|store=no|name=Sunstone of Thunder|quality=unique|lvlreq=50|meta=Keep in Inventory to Gain Bonus|stats=Adds 15-20 Lightning Damage
+-[6-10]% to Enemy Lightning Resistance
++10 Defense}}
+</div>
+
+Defeat the elemental priestesses on Destruction difficulty to get the Sunstone of the Gods (1/6 chance from each priestess).
+
+{{Item|store=no|name=Sunstone of the Gods|quality=unique|lvlreq=100|meta=Keep in Inventory to Gain Bonus|stats=Adds (51-100)-(101-150) Fire Damage
+Adds (51-100)-(101-150) Lightning Damage
+Adds (51-100)-(101-150) Cold Damage
+Increase Maximum Life (11-15)%
+Increase Maximum Mana (11-15)%}}
+
+2% chance to drop a trophy on Destruction difficulty. Cube the trophy with the charm for a small bonus.
+
+'''Drop Bias.''' Increased chance to drop unique items.
+<div style="clear:both"></div>
+
+== Fauztinville ==
+{{Uber
+|name=Fauztinville
+|difficulty=Tricky
+|hatred=80
+|terror=115
+|destruction=120
+|location=Stony Tomb Level 2 (Rocky Waste)
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L5.gif -->
+
+
+
+'''Lore.''' After the destruction of the Prime Evils, a new era of peace and prosperity began, eventually evolving into what we call the modern age. Humanity has all but forgotten how to deal with demons. Until out of nowhere an evil force beneath the metropolis of Fauztinville begins to corrupt the machinery and pets, turning them against their masters. Overwhelmed by the assault, the army employs its new experimental time machine to request help from the heroes of the past. Will you answer the call?
+
+'''Enemies.''' Fauztinville has fallen under an onslaught of demonically twisted robots and demons bursting from the city's neon signs. Each battle should be straightforward, but beware their various immunities, notably the tri-elemental immunities of Neon Fiends. Summoners should eliminate Harpylisks first to prevent their bouncing blade attack from ravaging their forces.
+
+'''Bosses.''' The invasion is led by five warped robots, Alpha, Beta, Gamma, Delta and Epsilon. Find them in the back alleys of Fauztinville and terminate them. If you have trouble finding them, look for dead-end streets and hidden passages through buildings. One of the five requires a teleport skill to access; if you do not have a teleportation spell, use an item with charges of Blink or Jitan’s Gate, like the runeword Pax Mystica or the reward charm for the Lord Aldric Jitan uberquest.
+
+'''Reward.''' On Terror difficulty, the Robot Bosses drop their electronic Brains. These are required for the Black Road challenge.
+
+Fauztinville on Destruction difficulty is the only place where you can find the following three Great Runes. These runes are required for the most powerful runewords.
+
+<!-- image: https://modsbylaz.vn.cz/images/runes/r-d-02.gif --> Taha Level<br>100 Weapons : +40 to Maximum Damage<br>Armor : +20 to Maximum Damage<br>Shields : +20 to Maximum Damage <!-- image: https://modsbylaz.vn.cz/images/runes/r-d-05.gif --> Ghal Level<br>100 Weapons : +15 Energy Factor to Spell Damage<br>Armor : +5 Energy Factor to Spell Damage<br>Shields : +5 Energy Factor to Spell Damage <!-- image: https://modsbylaz.vn.cz/images/runes/r-d-11.gif --> Qor Level<br>100 Weapons : Requirements -12%<br>Armor : Requirements -12%<br>Shields : Requirements -12%
+
+'''Drop Bias.''' Increased chance to drop runes and shrines.
+<div style="clear:both"></div>
+
+== Ghosts of Old Bremmtown ==
+{{Uber
+|name=Ghosts of Old Bremmtown
+|difficulty=Hard
+|hatred=85
+|terror=115
+|destruction=120
+|location=Pit of Acheron (Arreat Plateau)
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L6.gif -->
+
+
+
+'''Lore.''' You ended the demon invasion of Fauztinville... fast forward another few hundred years. Following a global demon apocalypse, the city is in ruins. Lilith, once banished to the Plane of the Dead, broke free and corrupted the sons of the cosmic dragon Trang-Oul. Weakened by his battle against the angelic and demonic legions at the end of time in the far future, the draconic death god was unable to stop Lilith from capturing and possessing his young. There is no hope for humanity’s resistance forces unless these creatures are eliminated. The old time machine was put into action once again... Will you help out Fauztinville a second time?
+
+'''Enemies.''' The Howling Spirits materialise directly on top of you when you approach their hiding spots. You have no choice but to take some hits unless you have inhuman reflexes. Defence is very important.
+
+'''Bosses.''' The shadowy Dark Star Dragon is one of Trang-Oul's young, twisted and bent to evil. It summons additional Howling Spirits and has a double rotating death beam that will make short work of you unless you seek cover as the beams pass by.
+
+'''Reward (requires your class charm).''' Bring the appropriate class charm you found in Kurast 3000 BA. Defeat the Dark Star Dragon on Destruction difficulty within 3 minutes after entering the level and without dying. If you succeed, a single use cube recipe is available to upgrade your class charm. You only have 30 seconds after killing the Dark Star Dragon to use the recipe.
+
+[Class Charm] + Arcane Crystal -> returns [Class Charm] w/ added bonuses
+
+This upgrade recipe adds the following bonuses:
+
+[[Amazon]]: uses Sacred Sunstone<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>+500 to Life
+
+[[Assassin]]: uses Shadow Vortex<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>+500 to Mana
+
+[[Barbarian]]: uses Worldstone Orb<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>Enhanced Weapon Damage +50%
+
+[[Druid]]: uses Caoi Dulra Fruit<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>+1000 Defense
+
+[[Necromancer]]: uses Soulstone Shard<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>+15% Bonus to Summoned Minion Resistances
+
+[[Paladin]]: uses Eye of Divinity<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>5% Chance to Avoid Damage
+
+[[Sorceress]]: uses Nexus Crystal<br>+500 Crafting Points<br>Maximum Skill Level Increased by 1<br>+50 Energy Factor to Spell Damage
+<div style="clear:both"></div>
+
+== Kingdom of Shadow ==
+{{Uber
+|name=Kingdom of Shadow
+|difficulty=Very hard
+|hatred=90
+|terror=115
+|destruction=120
+|location=Crypt (Blood Raven's Graveyard)
+|reward=Eternal Bone Pile
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L7.gif -->
+
+
+
+'''Lore.''' The mythical city of Ureh, where Diablo took the form of an angel and deceived the city wizards, tricking them into casting a spell that doomed the city. Ureh and everyone within are now trapped between the mortal plane and the Burning Hells, appearing in this world only once every two thousand years, when the shadow of Mount Nymyr falls upon the ruins. Be there.
+
+'''Enemies.''' The ghostly citizens are impossible to kill, but they are more than capable of killing you. Keep moving at all costs to avoid the undead hordes.
+
+'''Bosses.''' The plazas of Ureh are huge, there is no minimap, the lighting is very dim and the mad King Juris Khan is located at the end of a precarious bridge to oblivion. Please run around like a damsel in a zombie film until you find the narrow ledge leading to the king.
+
+'''Reward.''' Defeat Juris Khan on Destruction difficulty to get the Eternal Bone Pile.
+
+{{Item|store=no|name=Eternal Bone Pile|quality=unique|lvlreq=120|meta=Keep in Inventory to Gain Bonus|stats=+[1-2] to [[Amazon]] Skill Levels
++[1-2] to [[Assassin]] Skill Levels
++[1-2] to [[Barbarian]] Skill Levels
++[1-2] to [[Druid]] Skill Levels
++[1-2] to [[Necromancer]] Skill Levels
++[1-2] to [[Paladin]] Skill Levels
++[1-2] to [[Sorceress]] Skill Levels
++500 Maximum Stamina}}
+
+2% chance to drop a trophy on Destruction difficulty. Cube the trophy with the charm for a small bonus.
+<div style="clear:both"></div>
+
+== Duncraig ==
+{{Uber
+|name=Duncraig
+|difficulty=Extreme
+|hatred=95
+|terror=115
+|destruction=120
+|location=Cave Level 2 (Cold Plains)
+|reward=Demonsbane
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/L8.gif -->
+
+
+
+'''Lore.''' The powerful demonlord Assur is on the move, burning a wake of destruction across the Western Kingdoms and turning the inhabitants of the towns he razes into mindless minions on his side. All efforts to stop him so far have failed thanks to Assur's powerful invulnerability rune. Find a way to kill him before he takes over the world.
+
+'''Enemies.''' The possessed citizens and their Necromorb overseers are straightforward battles, but beware the ones that rush at you with lit powder kegs! They can throw the kegs over large distances and then light the fuse, which will burn down towards the keg and cause a devastating explosion that is almost always fatal to nearby adventurers.
+
+'''Bosses.''' Assur wields powerful fire magic, but his main threat is the invulnerability shield. It is impossible to damage Assur directly. You will have to wrestle the secret to destroy Assur from his henchmen.
+
+'''The secret.''' Retrieve the five demon seals from Assur's lieutenants: Skinrender, Spinecracker, Eyegouger, Fleshcutter and Bonehexer. On Destruction difficulty, each lieutenant drops his own seal. When you have the five Seals, kill Lost Souls and Necromorbs until a Ring of the Five drops. Cube it with all five seals to create Assur's Bane. Go back to Assur, then select your ring's Purify spell. This spell bypasses Assur's invulnerability and will take him out in a few hits.
+
+'''Reward.''' Defeat Assur on Destruction difficulty to get Demonsbane.
+
+{{Item|store=no|name=Demonsbane|quality=unique|lvlreq=100|meta=Keep in Inventory to Gain Bonus|stats=+[0-2] to [[Amazon]] Skill Levels
++[0-2] to [[Assassin]] Skill Levels
++[0-2] to [[Barbarian]] Skill Levels
++[0-2] to [[Druid]] Skill Levels
++[0-2] to [[Necromancer]] Skill Levels
++[0-2] to [[Paladin]] Skill Levels
++[0-2] to [[Sorceress]] Skill Levels
+Replenish Life +50}}
+
+2% chance to drop a trophy on Destruction difficulty. Cube the trophy with the charm for a small bonus.
+
+'''Drop Bias.''' Increased chance to drop sacred items.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/levelubers.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Uberquests]]
+<div style="clear:both"></div>
+

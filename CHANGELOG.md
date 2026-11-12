@@ -7,6 +7,11 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.21 (2026-11-12)
+
+- New in-game wiki: press J in a game (rebindable in Options > Controls, "Wiki"). It lists the mod's uniques, sets, runewords, gemwords, base items, cube recipes, monsters, skills, ubers and guide pages, with a search by name or by stat, categories, and links between entries. It works offline, in single player and multiplayer, and needs HD graphics. See [docs/wiki-guide.md](docs/wiki-guide.md).
+
+
 ### 0.1.20 (2026-11-12)
 
 - The mod runs on Diablo II: Resurrected 3.4 as well as 3.3, with the same D2RLoader 1.3.1 and the same download. On D2R 3.4

@@ -1,0 +1,23 @@
+Every set in D2R-XL 2012 and the items that belong to it. Each set's page shows all of its pieces and the bonuses for wearing two or more of them. Click a column to sort it, or type in a table's search box to filter.
+
+== Sets ==
+{{#cargo_query:tables=Items
+|fields=_pageName=Set,COUNT(*)=Items,MIN(lvlreq)=Lowest level,MAX(lvlreq)=Highest level
+|where=quality='set'
+|group by=_pageName
+|order by=_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== Set items ==
+{{#cargo_query:tables=Items
+|fields=CONCAT('[[',_pageName,'#',name,'{{!}}',name,']]')=Item,_pageName=Set,base=Base,type=Type,lvlreq=Required level
+|where=quality='set'
+|order by=_pageName,name
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+[[Category:Items]]

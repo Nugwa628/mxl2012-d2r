@@ -16,9 +16,12 @@ project is not affiliated with or endorsed by either.
   `assets/` and the HD art derived from them) belongs to Brother Laz. The port is a fan project.
   Nothing in this repository grants you rights to Median XL's content beyond those its author grants. Median XL 2012 and its
   files (the source of the mod files this port uses): <https://modsbylaz.vn.cz/>. Brother Laz's mods on Nexus Mods (he also
-  makes great Skyrim mods): <https://www.nexusmods.com/profile/EnaiSiaion/mods>. The files are not in git; they travel in a versioned asset pack and in the release
+  makes great Skyrim mods): <https://www.nexusmods.com/profile/EnaiSiaion/mods>. The mod's assets travel in a versioned asset pack and in the release
   (docs/setup.md, `tools/asset_pack.py`). Credit line in the downloader and the release notes: "a port of Median XL 2012 by
   Brother Laz".
+  Brother Laz's writing in `tools/wiki/pages/` and the cached class texts in `tools/wiki/class-texts/` is used with
+  Brother Laz's permission and credited to him. See [wiki prose sources](docs/wiki-prose-sources.md) for the page-by-page
+  distinction between his writing, project additions and mixed pages. His writing is not covered by this project's MIT license.
 - **Diablo II** and **Diablo II: Resurrected** belong to Blizzard Entertainment. No Blizzard game files are in this
   repository or in our releases: you need your own copy of Diablo II: Resurrected (build 93847); the D2R-XL 2012 Downloader puts
   the mod into its `mods` folder.

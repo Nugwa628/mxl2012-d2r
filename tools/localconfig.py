@@ -36,7 +36,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / ".mxl-local.json"
 ENV_KEYS = ("MXL_D2R_EXTRACT", "MXL_D2R_CACHE", "MXL_NATIVE_DIR", "MXL2012_PLUGINSDK_DIR", "MXL2012_SRC", "MXL2012_RUNS",
-            "MXL_MACHINE")
+            "MXL_MACHINE", "MXL_WIKI_PAGES", "MXL_WIKI_LAZ")
 SLOT_SAFETY_KEYS = ("shared_lock_dir", "protected_mod_folders", "protected_save_folders")
 SETUP_HINT = "run `py -3 tools/lane_setup.py` in this worktree (docs/setup.md, \"New worktree\")"
 # a D2R extraction is usable when both table banks of skills.txt are in it (txt_migrate merges into both)

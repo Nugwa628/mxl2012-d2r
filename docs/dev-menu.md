@@ -1,7 +1,8 @@
 # Developer menu (plugin part `devmenu`)
 
 For players: [dev-menu-guide.md](dev-menu-guide.md). Off word `devmenu`. Code: `plugin/src/devmenu.cpp`, pure rules in `plugin/src/devmenu_logic.h`
-(test `devmenu_tests`), layouts from `tools/devmenu_layout.py` (`plugin/src/mxl_devmenu_layout.h`, committed, `tools/tests/test_devmenu_layout.py`
+(test `devmenu_tests`), the parts it shares with the wiki panel ([wiki-panel.md](wiki-panel.md): layout and button registration, the text setter,
+the typing fix, reading the catalog file) in `plugin/src/panel_shared.cpp` and `panel_logic.h` (test `panel_tests`), layouts from `tools/devmenu_layout.py` (`plugin/src/mxl_devmenu_layout.h`, committed, `tools/tests/test_devmenu_layout.py`
 checks it is current), catalog from `tools/devmenu_catalog.py`, in-game check `devmenu` (`tools/devmenu_checks.py`).
 
 ## What it is

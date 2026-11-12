@@ -1,0 +1,12 @@
+Every runeword in D2R-XL 2012. Socket the runes in order into a normal (white) item of an allowed type. An item with more sockets than the word has runes still works when jewels fill the other sockets. Click a column to sort it, or type in the search box to filter.
+
+{{#cargo_query:tables=Runewords
+|fields=_pageName=Runeword,runes=Runes,runecount=Rune count,sockets=Sockets,itemtypes=Item types,excluded=Not in,lvlreq=Required level
+|order by=runecount,lvlreq,_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+See also [[Gemwords]]: one gem and jewels in a normal item.
+[[Category:Items]]

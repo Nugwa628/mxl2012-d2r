@@ -1,0 +1,139 @@
+== Heroic levels ==
+
+Abandon all hope, ye who enter here. Similar to ordinary demons but much stronger and more intelligent, heroic demons are more than a match for the toughest heroes.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/heroic.gif -->
+
+Median XL features four heroic areas:
+
+Act 1 Mausoleum (Burial Grounds)<br>Act 2 Stony Tomb Level 1 (Rocky Waste)<br>Act 5 Icy Cellar (Ancients' Way)<br>Each of the three areas contains the same 20 heroic monster types. You may want to choose the area that suits your character build the most.
+
+Act 1 Cow Level (Rogue Encampment)<br>Meet invisible cow ninjas, bovine summoners and other figments of your fever dreams after a bad case of food poisoning in the Cow Level!
+
+== Heroic bosses ==
+
+Each heroic area is protected by its own guardian. The area's heroic boss may randomly appear in the area, or he may not... Beware, heroic bosses are among the hardest encounters in Median XL.
+
+All heroic bosses are protected by an invulnerability shield. This shield is nearly impossible to break with mortal magic but will occasionally fail and drop a random immunity, though this still leaves the boss with high resistance to this element. Use these rare opportunities well.
+
+== Belial ==
+{{Uber
+|name=Belial
+|difficulty=Tricky
+|hatred=80
+|terror=115
+|destruction=120
+|location=Act 5 Icy Cellar (Ancients' Way)
+|reward=Book of Lies
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/H4.gif -->
+
+
+
+'''Lore.''' After his defeat in the civil war in Hell, the Lord of Lies and infernal King of Rats was banished to Sanctuary where he plots his return. The icy caves under Harrogath offered him both proximity to the powerful Worldstone and a dark moist breeding ground for his rodent servants.
+
+'''Strategy.''' As the Lord of Lies, Belial prefers to cheat in battle. His main offence consists of his Henchmen who use the Punisher spell to poison heroes to death. If one gets through this line of defence, his tiny rat familiars go on the attack. Being so small and fast, they cannot be hit or even aimed at. Belial himself wields a spell that spits out punishers in random directions, as well as an area effect spell that slowly siphons the victim's life away and the ability to summon more rats from the ground to swarm the unwary hero. According to witnesses, Belial does attack recklessly from time to time, chasing his enemy around by teleportation, but demonologists believe that this is just to impress his underlings and his main intention is to get close to summon another batch of Henchmen. Defensively, Belial is protected by a warding spell that makes him invulnerable to all attacks. Occasionally he may drop this shield for a few moments to entice a foolish hero to attack him; this is usually met with a fierce counterattack, but it is the only way to kill him.
+
+'''Reward.''' Defeat Belial on Destruction difficulty to get the Book of Lies.
+
+{{Item|store=no|name=Book of Lies|quality=unique|lvlreq=60|meta=Keep in Inventory to Gain Bonus|stats=+[51-500] to Life
++[51-500] to Mana}}
+<div style="clear:both"></div>
+
+== Bull Prince Rodeo ==
+{{Uber
+|name=Bull Prince Rodeo
+|difficulty=Hard
+|hatred=85
+|terror=115
+|destruction=120
+|location=Act 1 Cow Level
+|reward=Fool's Gold
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/H1.gif -->
+
+
+
+'''Lore.''' The moolicious heir to the Cow King's throne, Bull Prince Rodeo is out to exact his indiscriminate revenge for all the cattle killed by humans.
+
+'''Strategy.''' Rodeo is very aggressive and has a stunning Hoof Stomp and the Blink spell, making it difficult to put some distance between you and him. He can also summon more cows or call upon a Stampeding Herd of exploding cows that ploughs across the screen, trampling all in their path. This ability is unblockable, unresistable and will destroy you if you don't get out of the way in time. But his most common spell, in cooperation with another victim of cruel farming practices, is a wave of chickens that will pursue their victim relentlessly, inflicting devastating hurt with their beaks if they connect. The chickens can be dodged by staying mobile. Being a sacred cow, Rodeo is invulnerable to damage. Warding shields are not an exact science, however, and the spell may occasionally fail, allowing you to hit him with one or more elements until the spell is restored.
+
+'''Reward.''' Defeat Bull Prince Rodeo on Destruction difficulty to get the Fool's Gold.
+
+{{Item|store=no|name=Fool's Gold|quality=unique|lvlreq=100|meta=Keep in Inventory to Gain Bonus|stats=+[-10-40] to all Attributes
+Total Character Defense Plus [11-15]%
+5% Reanimate as: Random non-elite monster
+-75% Less Gold from Monsters
+[31-40]% Better Chance of Getting Magic Items}}
+
+Killing Rodeo does not prevent you from entering the Cow Level again.
+<div style="clear:both"></div>
+
+== Quov Tsin ==
+{{Uber
+|name=Quov Tsin
+|difficulty=Very hard
+|hatred=90
+|terror=115
+|destruction=120
+|location=Act 2 Stony Tomb Level 1
+|reward=Silver Seal of Ureh
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/H2.gif -->
+
+
+
+'''Lore.''' Hungry for power and misled by Diablo, the Vizjerei mage Quov Tsin almost succeeded in sacrificing the city of Ureh to the forces of Hell. He was defeated at the last moment, but his spirit still roams the burial tombs looking for a mortal vessel to come back to life...
+
+'''Strategy.''' As a former Vizjerei in life, Quov Tsin wields the elements. His most devastating attack is a streaming blast of fire, cold and lightning bolts powerful enough to annihilate any hero in a moment. In melee combat, he may use a fire, cold and lightning nova combo that causes massive destruction at close range. Prepare for this battle by equipping resistance items to counter his ability to pierce resistances, and try to find some absorb items to further cut the damage. His contingency spells protect him by teleporting him to safety when struck by any attack. Stay near cover in case he appears too close for comfort. Quov Tsin is protected by a mystical shield that makes him invulnerable to all damage, but thankfully for you, anger is not a good state of mind to maintain a difficult invulnerability spell. It may occasionally fail, leaving him vulnerable to one or more elements. Seize the moment.
+
+'''Reward.''' Defeat Quov Tsin on Destruction difficulty to get the Silver Seal of Ureh.
+
+{{Item|store=no|name=Silver Seal of Ureh|quality=unique|lvlreq=120|meta=Keep in Inventory to Gain Bonus|stats=+[21-30] Energy Factor to Spell Damage
++1 to All Skills
++[41-50] to Strength
++[41-50] to Dexterity
++[41-50] to Vitality
++[41-50] to Energy
+[21-25]% Bonus to Summoned Minion Damage
+[11-15]% Bonus to Summoned Minion Resistances}}
+
+2% chance to drop a trophy on Destruction difficulty. Cube the trophy with the charm for a small bonus.
+<div style="clear:both"></div>
+
+== Astrogha ==
+{{Uber
+|name=Astrogha
+|difficulty=Extreme
+|hatred=95
+|terror=115
+|destruction=120
+|location=Act 1 Mausoleum
+|reward=Astrogha's Venom Stinger
+}}
+
+<!-- image: https://modsbylaz.vn.cz/images/uberquests/H3.gif -->
+
+
+
+'''Lore.''' One of Hell's greatest, the scheming spider demon Astrogha has surfaced after the fall of Andariel to continue his reign of terror. He is not the most powerful demon in close combat, but the spider king is never alone.
+
+'''Strategy.''' Astrogha does not usually fight his foes directly, but he does not need to. His summoned Spider Statues serve as gateways for his personal swarm, belching waves of crawling Darklings from the depths of the void. Deal with them quickly, but do not touch the statues! They are protected by one of Astrogha's devious tricks: when destroyed, they will both rejuvenate Astrogha and unleash a curse that cripples the assailant causing a swift death. If left alone, they will eventually collapse on their own. Astrogha also possesses a very powerful but close ranged Frozen Orb attack and has warding spells that teleport him away when damaged, courtesy of Quov Tsin's mages. Another dweomer copied from Quov Tsin during centuries of fighting side by side at the head of their respective legions is the warding spell that renders Astrogha immune to all attacks. This is cutting edge magic and therefore still fails from time to time, allowing you to get some hits in.
+
+'''Reward.''' Defeat Astrogha on Destruction difficulty to get Astrogha's Venom Stinger.
+
+{{Item|store=no|name=Astrogha's Venom Stinger|quality=unique|lvlreq=120|meta=Keep in Inventory to Gain Bonus|stats=+1 to All Skills
++500 to Life
+Poison Length Reduced by 50%}}
+
+2% chance to drop a trophy on Destruction difficulty. Cube the trophy with the charm for a small bonus.
+
+Warning! Due to a bug with the way Diablo II handles champions, there is a chance Astrogha may spawn as a boss pack with several copies of himself as minions. When you see a mass of doom spiders, run for your life and restart the game.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/heroiclevels.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Uberquests]]
+<div style="clear:both"></div>
+

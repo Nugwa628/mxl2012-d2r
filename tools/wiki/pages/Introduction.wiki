@@ -1,0 +1,131 @@
+== What is Median XL? ==
+
+=== Overview ===
+Median XL is the most popular mod, or unofficial modification, for Diablo II Lord of Destruction. It modifies the game by replacing character skills, improving items and monsters, and adding new uberquests. 
+
+=== So is this a cheat? ===
+Mods are not cheats. A cheat makes the game easier. Median XL turns it into an entirely new game...  
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_033.jpg -->
+  
+
+=== Features ===
+'''o New skill trees with 30 brand new skills per class.'''
+ Bored with Blessed Hammer? Median XL offers brand new skill trees. Each class has 25 main skills, 3 uberskills and 2 challenge reward skills. If you ever wanted a crossbow [[necromancer]] or summoner [[amazon]], here is your chance! 
+
+'''o Improved monsters.'''
+ When was the last time a frog killed you? The monsters are much more aggressive and dangerous, and many have learned various new tricks. From quill rats with homing spikes to invisible templars, the monsters will pose a much tougher challenge. 
+
+'''o Elite and heroic monsters.'''
+ If the normal monsters are tricky, the elites will have you run for your life. Featuring their own unique attacks and improved statistics, elite and heroic monsters are a match for the strongest heroes. 
+
+'''o 30 new uberquests for high level characters.'''
+ Forget Battle.net and 'Uber Tristram', Median XL has 22 more uberbosses and 8 special uberlevels for high level characters. Defeating them on the highest difficulty yields powerful unique charms. 
+
+'''o New base items. Six quality tiers.'''
+ Median XL features many new class-specific items. Additionally, item stats have been rebalanced and there are now six tiers of item quality, each with better stats than the last. Rumours persist of even stronger Sacred items... 
+
+'''o New and improved gems and runes.'''
+ More gems, more runes and the existing gems and runes have been improved. Plentiful random sockets on items offer a powerful way to customise your items. 
+
+'''o Enhanced magic and rare items.'''
+ Between the improved affix pool and the addition of powerful new affixes including percentage based attribute bonuses, rares are a much improved game option. 
+
+'''o An assortment of new uniques and sets.'''
+ Median XL features 475 new uniques and 28 new sets. Many of the uniques and all of the sets can only drop in special difficult areas. 
+
+'''o An assortment of new runewords.'''
+ There are exactly 310 brand new runewords, each requiring only a single rune. You can fill the other sockets with jewels for your convenience. 
+
+'''o New and improved cube recipes.'''
+ Median XL offers many powerful new cube recipes including a revolutionary crafting system. 
+
+'''o Honorific items.'''
+ Create blank items and enchant them yourself. Ever wanted to make your very own uniques? Now you can. 
+
+'''o Special challenges for expert players.'''
+ Beating the game is only half the fun! Reach certain milestones in the game to obtain a special reward. 
+
+'''o Rebalanced drop rates to make good items more common.'''
+ You may actually see a Zod now. 
+
+'''o And much more...'''  
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_032.jpg -->
+  
+
+=== Full list of changes ===
+'''Warning: long and boring'''
+
+'''Character class changes'''
+ - Replaced all classic LoD skills with 30 new skills per class (210 new skills).
+ - Added many item-only skills.
+ - Modified various animation speeds to encourage unusual weapons.
+ - Characters gain life, mana and stamina at a different rate.
+ - Most classes have different favoured weapons (eg. amazons and sceptres).
+ - Spell damage is now affected by energy.
+ - Maximum character level is now 120. 
+
+'''Item changes'''
+ - Added a lot of class-specific items, 5 to 13 per class.
+ - Removed exceptional and elite items, added 6 tiers of regular items.
+ - All magic and rare items can now randomly spawn with sockets.
+ - Improved modifiers on superior items.
+ - Scrapped and redesigned the magic and rare affix pool.
+ - Added many new item modifiers (eg. +% to attributes, attacker flees).
+ - Added 5 new gems and 23 new runes.
+ - Existing gems and runes now have different stats.
+ - Replaced all unique and runeword items (475 new uniques, 310 runewords).
+ - Replaced all sets with 28 high level sets for advanced characters.
+ - Removed most classic LoD cube recipes, added lots of new recipes.
+ - Added several new item types that serve as cube reagents.
+ - Added Honorific items.
+ - Rares are much more likely to spawn with good affixes.
+ - Rebalanced treasure classes to make high base items more likely to drop.
+ - Greatly increased chance to find a high end rune.
+ - You can now gamble on any item in the game.
+ - Quivers can now be magical, rare and unique.
+ - Added elixirs, which provide a temporary stat or attribute bonus.
+ - Added hidden charms as rewards for beating difficult challenges. 
+
+'''Monster changes'''
+ - Monster behaviour tweaked and enhanced.
+ - Many monsters have various new skills, attacks or special properties.
+ - Rebalanced monster statistics.
+ - Added Elite monsters with their own attacks and improved statistics.
+ - Added even tougher Heroic monsters.
+ - Added 25 new superunique encounters throughout the game.
+ - Added 22 special uberbosses for established characters.
+ - Maximum monster level is now 120 in the regular game; special bosses are 121. 
+
+'''Level changes'''
+ - Repopulated levels with a different selection of monsters.
+ - Reduced map size of various large and/or annoying areas.
+ - Improved mood lighting in many areas (Direct 3D only).
+ - Added several bonus levels associated with the new uberbosses.
+ - Added 8 special uberlevels for high level characters. 
+
+'''Hireling changes'''
+ - All [[hirelings]] have a different skill set.
+ - Hireling stats changed to keep up with the new difficulty. 
+
+'''Miscellaneous changes'''
+ - Increased inventory and stash size.
+ - Added PlugYFixed.ini to support PlugY better (ie. avoid bugs)
+ - Healing and mana potions now provide regeneration over time.
+ - Added elixirs that provide a temporary boost.
+ - Reduced sell price for most items, but increased gold drops.
+ - Reduced damage, AR and life bonuses for bosses relative to regular monsters.
+ - Disabled bugged or overpowered boss modifiers.
+ - Increased or decreased effect durations of various shrines.
+ - Changed modifiers and stats on quest items.
+ - Several monsters have their own taunts.
+ - Many objects now have a coloured light radius.
+ - Added new names for Low Quality items.
+ - New chest and wall traps.
+{{Port note|D2R-XL 2012 carries over Median XL 2012 v005's skills, items, monsters, maps and uberquests. Where D2R does things differently: PlugY is not used (D2R's own stash pages and Akara's respec take its place), the inventory is Median XL's 10 x 6, the Horadric Cube 10 x 8 and each stash page 10 x 10, and in HD the coloured mood lighting of Median XL's retextured maps is a light in each map's own colour. See [[Port changes]].}}
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_031.jpg -->
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/introduction.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Guides]]

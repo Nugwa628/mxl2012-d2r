@@ -63,7 +63,7 @@ class BuildSteps(unittest.TestCase):
     def test_charminv_build_is_the_build_without_invtabs(self):
         steps = build.steps_for("charminv")
         self.assertEqual(steps, build.STEPS)
-        self.assertEqual(steps, [*build.DATA_STEPS, *build.ART_STEPS, *build.STRING_MERGE, ["devmenu_catalog.py"], ["validate.py"]])
+        self.assertEqual(steps, [*build.DATA_STEPS, *build.ART_STEPS, *build.STRING_MERGE, ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]])
         self.assertEqual(scripts(steps).count("charm_inv.py"), 1)
         self.assertFalse(set(scripts(steps)) & set(INVTABS_SCRIPTS))  # no invtabs data, no classic Charms button
 

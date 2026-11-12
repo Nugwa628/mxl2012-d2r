@@ -1,0 +1,32 @@
+== Dragon's eggs ==
+
+You might see these conspicuous eggs in low level areas. Kill them and the Baalspawn dragon will hatch. Killing this dragon brings great rewards... or your own death.
+
+'''Your reward is a cube recipe'''<br> After you kill a dragon, you have 30 seconds to freely perform a cube recipe. These recipes are repeatable during this window of opportunity, so practice your button mashing skills!
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_dragon.jpg -->
+
+== Act 2 —  Location: desert areas ==
+
+'''Maximum character level to do recipes'''<br> Hatred: level 60<br> Terror: level 100<br> Destruction: unlimited
+
+'''Reward'''<br> Killing the dragon allows you to reroll a rare item as many times as you wish! Until the 30 second timer runs out...
+
+Rare item + town portal scroll -> reroll item as rare + town portal scroll
+
+'''Item level of output item'''<br> Hatred: level 40<br> Terror: level 80<br> Destruction: level 99
+
+== Act 3 —  Location: jungle areas ==
+
+'''Maximum character level to do recipes'''<br> Hatred: level 60<br> Terror: level 100<br> Destruction: unlimited
+
+'''Reward'''<br> Killing the dragon gives you essentially an unlimited Chaos Reroll recipe for 30 seconds. This recipe will turn the item into a new item of the same type, which could be cracked, magical, unique or anything in between.
+
+Any item + identify scroll -> reroll item randomly + identify scroll
+
+'''Item level of output item'''<br> Hatred: level 50<br> Terror: level 80<br> Destruction: level 99
+
+For now, the eggs seem to appear only in the Eastern parts of the world, but druids have discovered that they are carried by underground magma currents and may well spread globally in the future...
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/eggs.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Challenges]]

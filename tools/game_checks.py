@@ -16981,5 +16981,33 @@ def check_morphgear():
 
 CHECKS += [("morphgear", check_morphgear)]
 
+
+def check_wiki():
+    """The wiki panel: the key, the Welcome page, a category, result pages, a typed search, an entry, scrolling, a link and Back, Esc and
+    the key, the notice in classic graphics (tools/wiki_checks.py; any character: MXL_CHAR=<letters only>)."""
+    import wiki_checks
+    wiki_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("wiki", check_wiki)]
+
+
+def check_wikilook():
+    """The wiki panel at 1600 x 900 and 1280 x 720, screenshots to judge by eye (tools/wiki_checks.py run_look)."""
+    import wiki_checks
+    wiki_checks.run_look(sys.modules[__name__])
+
+
+CHECKS += [("wikilook", check_wikilook)]
+
+
+def check_wikilab():
+    """What D2R's text boxes show: colour codes inside a text, several lines in one box (tools/wiki_checks.py run_lab; screenshots)."""
+    import wiki_checks
+    wiki_checks.run_lab(sys.modules[__name__])
+
+
+CHECKS += [("wikilab", check_wikilab)]
+
 if __name__ == "__main__":
     main()

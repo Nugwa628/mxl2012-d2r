@@ -7353,3 +7353,131 @@ port needs and changed no guard, launcher or version. Findings: [port-3.4.md](po
   3.3 (`DmFourH`, copied from slot 2's save folder) enters a game on 3.4; slot 2 (3.3) `mxl2012` and `devmenu` PASS.
   Seen and not looked into: one last-resort record at the game's close in the `apple_use` run, and the foreground
   window changing twice per 3.4 start (most likely D2RLoader's notice until it is answered; no cursor change).
+## Lane wikipanel: the in-game wiki panel (2026-11-11, slot 2, background input)
+
+Plugin part `wiki` (`plugin/src/wiki.cpp`, [wiki-panel.md](wiki-panel.md)) and the code it shares with the developer menu
+(`plugin/src/panel_shared.cpp`, `panel_logic.h`). Checks `wiki`, `wikilook`, `wikilab` (`tools/wiki_checks.py`). Evidence, kept outside
+the repo: `mxl2012-runs/wikipanel/wikipanel/evidence/` (the run folders below), `shots/` (19 numbered progress screenshots), `run-r*.log`.
+Unit tests: `devmenu_tests`, `panel_tests`, `wikilogic_tests` pass; `tools/tests/test_wiki_layout.py` 17 tests.
+
+| Run folder | Table | Check | Result |
+|-|-|-|-|
+| `checks-20261111-213331-s2` | hand-written sample, 70 entries | wiki | PASS, 24 rows |
+| (same batch) | same | wikilab | PASS, 7 rows (the experiments below) |
+| `checks-20261111-215401-s2` | built table of lane wikipanel-data, 3,855 entries | devmenu | PASS, 19 rows (the developer menu on the shared code) |
+| (same batch) | same | wiki | PASS, 23 rows, 1 skipped (the search-hit row found no entry; the check was widened after it) |
+| `checks-20261111-220326-s2` | same | wiki | PASS, 24 rows, 0 crash files |
+| (same batch) | same | wikilook | PASS, 10 rows: 1600 x 900 and 1280 x 720, the Welcome page, a long entry, "Death Pit Stake", "Cornerstone of the World" |
+| `checks-20261111-220851-s2` | same | devmenutype | no result table: the game died at the Toraja warp (see below) |
+
+- **`wiki` rows:** the table loaded; J opens the panel and nothing else; it opens on the Welcome page; a category by a real click and
+  All again; result pages by the button, a real click and the mouse wheel over the list; one click gives the box the keyboard; a typed
+  search; bound keys ("ictqmw1234") type into the box and open nothing; Backspace and Enter stay in the box; an entry by a real click on
+  its arrow; the text scrolled by wheel, button and Page Down to its end, and the wheel stops at the top; a link followed by a real click
+  and Back; an entry opened from a search starts at the hit (query "level 20: total character defense bonus: 675 percent", entry
+  Lionheart, hit on line 172, shown from line 170 of 244); Esc closes; it reopens with the search and the entry as they were; J closes;
+  Esc closes from the search box; with an empty box it opens on Welcome again; classic graphics: one notice line and no panel.
+  Clicks, keys and the wheel are real window messages (background input); the wheel was not tried on hardware.
+- **Load and size** (built table, 6.4 MB): read and parsed in 31 and 47 ms at game start (two runs, `loadms` of the `wiki` status
+  line), about 12 MB of memory for 3,855 entries and 89,254 lines.
+- **`wikilab` (experiments):** colour codes inside a text are drawn as written (`ÿc4`, with and without `pipeCharacterBehavior:
+  handle`, `|c4`, `|cffRRGGBB...|r`); a tall box with `newlineHandling: standard` and `lineWrap: true` shows several lines and wraps by
+  glyph width; rulers of 80 characters gave 15.7 (prose), 16.8 (digits) and 18.6 (capitals) panel units a character in the Formal face.
+  Results in [d2r-addresses.md](d2r-addresses.md) "Text boxes: colours, lines, and the panel name limit".
+- **`wikilook`:** 27 text lines of 80 characters and 22 result rows of 60 read well at both sizes; the panel (2800 x 1660 units) is
+  inside the screen at both. Judged by eye on the screenshots (`shots/10` to `19`).
+- **`devmenutype`** (the developer menu's typing on the shared code): no table, because the check keeps its rows until the end and the
+  game died at its last step, the Toraja uber warp. It is the open crash of lane devmenu4 (a warp while dead: the character was killed in
+  Stony Tomb Level 1 first, `devmenu_uber_fauztinville_landed.png` "You have died"), not the typing. Read from the run's log: in HD the box held
+  "a", "A", "75", "staff", "ictqmw1234" and "a" after Backspace and Enter, the level typed as 60 was applied, and the Cornerstone and
+  socket steps ran; in legacy the same texts except "iCTQmw1234" for the bound keys (capitals: the row lane devmenu4 saw fail once the
+  same way; the PC was in use during the run), level 70 applied.
+- **Limit found:** a plugin can register 64 panels (the 65th registration failed), so the wiki's 66 buttons share one registered name
+  and are told apart by the click position.
+- **Not covered:** a TCP/IP game (the part has no single-player test and calls nothing on the server; by reading only), a hardware mouse
+  wheel, a controller (the buttons need the pointer).
+
+## Lane wikipanel-data (2026-11-11)
+
+The exporter and its tests are described in [Wiki panel data](wiki-panel-data.md).
+No plugin changes and no game run or game slot. Build verification uses
+`py -3 tools/build.py --data-only`; the table is generated after the developer
+catalog. Required test-discovery logs and the content report are retained in the
+lane's evidence folder outside git. The generated table stays outside git.
+The third-round owner ruling permits the prose snapshot described below.
+No table interface change.
+
+### Player-content review (second round, 2026-11-11)
+
+The data build passes with 4,025 entries: 770 uniques, 29 sets, 334 runewords,
+61 gemwords, 1,545 bases, 221 cube families, 548 monsters, 458 skills, 29 ubers
+and 30 guides. The table is 6,450,531 bytes. Every category has unique names.
+The 34 wiki-specific tests cover each owner ruling, including provenance of the
+three reviewed charms, all 149 Cornerstone skill variants in one entry, player
+skill metadata, effective area names, forbidden display/search patterns and two
+byte-identical exports. The configured baseline string path is pinned in the
+integration fixture so earlier test imports cannot hide D2R area or skill names.
+
+The ignored player audit lists 249 removed technical passages and 156 unnamed
+monster effects. The original wiki generators and external prose were not edited.
+No game was started. Full discovery, build and audit evidence is in the lane's
+external evidence folder. An existing matching drawcap build was copied into this
+worktree's ignored build folder to satisfy the release-package fixture dependency.
+Both required discovery suites pass: 1,416 tests (42 skipped) and 550 tests
+(12 skipped). Documentation links and tracked/staged public scans have zero findings.
+
+### Shared cube methods and prose snapshot (third round, 2026-11-11)
+
+The data build passes with 3,855 entries, including 51 cube methods, in a
+6,166,504-byte table. All other category counts remain as in the second round.
+Mystic Orbs, Unique Mystic Orbs, Trophies, gem upgrades, runes, alchemy and other
+shared methods list members together. Honorific creation and distinct quest
+methods remain separate. Tests compare every orb and gem member with the source,
+preserve item-kind and honorific differences, check compact methods and guide
+trimming, reject unrepresented conditions, and compare deterministic exports.
+Six category guides retain prose and credits while omitting repeated lists.
+
+The owner authorized Brother Laz's writing in git, used with Brother Laz's
+permission. The separate raw snapshot contains 29 player pages and eight cached
+class/skill HTML files, 662,401 bytes total. Non-player pages were not copied.
+These are now the default inputs; environment/configuration overrides remain
+optional. The sources were not edited. Page-by-page attribution is in
+[Wiki prose sources](wiki-prose-sources.md). No game run, slot or plugin edit.
+
+All 48 wiki tests pass within the required discovery suite: 1,430 tests with
+42 skipped. The tools discovery suite passes 550 tests with 12 skipped.
+Documentation links have zero findings; tracked/staged public scans have zero
+hits. Two exact public-prose lines have narrowly anchored false-positive
+exceptions in the existing public scanner's allow file. The raw source snapshot
+retains its original whitespace; exporter code has no whitespace findings.
+
+### Resolved orb descriptions and name audit (fourth round, 2026-11-11)
+
+The data-only build passes with the same 3,855 entries and 51 cube methods in a
+6,634,779-byte table. All ordinary orb qualifiers were invented from editor
+labels; 21 of the old 70 pairings also combined different game descriptions or
+effects. There are now 70 ordinary members and 30 unique members, identified by
+complete resolved descriptions and complete recipe effects. All 170 recipe-bearing
+definitions map to exactly one real member line; five unavailable aliases add no
+content. No unsupported vendor/drop claim is made. Snapshot name corrections are
+committed separately from exporter changes. See [Wiki name audit](wiki-name-audit.md).
+
+The monster snapshot also stripped “Mon” from unresolved skill labels, bypassing
+the exporter's unknown-name filter. Keeping diagnostic keys intact corrects 76
+monster entries: unresolved effects are omitted or a known summon is translated
+to its resolved monster name. No editor alias becomes a displayed ability.
+
+The 54 wiki tests include exact orb identity, per-definition member coverage,
+absence of invented qualifiers, resolved allowed-base names, missing-name
+fallback rejection and unresolved monster-skill filtering. Both required suites
+pass: 1,436 tests (42 skipped) and 550 tests (12 skipped). Documentation links and
+public scans have zero findings.
+Determinism and forbidden-pattern checks pass, with no duplicate category names.
+
+A fixed seed of 20261111 selects 15 entries across uniques, sets, runewords,
+skills and monsters. Every chosen name and one stat line per entry agree with
+hand-traced raw tables, property functions and effective strings. The external
+lane evidence retains the selection, raw columns and manual interpretation.
+This is a bounded source check; unsupported skill formulas remain omitted and
+rolled negative ranges retain the existing bracket notation. No game, slot or
+plugin change was needed; format 1 and the Unreleased note remain unchanged.

@@ -1,0 +1,10 @@
+Explore these Median XL concepts:
+
+* [[Difficulty levels]]
+* [[Energy factor]]
+* [[Block and defense]]
+* [[Players X]]
+* [[Witches]]
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/difficultylevels.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Concepts]]

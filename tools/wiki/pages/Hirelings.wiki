@@ -1,0 +1,385 @@
+== Mercenaries ==
+
+Anyone desperate enough can put up a fight against the demons, but only the exceptionally strong and brave will follow plundering maniacs such as yourself into the pits of Hell. 
+
+=== Heroic Strength ===
+Per strength point: Enhanced Weapon Damage +1%
+ Per strength point: Regenerate Life +1
+ Per strength point: +0.25 [[Energy Factor]] to Spell Damage  
+
+== The sisters ==
+<!-- image: http://classic.battle.net/images/battle/diablo2/images/animations/npcs/act1/rogue.gif -->
+ 
+
+Weakened by the prolonged siege, the Sisters of the Sightless Eye may not be in fighting condition. But help them liberate the Monastery and watch them rise and shine. 
+
+=== Bonuses ===
+Starts with 30 energy, +6 energy per level
+ '''Defensive Harmony:''' slows attackers by 25%, +1% per 5 levels 
+
+=== Ranger Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| CASCADE 
+| ''Effect: shoots arrows at all nearby enemies'' 
+|-
+
+| 12
+| VANQUISH 
+| ''Effect: briefly increases physical damage'' 
+|-
+
+| 24
+| WRAITH ARROW 
+| ''Effect: arrow that unleashes homing spirits'' 
+|-
+
+| 24
+| BROADSIDE 
+| ''Effect: fires a massive stream of arrows at nearby enemies'' 
+|-
+
+| 90
+| WAR SPIRIT 
+| ''Effect: adds crushing blow and automatically casts spike novas'' 
+|}
+  
+
+=== Priestess Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| SPORE SHOT 
+| ''Effect: arrow that exponentially splits on striking'' 
+|-
+
+| 12
+| PAGAN RITES 
+| ''Effect: destroys corpses in flames, healing the caster'' 
+|-
+
+| 24
+| VINDICATE 
+| ''Curse effect: heals party and increases damage when victim dies'' 
+|-
+
+| 24
+| DEATHSTRIKE 
+| ''Effect: mercenary shoots her bow and calls down an energy blast'' 
+|-
+
+| 90
+| TREMOR 
+| ''Effect: all visible enemies lose 25% of their current life'' 
+|}
+  
+
+== The town guard ==
+<!-- image: http://classic.battle.net/images/battle/diablo2/images/animations/npcs/act2/guard.gif -->
+ 
+
+Many trade routes converge at Lut Gholein, the jewel of the East. When the demons blocked access over land and the kraken nested in the port, travelling paladins, mystics and warriors were forced to take up arms to defend the city. 
+
+=== Bonuses ===
+Starts with 20 energy, +4 energy per level
+ '''Suppression:''' crushing blow 25%, +1% per 5 levels
+ '''Grit:''' damage reduced by 25%, +1% per 5 levels 
+
+=== Exemplar Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| RETALIATE 
+| ''Effect: retaliates when struck with a damaging shockwave'' 
+|-
+
+| 1
+| GOREFEST 
+| ''Effect: melee attack that causes a fountain of blood'' 
+|-
+
+| 6
+| LIFEBLOOD 
+| ''Effect: slowly regenerates lost life over time'' 
+|-
+
+| 12
+| KING OF BLADES 
+| ''Effect: automatically launches bouncing blades at nearby enemies'' 
+|-
+
+| 90
+| DISINTEGRATE 
+| ''Effect: massively damaging arcane radius blast around caster'' 
+|}
+  
+
+=== Shapeshifter Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| WEREBEAR 
+| ''Effect: turn into a bear, increasing life and armour'' 
+|-
+
+| 1
+| CLAW TORNADO 
+| ''Effect: melee attack that sends out spinning whirlwinds'' 
+|-
+
+| 6
+| BLOODLUST 
+| ''Effect: increases all damage of the party'' 
+|-
+
+| 12
+| POUNCE 
+| ''Effect: teleport onto an enemy, causing a powerful shockwave'' 
+|-
+
+| 90
+| THORN FIELD 
+| ''Effect: melee attack that summons a ripple of spiked thorns'' 
+|}
+  
+
+=== Fighter Mage Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| TITAN STRIKE 
+| ''Effect: melee attack that heals and increases stats'' 
+|-
+
+| 1
+| GUARD TOWER 
+| ''Effect: summons a guard tower that shoots arrows at enemies'' 
+|-
+
+| 6
+| GLACIAL NOVA 
+| ''Effect: cast a gigantic nova that completely freezes enemies'' 
+|-
+
+| 12
+| FORTRESS 
+| ''Effect: summons a ring of guard towers around the caster'' 
+|-
+
+| 90
+| CHRONOFIELD 
+| ''Effect: field that slows the movement and attack speed of enemies'' 
+|}
+  
+
+== The iron wolves ==
+<!-- image: http://classic.battle.net/images/battle/diablo2/images/animations/npcs/act3/ironwolf.gif -->
+ 
+
+Kehjistan is the wellspring of magic. This is where the first magically attuned hunter-gatherers settled at ley nodes and founded the primeval mage clans. Their distant sons of seventh sons will not give up the ley nodes to the forces of Hell without giving them hell first! 
+
+=== Bonuses ===
+Starts with 200 energy, +20 energy per level
+ '''Unearthly Power:''' +250 [[energy factor]] to spell damage, +5 per level
+ '''Warp Armor:''' total defense +250%, +10% per level 
+
+=== Bloodmage Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| FLAMEFRONT 
+| ''Effect: cast a wave of multiple streaking fireballs'' 
+|-
+
+| 1
+| PUNISHER 
+| ''Effect: slow moving bolt that deals lethal poison damage'' 
+|-
+
+| 12
+| GIFT OF INNER FIRE 
+| ''Effect: instantly regenerates the party's lost life'' 
+|-
+
+| 24
+| PYROBLAST 
+| ''Effect: giant fireball that explodes in a pool of flame'' 
+|-
+
+| 90
+| GRAVEYARD 
+| ''Effect: periodically shoots punishers at nearby enemies'' 
+|}
+  
+
+=== Necrolyte Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| HUNTING BANSHEE 
+| ''Effect: spirit follows random targets before exploding'' 
+|-
+
+| 1
+| CHARM 
+| ''Effect: converts enemies to fight other enemies'' 
+|-
+
+| 12
+| MIASMA 
+| ''Effect: field of living goo that poisons and weakens enemies'' 
+|-
+
+| 24
+| HAILSTORM 
+| ''Effect: rains deadly cold on target enemy'' 
+|-
+
+| 90
+| VENOMOUS SPIRIT 
+| ''Effect: casts a powerful homing spirit of lethal poison'' 
+|}
+  
+
+=== Abjurer Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| FORKED LIGHTNING 
+| ''Effect: cast multiple forked lightning bolts'' 
+|-
+
+| 1
+| BANISH 
+| ''Curse effect: reduces monster life by a percentage'' 
+|-
+
+| 12
+| SINGULARITY 
+| ''Effect: massively damaging black hole'' 
+|-
+
+| 24
+| SUPERNOVA 
+| ''Effect: cast a gigantic nova of lightning'' 
+|-
+
+| 90
+| SUPERBEAST 
+| ''Effect: morph into a demon, gain spell damage and speed'' 
+|}
+  
+
+== The barbarians ==
+<!-- image: http://classic.battle.net/images/battle/diablo2exp/images/animations/npcs/act5/barbhireable.gif -->
+ 
+
+Considered uncivilised man-beasts by some, sons of the nephalem by others, the only reason why few outsiders from the south have reported their considerable shamanic prowess is because they were usually at the receiving end of it. 
+
+=== Bonuses ===
+Starts with 10 energy, +2 energy per level
+ '''Mountain King:''' 20% bonus to strength and dexterity, +1% per 2 levels 
+
+=== Skills ===
+{| class="wikitable"
+ 
+|-
+ 
+! Lvl 
+! Name 
+! Effect 
+|-
+
+|  1
+| GIFT OF THE WILD 
+| ''Effect: increases all damage of the party'' 
+|-
+
+| 12
+| THUNDER SLAM 
+| ''Effect: damages and stuns enemies in a radius'' 
+|-
+
+| 18
+| SHOWER OF ROCKS 
+| ''Effect: melee attack that drops rocks that reduce attack rating'' 
+|-
+
+| 60
+| ANCIENTS' HAND 
+| ''Effect: melee attack that unleashes a shockwave through the ground'' 
+|-
+
+| 90
+| WARBAND 
+| ''Effect: summons a [[barbarian]] army'' 
+|}
+  
+
+== Known bugs ==
+
+'''My mercenary stands there and doesn't do anything!'''
+ This is a bug with mercenary AI in Diablo II. If you walk, the mercenary will also walk, and this occasionally causes it to freeze up. To cure this, jump into a town portal. 
+
+'''My mercenary is slow and does no damage!'''
+ Due to various bugs with mercenary auras in Diablo II, reequipping items and dying are excuses for your mercenary to slack off. You are not supposed to see how things like this work under the hood, but it does mean that the mercenary may sink into a depression and require a game restart to get back into the battle mindset!
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/hirelings.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Guides]]

@@ -1,0 +1,13 @@
+Median XL replaces the items of classic Diablo II: new base items in six quality tiers, new uniques, sets and runewords, more gems and runes, and many new cube recipes.
+
+* [[Base items]]: the weapons, armour and class-specific items, in six tiers.
+* [[Armor looks]]: how each piece of armour changes your character's look.
+* [[Unique items]]: the tiered and sacred uniques, and where they drop.
+* [[Set items]]: Median XL's sets for advanced characters and their bonuses.
+* [[Runewords]]: single-rune runewords and the item types they need.
+* [[Gemwords]]: words made with gems instead of runes.
+* [[Gems and runes]]: what each gem and rune gives in weapons, armour and shields.
+* [[Special items]]: charms, elixirs, quest items, cube reagents and other items that fit no other list.
+* [[Horadric Cube]]: the cube recipes, from upgrades to crafting.
+
+[[Category:Items]]

@@ -1,0 +1,92 @@
+== The ennead challenge —  '''maximum level 80''' ==
+
+A low level challenge that rewards you with a new skill and other useful midgame perks.
+
+Go to the Kurast 3000 BA uberlevel on any difficulty and kill the Ennead [[Necromancer]] bosses until your class charm drops. Each [[Necromancer]] drops a random charm, so if you are unlucky, just restart the game and try again.
+
+See [[Level ubers#Kurast 3000 BA|Kurast 3000 BA]] for more information.
+
+If you are level 80 or below, cube the charm with a jewel to add extra bonuses and unlock your Ennead Challenge skill.
+
+[Class Charm] + any jewel -> returns [Class Charm] with added bonuses
+
+Requires: level 80 or below<br>
+
+''This upgrade recipe adds ''Maximum Skill Level Increased by 1'' as well as the following bonuses:''
+
+{| class="wikitable"
+! Class
+! Ingredient
+! Bonuses
+|-
+| [[Amazon]]
+| Sacred Sunstone
+| +2 to [[Amazon]] Skills<br>Increase Maximum Life 15%<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|-
+| [[Assassin]]
+| Shadow Vortex
+| +2 to [[Assassin]] Skills<br>50% Curse Length Reduction<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|-
+| [[Barbarian]]
+| Worldstone Orb
+| +2 to [[Barbarian]] Skills<br>20% Bonus to Summoned Minion Life<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|-
+| [[Druid]]
+| Caoi Dulra Fruit
+| +2 to [[Druid]] Skills<br>All Resists +25%<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|-
+| [[Necromancer]]
+| Soulstone Shard
+| +2 to [[Necromancer]] Skills<br>40% Bonus to Summoned Minion Damage<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|-
+| [[Paladin]]
+| Eye of Divinity
+| +2 to [[Paladin]] Skills<br>Total Character Defense +20%<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|-
+| [[Sorceress]]
+| Nexus Crystal
+| +2 to [[Sorceress]] Skills<br>+25% to Spell Damage<br>Poison Length Reduced by 33%<br>Unlocks your Ennead Challenge skill
+|}
+
+'''Your free bonus skill'''<br> This skill can be found at the bottom right of your third skill tab. When you complete the Ennead Challenge, upgrade your class charm and keep it into your inventory. This allows you to put skill points into the skill.
+
+{| class="wikitable"
+|-
+! Name
+! Icon
+! Effect
+|-
+| 
+|-
+| SPELLBIND<br>[AMZ] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/Spellbind.gif -->
+| The basilisk snake of Skartara is a devious creature whose bite turns flesh to stone. A skilled [[amazon]] warrior may carry a few to the battlefield in a leather bag for an unexpected surprise.<br> ''Effect: throws snakes that turn enemies to stone''
+|-
+| VAMPIRIC ICON <br>[ASN] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/VampiricIcon.gif -->
+| An [[assassin]] knows very well that most mages are male and many spend their life in seclusion without seeing a woman. Some who have trained in these particular arts can also employ this strategy on the battlefield.<br> ''Effect: burns an unholy female sign on the ground in life stealing flames''
+|-
+| IMMORTAL <br>[BAR] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/Immortal.gif -->
+| Running away is for the weak. A [[barbarian]] warrior who runs is easy prey. One who stands his ground in the face of death may survive, for he is the one the ancestral spirits will favour.<br> ''Passive effect: avoids damage when standing still and improves hit recovery''
+|-
+| GOODBERRY <br>[DRU] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/Goodberry.gif -->
+| The fruits of the Glor-An-Fhaidha, the mystical tree of life, can bring back mortals from the brink of death. Wise druids look for large red berries growing on plants that ordinary do not bear fruit.<br> ''Passive effect: create a Goodberry in the Horadric Cube that boosts life''
+|-
+| BLACK MASS <br>[NEC] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/BlackMass.gif -->
+| The dragon god of death Trang-Oul takes his faithful under his wings, turning aside blades and arrows. This powerful spell requires total concentration and is easily broken when the caster is disturbed.<br> ''Effect: press and hold to protect self and nearby minions''
+|-
+| DIVINE APPARITION <br>[PAL] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/DivineApparition.gif -->
+| Like a deus ex machina, the [[paladin]] of Zakarum descends upon the battlefield, his mere appearance chilling his heathen enemies to the bone.<br> ''Effect: teleport to target location and freeze enemies''
+|-
+| SYMBOL OF ESU <br>[SOR] |
+<!-- image: https://modsbylaz.vn.cz/images/skillicons/specials/SymbolofEsu.gif -->
+| The symbol of the ancient witch queen is a specially crafted conductive adamantine moon crescent that accumulates ambient energy from the magic in the environment, releasing it as a healing pulse when broken.<br> ''Effect: create a symbol in the cube that instantly heals life and mana''
+
+|}
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/ennead.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Challenges]]

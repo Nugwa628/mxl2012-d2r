@@ -197,8 +197,8 @@ def steps_for(charm_inv: str, data_only: bool = False) -> list:
     elif charm_inv != "charminv":
         raise SystemExit(f"charm inventory {charm_inv!r}: one of {', '.join(charm_inventory.CHARM_INVENTORIES)}")
     if data_only:
-        return [*data, STRING_MERGE[0], ["devmenu_catalog.py"], ["validate.py"]]
-    return [*data, *art, *STRING_MERGE, ["devmenu_catalog.py"], ["validate.py"]]
+        return [*data, STRING_MERGE[0], ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]]
+    return [*data, *art, *STRING_MERGE, ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]]
 
 
 STEPS = steps_for("charminv")

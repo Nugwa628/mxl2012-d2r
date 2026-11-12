@@ -1,0 +1,132 @@
+== Level challenge 1 ==
+
+Looking for some low level action while levelling up your character? The Level Challenge 1 rewards you for beating a specific uberlevel at a low character level.
+
+Advanced players only!
+
+'''Killing a Boss'''<br> This challenge requires you to 'kill' a boss. This means that you need to be physically present at the battle and near the boss when it dies before you can use the cube recipe that grants you the reward.
+
+If you succeed in killing the target monster, you get a whirling red overlay that looks like three rotating bolts:
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_swirlies.jpg -->
+
+You now have 30 seconds to perform the cube recipe. If you are too slow and the red overlay vanishes, you have to do it again!
+
+'''Warning:''' This does not work if the monster is killed by reflected damage, due to a Diablo II engine limitation. Please use different means of killing the target.
+
+== How to do the level challenge 1 —  '''maximum level 50-70 depending on element''' ==
+
+Go to the '''Tran Athulua''' uberlevel on '''Hatred''' difficulty, find and defeat any of the three '''Priestesses.'''
+
+She will drop her Sunstone. '''Cube it''' immediately while you have the red swirls on you. This will add some nice additional bonuses to your Sunstone, if your level is low enough.
+
+You have '''30 seconds''' to cube the Sunstone after killing the Priestess, so keep your cube empty!
+
+See [[Level ubers#Tran Athulua|Tran Athulua]] for more information.
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_026.jpg -->
+
+'''Level Challenge 1A: Fire<br>(Max Level 70)'''<br> Kill Philios, Priestess of Hefaetrus. She will drop a Sunstone of Fire. If you are '''level 70''' or below, cube it while the red whirls are on your character to add extra bonuses.
+
+Sunstone of Fire + town portal scroll + identify scroll -> returns Sunstone of Fire with added bonuses
+
+Requires: level 70 or below
+
+''This upgrade recipe adds the following bonuses:''
+
+All Resists +20%
+
+'''Level Challenge 1B: Ice<br>(Max Level 60)'''<br> Kill Skovos, Priestess of Karcheus. She will drop a Sunstone of Ice. If you are '''level 60''' or below, cube it while the red whirls are on your character to add extra bonuses.
+
+Sunstone of Ice + town portal scroll + identify scroll -> returns Sunstone of Ice with added bonuses
+
+Requires: level 60 or below
+
+''This upgrade recipe adds the following bonuses:''
+
++2 to All Skills
+
+'''Level Challenge 1C: Thunder<br>(Max Level 50)'''<br> Kill Lycander, Priestess of Zerae. She will drop a Sunstone of Thunder. If you are '''level 50''' or below, cube it while the red whirls are on your character to add extra bonuses.
+
+Sunstone of Thunder + town portal scroll + identify scroll -> returns Sunstone of Thunder with added bonuses
+
+Requires: level 50 or below
+
+''This upgrade recipe adds the following bonuses:''
+
+20% Increased Attack Speed<br> 20% Faster Cast Rate<br> 20% Faster Hit Recovery<br> 20% Faster Block Rate<br> 20% Faster Run/Walk<br> 15% Bonus to all Attributes
+
+'''Btw. '''You gain no experience on Hatred difficulty in Tran Athulua itself. Keep trying until you succeed!
+
+'''Btw. '''Although all three Priestesses give you the same looking red whirls, you need to kill the right Priestess to cube the right charm.
+
+== Level challenge 2 ==
+
+Looking for a challenge in Terror difficulty? The Level Challenge 2 rewards you for beating a specific uberquest at a low character level.
+
+Advanced players only!
+
+'''Killing a Boss'''<br> This challenge requires you to 'kill' a boss. This means that you need to be physically present at the battle and near the boss when it dies before you can use the cube recipe that grants you the reward.
+
+If you succeed in killing the target monster, you get a whirling red overlay that looks like three rotating bolts:
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_swirlies.jpg -->
+
+You now have 30 seconds to perform the cube recipe. If you are too slow and the red overlay vanishes, you have to do it again!
+
+'''Warning:''' This does not work if the monster is killed by reflected damage, due to a Diablo II engine limitation. Please use different means of killing the target.
+
+'''You need your Class Charm'''<br> This challenge requires you to have your 'Class Charm'. This is a charm that drops in the Kurast 3000 BA uberlevel. If you did the Ennead Challenge, you already have one.
+
+If not, See [[Level ubers#Kurast 3000 BA|Kurast 3000 BA]] for more information.
+
+There are 7 class charms, one for each character class.
+
+== How to do the level challenge 2 —  '''maximum level 90''' ==
+
+Do the '''Binding of Baal''' uberquest on '''Terror''' difficulty and defeat '''Tal Rasha.'''
+
+This will trigger the whirly effect. '''Cube''' your class charm with a perfect gem to receive additional bonuses if your characterlevel is low enough.
+
+You have '''30 seconds''' to cube the class charm after killing Tal Rasha, so keep your cube empty!
+
+See [[Summoning ubers#The Binding of Baal|Binding of Baal]] for more information.
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_037.jpg -->
+
+[Class Charm] + perfect gem -> returns [Class Charm] with added bonuses
+
+Requires: level 90 or below
+
+''This upgrade recipe adds the following bonuses:''
+
+{| class="wikitable"
+! Class
+! Bonuses
+|-
+| [[Amazon]]
+| Increase Maximum Life 5%<br>+25% Increased Healing Rate from Apples
+|-
+| [[Assassin]]
+| Curse Length Reduced by 25%<br>5% Chance to Avoid Damage
+|-
+| [[Barbarian]]
+| 5% Bonus to Summoned Minion Life<br>+1% to Defense per Socketed Rune
+|-
+| [[Druid]]
+| Total Character Defense Plus 25%<br>All Resists +5%
+|-
+| [[Necromancer]]
+| +1 Extra Totems<br>10% Bonus to Summoned Minion Damage<br>'''*''' Due to a bug, the bonus to extra totems is not applied in version 1.E9. It is fixed in 1.F9.
+|-
+| [[Paladin]]
+| Damage Reduced by 5%<br>Total Character Defense Plus 10%
+|-
+| [[Sorceress]]
+| +15% Bonus to Energy Factor<br>+5% to Spell Damage
+|}
+
+'''Btw. '''You gain no experience on Terror difficulty from Binding of Baal itself. Keep trying until you succeed!
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/levelchallenges.html Brother Laz's Median XL documentation] [https://modsbylaz.vn.cz/levelchallenge2.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Challenges]]

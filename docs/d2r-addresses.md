@@ -1420,3 +1420,23 @@ front of D2R's window procedure (devmenu.cpp, a subclass of the game window, no 
 WM_KEYDOWN / WM_KEYUP reach D2R as F24 (no default binding), its character types; editing keys (Backspace, Enter, arrows, Home, End, Delete) go on
 as themselves and the listener marks their BindingDown / BindingUp handled. D2R keeps the UI focus on the box after a click on a button or the game,
 so "has the keyboard" follows the last left click (on the box or not), not the focus.
+
+## Text boxes: colours, lines, and the panel name limit (lane wikipanel, 2026-11-11; plugin/src/wiki.cpp, panel_shared.cpp)
+
+Seen in game on build 93847 (check `wikilab`, screenshots `mxl2012-runs/wikipanel/wikipanel/shots/`), not read from the dump:
+
+- **No colour codes through the setter.** A text given to `0x86dd50` is drawn as written: `ÿc4` shows its three characters, also in a
+  box whose style has `pipeCharacterBehavior: "handle"`, and so do `|c4` and `|cffRRGGBB...|r`. A `TextBoxWidget` has the one colour of its
+  style (`fontColor` in the layout). The wiki panel stacks one box per colour at each line and fills the one it needs.
+- **Several lines in one box work**: with `newlineHandling: "standard"` and `lineWrap: true` in the style, a text with `
+` is drawn on
+  several lines and long lines are wrapped by the real glyph widths. Nothing is cut: a text longer or taller than the box runs past it.
+- **Font face.** `"fontFace": "Formal"` in a style draws mixed case; the default face of `$SmallFontSize` text draws capitals only. Formal
+  at `$SmallFontSize` measured 15.7 panel units a character for prose, 16.8 for digits, 18.6 for capitals (1600 x 900).
+- **`RectangleWidget`** (`fields.rect`, `fields.color`) draws in HD and is enough for a panel background and pane frames.
+- **64 registered panels a plugin.** PanelService registration failed at the 65th name of mxl2012-core (developer menu 32, send to stash
+  1, then the wiki's). A button's `PanelManager:OpenPanel:<name>` message needs a registered name to reach the UI message listener, so a
+  panel with many buttons gives them one name and finds the button from the position of the click (the window subclass of
+  `panel_shared.cpp` records WM_LBUTTONUP; client pixels to panel units with `panel_logic::ToPanelUnits`).
+- **WM_MOUSEWHEEL** reaches the game window's procedure, so the same subclass can take it while a panel is open and the pointer is over it;
+  swallowing it there keeps the game from changing the skill or zooming the map.

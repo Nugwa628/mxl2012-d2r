@@ -1,0 +1,15 @@
+Invulnerable ethereal demonic spirits that may appear near places of power. They cannot be destroyed, but present a deadly hazard for the unwary adventurer.
+
+A violent death often leaves a spirit or poltergeist behind. Most spirits are weak, manifesting only as a sobbing on the wind or dancing ghost lights at night. Some grow stronger in death and guard their final resting place with unholy fury.
+
+A witch is a rare sight, but great care should be taken around them. They are invulnerable to any attack or spell but are not agressive and do not move. However, do not come too close and startle a witch - or else!... Their ethereal shockwave attack bypasses all defenses and sunders the victim's soul, killing instantly.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_witches.jpg -->
+
+== Strategy ==
+Give a witch wide berth to avoid upsetting her. They do stand out from the crowd and their eerie song can be heard up to a screen away. A witch will laugh when she is about to pounce - when you hear this, run away immediately!
+
+''If a witch is completely blocking your path, summon a minion near her. She will kill it and then remain inert for a few seconds, giving you an opportunity to run past.''
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/witches.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Concepts]]

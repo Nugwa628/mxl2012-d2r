@@ -1,0 +1,11 @@
+Challenges include the following activities:
+
+* [[Eggs]]
+* [[Level challenges]]
+* [[Ennead]]
+* [[Black Road]]
+* [[Minigames]]
+* [[Enemy tokens]]
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/levelchallenges.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Challenges]]

@@ -1,0 +1,24 @@
+Blocking and defence rating in Median XL work much the same as in classic Diablo II Lord of Destruction, but their role in the game has changed. In the regular game, max block (75% block) through investment into dexterity was common, while defence rating was hardly worth it. The two statistics are much more balanced in Median XL.
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_011.jpg -->
+
+== Defence ==
+The chance to be hit is as follows:
+
+'''CtBH = 100*(attack)/(attack + defence)'''
+
+Investing into defence pays off if you can get around 20-50K defence at level 120, at which point you will see a noticeable improvement in your chance to be hit. Some builds can go well over 100K defence.
+
+''Important: in Diablo II, defence is ignored when you run. Use 'R' to switch to walk mode to preserve your defence. Walk speed is much improved in Median XL.''
+
+== Block ==
+In Median XL, your chance to block depends on character class, not your shield. You may have noticed that these block chances are very low, between 0% and 3%. This is because block rating is boosted by dexterity as follows:
+
+'''CtB = (block_percent * dex)/(clvl * 2)'''
+
+Also, if you use a class-specific shield, you gain +1% extra block rating.
+
+Max block is hard to reach; you will need to invest heavily into dexterity. This is a balance measure in Median XL to ensure that shields do not outclass two-handed weapons as in classic Diablo II Lord of Destruction.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/block_and_ac.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Concepts]]

@@ -13,7 +13,23 @@
 #include <string_view>
 #include <vector>
 
+#include "panel_logic.h"
+
 namespace devmenu {
+
+// The rules every native panel of the plugin shares (panel_logic.h): the menu's search box, paging and line cutting are those.
+using panel_logic::EditingKey;
+using panel_logic::Ellipsize;
+using panel_logic::Fold;
+using panel_logic::Matches;
+using panel_logic::OnBox;
+using panel_logic::Page;
+using panel_logic::PageOf;
+using panel_logic::SplitTabs;
+using panel_logic::StandInKey;
+using panel_logic::ToInt;
+using panel_logic::TypedKey;
+using panel_logic::WrapText;
 
 // --- catalog (tools/devmenu_catalog.py writes it, data/mxl2012-devmenu/catalog.tsv in the mod) ----------------------------------------------
 inline constexpr int CatalogFormat = 3;
@@ -79,31 +95,6 @@ struct Catalog {
 	int thresholds[ClassCount][MaxLevel] = {};
 	std::string error;
 };
-
-inline auto SplitTabs(std::string_view line) -> std::vector<std::string_view> {
-	std::vector<std::string_view> out;
-	size_t from = 0;
-	for (;;) {
-		const size_t tab = line.find('\t', from);
-		out.push_back(line.substr(from, tab == std::string_view::npos ? std::string_view::npos : tab - from));
-		if (tab == std::string_view::npos) {
-			return out;
-		}
-		from = tab + 1;
-	}
-}
-
-inline auto ToInt(std::string_view s, int fallback = -1) -> int {
-	if (s.empty() || s.size() > 11) {
-		return fallback;
-	}
-	char buf[12];
-	std::memcpy(buf, s.data(), s.size());
-	buf[s.size()] = 0;
-	char* end = nullptr;
-	const long v = std::strtol(buf, &end, 10);
-	return end == buf + s.size() ? static_cast<int>(v) : fallback;
-}
 
 // Parses the catalog file's text. On a malformed file `ok` stays false and `error` names the problem: the menu then refuses everything.
 inline auto ParseCatalog(std::string_view text) -> Catalog {
@@ -217,13 +208,6 @@ inline auto ParseCatalog(std::string_view text) -> Catalog {
 }
 
 // --- search ---------------------------------------------------------------------------------------------------------------------------
-inline auto Fold(std::string_view s) -> std::string {
-	std::string out(s);
-	std::transform(out.begin(), out.end(), out.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-	return out;
-}
-
-// All the words of the query appear in the name (ASCII case folded; UTF-8 sequences compare as bytes).
 // The empty sockets asked for when an item is spawned: a normal item gets its maximum (the catalog's count, 0 for an item that cannot have
 // sockets); a unique or set item asks for none, so it keeps its row's fixed `sock` property or stays without sockets, as Median makes it.
 inline auto SpawnSockets(const Item& item) -> uint32_t {
@@ -246,56 +230,6 @@ inline auto SpawnIdentified(uint32_t /*quality*/) -> bool {
 // when the game caps it; the status says "n of m".
 inline auto SocketsReal(uint32_t wanted, uint32_t flags, int32_t count) -> bool {
 	return wanted == 0 || (count > 0 && (flags & ItemFlagSocketed) != 0 && (flags & ItemFlagIdentified) != 0);
-}
-
-// Keys of the search / level box while it has the focus (devmenu.cpp "typing"), by Windows virtual key. A typed key makes a character (letters,
-// digits, space, punctuation, numpad digits and operators): D2R gets its character and not its key press, so no binding runs. An editing key
-// moves or deletes in the box and keeps going to D2R, with its binding blocked. Everything else (Esc, F-keys, Tab, modifiers) stays the game's.
-inline auto TypedKey(unsigned vk) -> bool {
-	return vk == 0x20 || (vk >= 0x30 && vk <= 0x39) || (vk >= 0x41 && vk <= 0x5A) || (vk >= 0x60 && vk <= 0x6F && vk != 0x6C) || (vk >= 0xBA && vk <= 0xC0) ||
-	       (vk >= 0xDB && vk <= 0xDF) || vk == 0xE2;
-}
-
-inline auto EditingKey(unsigned vk) -> bool {
-	return vk == 0x08 || vk == 0x0D || vk == 0x2E || (vk >= 0x23 && vk <= 0x28);  // Backspace, Enter, Delete, End, Home, arrows
-}
-
-// The key D2R is given instead of a typed key while the box has the keyboard: a key with no binding by default (F24), so D2R treats the key
-// press like any unbound key and turns its character into typing.
-inline constexpr unsigned StandInKey = 0x87;
-
-// Whether a click at client pixel (x, y) is on the search / level box. The panel is centred in the window (anchor 0.5, 0.5); HD layouts are in
-// units of a 2160-pixel-high screen, classic ones in an 800 x 600 screen scaled to fit (the same mapping the in-game check clicks with).
-// `margin` widens the box by that many layout units on each side.
-inline auto OnBox(bool hd, int clientW, int clientH, int panelX, int panelY, int boxX, int boxY, int boxW, int boxH, int x, int y, int margin = 6) -> bool {
-	if (clientW <= 0 || clientH <= 0) {
-		return false;
-	}
-	const double scale = hd ? clientH / 2160.0 : (clientH / 600.0 < clientW / 800.0 ? clientH / 600.0 : clientW / 800.0);
-	const double left = clientW / 2.0 + (panelX + boxX - margin) * scale, top = clientH / 2.0 + (panelY + boxY - margin) * scale;
-	const double right = left + (boxW + 2 * margin) * scale, bottom = top + (boxH + 2 * margin) * scale;
-	return x >= left && x < right && y >= top && y < bottom;
-}
-
-inline auto Matches(std::string_view name, std::string_view query) -> bool {
-	const std::string hay = Fold(name), q = Fold(query);
-	size_t from = 0;
-	for (;;) {
-		while (from < q.size() && q[from] == ' ') {
-			++from;
-		}
-		if (from >= q.size()) {
-			return true;
-		}
-		size_t end = q.find(' ', from);
-		if (end == std::string::npos) {
-			end = q.size();
-		}
-		if (hay.find(q.substr(from, end - from)) == std::string::npos) {
-			return false;
-		}
-		from = end;
-	}
 }
 
 // One row of a result list: an index into Catalog::items, kits or levels.
@@ -387,23 +321,6 @@ inline auto UberArrivalText(const Catalog& c, const Uber& u) -> std::string {
 	const Level* entry = FindLevel(c, u.entry);
 	return "You arrived in " + (entry != nullptr ? entry->name : std::string("?")) + ", right before " + u.name + ": its " +
 	       (u.how == 1 ? "red portal" : "entrance") + " is in this area.";
-}
-
-// Pages over a result list. `page` is zero-based; a page past the end clamps.
-struct Page {
-	int first = 0, count = 0, page = 0, pages = 1;
-};
-
-inline auto PageOf(int total, int page, int perPage) noexcept -> Page {
-	Page p;
-	p.pages = total == 0 ? 1 : (total + perPage - 1) / perPage;
-	p.page = std::clamp(page, 0, p.pages - 1);
-	p.first = p.page * perPage;
-	p.count = std::min(perPage, total - p.first);
-	if (p.count < 0) {
-		p.count = 0;
-	}
-	return p;
 }
 
 // --- the gate (every action, at the button and again on the game thread) -----------------------------------------------------------------
@@ -519,50 +436,5 @@ inline auto WaypointNumbers(const Catalog& c) -> std::vector<int> {
 // rewarded; the unlock sets them as closed-save edits did, without touching any other quest state.
 inline constexpr int ActWords[] = {7, 15, 23, 26, 28};
 inline constexpr int ActWordBits[] = {0, 12};
-
-// Word wrap for overlay text: at most maxLines lines no wider than maxWidth by `width(string)`. A single word wider than the line keeps its
-// own line. What no longer fits is cut, and the last line ends in "...".
-// A line cut to at most maxChars bytes, ending in "..." when cut, and never inside a UTF-8 sequence.
-inline auto Ellipsize(const std::string& text, size_t maxChars) -> std::string {
-	if (text.size() <= maxChars) {
-		return text;
-	}
-	size_t keep = maxChars > 3 ? maxChars - 3 : 0;
-	while (keep > 0 && (static_cast<unsigned char>(text[keep]) & 0xC0) == 0x80) {
-		--keep;
-	}
-	return text.substr(0, keep) + "...";
-}
-
-template <class Width>
-auto WrapText(const std::string& text, float maxWidth, size_t maxLines, Width&& width) -> std::vector<std::string> {
-	std::vector<std::string> lines;
-	std::string current;
-	size_t pos = 0;
-	while (pos < text.size()) {
-		size_t end = text.find(' ', pos);
-		end = end == std::string::npos ? text.size() : end;
-		const std::string word = text.substr(pos, end - pos);
-		pos = end + 1;
-		if (word.empty()) {
-			continue;
-		}
-		std::string joined = current.empty() ? word : current + " " + word;
-		if (current.empty() || width(joined) <= maxWidth) {
-			current = std::move(joined);
-			continue;
-		}
-		if (lines.size() + 1 == maxLines) {
-			lines.push_back(current + "...");
-			return lines;
-		}
-		lines.push_back(current);
-		current = word;
-	}
-	if (!current.empty()) {
-		lines.push_back(current);
-	}
-	return lines;
-}
 
 }  // namespace devmenu

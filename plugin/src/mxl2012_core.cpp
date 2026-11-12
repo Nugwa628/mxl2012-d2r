@@ -130,6 +130,7 @@
 #include "merc_equip.h"
 #include "translation_guard.h"
 #include "devmenu.h"
+#include "wiki.h"
 #include "send_stash.h"
 #include "vo_chat.h"
 #include "void_floor.h"
@@ -146,7 +147,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.20";
+constexpr const char* PluginVersion = "0.1.21";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -501,6 +502,7 @@ char g_tabFlashReport[192] = "";
 char g_voidFloorReport[160] = "";
 char g_modelCacheReport[192] = "";
 char g_devMenuReport[320] = "";
+char g_wikiReport[320] = "";
 char g_stashPageReport[192] = "";
 char g_sendStashReport[192] = "";
 char g_mapRevealReport[256] = "";
@@ -853,6 +855,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		SayPart(command, "devmenu", line);
 	}
 	{
+		char status[640];
+		WikiStatus(status, sizeof(status));
+		std::snprintf(line, sizeof(line), "%s | %s", g_wikiReport, status);
+		SayPart(command, "wiki", line);
+	}
+	{
 		char status[512];
 		ClearFontsStatus(status, sizeof(status));
 		std::snprintf(line, sizeof(line), "%s | %s", g_clearFontsReport, status);
@@ -1127,6 +1135,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("devmenu")) {
 		InstallDevMenu(context, g_selfPath, g_devMenuReport, sizeof(g_devMenuReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_devMenuReport);
+		context->LogInfo(line);
+	}
+	if (!Off("wiki")) {
+		InstallWiki(context, g_selfPath, g_wikiReport, sizeof(g_wikiReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_wikiReport);
 		context->LogInfo(line);
 	}
 	if (!Off("cltdostub")) {

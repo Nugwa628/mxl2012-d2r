@@ -1,0 +1,192 @@
+== Installation ==
+'''How do I install Median XL?'''
+ Simply make sure your Diablo 2 Lord of Destruction installation is up to date, then find the file named ''patch_d2.mpq'' in your install directory and replace it with the one in the mod download. Detailed instructions and information about Macs are inside the download.
+{{Port note|D2R-XL 2012 is not installed by replacing ''patch_d2.mpq''. It is a mod folder (<code>mods\mxl2012</code>) inside your own Diablo II: Resurrected 3.3 install and runs through [[D2RLoader]] 1.3.1. The D2R-XL 2012 Downloader installs and updates it and can install D2RLoader for you. See [[Installation]].}}
+
+'''Can I still go back to classic LoD?'''
+ To install the mod, you need to swap out one file. To go back to classic LoD, swap it back! It is that simple!
+{{Port note|Nothing in your D2R install is swapped out. Start D2R as usual (without D2RLoader's <code>-mod mxl2012</code>) to play the unmodded game; D2R-XL 2012 stays in its own mod folder.}}
+
+'''Will my classic Lord of Destruction characters work?'''
+ No; Median XL has separate characters.
+
+'''I don't have the Lord of Destruction expansion!'''
+ What a bloody shame. No Median XL for you!
+
+== Compatibility ==
+'''Which Diablo 2 version do I need?'''
+ You need Diablo 2 Lord of Destruction 1.10, 1.11, 1.12 or 1.13. If Blizzard releases 1.14, it will most likely remain compatible, but check the latest news just to be sure.
+{{Port note|D2R-XL 2012 needs '''Diablo II: Resurrected 3.3''' and '''D2RLoader 1.3.1'''. On another D2R version the mod's engine plugin switches itself off and says so at the top of the screen: "D2R-XL 2012 ''version'' needs Diablo II: Resurrected 3.3; this game is a different version." With Reign of the Warlock on your Battle.net account you can also play the Warlock.}}
+
+'''What are the system requirements for Median XL?'''
+ Any system that runs Diablo 2 reasonably well is compatible with Median XL. Note that the Diablo 2 engine is outdated and will occasionally slow down on even a modern system when too much awesome stuff happens, regardless of system specifications. This is perfectly normal and unavoidable other than by making the mod less awesome.
+
+'''Does this mod work on a Mac?'''
+ Yes, although the installation procedure may be slightly complicated.
+{{Port note|D2R-XL 2012 runs on Windows only: D2RLoader and the mod's plugins are Windows x64 programs.}}
+
+'''Does this mod support PlugY?'''
+ Yes, however the skill reallocation feature in PlugY is disabled due to a major bug in PlugY that may cause you to end up with a large number of skill points. Also, PlugY itself has a few glitches that may lead to item loss.
+{{Port note|PlugY does not exist for D2R. The port uses what D2R and D2RLoader have instead: two personal stash pages, five shared stash pages (seven in Reign of the Warlock games), the Gems, Materials and Runes pages in Reign of the Warlock games, and Akara's "Reset Skills and Stats", which is unlimited up to character level 100. There is no stat unassign per point and no item level display. See [[Port changes]].}}
+
+'''Does this mod support Multires?'''
+ Yes.
+{{Port note|D2R draws in widescreen by itself. For the classic graphics (press G) the mod comes with the [[Plugins|D2R Legacy 16:9]] plugin, which widens the classic picture to 16:9 or 16:10.}}
+
+'''Does this mod support my illegal/pirated/torrented Diablo II?'''
+ I don't know because I didn't steal the game.
+
+'''Does this mod support maphack/pickit/bots?'''
+ Stop cheating and learn to play.
+
+== Crashes and errors ==
+'''Median XL crashes while loading'''
+ ''- You installed a LoD patch while Median XL was already installed.
+ - You are using '''-direct -txt''' or a loader.
+ - You are using PlugY and it is not installed correctly.
+ - You are trying to play on battle.net.''
+{{Port note|In D2R-XL 2012 the loader is required: start the game through [[D2RLoader]] (or the Downloader's Play button); <code>-txt</code> is not needed. The very first start after installing D2RLoader, or after a D2R or D2RLoader update, builds D2RLoader's cache and the mod asks you to close the game and start it again. Do not copy another mod's <code>d2rloader</code> files into <code>mods\mxl2012</code>: the mod's plugin then does not load. After a crash, <code>d2rloader\logs\d2rloader.log</code> in your D2R folder says what happened; send it with a bug report.}}
+
+'''Median XL crashes during gameplay'''
+ ''- Your Diablo 2 files were damaged. Yes, this does happen.
+ - Different mod versions in a multiplayer game.
+ - You are using PlugY and it has a bug. Contact the creator of PlugY for a solution.
+ - Your character reached the file size limit for Diablo 2 save files and now it crashes every time it attempts to save the game. This can occasionally happen if you have a lot of socketed items with a large number of modifiers. To fix it, throw out some items or alternatively install PlugY and use its shared stash feature.
+''
+{{Port note|D2R-XL 2012 saves characters in D2RLoader's extended save format, which the mod's <code>d2rloader.toml</code> sets (<code>[d2rcore.save_format] mode = "extended"</code>). The mod checks that key at start, adds it if it is missing and asks for one restart. Without it, saving failed while you carried many Median uniques, set items or runewords; a failed save shows a red line. The Downloader's '''Repair''' brings back damaged mod files.}}
+
+'''Median XL does not save characters properly'''
+ ''- You are using PlugY and it has a bug. Contact the creator of PlugY for a solution.
+ - Your save folder is read only. This may be due to a permissions problem with recent Windows versions (Vista and up) which zealously protect the Program Files folder. Try running Diablo 2 as administrator.''
+{{Port note|D2R-XL 2012 characters are saved in <code>Saved Games\Diablo II Resurrected\mods\mxl2012\</code>, not in the game folder. If saving fails, check the extended save format above. The Downloader never asks for administrator rights.}}
+
+'''My characters have disappeared'''
+ ''- A computer or game crash may have corrupted your save file. I hope you have a backup.
+ - Your file paths may have been redirected by another mod (active or uninstalled). Reinstall Diablo 2.
+ - Your file paths may have been redirected by Windows. Try running Diablo 2 as administrator. If you already did, try not running it as administrator.''
+{{Port note|Backups exist: the Downloader copies your characters and shared stashes before every install, update and repair into <code>save-copies</code> in its data folder (<code>%LOCALAPPDATA%\mxl2012</code>, the 10 newest are kept), and D2RLoader keeps its own in <code>Saved Games\Diablo II Resurrected\D2RLoader Backups</code>. To go back, close the game and copy the files into the save folder. Each character has a D2RLoader file (<code>.d2rl</code>) next to its <code>.d2s</code>; a character whose <code>.d2s</code> was edited by hand no longer matches it and is not listed. A character with items on personal stash page 2 does not load without the mod's plugin.}}
+
+'''Median XL crashes while travelling between Acts'''
+ ''- Your sound is missing, defective or disabled, causing the Diablo II video player to crash. This is not a Median XL bug.''
+
+'''Median XL gives a 'Bad Inventory Data' or similar error while loading a character'''
+ ''- You are attempting to use a character that is not from Median XL.
+ - Your character save file has become damaged.
+ - You are using PlugY and there are invalid items in the shared stash.
+ - You tried to hack your character and failed epically.
+ - This may happen after a Median XL version upgrade. Although characters should be compatible between various Median XL releases, new items introduced in later patches are not backwards compatible and the Omega patch is a little more sensitive. Try going back to your earlier version and throwing out some items until your character loads.''
+{{Port note|Restore a damaged character or stash from the backups described above. If a shared stash shows a "bad header" error after an update, close the game, copy the stash back from a backup and send <code>d2rloader\logs\d2rloader.log</code> and the stash file with a bug report. Do not go back to 0.1.11 or older after putting Median runes or gems in the Reign of the Warlock Runes and Gems pages: older versions delete those stacks.}}
+
+'''The mod does nothing, my game did not change'''
+ ''- Another mod changed your file locations.
+ - You copied the game to another folder.
+ - You renamed the Median XL patch_d2.mpq file.
+ - You have a Mac and did not follow the instructions.
+ - You have an unpatched (1.07) version of LoD.''
+{{Port note|In D2R-XL 2012: you started <code>D2R.exe</code> instead of D2RLoader, D2RLoader's Default Mod is another mod (use the Downloader's Play button, which always starts D2R-XL 2012), or your D2R is not version 3.3 (the mod then says so at the top of the screen).}}
+
+'''None of the runewords work'''
+ ''- Check the requirements on the runeword page.
+ - Fill all sockets with jewels except the last one, where you put the rune.
+ - Make sure the item is nonmagical (grey).
+ - If you were using the third party 'Runeword mod', remove it.''
+
+If you checked all this and found nothing, contact me through EMAIL for a solution.
+
+== Gameplay ==
+'''Why can I only put two points into a skill?'''
+ Skills start out with a maximum level of 2 that goes up by 1 after each six character levels. In other words, the maximum skill level slowly increases as your character levels up.
+
+'''Does [this skill] carry [crushing blow/leech/etc.]?'''
+ Any skill that deals weapon damage will carry all weapon modifiers. The exceptions are x% Chance to cast level y [Skill] on Attack (as opposed to "Striking"), +x to [Life/Mana] on Striking in Melee and Stun Attack, which only affect melee attacks.
+
+'''Where do I get teleport?'''
+ Some characters have a teleportation skill ([[amazon]]: Pounce - [[assassin]]: Blink - [[barbarian]]: Spirit Walk - [[necromancer]]: Bend the Shadows - [[paladin]]: Colosseum, Divine Apparition). If you use a different character or you do not have this skill, you can use an item with charges of these skills. The most popular is the runeword staff Pax Mystica, which has charges of Blink. At the end game, the Moon of the Spider reward charm for the Lord Aldric Jitan uberquest grants you the Jitan's Gate skill.
+
+'''Will the classic LoD runewords work?'''
+ The classic LoD runewords have been removed because they would not fit into the new item paradigm.
+
+'''How do I get those pretty colours like on the screenshots?'''
+ Go to your Diablo II folder, find the program 'D2VidTst', run it, let it do its thing for a while and then choose ''Direct3D'' mode. This enables coloured lighting in Diablo II. This does not work if you run Diablo II in a window.
+{{Port note|D2R has no D2VidTst. D2R-XL 2012 plays in D2R's HD graphics, and G switches to the classic graphics with Median XL's own art. In HD, Median XL's retextured maps are lit in their own colours.}}
+
+== Features ==
+'''What are Hatred, Terror, Destruction difficulty?'''
+ These are the new names for Normal, Nightmare and Hell respectively.
+
+'''What are Crafting Points?'''
+ You need Crafting Points to use some cube recipes. The amount of Crafting Points required is listed below the recipe. Find items with +xyz Crafting Points on them and wear those items while performing the recipe.
+
+'''What are Uberquests?'''
+ Uberquests are the ultimate challenge of Median XL. They involve special difficult monsters and bosses to kill. Most have a special unique reward for beating them on Destruction difficulty... See [[Uberquests]] for more information.
+
+'''What are Challenges?'''
+ Challenges reward you for completing difficult tasks under special limited rules. See [[Challenges]] for more information.
+
+== Strategy and tactics ==
+'''What is the best class?'''
+ The best class is the class you like the most.
+
+'''Physical damage kills me easily!'''
+ Defence rating and defensive skills (like the [[amazon]]'s Defensive Harmony and the [[sorceress]]' Warp Armor) are much more important in Median XL than in classic LoD. By contrast, life and blocking are less important. Note that in Diablo II your defence is ignored when you run, so hit 'R' to enter walk mode. In Median XL, walk mode is much faster and more comfortable.
+
+'''Elemental damage kills me easily!'''
+ Improve your resistances. It is important to have 75% resistance to every element before Act 3 Hatred. As for poison damage, the Poison Length Reduced by xx% modifier is very useful. In the end game, you should be able to find items with a bonus to maximum resistances, allowing you to increase your resistances to 90% or 95%.
+
+'''My weapon attacks don't do enough damage!'''
+ Aside from the obvious solution of getting a better weapon, you can also invest into skills that increase your damage or put points into strength or dexterity. Unlike in classic LoD, the strength and dexterity bonuses make a noticable difference at high levels, especially if you have no skills that add +% damage (bowazon). The description of the weapon tells you how much damage you gain at your current strength or dexterity value.
+
+'''My spells don't do enough damage!'''
+ The +x% to [Element] Spell Damage modifiers are plentiful and powerful. Get some of these bonuses and you will notice a significant difference. Aim for +200% in your chosen elements by the end game. Also make sure to put some points into energy to benefit from the spell damage synergy. The spell description of affected spells tells you how much of a damage bonus you gain at your current energy value.
+
+'''How many elements do I need?'''
+ Regular enemies can only have one natural immunity, so two elements is fine. The exception is Titan resist auras (solution: kill the Titan first). Physical immunity does not appear on any enemy by default but has a small chance to spawn on any random enemy in Destruction difficulty. Also, the Fauztinville uberquest contains monsters that are immune to multiple elements, and heroic bosses are very hard to kill without a large number of elements at your disposal.
+
+'''Can I remove immunities from enemies?'''
+ You can use various skills and items to remove an immunity off an enemy: the [[amazon]]'s Spellbind, [[assassin]]'s Phase Bomb, [[druid]]'s Mythal, [[necromancer]]'s Bane or the [[paladin]]'s Colosseum ability or certain class-specific items with the Mega Impact modifier. These attacks only work at 1/5 effectiveness if the target is immune. Items with -x% to Enemy [Element] Resistance do not break immunities by themselves, but can be used to further reduce an enemy's resistance after the immunity has been removed with Phase Bomb. Note that if an enemy is completely immune to all elements, this is usually an uberquest enemy and there is a trick to killing it. Consult the description of the uberquest.
+
+'''My minions die all the time!'''
+ Many items carry the +x% Bonus to Summoned Minion Life modifier. Focus on these items and your minions will get much stronger.
+
+'''My minions die all the time to elemental damage!'''
+ Focus on items with +x% Bonus to Summoned Minion Resistances. At skill level 5 and up, minions have 75% base resistance in Hatred difficulty, 25% in Terror and -25% in Destruction. The maximum amount of minion resistances on items you can have is +75%, meaning your minions can be elemental immune in Hatred and Terror but not Destruction.
+
+'''[This enemy] is invulnerable!'''
+ Uberquest enemies usually have a special trick to them. Some bosses are protected by a shield when their minions are nearby. Others can only be damaged after you kill a minion. Some enemies are simply unkillable and should be avoided. Consult the documentation for the uberquest for more information.
+
+== Issues ==
+'''Are there any belts with more than 2 rows?'''
+ Due to a Diablo II engine limitation, additional rows are hardcoded to the classic LoD belt types.
+
+'''My sacred belt has one one row!'''
+ Due to a Diablo II engine limitation, belts that do not have the 'belt' itemtype (ie. ones with the 'sacred belt' itemtype) have only one visible row. The other row exists, but is not accessible. Filling up your belt with shift-click and using potions with the number keys does work, though.
+
+'''My gems are not upgraded by a Gem Shrine!'''
+ Due to a Diablo II engine limitation, the new gems are not considered gems in some parts of the game.
+
+'''Is it normal that an uberboss or heroic boss spawns as a champion pack?'''
+ Diablo II likes to force spawn champions even when explicitly asked not to, or when a given monster is excluded from the champion pool. Restart the game and try again.
+
+== Multiplayer ==
+'''Can I play Median XL with other people?'''
+ Median XL officially supports TCP/IP multiplayer and open battle.net. It does not work on closed battle.net ('realms') because a realm game runs on the server and all your computer does is display the graphics. Blizzard's servers do not have Median installed.
+{{Port note|D2R has no open Battle.net. D2R-XL 2012 multiplayer games are hosted by a player who runs the mod (TCP/IP or a D2RLoader lobby). A few features work only for the host for now: the "Send storable/stackable items to stash" button is greyed when you joined another player's game.}}
+
+'''Does Median XL have a realm?'''
+ Since the ''Vivendi vs. BnetD'' lawsuit, realm emulation is considered illegal. For this reason, I do not provide an official realm for Median XL. Certain third parties may offer Median XL realms, but these are not supported by Modsbylaz and may use lower quality hacked versions of the mod.
+
+'''You didn't answer the question...'''
+ I heard the D2 Maniacs realm is free of cheaters and offers the official version of Median XL. Note that I do not own or take part in this realm; any questions should go to the realm owner.
+
+'''How do I find other Median players?'''
+ The ''Pandemonium'' section on the official FORUM allows players to find each other and play online together.
+
+'''TCP/IP or open battle.net doesn't work!'''
+ Make sure that all players in the game have the same version of Diablo II LoD, the same version of the mod and that either noone or everyone is using PlugY (if you don't know what PlugY is, you're not using it).
+{{Port note|For D2R-XL 2012: all players need Diablo II: Resurrected 3.3, D2RLoader 1.3.1 and the same D2R-XL 2012 version.}}
+
+'''I checked all that and it still doesn't work!'''
+ Median XL does not interfere with your ability to play multiplayer. This is not a Median XL problem. If a router or LAN is involved, Diablo II may display an incorrect IP address; consult a site like www.whatismyip.com to obtain your public IP. If this fails, please consult the official Blizzard support pages on www.battle.net.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/faq.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Guides]]

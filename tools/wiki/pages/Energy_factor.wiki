@@ -1,0 +1,13 @@
+In Median XL, direct damage spells gain a damage bonus from energy. This bonus has diminishing returns: the damage gained per additional point of energy is lower if you already have lots of energy to begin with.
+
+The energy factor bonus on some caster items modifies this curve, causing each point into energy to provide a significant benefit until much higher levels of energy. Energy factor is particularly effective for high level characters with most or all points into energy.
+
+The formula used to calculate the bonus from energy to spell damage is:
+
+''Spell damage increased by (260*energy)/(250+energy) + min((energy*enr_factor)/15000,200) percent''
+
+== Strength Factor ==
+This rare modifier can only be found on some legendary items and the [[Druid]]'s Force of Nature skill. It functions the same way as energy factor, but is based on strength instead.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/energy_factor.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Concepts]]

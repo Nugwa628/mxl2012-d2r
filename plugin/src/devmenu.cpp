@@ -2,9 +2,10 @@
 // native panel `mxl2012-core/DevMenu` (tools/devmenu_layout.py, HD and classic): searchable item spawning (uniques, sets, charms, quest / misc,
 // bases, runeword kits), area travel, a level raise, waypoint unlocks on all three difficulties and the advanced quests action.
 //
-// Layering: the UI runs on the UI thread (ThreadService, WidgetService); buttons are native and their PanelManager messages name panels
-// registered here (send_stash.cpp); result names, the page line and the status are native text boxes the plugin fills through D2R's own
-// text setter (WidgetService has none, and D2RLoader's overlay text does not show on this game).
+// Layering: the UI runs on the UI thread (ThreadService, WidgetService); buttons are native and their PanelManager messages name registered
+// panels (send_stash.cpp); result names, the page line and the status are native text boxes the plugin fills through D2R's own text setter
+// (WidgetService has none, and D2RLoader's overlay text does not show on this game). The button routing, the text setter and the search box
+// typing fix are shared with the wiki panel: panel_shared.cpp.
 // Every action is gated twice: by the UI on the press, and again on the game thread in Execute(). Nothing is built from free text: the input
 // box only filters the catalog and gives a level number; an action names a catalog row, a level id or a fixed console command.
 //
@@ -25,7 +26,7 @@
 #include "d2r.h"
 #include "devmenu_logic.h"
 #include "mxl_devmenu_layout.h"
-#include "rotw_stash_logic.h"
+#include "panel_shared.h"
 #include "server_frame.h"
 
 #include <D2RLPlugin/core_exports.h>
@@ -33,8 +34,6 @@
 #include <D2RLPlugin/inventory.h>
 #include <D2RLPlugin/item.h>
 #include <D2RLPlugin/panels.h>
-#include <D2RLPlugin/resources.h>
-#include <D2RLPlugin/shared_events.h>
 #include <D2RLPlugin/threads.h>
 #include <D2RLPlugin/widgets.h>
 
@@ -72,16 +71,8 @@ constexpr uint64_t RvaUnitRoom = 0x34b440;       // (unit) -> room
 constexpr uint64_t RvaRoomLevel = 0x2efc10;      // (room) -> level id
 constexpr uint64_t RvaTravel = 0x4f2e40;         // (game, player, level, 0): NPC travel, across acts
 constexpr uint64_t RvaLevelWarp = 0x488180;      // (game, player, level, 0): the warp inside an act
-constexpr uint64_t RvaUiRoot = 0x3440170;        // data: the root widget
-constexpr uint64_t RvaUiFindPanel = 0x89f760;    // (root, char name[128]) -> panel widget
-constexpr uint64_t RvaUiFindChild = 0x855c90;    // (widget, name) -> child widget, searching below it
-constexpr uint64_t RvaTextBoxSetText = 0x86dd50; // (TextBoxWidget, const string view*)
-constexpr uint64_t RvaHasUiFocus = 0x876160;     // (widget) -> the UI root's focus is this widget
-constexpr uint64_t RvaMarkHandled = 0x843fc0;    // (): the UI handled this input (root byte +0xb8): the key binding does not run
 constexpr uint64_t RvaItemData = 0x34a500;       // (item) -> item data, +0x18 the flag word (cube_dupe.cpp, harness_cmds.cpp)
 constexpr int ItemDataFlags = 0x18;
-constexpr unsigned char HasUiFocusEntry[] = {0x40, 0x53, 0x48, 0x83, 0xec, 0x20, 0x48, 0x8b, 0xd9, 0xe8};
-constexpr unsigned char MarkHandledEntry[] = {0x48, 0x8b, 0x05, 0xa9, 0xc1, 0xbf, 0x02, 0x48, 0x85, 0xc0, 0x74, 0x07, 0xc6, 0x80, 0xb8, 0x00};
 constexpr int UnitIdOffset = 0x08;
 constexpr int GameClients = 0x138, ClientNext = 0x628;
 constexpr int StatLevel = 12, StatExperience = 13;
@@ -106,7 +97,6 @@ using TravelFn = void (*)(d2r::Game*, d2r::Unit*, int32_t, int32_t);
 using ServerUnitFn = d2r::Unit* (*)(d2r::Game*, int32_t, uint32_t);
 using LocalIdFn = uint32_t (*)();
 using ClientPlayerFn = void* (*)(uint32_t);
-using HdFn = bool (*)() noexcept;
 using ExtTcpFn = DWORD(WINAPI*)(PVOID, PDWORD, BOOL, ULONG, TCP_TABLE_CLASS, ULONG);
 
 const D2RL::PluginContext* g_context = nullptr;
@@ -120,7 +110,6 @@ D2RL::Panels::RegistrationHandle g_panel = 0;
 D2RL::Input::ActionHandle g_action = D2RL::Input::InvalidHandle;
 uint64_t g_base = 0;
 bool g_on = false;
-HdFn g_hd = nullptr;
 ExtTcpFn g_extTcp = nullptr;
 
 template <class F>
@@ -132,7 +121,8 @@ auto Fn(uint64_t rva) noexcept -> F {
 Catalog g_catalog;  // read once at load, read-only afterwards
 
 // --- state shared across threads ----------------------------------------------------------------------------------------------
-std::atomic<bool> g_open{false};            // the panel is open
+panel_shared::Client g_client;              // the menu's part of the shared panel code (panel_shared.h)
+std::atomic<bool>& g_open = g_client.open;  // the panel is open
 std::atomic<bool> g_tickQueued{false};
 std::atomic<bool> g_toggleQueued{false};
 std::atomic<bool> g_busy{false};             // an action is in flight (one at a time, travel included)
@@ -144,7 +134,8 @@ std::atomic<int> g_clients{0};               // clients of the local server game
 std::atomic<d2r::Game*> g_game{nullptr};     // the local server game of the last frame
 std::atomic<long> g_presses{0}, g_actions{0}, g_refused{0}, g_faults{0}, g_listenChecks{0}, g_listeners{0}, g_gameOps{0}, g_taken{0}, g_done{0};
 
-std::atomic<long> g_textsSet{0}, g_textFails{0};
+std::atomic<long>& g_textsSet = g_client.textsSet;
+std::atomic<long>& g_textFails = g_client.textFails;
 std::atomic<long> g_socketFails{0};                       // spawned items whose sockets did not read back as real
 std::atomic<uint32_t> g_lastItemFlags{0};                 // the native flag word of the last spawned item that asked for sockets
 std::string g_portsSeen;
@@ -153,7 +144,8 @@ std::string g_rowTexts[layout::MaxRows];
 int g_rowCount = 0;
 std::string g_header, g_status = "Ready. Ctrl+F12 closes this menu.";
 std::string g_queryShown;      // the input box's text, for the harness's status line
-std::atomic<bool> g_boxFocus{false};   // the box has the UI focus (keys type into it), as of the last UI tick
+std::atomic<bool>& g_boxFocus = g_client.boxFocus;      // the box has the UI focus (keys type into it), as of the last UI tick
+std::atomic<bool>& g_boxClicked = g_client.boxClicked;  // the last left click while the menu was open was on the box
 std::atomic<bool> g_drawHd{true};
 
 // UI-thread-only state
@@ -695,42 +687,13 @@ void Frame(d2r::Game* game) noexcept {
 }
 
 // --- native text ------------------------------------------------------------------------------------------------------------
-// The result names, page line and status are TextBoxWidgets of the panel, filled with D2R's own text setter.
-struct NativeStringView {
-	const char* data;
-	size_t size;
-};
-using NativeFindPanelFn = void* (*)(void* root, const char* name128);
-using NativeFindChildFn = void* (*)(void* parent, const char* name);
-using NativeSetTextFn = void (*)(void* widget, const NativeStringView* text);
-
-auto NativePanel() noexcept -> void* {
-	void* root = *reinterpret_cast<void**>(g_base + RvaUiRoot);
-	if (root == nullptr) {
-		return nullptr;
-	}
-	char name[128] = {};
-	std::strncpy(name, layout::PanelName, sizeof(name) - 1);
-	return Fn<NativeFindPanelFn>(RvaUiFindPanel)(root, name);
-}
-
+// The result names, page line and status are TextBoxWidgets of the panel, filled with D2R's own text setter (panel_shared.cpp).
 void SetLine(void* panel, const char* name, std::string& shown, const std::string& want, bool force) {
-	if (!force && shown == want) {
-		return;
-	}
-	void* widget = Fn<NativeFindChildFn>(RvaUiFindChild)(panel, name);
-	if (widget == nullptr) {
-		g_textFails.fetch_add(1);
-		return;
-	}
-	const NativeStringView view{want.c_str(), want.size()};
-	Fn<NativeSetTextFn>(RvaTextBoxSetText)(widget, &view);
-	shown = want;
-	g_textsSet.fetch_add(1);
+	panel_shared::SetLine(g_client, panel, name, shown, want, force);
 }
 
 void ApplyTexts() {
-	void* panel = NativePanel();
+	void* panel = panel_shared::NativePanel(g_client);
 	if (panel == nullptr) {
 		return;
 	}
@@ -763,121 +726,15 @@ void ApplyTexts() {
 }
 
 // --- typing into the search / level box --------------------------------------------------------------------------------------
-// How D2R routes a key (docs/d2r-addresses.md "Text boxes and key bindings"): WM_KEYDOWN becomes InputMessage:KeyDown for the UI; a key with a
-// binding then becomes InputMessage:BindingDown and runs its command unless a UI handler marked the input as handled (`0x843fc0`, root byte
-// +0xb8); the key's WM_CHAR becomes InputMessage:CharacterTyped, which the focused text box takes, only for a key without a binding. Nothing
-// marks a bound key while a layout text box has the focus (the game's own "edited box" belongs to the controller's TextInputModal), so in 0.1.18
-// a bound key ("A", the digits) ran its command and never reached the box.
-//
-// While the menu is open and its box has the UI focus (a click on the box), two things, both scoped to that state:
-// - a printable key without Ctrl or Alt (letters, digits, space, punctuation, numpad digits) reaches D2R as an unbound key (`StandInKey`, F24):
-//   the subclass of the game's own window (not a system hook) changes the key of its WM_KEYDOWN / WM_KEYUP, so no binding matches, D2R takes the
-//   press as an unbound key and its WM_CHAR types (D2R types a character only after a key press that matched no binding, so holding the
-//   press back loses all but the first character);
-// - an editing key (Backspace, Enter, arrows, Home, End, Delete) still goes to D2R, so the box edits with it, and the UI listener marks its
-//   BindingDown / BindingUp as handled (Enter would otherwise open the chat line).
-// Esc and keys with Ctrl or Alt (Ctrl+F12) are untouched: Esc closes the menu, Ctrl+F12 toggles it. "Has the keyboard" follows the player's last
-// left click while the menu is open: on the box (`OnBox`, from the click's own window message) it does, anywhere else (a button, the rows, the
-// game) it does not, and the keys are the game's as before. D2R keeps the UI focus on the box after such clicks, so the focus alone cannot say.
-using HasUiFocusFn = bool (*)(void* widget);
-using MarkHandledFn = void (*)();
-bool g_typingOk = false;        // the functions' entry bytes matched at install
-std::atomic<long> g_keysTaken{0}, g_keysHeld{0};
-HWND g_window = nullptr;        // the subclassed game window (UI thread)
-WNDPROC g_gameProc = nullptr;
-std::atomic<bool> g_ctrl{false}, g_alt{false};  // as the window's own key messages say (posted test keys included)
-std::atomic<unsigned> g_lastKey{0};              // the virtual key of the last key down
+// The typing fix (bound keys type into the focused box instead of running their commands) is panel_shared.cpp "typing"; the menu says where its
+// box is, so a left click on it gives it the keyboard and a click anywhere else takes it away.
+std::atomic<long>& g_keysTaken = g_client.keysTaken;
+std::atomic<long>& g_keysHeld = g_client.keysHeld;
 
-auto BoxFocused() noexcept -> bool {
-	if (!g_typingOk) {
-		return false;
-	}
-	void* panel = NativePanel();
-	void* box = panel != nullptr ? Fn<NativeFindChildFn>(RvaUiFindChild)(panel, layout::InputName) : nullptr;
-	return box != nullptr && Fn<HasUiFocusFn>(RvaHasUiFocus)(box);
-}
-
-std::atomic<bool> g_boxClicked{false};  // the last left click while the menu was open was on the box
-
-auto Typing() noexcept -> bool {
-	return g_open.load() && g_boxClicked.load() && g_boxFocus.load() && !g_ctrl.load() && !g_alt.load();
-}
-
-void NoteClick(HWND window, LPARAM lParam) noexcept {
-	if (!g_open.load()) {
-		return;
-	}
-	RECT r{};
-	GetClientRect(window, &r);
+auto InputBox(panel_shared::BoxRect* box) noexcept -> bool {
 	const bool hd = g_drawHd.load();
 	const auto& m = hd ? layout::Hd : layout::Sd;
-	g_boxClicked.store(OnBox(hd, r.right - r.left, r.bottom - r.top, m.panelX, m.panelY, m.inputX, m.inputY, m.inputW, m.inputH,
-	                         static_cast<int>(static_cast<short>(LOWORD(lParam))), static_cast<int>(static_cast<short>(HIWORD(lParam)))));
-}
-
-LRESULT CALLBACK MenuWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
-	if (message == WM_KEYDOWN || message == WM_KEYUP || message == WM_SYSKEYDOWN || message == WM_SYSKEYUP) {
-		const auto key = static_cast<unsigned>(wParam);
-		const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
-		if (key == VK_CONTROL || key == VK_LCONTROL || key == VK_RCONTROL) {
-			g_ctrl.store(down);
-		} else if (key == VK_MENU || key == VK_LMENU || key == VK_RMENU) {
-			g_alt.store(down);
-		}
-		if (down) {
-			g_lastKey.store(key);
-		}
-		if ((message == WM_KEYDOWN || message == WM_KEYUP) && TypedKey(key) && Typing()) {
-			g_keysHeld.fetch_add(1);
-			return CallWindowProcW(g_gameProc, window, message, StandInKey, lParam);
-		}
-	} else if (message == WM_LBUTTONDOWN) {
-		NoteClick(window, lParam);
-	} else if (message == WM_KILLFOCUS || message == WM_ACTIVATEAPP) {
-		g_ctrl.store(false);
-		g_alt.store(false);
-	}
-	return CallWindowProcW(g_gameProc, window, message, wParam, lParam);
-}
-
-auto CALLBACK PickGameWindow(HWND window, LPARAM out) -> BOOL {
-	RECT r{};
-	if (GetWindow(window, GW_OWNER) == nullptr && GetClientRect(window, &r) && r.right > 320 && r.bottom > 200) {
-		*reinterpret_cast<HWND*>(out) = window;
-		return FALSE;
-	}
-	return TRUE;
-}
-
-// UI thread (the thread that owns the game window): subclasses the window once, the first time the menu opens.
-void HookGameWindow() noexcept {
-	if (g_window != nullptr || !g_typingOk) {
-		return;
-	}
-	HWND found = nullptr;
-	EnumThreadWindows(GetCurrentThreadId(), &PickGameWindow, reinterpret_cast<LPARAM>(&found));
-	if (found == nullptr) {
-		return;
-	}
-	const auto previous = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(found, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&MenuWindowProc)));
-	if (previous != nullptr) {
-		g_gameProc = previous;
-		g_window = found;
-		LogLine("typing: the game window is subclassed");
-	}
-}
-
-// UI thread (the UI message listener): true when this binding message belongs to an editing key of the focused box.
-auto TakeBindingForBox(const char* target, const char* command) noexcept -> bool {
-	if (target == nullptr || command == nullptr || std::strcmp(target, "InputMessage") != 0 ||
-	    (std::strcmp(command, "BindingDown") != 0 && std::strcmp(command, "BindingUp") != 0)) {
-		return false;
-	}
-	if (!Typing() || !EditingKey(g_lastKey.load()) || !BoxFocused()) {
-		return false;
-	}
-	Fn<MarkHandledFn>(RvaMarkHandled)();
-	g_keysTaken.fetch_add(1);
+	*box = panel_shared::BoxRect{hd, m.panelX, m.panelY, m.inputX, m.inputY, m.inputW, m.inputH};
 	return true;
 }
 
@@ -1094,7 +951,7 @@ void TickInner() {
 		g_presses_q.clear();  // a press never waits for the next opening
 		return;
 	}
-	if (g_hd != nullptr && g_hd() != g_drawHd.load()) {
+	if (panel_shared::IsHd() != g_drawHd.load()) {
 		g_drawHd.store(!g_drawHd.load());
 		g_dirty = true;
 		g_shownValid = false;
@@ -1107,8 +964,8 @@ void TickInner() {
 	for (int b : presses) {
 		OnPress(b);
 	}
-	HookGameWindow();
-	g_boxFocus.store(BoxFocused());
+	panel_shared::HookGameWindow();
+	g_boxFocus.store(panel_shared::BoxFocused(g_client));
 	char input[64] = "";
 	if (g_testInputSet) {
 		std::snprintf(input, sizeof(input), "%s", g_testInput.c_str());
@@ -1171,58 +1028,27 @@ auto __cdecl OnAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent
 	return D2RL::Input::ActionResult::Handled;
 }
 
-auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::UiMessageEvent* event, void*) noexcept -> D2RL::SharedEvents::UiMessageAction {
-	if (event != nullptr && TakeBindingForBox(event->target, event->command)) {
-		return D2RL::SharedEvents::UiMessageAction::Consume;
-	}
-	if (event == nullptr || event->target == nullptr || event->command == nullptr || event->text == nullptr || std::strcmp(event->target, "PanelManager") != 0 ||
-	    std::strcmp(event->command, "OpenPanel") != 0) {
-		return D2RL::SharedEvents::UiMessageAction::Continue;
-	}
-	const char* prefix = "mxl2012-core/DevMenuB_";
-	const size_t n = std::strlen(prefix);
-	if (std::strncmp(event->text, prefix, n) != 0) {
-		return D2RL::SharedEvents::UiMessageAction::Continue;
-	}
-	const int button = std::atoi(event->text + n);
-	if (button >= 0 && button < layout::ButtonCount) {
+// UI listener (panel_shared.cpp): a button of the menu was clicked. The work runs on the next UI tick.
+void OnButton(int button) noexcept {
+	{
 		const std::lock_guard<std::mutex> lock(g_pressMutex);
 		g_presses_q.push_back(button);
 	}
 	QueueTick();
-	return D2RL::SharedEvents::UiMessageAction::Consume;
 }
 
 auto LoadCatalog(const char* selfPath) -> std::string {
-	const char* mod = g_context->activeMod != nullptr && g_context->activeMod[0] != '\0' ? g_context->activeMod : "mxl2012";
-	std::wstring path;
-	wchar_t wide[1024];
-	if (MultiByteToWideChar(CP_UTF8, 0, selfPath, -1, wide, 1024) == 0) {
+	std::string text;
+	switch (panel_shared::ReadModFile(g_context, selfPath, L"data\\mxl2012-devmenu\\catalog.tsv", 8 * 1024 * 1024, &text)) {
+	case panel_shared::FileResult::Ok:
+		break;
+	case panel_shared::FileResult::NoPath:
 		return "the plugin path could not be read";
-	}
-	path = wide;
-	const size_t slash = path.find_last_of(L"\\/");
-	path = path.substr(0, slash == std::wstring::npos ? 0 : slash);
-	wchar_t modw[128];
-	(void)MultiByteToWideChar(CP_UTF8, 0, mod, -1, modw, 128);
-	path += L"\\..\\..\\";
-	path += modw;
-	path += L".mpq\\data\\mxl2012-devmenu\\catalog.tsv";
-	HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-	if (file == INVALID_HANDLE_VALUE) {
+	case panel_shared::FileResult::NotFound:
 		return "no catalog file in the mod (data/mxl2012-devmenu/catalog.tsv)";
-	}
-	LARGE_INTEGER size{};
-	GetFileSizeEx(file, &size);
-	if (size.QuadPart <= 0 || size.QuadPart > 8 * 1024 * 1024) {
-		CloseHandle(file);
+	case panel_shared::FileResult::BadSize:
 		return "the catalog file has a bad size";
-	}
-	std::string text(static_cast<size_t>(size.QuadPart), '\0');
-	DWORD read = 0;
-	const BOOL ok = ReadFile(file, text.data(), static_cast<DWORD>(text.size()), &read, nullptr);
-	CloseHandle(file);
-	if (!ok || read != text.size()) {
+	case panel_shared::FileResult::ReadFailed:
 		return "the catalog file could not be read";
 	}
 	g_catalog = ParseCatalog(text);
@@ -1234,19 +1060,13 @@ auto LoadCatalog(const char* selfPath) -> std::string {
 auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, char* report, size_t reportSize) noexcept -> bool {
 	g_context = context;
 	g_base = context->exeBase;
-	g_hd = reinterpret_cast<HdFn>(g_base + rotw_stash::HdModeRva);
-	g_typingOk = std::memcmp(reinterpret_cast<const void*>(g_base + RvaHasUiFocus), HasUiFocusEntry, sizeof(HasUiFocusEntry)) == 0 &&
-	             std::memcmp(reinterpret_cast<const void*>(g_base + RvaMarkHandled), MarkHandledEntry, sizeof(MarkHandledEntry)) == 0;
-	const D2RL::SharedEventService* events = nullptr;
-	const D2RL::ResourceService* resources = nullptr;
 	if (context->QueryService(&g_threads) != D2RL::ServiceQueryResult::Success || !D2RL::HasThreadServiceField(g_threads, D2RL::ThreadServiceRequiredSize) ||
 	    context->QueryService(&g_widgets) != D2RL::ServiceQueryResult::Success || !D2RL::HasWidgetServiceField(g_widgets, D2RL::WidgetServiceRequiredSize) ||
 	    context->QueryService(&g_panels) != D2RL::ServiceQueryResult::Success || !D2RL::HasPanelServiceField(g_panels, D2RL::PanelServiceRequiredSize) ||
 	    context->QueryService(&g_items) != D2RL::ServiceQueryResult::Success || !D2RL::HasItemServiceField(g_items, D2RL::ItemServiceRequiredSize) ||
 	    context->QueryService(&g_inventory) != D2RL::ServiceQueryResult::Success ||
 	    context->QueryService(&g_input) != D2RL::ServiceQueryResult::Success || !D2RL::HasInputServiceField(g_input, D2RL::InputServiceRequiredSize) ||
-	    context->QueryService(&events) != D2RL::ServiceQueryResult::Success || !D2RL::HasSharedEventServiceField(events, D2RL::SharedEventServiceRequiredSize) ||
-	    context->QueryService(&resources) != D2RL::ServiceQueryResult::Success) {
+	    !panel_shared::Init(context)) {
 		std::snprintf(report, reportSize, "devmenu off: a loader service is unavailable");
 		return false;
 	}
@@ -1260,18 +1080,8 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 		g_extTcp = reinterpret_cast<ExtTcpFn>(GetProcAddress(ip, "GetExtendedTcpTable"));
 	}
 
-	const char* layouts[][2] = {{"DevMenuhd", layout::LayoutHd}, {"DevMenu", layout::LayoutSd}};
-	for (const auto& entry : layouts) {
-		char path[96];
-		std::snprintf(path, sizeof(path), "data/global/ui/layouts/mxl2012-core/%s.json", entry[0]);
-		D2RL::Resources::ResourceRegistration resource{};
-		resource.structSize = D2RL::Resources::ResourceRegistrationSize;
-		resource.path = path;
-		resource.bytes = entry[1];
-		resource.byteCount = std::strlen(entry[1]);
-		D2RL::Resources::RegistrationHandle handle = D2RL::Resources::InvalidHandle;
-		(void)resources->registerResource(context, &resource, &handle);
-	}
+	(void)panel_shared::RegisterLayout(context, "DevMenuhd", layout::LayoutHd, std::strlen(layout::LayoutHd));
+	(void)panel_shared::RegisterLayout(context, "DevMenu", layout::LayoutSd, std::strlen(layout::LayoutSd));
 	D2RL::Panels::PanelRegistration panel{};
 	panel.structSize = D2RL::Panels::PanelRegistrationSize;
 	panel.flags = D2RL::Panels::PanelFlags::CloseOnEscape;
@@ -1280,18 +1090,9 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 		std::snprintf(report, reportSize, "devmenu off: the panel could not be registered");
 		return false;
 	}
-	for (int i = 0; i < layout::ButtonCount; ++i) {
-		char local[48];
-		std::snprintf(local, sizeof(local), "DevMenuB_%d", i);
-		D2RL::Panels::PanelRegistration button{};
-		button.structSize = D2RL::Panels::PanelRegistrationSize;
-		button.flags = D2RL::Panels::PanelFlags::None;
-		button.localId = local;
-		D2RL::Panels::RegistrationHandle h = 0;
-		if (g_panels->registerPanel(context, &button, &h) != D2RL::Panels::Result::Success) {
-			std::snprintf(report, reportSize, "devmenu off: button panel %d could not be registered", i);
-			return false;
-		}
+	if (const int failed = panel_shared::RegisterButtons(context, "DevMenuB_", layout::ButtonCount); failed >= 0) {
+		std::snprintf(report, reportSize, "devmenu off: button panel %d could not be registered", failed);
+		return false;
 	}
 	const D2RL::Input::ActionRegistration reg{
 	    .structSize = D2RL::Input::ActionRegistrationSize,
@@ -1309,12 +1110,13 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 		std::snprintf(report, reportSize, "devmenu off: the Controls action could not be registered (result %u)", static_cast<unsigned>(rc));
 		return false;
 	}
-	D2RL::SharedEvents::UiMessageListener listener{};
-	listener.structSize = D2RL::SharedEvents::UiMessageListenerSize;
-	listener.callback = &OnUiMessage;
-	D2RL::SharedEvents::ListenerHandle handle = 0;
-	if (events->registerUiMessageListener(context, &listener, &handle) != D2RL::SharedEvents::Result::Success ||
-	    !InstallServerFrame(context) || !AddServerFrameCallback(&Frame)) {
+	g_client.panelName = layout::PanelName;
+	g_client.inputName = layout::InputName;
+	g_client.buttonPrefix = "mxl2012-core/DevMenuB_";
+	g_client.buttonCount = layout::ButtonCount;
+	g_client.onPress = &OnButton;
+	g_client.inputBox = &InputBox;
+	if (!panel_shared::AddClient(&g_client) || !InstallServerFrame(context) || !AddServerFrameCallback(&Frame)) {
 		std::snprintf(report, reportSize, "devmenu off: listener / server frame unavailable");
 		return false;
 	}
@@ -1324,7 +1126,7 @@ auto InstallDevMenu(const D2RL::PluginContext* context, const char* selfPath, ch
 	g_on = true;
 	std::snprintf(report, reportSize, "devmenu on: Controls action mxl_dev_menu (default Ctrl+F12), catalog %s (%zu items, %zu kits, %zu levels), socket table %s, typing keys %s",
 	              catalogError.empty() ? "ok" : catalogError.c_str(), g_catalog.items.size(), g_catalog.kits.size(), g_catalog.levels.size(), g_extTcp != nullptr ? "readable" : "unavailable",
-	              g_typingOk ? "taken from the bindings while the box has the focus" : "off (entry bytes differ)");
+	              panel_shared::TypingOk() ? "taken from the bindings while the box has the focus" : "off (entry bytes differ)");
 	return true;
 }
 

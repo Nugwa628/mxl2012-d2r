@@ -1,0 +1,9 @@
+Uberquests include challenging dungeons, summoning encounters, levels and heroic areas.
+
+* [[Dungeon ubers]]
+* [[Summoning ubers]]
+* [[Level ubers]]
+* [[Heroic levels]]
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/uberquests.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Uberquests]]

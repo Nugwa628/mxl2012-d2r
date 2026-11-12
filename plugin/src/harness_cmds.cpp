@@ -26,6 +26,7 @@
 #include "server_frame.h"
 #include "testharness.h"
 #include "devmenu.h"
+#include "wiki.h"
 #include "send_stash.h"
 #include "clear_fonts.h"
 #include "map_reveal.h"
@@ -3018,6 +3019,29 @@ auto CmdDevMenu(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `wiki [state] | open | close | press <button> | input <text ...> | box | raw <widget> <text ...>`: the wiki panel's own paths.
+auto CmdWiki(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const char* verb = t.n >= 2 ? t.tok[1] : "state";
+	if (t.n >= 2 && !hcmd::LowerEq(verb, "state")) {
+		char arg[240] = "";
+		for (int i = 2; i < t.n; ++i) {
+			std::snprintf(arg + std::strlen(arg), sizeof(arg) - std::strlen(arg), "%s%s", i > 2 ? " " : "", t.tok[i]);
+		}
+		if (!WikiHarness(verb, arg)) {
+			return Fail(c, "wiki: the part is off or the argument is unknown");
+		}
+	}
+	char status[640];
+	WikiStatus(status, sizeof(status));
+	char* texts = std::strstr(status, " query=");  // two lines: Out keeps 400 characters
+	if (texts != nullptr) {
+		*texts = '\0';
+		Out("wiki texts %s", texts + 1);
+	}
+	Out("wiki %s", status);
+	return true;
+}
+
 auto CmdSendStash(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	const bool press = t.n >= 2 && hcmd::LowerEq(t.tok[1], "press");
 	if (t.n >= 2 && !press && !hcmd::LowerEq(t.tok[1], "state")) {
@@ -3261,7 +3285,7 @@ const Verb Verbs[] = {
     {"tiles", CmdTiles, false}, {"hashscan", CmdHashScan, false},
     {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"cstat", CmdClientStat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
-    {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true}, {"devmenu", CmdDevMenu, true},
+    {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true}, {"devmenu", CmdDevMenu, true}, {"wiki", CmdWiki, true},
     {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true}, {"padui", CmdPadUi, true},
     {"pad", CmdPad, true},
 };

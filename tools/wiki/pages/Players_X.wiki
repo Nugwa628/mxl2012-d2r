@@ -1,0 +1,17 @@
+This is a classic Lord of Destruction feature that is not known to all players.
+
+During a single player game or tcp/ip or open battle.net multiplayer game, press Enter and type the following:
+
+'''/players X'''
+
+where X is a number from 1 to 8. Press Enter again. The game will confirm your action.
+{{Port note|D2R has no open Battle.net. In D2R-XL 2012 you play single player games or multiplayer games hosted by a player who runs the mod (TCP/IP or a D2RLoader lobby).}}
+
+<!-- image: https://modsbylaz.vn.cz/images/menu/MXL_menu_012.jpg -->
+
+What this does is increase the difficulty of the monsters, as well as their rewards, to correspond with a multiplayer game with X players in it.
+
+Monster life and experience is greatly boosted, monsters are more likely to drop items and their damage is slightly boosted on Terror and Destruction difficulty.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/playersx.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Concepts]]

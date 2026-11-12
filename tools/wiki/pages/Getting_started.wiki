@@ -1,0 +1,36 @@
+New to D2R-XL 2012? This is the short path from a fresh install to your first character. D2R-XL 2012 is Median XL 2012 by Brother Laz, ported to Diablo II: Resurrected; for what the mod is, see the [[Introduction]].
+
+== 1. Install ==
+You need your own '''Diablo II: Resurrected 3.3''' on Windows and '''[[D2RLoader]] 1.3.1'''. The D2R-XL 2012 Downloader installs the mod, can install D2RLoader for you, and starts the game with its '''Play''' button. Step by step: [[Installation]].
+
+Your D2R-XL 2012 characters have their own save folder and never touch your normal D2R characters.
+
+== 2. Pick a class ==
+Every class has new skill trees: 25 main skills, 3 uberskills and 2 challenge reward skills. The best class is the class you like the most.
+
+* [[Amazon]] · [[Assassin]] · [[Barbarian]] · [[Druid]] · [[Necromancer]] · [[Paladin]] · [[Sorceress]]
+* With Reign of the Warlock on your Battle.net account you can also play the Warlock, on Median XL's rules.
+
+== 3. First character tips ==
+* '''Skill levels grow with you.''' A skill's maximum level starts at 2 and goes up by 1 every six character levels.
+* '''The difficulties''' are called Hatred, Terror and Destruction (Normal, Nightmare and Hell).
+* '''Defence matters more than in classic Diablo II''', life and blocking less. Defence is ignored while you run, so press R to walk; walking is much faster in Median XL. See [[Block and defense]].
+* '''Resistances:''' have 75% in every element before Act 3 on Hatred.
+* '''Spells''' grow with energy and the +% Spell Damage modifiers; '''weapon attacks''' with strength and dexterity. See [[Energy factor]].
+* '''Two elements''' are enough against regular monsters: they have at most one natural immunity.
+* '''Runewords''' need a single rune: put it in a grey (nonmagical) socketed item last, after filling the other sockets with jewels. See [[Runewords]].
+* '''Respec:''' Akara's "Reset Skills and Stats" works once per difficulty, as in D2R. Median XL's own respec item, the Token of Absolution (Belladonna Extract), works at any level: cube an Oil of Absolution with any rune. See [[Horadric Cube]].
+* '''Harder games:''' type <code>/players X</code> for tougher monsters and better rewards. See [[Players X]].
+
+== 4. Later on ==
+* [[Uberquests]]: special bosses and levels for high level characters, with unique charms as rewards on Destruction.
+* [[Challenges]]: special rewards for difficult tasks.
+* [[Horadric Cube]]: Median XL's recipes, crafting and more.
+* [[Items]]: the item pages.
+
+== Help ==
+* [[FAQ]]: common questions, crashes and errors.
+* [[Port changes]]: what the port does differently from Median XL 2012.
+* [[Plugins]]: the Buff HUD and the widescreen classic graphics that come with the mod.
+
+[[Category:Guides]]

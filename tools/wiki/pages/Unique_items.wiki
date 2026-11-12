@@ -1,0 +1,41 @@
+Every unique item that can drop in D2R-XL 2012. Click a column to sort it, or type in a table's search box to filter.
+
+== Tiered uniques ==
+Tiered uniques exist on every tier of their base (tiers 1 to 6) and grow stronger with it.
+
+{{#cargo_query:tables=Items
+|fields=_pageName=Item,base=Base,type=Type,COUNT(*)=Tiers,MIN(lvlreq)=Lowest level,MAX(lvlreq)=Highest level
+|where=quality='unique' AND tier<>'' AND tier<>'sacred'
+|group by=_pageName
+|order by=type,_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== Sacred uniques ==
+Sacred uniques sit on sacred bases and drop only in the highest difficulty.
+
+{{#cargo_query:tables=Items
+|fields=_pageName=Item,base=Base,type=Type,lvlreq=Required level
+|where=quality='unique' AND tier='sacred'
+|order by=type,_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== Other uniques ==
+Jewels, charms, rings, amulets and other uniques without tiers.
+
+{{#cargo_query:tables=Items
+|fields=_pageName=Item,base=Base,type=Type,lvlreq=Required level
+|where=quality='unique' AND (tier='' OR tier IS NULL)
+|order by=type,_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+Also: [[Cornerstone of the World]], a jewel with 149 variants.
+[[Category:Items]]

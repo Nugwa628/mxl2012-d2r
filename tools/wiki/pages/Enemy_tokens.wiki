@@ -1,0 +1,34 @@
+== Monster tokens ==
+
+Some targets on the battlefield may drop special items or tokens. They grant useful bonuses when cubed with the class charm you picked up in Kurast 3000 BA. See [[Level ubers#Kurast 3000 BA|Kurast 3000 BA]] if you do not have it yet.
+
+== Veteran tokens ==
+
+In '''Terror and Destruction''' difficulty, you can find '''veteran monsters''' near the end of each Act. There are 5 types of veteran monsters, one for each Act. Kill them on '''Terror''' difficulty to receive an 'Evil Eye' token.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/veteran.gif -->
+
+Cube your class charm with five tokens to receive additional bonuses.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/veteran_item.gif -->
+
+'''Veterans'''<br> ''Act 1 : Clawstorm Terror<br> Act 2 : Fairy Witch<br> Act 3 : Glowing Blob<br> Act 4 : Landmass<br> Act 5 : Bane Hunter''
+
+[Class Charm] + the correct 5 tokens -> returns [Class Charm] with added bonuses
+
+''This upgrade recipe adds the following bonuses:''
+
++1 to [Your class] Skill Levels<br> +20% to Experience Gained<br>
+
+== Act boss tokens ==
+
+On '''Terror or Destruction''' difficulty, kill '''Act bosses''' to receive a 'Dogma' token. Collect each of the five tokens, plus two extra tokens corresponding to one of the Prime Evils (Mephisto, Diablo or Baal).
+
+Then cube the tokens to receive a Signet of Skill. The Signet can be consumed to gain 1 skill point. You can only use 3 of these signets on any given character.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/skillsignet_item.gif -->
+
+Required tokens (7) -> Signet of Skill
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/enemy_tokens.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Challenges]]

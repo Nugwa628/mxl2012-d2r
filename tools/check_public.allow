@@ -19,3 +19,7 @@ launcher/res/*.png | .
 launcher/res/*.ico | .
 # monster token 8@ (lane tokens): DCC file names, not addresses
 docs/legacy-graphics.md | 8@[a-z0-9]+\.(dcc|cof)
+# Exact public Median prose lines: a sorceress description and the Rogue hirelings
+# heading. Their ordinary game wording happens to match the unrelated-project rule.
+tools/wiki/class-texts/sorceress.html | ^\t{3}<td>The sister of the flame summons a massive ball of fire and casts it at her demonic enemies\. The globe bursts on impact, engulfing the enemy in her flames of vengeance\.<br />$
+tools/wiki/pages/Hirelings.wiki | ^== The sisters ==$

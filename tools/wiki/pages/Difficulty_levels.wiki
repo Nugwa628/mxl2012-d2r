@@ -1,0 +1,24 @@
+Just like regular Diablo II Lord of Destruction, Median XL features three difficulty levels. Killing Baal unlocks the next difficulty level for that character.
+
+== Hatred ==
+Level range (regular game) : 1-55<br>
+Level range (uberquests) : 60-95
+
+The first and easiest difficulty level. Regular monsters range from 50 to 10K health and deal 1 to 200 damage. Their AI is not very bright and leech works at 1/4 effectiveness, which should be just fine considering the increased amount of damage characters can deal compared to the regular game.
+
+== Terror ==
+Level range (regular game) : 55-115<br>
+Level range (uberquests) : 115
+
+A significant step up in difficulty, regular monsters range from 10K to 100K health and deal 250 to 750 damage. Leech is reduced to 1/25 effectiveness. If you can beat Terror, you have completed the regular game. You can expect to hit the level cap of 120 in Terror difficulty.
+
+== Destruction ==
+Level range (regular game) : 120<br>
+Level range (uberquests) : 120
+
+After reaching the level cap, Inferno awaits. Every monster is level 120 and is extremely aggressive. Regular monsters range from 100K to 300K health and deal 500 to 1000 damage, but uberquest monsters go far beyond that. Abandon all hope. Leech is reduced to 1/200 to make up for high attack damage at this point in the game.
+
+Sacred uniques and sets drop only in Destruction difficulty.
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/difficultylevels.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Concepts]]

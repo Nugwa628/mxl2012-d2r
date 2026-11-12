@@ -1,0 +1,69 @@
+Do not expect an easy victory over the forces of Hell. Median XL features an assortment of new monsters and beefs up the familiar monsters with improved statistics and more intelligent and aggressive behaviour.
+
+'''Elite monsters.''' The elite forces of the demonic hordes are much more dangerous than their lesser underlings. Elite monsters are similar to their lesser species but have a <span style="color:#ffff64">yellow name</span>, higher statistics and usually employ additional or different attacks and defences.
+
+'''Heroic monsters.''' Even stronger than elite monsters, heroic monsters are thankfully confined to their own dungeons which are usually out of the way... usually. Rumour has it that the guardians of Baal himself are among them. See [[Heroic levels]] for where to hunt these fiends.
+
+'''Veteran monsters.''' The Prime Evils' ace in the hole. These are the few demons who survived the battle below Tristram and have only grown stronger. They appear very rarely and only in specific areas, but you'll know it when you find them. Veteran monsters are unique in the game and have a <span style="color:#1a8a1a">dark green name</span> and powerful attacks and defences.
+
+'''Ubermonsters.''' Uberquest monsters are the toughest and hardest monsters in the game. There is usually something 'special' about ubermonsters, from a shield aura that grants the boss an immunity shield to the ability to resurrect upon death. See [[Uberquests]].
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/monsters.html Brother Laz's Median XL documentation], used with permission.</div>
+
+== Reading the monster pages ==
+Each monster has a box with one column per difficulty: [[Difficulty levels|Hatred, Terror and Destruction]]. Regular monsters take the level of the area they spawn in, so their figures are given at the lowest and highest area level they have in that difficulty; bosses have a fixed level. The figures are for one player and a plain monster: champions, uniques and [[Players X|more players]] make them stronger. A resistance of 100% or more is an immunity.
+
+Monsters are grouped into families: the elite and heroic versions of a monster are on the page of the monster they are built on. Bosses and superuniques have their own pages. Click a column to sort it, or type in a table's search box to filter.
+
+== Bosses ==
+{{#cargo_query:tables=Monsters
+|fields=_pageName=Page,name=Monster,category=Kind,level_h=Hatred,level_t=Terror,level_d=Destruction,life_d=Life (Destruction)
+|where=rank='boss'
+|order by=_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== Superuniques ==
+{{#cargo_query:tables=Monsters
+|fields=_pageName=Page,category=Kind,level_h=Hatred,level_t=Terror,level_d=Destruction,areas=Areas
+|where=rank='superunique'
+|order by=_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== Monster families ==
+{{#cargo_query:tables=Monsters
+|fields=_pageName=Family,category=Kind,COUNT(*)=Variants,MIN(level_h)=Lowest in Hatred
+|where=rank<>'boss' AND rank<>'superunique'
+|group by=_pageName
+|order by=_pageName
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== Elite, heroic and veteran monsters ==
+{{#cargo_query:tables=Monsters
+|fields=name=Monster,_pageName=Family,rank=Rank,category=Kind,level_h=Hatred,level_t=Terror,immune_d=Immune (Destruction),areas=Areas
+|where=rank='elite' OR rank='heroic' OR rank='veteran'
+|order by=rank,name
+|format=dynamic table
+|limit=5000
+|rows per page=25
+}}
+
+== All monsters ==
+{{#cargo_query:tables=Monsters
+|fields=name=Monster,_pageName=Page,rank=Rank,category=Kind,level_h=Hatred,level_t=Terror,level_d=Destruction,immune_t=Immune (Terror),immune_d=Immune (Destruction),areas=Areas
+|order by=name
+|format=dynamic table
+|limit=5000
+|rows per page=50
+}}
+
+See also: [[:Category:Monster families]], [[:Category:Bosses]], [[:Category:Superuniques]], [[:Category:Uberquest monsters]], [[Dungeon ubers]], [[Summoning ubers]], [[Level ubers]].
+[[Category:Monsters]]

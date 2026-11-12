@@ -1,0 +1,48 @@
+Minigames are small challenges you can do in Terror and/or Destruction difficulty. The reward for all of these is the same: the maximum amount of points you can put into your skills is raised by 1 for each completed minigame.
+
+This bonus is applied to the class charm you picked up in Kurast 3000 BA. See [[Level ubers#Kurast 3000 BA|Kurast 3000 BA]] if you do not have it yet.
+
+== Minigame 1: witch queen ==
+
+Simply slay the Countess on Terror difficulty to receive a red swirly overlay. Quickly cube your class charm with an '''Eth''' rune while the overlay is visible to receive a bonus. You have 30 seconds. Easy you say? Be afraid... the inhabitants of the deepest Tower level are a bit ''unusual''.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_countess.jpg -->
+
+[Class Charm] + Eth Rune -> returns [Class Charm] with added bonuses
+
+''This upgrade recipe adds the following bonus:''
+
+Maximum Skill Level Increased by 1
+
+== Minigame 2: crowned ==
+
+Find a witch anywhere on Terror difficulty, ''except'' in the Countess tower. Witches generally appear in outdoors areas. Inch as close as you dare to a witch without waking her up... there is a chance that you will see an unmistakeable star effect ''just'' before you get close enough to get eaten by the witch.
+
+This only works on '''15%''' of the witches - if you see no stars, run away before the witch pounces! Cube your class charm with a '''Thul''' rune while the overlay is on you to receive a bonus.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_witchstar.jpg -->
+
+[Class Charm] + Thul Rune -> returns [Class Charm] with added bonuses
+
+''This upgrade recipe adds the following bonus:''
+
+Maximum Skill Level Increased by 1
+
+'''Witches spawn in the following areas:'''
+
+· Act 1: Countess Tower (these witches cannot give stars)<br> · Act 1: Tamoe Highland<br> · Act 2: Rocky Waste<br> · Act 5: Frozen Tundra
+
+== Minigame 3: mirror mirror ==
+
+Do the Baal fight on Terror or Destruction difficulty and instead of killing Baal, kill his Shardspawn minions. Each kill brings a 1% chance to gain a red swirly overlay, so you may have to let him summon a few. Cube your class charm with a '''Lem''' rune while the swirls are active to receive a bonus. You have 30 seconds before the swirls vanish.
+
+<!-- image: https://modsbylaz.vn.cz/images/highlights/doc_shardspawn.jpg -->
+
+[Class Charm] + Lem Rune -> returns [Class Charm] with added bonuses
+
+''This upgrade recipe adds the following bonus:''
+
+Maximum Skill Level Increased by 1
+
+<div class="source-credit">From [https://modsbylaz.vn.cz/minigames.html Brother Laz's Median XL documentation], used with permission.</div>
+[[Category:Challenges]]

@@ -147,9 +147,10 @@ def median_text(texts: dict, cell: str) -> str:
     return texts.get(key + "_mxl", texts.get(key, "")) if key else ""
 
 
-def expected(stat: int, fn: int, row: dict, texts: dict):
+def expected(stat: int, fn: int, row: dict, texts: dict, value: int | None = None):
     """(text, kind): kind 'text' = exact, 'regex' = text is a pattern, 'none' = no line, 'item' = needs a real item."""
-    value, _ = sample(stat)
+    if value is None:
+        value, _ = sample(stat)
     dv = int(row.get("descval") or 0)
     pos, neg, s2 = (median_text(texts, row.get(c, "")) for c in ("descstrpos", "descstrneg", "descstr2"))
     text = neg if value < 0 and neg else pos
