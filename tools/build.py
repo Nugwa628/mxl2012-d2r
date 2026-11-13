@@ -150,6 +150,13 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["strings_check.py", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"), "--rewritten", "--warn-missing",
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")]]
 STRING_MERGE = [["merge_string_overrides.py"], DATA_STEPS[-1]]
+# The hand-built maps drawn as flat HD maps (tools/maps_flat.py, docs/maps-hd-method.md "Flat maps"): each built in place
+# from the scene walls_cache.py wrote, its painted models added to the mod's model_lod_desc.bin
+FLAT_MAPS = ("expansion/ghetto/cypherpunk", "expansion/morework/epicwhiners", "expansion/dystopic/desertpeak",
+             "expansion/glados/glados", "expansion/neonmile/downtown", "expansion/redsquare/moskvich",
+             "expansion/voodoo/macumba", "expansion/terror/borgir", "expansion/zakarum/charismatic")
+FLAT_STEPS = [["maps_flat.py", "--lod-base", str(MOD / "data" / "hd" / "model_lod_desc.bin"), "build", m.rsplit("/", 1)[1],
+               str(MOD / "data" / "hd" / "env" / "preset" / (m + ".json")), str(MOD / "data")] for m in FLAT_MAPS]
 # [script, args..., {env}]: a trailing dict is extra environment for that step
 ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"], ["art_provenance.py"],
              ["hd_monsters.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],
@@ -162,6 +169,7 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["menu_credit.py"],
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_cache.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
+             *FLAT_STEPS,  # after walls_cache: its scenes are the flat build's input
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
              ["shrine_colours.py", "art", str(MOD / "data")],  # needs HD jbscross; preserve the ground/drop art
              ["elixir_colours.py", "art", str(MOD / "data")],

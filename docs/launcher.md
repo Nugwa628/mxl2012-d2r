@@ -120,8 +120,10 @@ it only from that site, only when the player asks.
 
 ## Install, Update, Repair and Uninstall
 
-The default site is **https://files.werdegames.com/mxl2012/** (backup origin
-`https://dl.werdegames.com/mxl2012/`, selectable with `--site`). Each refresh reads
+The default site is **https://files.wyrd.games/mxl2012/** (backup origin
+`https://dl.wyrd.games/mxl2012/`, selectable with `--site`). A saved site on the old host names of the
+same folders (files. and dl. of the retired domain) is moved to `files.wyrd.games` / `dl.wyrd.games` on start
+(`MigrateRetiredSite`) and saved; other sites (other hosts, `file://`, folders) stay as saved. Each refresh reads
 `channels/<channel>.json` then its schema-2 manifest and verifies `manifestSha256`.
 Unpublished channels, HTTP failures and connection errors produce separate messages.
 A release without game data (`complete: false`, a `--no-data` package) installs only from a
@@ -133,6 +135,15 @@ Size/mtime records can skip hashes of unchanged files; **Repair** hashes every f
 Files absent from the release are removed except manifest `preserve` entries (and their
 `.retail-backup` copies, below), D2RLoader logs/crashes, the install marker and staging. Empty
 directories are created. The marker and state record the completed release.
+
+**The player's own plugins stay** (player report, 2026-11-13: "have the update just replace files, not wipeout my plugins").
+The mod's `d2rloader\` folder (plugins, their configs, patches) is shared with the player. Under it an unlisted file is
+removed only when it is ours: a file of the release installed before (the state's `mod.files`, kept for the folder the
+state names), or one of the names our releases have shipped (`KnownBundledFile`, manifest.h: our plugins with their MPQs,
+licences and configs, and `mxl2012-core*.dll`). The latter alone decides for an install without that record (an older
+state, a manual 7z install, a folder the player said to replace). Every other file there (a player's DLL, its config) is
+left as it is (`InstallPlan::foreign`; the panel says "Kept N files of your own in d2rloader", the log names each). Outside
+`d2rloader\` the folder is still the release's exact copy. Downloaders up to 0.1.4 removed every unlisted file there too.
 
 **Save format of a kept config** (bug #512, owner decision 2026-10-30). The mod's
 `d2rloader/config/d2rloader.toml` is a `preserve` file, so a player's copy (an old install, or
@@ -314,7 +325,7 @@ before and `compare` after (with `--exclude mods/mxl2012`) shows that nothing el
   panel says "Stopped. Install again to continue ..." without a message box.
 
 Validation for lane `launcher` (2026-10-29), MSVC x64 Release, 2,205,184 bytes, `launcher_tests.exe`
-**210 checks, 0 failures**. Live host (`files.werdegames.com`, channel `test` = 0.0.1, a no-data
+**210 checks, 0 failures**. Live host (`files.wyrd.games`, channel `test` = 0.0.1, a no-data
 package, read-only GETs): status, install (7z), second run up to date, resume from a partial 7z,
 uninstall, window install by message, fake folder unchanged. Local site (0.0.2-lt1 -> 0.0.3-lt2,
 42 MB 7z served at 4 MB/s): 7z download killed after 4 s and resumed, object download killed and

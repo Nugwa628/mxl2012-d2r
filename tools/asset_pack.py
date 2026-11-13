@@ -20,7 +20,7 @@ step 4), then the URLs of assets.lock. SRC is a pack file, a directory holding t
 with --link assets/ becomes a junction/symlink to it, no copy), or a file:// / http(s):// URL. Every pack is checked against
 the sha256 and size in assets.lock before it is unpacked, and every unpacked file against the manifest.
 A read token for the private forge release (env MXL_ASSETS_TOKEN: a Forgejo access token with read:repository) is sent as
-`Authorization: token ...` to git.werdegames.com URLs only (CI's `assets` job, docs/setup.md "CI asset pack"); a GitHub token
+`Authorization: token ...` to git.wyrd.games URLs only (CI's `assets` job, docs/setup.md "CI asset pack"); a GitHub token
 (MXL_ASSETS_TOKEN or GITHUB_TOKEN) as a bearer header to github.com URLs only. Never anywhere else.
 
 Exit codes: 0 ok, 1 mismatch / failure, 2 usage or nothing to fetch from.
@@ -53,10 +53,10 @@ FIXED_TIME = (1980, 1, 1, 0, 0, 0)         # zip entries: the pack is byte-ident
 CHUNK = 1 << 20
 LFS_POINTER = b"version https://git-lfs"
 REPO = "Nugwa628/mxl2012-d2r"
-DOWNLOAD_BASE = "https://dl.werdegames.com/mxl2012/"  # the download host (docs/hosting.md); publish_release.py --assets puts packs in assets/
-FORGE = "https://git.werdegames.com/"
+DOWNLOAD_BASE = "https://dl.wyrd.games/mxl2012/"  # the download host (docs/hosting.md); publish_release.py --assets puts packs in assets/
+FORGE = "https://git.wyrd.games/"
 # the private release the pack is downloaded from until the owner approves public hosting (docs/setup.md "CI asset pack")
-FORGE_RELEASES = FORGE + "WerdeGames/mxl2012-assets/releases/download/"
+FORGE_RELEASES = FORGE + "WyrdGames/mxl2012-assets/releases/download/"
 RUNS = projtemp.runs_dir()
 LOCAL_PACKS = RUNS / "assetpack" / "pack"   # the build PC: tools/asset_pack.py build --out here (docs/setup.md step 4)
 

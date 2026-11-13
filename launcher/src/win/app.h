@@ -16,13 +16,13 @@
 namespace mxl {
 
 #ifndef MXL_LAUNCHER_VERSION
-#define MXL_LAUNCHER_VERSION "0.1.4"  // the downloader version; CMake reads it from here for the version resource
+#define MXL_LAUNCHER_VERSION "0.1.5"  // the downloader version; CMake reads it from here for the version resource
                                       // (cmake -DMXL_LAUNCHER_VERSION=x.y.z overrides both, for tests of the self-update)
 #endif
 constexpr const char* LauncherVersion = MXL_LAUNCHER_VERSION;
 constexpr const char* ProductTitle = "D2R-XL 2012 Downloader";
 // the download host (docs/release.md "Hosting layout"): channels/<channel>.json, releases/<v>/, objects/
-constexpr const char* DefaultSite = "https://files.werdegames.com/mxl2012/";  // Space mxl2012 behind Cloudflare; dl.werdegames.com/mxl2012/ is the origin and backup (--site)
+constexpr const char* DefaultSite = "https://files.wyrd.games/mxl2012/";  // Space mxl2012 behind Cloudflare; dl.wyrd.games/mxl2012/ is the origin and backup (--site)
 constexpr const char* DefaultChannel = "stable";
 constexpr int ObjectAttempts = 5;  // tries per object or 7z (resumed each time) before an install stops with "try again"
 constexpr const char* IssuesUrl = "https://github.com/Nugwa628/mxl2012-d2r/issues";

@@ -8,7 +8,7 @@
 #
 # Without the secret (the owner has not uploaded the pack yet, docs/setup.md "CI asset pack") it prints a notice and exits 0,
 # so CI stays green. MXL_ASSETS_REQUIRED=1 (job env) makes a missing secret fail instead.
-# The token is only in this script's environment, sent to git.werdegames.com only, and unset right after the fetch.
+# The token is only in this script's environment, sent to git.wyrd.games only, and unset right after the fetch.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python3}"

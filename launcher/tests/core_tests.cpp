@@ -176,7 +176,7 @@ void TestHosting() {
 	      "unsafe channel manifest path refused");
 	Check(!mxl::ParseChannel(R"({"schemaVersion": 1, "version": "1", "manifest": "m.json"})", c, err), "channel without sha refused");
 	Check(!mxl::ParseChannel("<html>sign in</html>", c, err), "a login page is not a channel");
-	const std::string chUrl = "https://dl.werdegames.com/mxl2012/channels/stable.json";
+	const std::string chUrl = "https://dl.wyrd.games/mxl2012/channels/stable.json";
 	Check(mxl::ChannelReadError("stable", chUrl, 404, "") == "No release has been published on the stable channel yet.",
 	      "channel 404: nothing published yet");
 	Check(mxl::ChannelReadError("test", "file:///D:/site/channels/test.json", 404, "cannot open") ==
@@ -189,12 +189,35 @@ void TestHosting() {
 	      "no answer: cannot reach, with the WinHTTP error");
 	Check(mxl::ChannelReadError("stable", chUrl, 0, "") == "Cannot reach the download site (" + chUrl + ")", "no answer without error text");
 
-	Check(mxl::SiteRoot("https://dl.werdegames.com/mxl2012") == "https://dl.werdegames.com/mxl2012/", "site root gets a '/'");
+	Check(mxl::SiteRoot("https://dl.wyrd.games/mxl2012") == "https://dl.wyrd.games/mxl2012/", "site root gets a '/'");
 	Check(mxl::SiteRoot("http://127.0.0.1:8765/") == "http://127.0.0.1:8765/", "site root kept");
 	const std::string bs(1, char(92));
 	Check(mxl::SiteRoot("D:" + bs + "test site" + bs) == "file:///D:/test%20site/", "local folder becomes a file URL");
 	Check(mxl::SiteRoot(bs + bs + "srv" + bs + "mxl2012") == "file://srv/mxl2012/", "UNC share becomes a file URL");
 	Check(mxl::ResolveUrl(mxl::SiteRoot("http://h/mxl2012"), "objects/aa/x") == "http://h/mxl2012/objects/aa/x", "object URL under the root");
+
+	// a saved site on the retired host names moves to wyrd.games; everything else stays as saved
+	auto moved = [](const std::string& from, const std::string& to, const char* what) { Check(mxl::MigrateRetiredSite(from) == to, what); };
+	moved("https://files.werdegames.com/mxl2012/", "https://files.wyrd.games/mxl2012/", "files host moves");
+	moved("https://dl.werdegames.com/mxl2012/", "https://dl.wyrd.games/mxl2012/", "dl host moves");
+	moved("https://files.werdegames.com/mxl2012", "https://files.wyrd.games/mxl2012", "no trailing '/' kept");
+	moved("https://dl.werdegames.com/other/sub/", "https://dl.wyrd.games/other/sub/", "any path kept");
+	moved("https://files.werdegames.com", "https://files.wyrd.games", "bare host moves");
+	moved("HTTPS://Files.WerdeGames.COM/mxl2012/", "https://files.wyrd.games/mxl2012/", "scheme and host in any case");
+	moved("https://DL.werdegames.com/MXL2012/", "https://dl.wyrd.games/MXL2012/", "path case kept");
+	moved("https://files.werdegames.com?x", "https://files.wyrd.games?x", "query after the host kept");
+	moved("https://files.wyrd.games/mxl2012/", "https://files.wyrd.games/mxl2012/", "new host unchanged");
+	moved("https://git.werdegames.com/mxl2012/", "https://git.werdegames.com/mxl2012/", "other retired-domain host unchanged");
+	moved("https://werdegames.com/mxl2012/", "https://werdegames.com/mxl2012/", "apex unchanged");
+	moved("https://xfiles.werdegames.com/mxl2012/", "https://xfiles.werdegames.com/mxl2012/", "look-alike host unchanged");
+	moved("https://files.werdegames.com.example.org/m/", "https://files.werdegames.com.example.org/m/", "suffix host unchanged");
+	moved("https://files.werdegames.com:8443/mxl2012/", "https://files.werdegames.com:8443/mxl2012/", "explicit port unchanged");
+	moved("http://files.werdegames.com/mxl2012/", "http://files.werdegames.com/mxl2012/", "http:// unchanged");
+	moved("https://example.org/files.werdegames.com/", "https://example.org/files.werdegames.com/", "host only, not the path");
+	moved("file:///D:/site/", "file:///D:/site/", "file URL unchanged");
+	moved("D:" + bs + "test site" + bs, "D:" + bs + "test site" + bs, "folder unchanged");
+	moved("http://127.0.0.1:8765/", "http://127.0.0.1:8765/", "local test server unchanged");
+	moved("", "", "empty unchanged");
 }
 
 void TestPlan() {
@@ -224,10 +247,12 @@ void TestPlan() {
 	Check(has(plan.fetch, "changed.txt") && has(plan.fetch, "new.txt") && has(plan.fetch, "missing.txt"), "changed, new, missing fetched");
 	Check(hasS(plan.preserved, "d2rloader/config/d2rloader.toml") && !has(plan.fetch, "d2rloader/config/d2rloader.toml"),
 	      "existing preserve file never overwritten");
-	Check(hasS(plan.remove, "gone.txt") && hasS(plan.remove, "stray/own.txt") && hasS(plan.remove, "d2rloader/config/other.toml.retail-backup") &&
-	          hasS(plan.remove, "d2rloader/plugins/stray-off.txt") && plan.remove.size() == 4,
+	Check(hasS(plan.remove, "gone.txt") && hasS(plan.remove, "stray/own.txt") && plan.remove.size() == 2,
 	      "unlisted files removed, D2RLoader logs / crashes, the preserve file's .retail-backup (#512) and the player's "
 	      "mxl2012-core-off.txt (#522) kept");
+	Check(hasS(plan.foreign, "d2rloader/config/other.toml.retail-backup") && hasS(plan.foreign, "d2rloader/plugins/stray-off.txt") &&
+	          plan.foreign.size() == 2,
+	      "files under d2rloader/ that were never ours are the player's: kept");
 	Check(plan.fetchBytes == 20 + 30 + 5, "fetch byte count");
 	disk.clear();
 	plan = mxl::PlanInstall(next, local(), cur);
@@ -235,6 +260,77 @@ void TestPlan() {
 	for (const auto& f : next.files) disk[f.path] = f.sha256;
 	plan = mxl::PlanInstall(next, local(), cur);
 	Check(plan.fetch.empty() && plan.remove.empty() && plan.preserved.empty(), "verified install: nothing to do");
+}
+
+// The player's report "have the update just replace files, not wipe out my plugins": under d2rloader/ an update removes
+// only what a release of ours shipped.
+void TestPlanPlayerPlugins() {
+	std::string err;
+	auto hasS = [](const std::vector<std::string>& v, const char* p) {
+		for (const auto& f : v) if (f == p) return true;
+		return false;
+	};
+	mxl::Manifest next;
+	mxl::ParseManifest(ManifestText(F("data/a.txt", H1) + "," + F("d2rloader/plugins/mxl2012-core.dll", H1) + "," +
+	                                F("d2rloader/plugins/newname.dll", H1) + "," + F("d2rloader/config/newname.toml", H1) + "," +
+	                                F("d2rloader/config/legacy169.toml", H1),
+	                                R"(, "preserve": ["d2rloader/config/legacy169.toml"])"),
+	                   next, err);
+	Check(err.empty(), "player-plugin manifest parses");
+	auto cur = [](const std::map<std::string, std::string>& disk) {
+		return [&disk](const std::string& p) { auto it = disk.find(p); return it == disk.end() ? std::string() : it->second; };
+	};
+	auto keys = [](const std::map<std::string, std::string>& disk) {
+		std::vector<std::string> v;
+		for (const auto& [k, _] : disk) v.push_back(k);
+		return v;
+	};
+
+	// With the previous release's list: the player's plugin and its config survive, our renamed plugin (oldname.dll ->
+	// newname.dll) and a dropped one are removed, the player's edit of our preserve config stays.
+	std::map<std::string, std::string> disk = {
+		{"data/a.txt", H1}, {"data/old.txt", H1}, {"d2rloader/plugins/mxl2012-core.dll", H2},
+		{"d2rloader/plugins/oldname.dll", H1}, {"d2rloader/config/oldname.toml", H1}, {"d2rloader/plugins/dropped.dll", H1},
+		{"d2rloader/plugins/MyPlugin.dll", H3}, {"d2rloader/config/MyPlugin.toml", H3}, {"d2rloader/patches/mine.json", H3},
+		{"d2rloader/config/legacy169.toml", H4}};
+	std::vector<std::string> previous = {"data/a.txt", "data/old.txt", "d2rloader/plugins/mxl2012-core.dll",
+	                                     "d2rloader/plugins/OldName.dll", "d2rloader/config/oldname.toml",
+	                                     "d2rloader/plugins/dropped.dll", "d2rloader/config/legacy169.toml"};
+	mxl::InstallPlan plan = mxl::PlanInstall(next, keys(disk), cur(disk), previous);
+	Check(hasS(plan.foreign, "d2rloader/plugins/MyPlugin.dll") && hasS(plan.foreign, "d2rloader/config/MyPlugin.toml") &&
+	          hasS(plan.foreign, "d2rloader/patches/mine.json") && plan.foreign.size() == 3,
+	      "the player's own plugin, its config and patch survive an update");
+	Check(hasS(plan.remove, "d2rloader/plugins/oldname.dll") && hasS(plan.remove, "d2rloader/config/oldname.toml") &&
+	          hasS(plan.remove, "d2rloader/plugins/dropped.dll") && hasS(plan.remove, "data/old.txt") && plan.remove.size() == 4,
+	      "our renamed and dropped plugin files (case-blind) and a dropped data file are removed");
+	Check(hasS(plan.preserved, "d2rloader/config/legacy169.toml"), "the player's edit of our plugin's config is kept");
+	Check(plan.fetch.size() == 3, "changed core, new plugin and its config fetched");
+
+	// An install from 0.1.21 without the list (manual 7z install, or a state from an older downloader): only our known
+	// plugin names count as ours; a foreign DLL stays, outside d2rloader/ the folder is still mirrored.
+	disk = {{"data/a.txt", H1}, {"data/old.txt", H1}, {"d2rloader/plugins/mxl2012-core.dll", H1},
+	        {"d2rloader/plugins/invtabs.dll", H1}, {"d2rloader/config/invtabs.toml", H1}, {"d2rloader/plugins/drawcap.dll", H1},
+	        {"d2rloader/plugins/legacy169.dll", H1}, {"d2rloader/config/legacy169.toml", H1},
+	        {"d2rloader/plugins/d2rl-buff-panel.dll", H1}, {"d2rloader/plugins/d2rl-buff-panel.mpq", H1},
+	        {"d2rloader/plugins/D2RL-Charm-Inv.dll", H1}, {"d2rloader/plugins/Controller QOL Updates.dll", H1},
+	        {"d2rloader/plugins/mxl2012-core-dev.dll", H1}, {"d2rloader/plugins/SomeoneElse.dll", H2},
+	        {"d2rloader/config/SomeoneElse.toml", H2}, {"d2rloader/plugins/mxl2012-core.dll.bak", H2}};
+	plan = mxl::PlanInstall(next, keys(disk), cur(disk));
+	Check(hasS(plan.foreign, "d2rloader/plugins/SomeoneElse.dll") && hasS(plan.foreign, "d2rloader/config/SomeoneElse.toml") &&
+	          hasS(plan.foreign, "d2rloader/plugins/mxl2012-core.dll.bak") && plan.foreign.size() == 3,
+	      "no list (0.1.21 layout): the foreign DLL and its config are kept");
+	Check(hasS(plan.remove, "d2rloader/plugins/invtabs.dll") && hasS(plan.remove, "d2rloader/config/invtabs.toml") &&
+	          hasS(plan.remove, "d2rloader/plugins/drawcap.dll") && hasS(plan.remove, "d2rloader/plugins/legacy169.dll") &&
+	          hasS(plan.remove, "d2rloader/plugins/d2rl-buff-panel.dll") && hasS(plan.remove, "d2rloader/plugins/d2rl-buff-panel.mpq") &&
+	          hasS(plan.remove, "d2rloader/plugins/D2RL-Charm-Inv.dll") &&
+	          hasS(plan.remove, "d2rloader/plugins/Controller QOL Updates.dll") &&
+	          hasS(plan.remove, "d2rloader/plugins/mxl2012-core-dev.dll") && hasS(plan.remove, "data/old.txt") &&
+	          plan.remove.size() == 10,
+	      "no list: our known plugins the release no longer has are removed");
+	Check(mxl::KnownBundledFile("d2rloader/plugins/mxl2012-core.dll") && !mxl::KnownBundledFile("d2rloader/plugins/mxl2012-core.toml") &&
+	          !mxl::KnownBundledFile("d2rloader/plugins/x/mxl2012-core.dll") && !mxl::PlayerPluginArea("data/d2rloader/x") &&
+	          mxl::PlayerPluginArea("D2RLoader/plugins/x.dll"),
+	      "known names and the d2rloader/ area");
 }
 
 void TestVersions() {
@@ -1056,6 +1152,7 @@ int main() {
 	TestManifest();
 	TestHosting();
 	TestPlan();
+	TestPlanPlayerPlugins();
 	TestVersions();
 	TestDetect();
 	TestPaths();

@@ -15,7 +15,7 @@
 # Settings come from the environment (nothing machine-specific is kept in the repository):
 #   MXL_PUBLISH_TARGET    required: sftp://mxlup@<host>/mxl2012   (the site folder inside the SFTP chroot, docs/hosting.md)
 #   MXL_PUBLISH_IDENTITY  the private key for it (default: ssh's own choice)
-#   MXL_LIVE_URL          where players read it (default https://files.werdegames.com/mxl2012)
+#   MXL_LIVE_URL          where players read it (default https://files.wyrd.games/mxl2012)
 #   MXL_SCRUB_MIRROR_CMD  --with-github: the command that mirrors main to the public GitHub repository (scrubbed)
 #   MXL_SCRUB_WORKGIT     --with-github: the bare repository that command writes; the release commit is found there by its subject
 #   MXL_FORGE_TOKEN       --with-github: the forge token (or ~/.mxl2012-d2r/forge_token, tools/github_release.py)
@@ -50,7 +50,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 [ -z "${MXL_CMAKE_DIR:-}" ] || export PATH="$MXL_CMAKE_DIR:$PATH"
 [ -z "${MXL_7Z_DIR:-}" ] || export PATH="$MXL_7Z_DIR:$PATH"
-LIVE="${MXL_LIVE_URL:-https://files.werdegames.com/mxl2012}"; LIVE="${LIVE%/}"
+LIVE="${MXL_LIVE_URL:-https://files.wyrd.games/mxl2012}"; LIVE="${LIVE%/}"
 LAUNCHER=build/launcher/Release/D2R-XL-2012-Downloader.exe
 VRE="${V//./\\.}"
 

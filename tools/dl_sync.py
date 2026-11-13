@@ -4,7 +4,7 @@
 ingest, promote and gc (a path unit on <site>/.sync/wanted) and by a timer every 30 minutes. Needs python3 (stdlib, 3.9+)
 and rclone (Debian package rclone; a remote `spaces` in /etc/mxl-dl/rclone.conf).
 
-  /srv/dl/mxl/<rel>  ->  spaces:d2r-xl/mxl/<rel>  ->  https://files.werdegames.com/mxl/<rel>   (same layout)
+  /srv/dl/mxl/<rel>  ->  spaces:d2r-xl/mxl/<rel>  ->  https://files.wyrd.games/mxl/<rel>   (same layout)
 
 One pass, in this order, so a player never sees a channel that points at something the Space does not have yet:
 

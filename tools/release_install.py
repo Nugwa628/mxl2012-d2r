@@ -1,5 +1,5 @@
 """Put a game slot on a PLAYER install: the published D2R-XL 2012 Downloader installs the live release (7z from
-files.werdegames.com) and the slot's runs use the release's launch arguments, instead of tools/install_mod.py's
+files.wyrd.games) and the slot's runs use the release's launch arguments, instead of tools/install_mod.py's
 developer install (docs/testing.md "Test what players get").
 
   py -3 tools/release_install.py install --slot N [--channel stable] [--downloader <exe>] [--release-dll]
@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game_slots  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SITE = "https://files.werdegames.com/mxl2012/"
+SITE = "https://files.wyrd.games/mxl2012/"
 DEV_DLL = os.path.join(ROOT, "build", "plugin", "Release", "mxl2012-core.dll")
 MOD = game_slots.MOD
 

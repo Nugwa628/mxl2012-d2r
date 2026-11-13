@@ -1,0 +1,248 @@
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+index 2f1dc24..d99b7f7 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
++++ b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+@@ -2213,31 +2213,75 @@ void UpdateBeltCounts(const Snapshot& snapshot) noexcept {
+ 	g_countsStampMs.store(GetTickCount64(), std::memory_order_release);
+ }
+ 
+-// HD or legacy graphics: D2R's own getter (0x846210, the panel manager's byte +0xb9: 1 in HD, 0 in legacy), used only when its
+-// bytes match this build. The classic screen size (legacy: 800 x 600, or D2R Legacy 16:9's 1066 x 600 / 853 x 480) is at
+-// 0x22a0d68 / 0x22a0d6c.
+-constexpr uint64_t HdModeRva = 0x846210;
+-constexpr uint8_t  HdModeCode[] = {0x48, 0x8b, 0x05, 0x59, 0x9f, 0xbf, 0x02, 0x48, 0x85, 0xc0, 0x74, 0x08,
+-                                   0x0f, 0xb6, 0x80, 0xb9, 0x00, 0x00, 0x00, 0xc3};
+-constexpr uint64_t ScreenSizeXRva = 0x22A0D68;
+-constexpr uint64_t ScreenSizeYRva = 0x22A0D6C;
++// HD or legacy graphics and the classic screen size (legacy: 800 x 600, or D2R Legacy 16:9's 1066 x 600 / 853 x 480): found
++// by byte signatures in the game's .text at load (BeltMatch::ResolveCountNatives), never at a build's fixed address. When one
++// is not found the counts stay off (g_countNatives false) and nothing is read or called.
+ using HdModeFn = uint8_t(__fastcall*)() noexcept;
+-HdModeFn  g_hdMode    = nullptr;
+-uintptr_t g_exeBase   = 0;
++HdModeFn                g_hdMode       = nullptr;
++const volatile int32_t* g_screenWidth  = nullptr;
++const volatile int32_t* g_screenHeight = nullptr;
++bool                    g_countNatives = false;
++const char*             g_countMissing = "belt_counts off in the config";
++
++// The main module's image size and .text section, from its PE headers.
++auto ImageText(uintptr_t base, size_t& imageSize, size_t& textRva, size_t& textSize) noexcept -> bool {
++	const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
++	if (dos == nullptr || dos->e_magic != IMAGE_DOS_SIGNATURE) {
++		return false;
++	}
++	const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + static_cast<uintptr_t>(dos->e_lfanew));
++	if (nt->Signature != IMAGE_NT_SIGNATURE) {
++		return false;
++	}
++	imageSize = nt->OptionalHeader.SizeOfImage;
++	const IMAGE_SECTION_HEADER* section = IMAGE_FIRST_SECTION(nt);
++	for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index, ++section) {
++		if (std::memcmp(section->Name, ".text", 6) == 0) {
++			textRva  = section->VirtualAddress;
++			textSize = section->Misc.VirtualSize;
++			return textRva < imageSize && textSize <= imageSize - textRva;
++		}
++	}
++	return false;
++}
+ 
+-void ResolveCountNatives() noexcept {
+-	g_exeBase = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+-	if (g_exeBase != 0 && std::memcmp(reinterpret_cast<const void*>(g_exeBase + HdModeRva), HdModeCode, sizeof(HdModeCode)) == 0) {
+-		g_hdMode = reinterpret_cast<HdModeFn>(g_exeBase + HdModeRva);
++void ResolveCountNatives(const D2RL::PluginContext* context) noexcept {
++	g_hdMode       = nullptr;
++	g_screenWidth  = nullptr;
++	g_screenHeight = nullptr;
++	g_countNatives = false;
++	const auto base      = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
++	size_t     imageSize = 0;
++	size_t     textRva   = 0;
++	size_t     textSize  = 0;
++	if (base == 0 || !ImageText(base, imageSize, textRva, textSize)) {
++		g_countMissing = "the game's .text section";
++		Log(context, "AutoBeltRefill: belt_counts: OFF - the game's .text section was not found.");
++		return;
++	}
++	const auto natives = BeltMatch::ResolveCountNatives(reinterpret_cast<const uint8_t*>(base), imageSize, textRva, textSize);
++	if (!natives.ok()) {
++		g_countMissing = natives.missing;
++		Log(context, "AutoBeltRefill: belt_counts: OFF - pattern %s not found exactly once in this D2R build.", natives.missing);
++		return;
+ 	}
++	g_hdMode       = reinterpret_cast<HdModeFn>(base + static_cast<uintptr_t>(natives.hdMode));
++	g_screenWidth  = reinterpret_cast<const volatile int32_t*>(base + static_cast<uintptr_t>(natives.screenWidth));
++	g_screenHeight = reinterpret_cast<const volatile int32_t*>(base + static_cast<uintptr_t>(natives.screenHeight));
++	g_countNatives = true;
++	Log(context, "AutoBeltRefill: belt_counts: patterns resolved: %s at D2R+0x%llX (0x%llX on 93847), %s width / height at "
++		"D2R+0x%llX / +0x%llX (0x%llX on 93847).", BeltMatch::HdModeNative.name, static_cast<unsigned long long>(natives.hdMode),
++		static_cast<unsigned long long>(BeltMatch::HdModeNative.rva93847), BeltMatch::ScreenSizeNative.name,
++		static_cast<unsigned long long>(natives.screenWidth), static_cast<unsigned long long>(natives.screenHeight),
++		static_cast<unsigned long long>(BeltMatch::ScreenWidthRva93847));
+ }
+ 
+ auto ClassicScreen(float& width, float& height) noexcept -> bool {
+-	if (g_exeBase == 0) {
++	if (!g_countNatives) {
+ 		return false;
+ 	}
+-	const auto w = *reinterpret_cast<const volatile int32_t*>(g_exeBase + ScreenSizeXRva);
+-	const auto h = *reinterpret_cast<const volatile int32_t*>(g_exeBase + ScreenSizeYRva);
++	const auto w = *g_screenWidth;
++	const auto h = *g_screenHeight;
+ 	if (w < 640 || w > 4096 || h < 480 || h > 4096) {
+ 		return false;
+ 	}
+@@ -2274,7 +2318,7 @@ void DrawCountText(const D2RL::PluginContext* context, const D2RL::Overlay::Fram
+ }
+ 
+ void OnOverlayFrame(const D2RL::PluginContext* context, const D2RL::Overlay::Frame* frame, void*) noexcept {
+-	if (frame == nullptr || g_overlay == nullptr) {
++	if (frame == nullptr || g_overlay == nullptr || !g_countNatives) {
+ 		return;
+ 	}
+ 	g_overlayFrames.fetch_add(1, std::memory_order_relaxed);
+@@ -2282,7 +2326,7 @@ void OnOverlayFrame(const D2RL::PluginContext* context, const D2RL::Overlay::Fra
+ 	if (stamp == 0 || GetTickCount64() - stamp > CountsStaleMs) {
+ 		return;
+ 	}
+-	const bool hd = g_hdMode != nullptr && g_hdMode() != 0;
++	const bool hd = g_hdMode() != 0;
+ 	float sdWidth = 800.0F;
+ 	float sdHeight = 600.0F;
+ 	if (!hd && !ClassicScreen(sdWidth, sdHeight)) {
+@@ -2324,7 +2368,10 @@ void RegisterCountOverlay(const D2RL::PluginContext* context) noexcept {
+ 	if (!g_config.beltCounts) {
+ 		return;
+ 	}
+-	ResolveCountNatives();
++	ResolveCountNatives(context);
++	if (!g_countNatives) {
++		return; // logged; refilling is not affected
++	}
+ 	if (context->QueryService(&g_overlay) != D2RL::ServiceQueryResult::Success
+ 	    || !D2RL::HasOverlayServiceField(g_overlay, D2RL::OverlayServiceRequiredSize)) {
+ 		g_overlay = nullptr;
+@@ -2344,17 +2391,21 @@ void RegisterCountOverlay(const D2RL::PluginContext* context) noexcept {
+ 		context->LogInfo("AutoBeltRefill: belt_counts: overlay registration failed - no counts.");
+ 		return;
+ 	}
+-	Log(context, "AutoBeltRefill: belt_counts: on (HD/legacy getter %s).", g_hdMode != nullptr ? "matched" : "NOT matched: HD assumed");
++	Log(context, "AutoBeltRefill: belt_counts: on.");
+ }
+ 
+ // belt-counts: the counts and where the overlay puts them.
+ void RunCounts(const D2RL::PluginContext* context, void*) noexcept {
++	if (!g_countNatives) {
++		Log(context, "AutoBeltRefill: counts: off (%s).", g_countMissing);
++		return;
++	}
+ 	Snapshot snapshot {};
+ 	if (!Gather(context, snapshot)) {
+ 		return;
+ 	}
+ 	UpdateBeltCounts(snapshot);
+-	const bool hd = g_hdMode != nullptr && g_hdMode() != 0;
++	const bool hd = g_hdMode() != 0;
+ 	float sdWidth = 0.0F;
+ 	float sdHeight = 0.0F;
+ 	const bool classic = ClassicScreen(sdWidth, sdHeight);
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h b/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
+index d13e9c3..24419a0 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
++++ b/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
+@@ -3,8 +3,13 @@
+ // D2R-XL 2012 (Median XL 2012 port) additions: exact first-slot matching and the per-column potion count. Pure logic, no game
+ // access, so it has unit tests (belt_match_tests.cpp).
+ 
++#include <cstddef>
+ #include <cstdint>
+ 
++// The repo's signature scan (invtabs/src, the same helper as the tab and summary plugins): ParsePattern / FindPattern /
++// RipTarget / ResolveNative. Pure, standard headers only.
++#include "invtabs_logic.h"
++
+ namespace BeltMatch {
+ 
+ constexpr uint32_t Columns = 4;
+@@ -94,4 +99,78 @@ constexpr auto CountText(uint32_t count, char (&out)[4]) noexcept -> uint32_t {
+ 	return length;
+ }
+ 
++// ---- the game data the counts need, found by byte signatures at load (no build's fixed addresses) ----
++// Both signatures are taken from D2R 3.3 build 93847 (image 0x6ab3782c, the same image under 3.4 95032) and are unique in its
++// .text; the 93847 RVAs are only for the log. A signature that does not match exactly once turns belt_counts off.
++
++struct Native {
++	const char*   name;
++	const char*   pattern;
++	int           rip;    // >= 0: the disp32 at this offset in the match is the target (invtabs::ResolveNative)
++	std::int64_t  adjust; // else the target is the match + adjust
++	std::uint64_t rva93847;
++};
++
++// HD or legacy graphics (0x846210): `mov rax,[rip+PANELMGR]; test rax,rax; je; movzx eax, byte [rax+0xb9]; ret`, 1 in HD, 0 in
++// legacy. Called as is; the disp32 at +3 (the panel manager global) must point inside the image.
++inline constexpr Native HdModeNative {"hd_mode", "48 8b 05 ?? ?? ?? ?? 48 85 c0 74 08 0f b6 80 b9 00 00 00 c3", -1, 0, 0x846210};
++inline constexpr std::size_t HdModeGlobalDisp = 3;
++
++// The screen size (0x7f4d0): HD asks the HD test (call rel32 at +5) and jumps to the HD size, else it returns the classic
++// screen's width / height, `mov eax,[rip+W]` (disp32 at +0x18) and `mov eax,[rip+H]` (+0x22): 0x22a0d68 / 0x22a0d6c in 93847.
++inline constexpr Native ScreenSizeNative {"screen_size",
++	"48 83 ec 28 e8 ?? ?? ?? ?? 84 c0 74 09 48 83 c4 28 e9 ?? ?? ?? ?? 8b 05 ?? ?? ?? ?? 89 44 24 30 8b 05 ?? ?? ?? ?? 89 44 24 34 "
++	"48 8b 44 24 30 48 83 c4 28 c3",
++	-1, 0, 0x7f4d0};
++inline constexpr std::size_t   ScreenCallDisp      = 5;
++inline constexpr std::size_t   ScreenWidthDisp     = 0x18;
++inline constexpr std::size_t   ScreenHeightDisp    = 0x22;
++inline constexpr std::uint64_t ScreenWidthRva93847 = 0x22a0d68; // for the log only
++
++struct CountNatives {
++	std::int64_t hdMode       = -1;      // RVA of the HD test function
++	std::int64_t screenWidth  = -1;      // RVA of the classic screen width (int32)
++	std::int64_t screenHeight = -1;      // and its height (the next int32)
++	const char*  missing      = nullptr; // the signature that failed, when one did
++	auto ok() const noexcept -> bool { return missing == nullptr; }
++};
++
++// Resolves both signatures in the image (`image`, `imageSize` bytes, .text at `textRva`, `textSize`). Each must match exactly
++// once, the data it points to must lie inside the image and outside .text, the height must follow the width, and the screen
++// function must call the HD test that was found; else `missing` names the failed signature and every RVA stays -1.
++inline auto ResolveCountNatives(const std::uint8_t* image, std::size_t imageSize, std::size_t textRva, std::size_t textSize) noexcept
++	-> CountNatives {
++	const auto fail = [](const char* name) {
++		CountNatives none;
++		none.missing = name;
++		return none;
++	};
++	if (image == nullptr || textRva >= imageSize || textSize > imageSize - textRva) {
++		return fail("image");
++	}
++	const auto isData = [&](std::int64_t rva, std::size_t size) {
++		return rva >= 0 && size <= imageSize && static_cast<std::size_t>(rva) <= imageSize - size
++		       && (static_cast<std::size_t>(rva) + size <= textRva || static_cast<std::size_t>(rva) >= textRva + textSize);
++	};
++	const std::int64_t hd = invtabs::ResolveNative(image, textRva, textSize, HdModeNative);
++	if (hd < 0 || !isData(invtabs::RipTarget(image, static_cast<std::size_t>(hd) + HdModeGlobalDisp), 8)) {
++		return fail(HdModeNative.name);
++	}
++	const std::int64_t screen = invtabs::ResolveNative(image, textRva, textSize, ScreenSizeNative);
++	if (screen < 0) {
++		return fail(ScreenSizeNative.name);
++	}
++	const auto         at     = static_cast<std::size_t>(screen);
++	const std::int64_t width  = invtabs::RipTarget(image, at + ScreenWidthDisp);
++	const std::int64_t height = invtabs::RipTarget(image, at + ScreenHeightDisp);
++	if (invtabs::RipTarget(image, at + ScreenCallDisp) != hd || height != width + 4 || !isData(width, 8)) {
++		return fail(ScreenSizeNative.name);
++	}
++	CountNatives out;
++	out.hdMode       = hd;
++	out.screenWidth  = width;
++	out.screenHeight = height;
++	return out;
++}
++
+ } // namespace BeltMatch

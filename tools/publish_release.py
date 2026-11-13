@@ -1,6 +1,6 @@
 """Publish a tools/package_release.py output to the download host (docs/release.md "Hosting layout", docs/hosting.md).
 
-The host serves one folder over HTTPS (Caddy file_server on dl.werdegames.com/mxl2012/). Layout under the site root:
+The host serves one folder over HTTPS (Caddy file_server on dl.wyrd.games/mxl2012/). Layout under the site root:
 
   channels/<channel>.json                   {"schemaVersion":1,"version","manifest","manifestSha256","publishedAt"}
   releases/<v>/release-manifest.json        the packager's manifest + "objectsBase":"objects/" (+ launcher) + the server's
@@ -33,8 +33,8 @@ Targets (the site root; <incoming> is "../incoming-mxl2012" from it, a folder of
   py -3 tools/publish_release.py promote 0.70.0 --channel stable --target ...
   py -3 tools/publish_release.py list --target ...
   py -3 tools/publish_release.py gc --keep 3 [--dry-run] --target ...
-  py -3 tools/publish_release.py verify --url https://dl.werdegames.com/mxl2012/ [--channel stable] [--sample 200]
-  py -3 tools/publish_release.py verify --url https://files.werdegames.com/mxl2012/      (the Space mirror behind Cloudflare)
+  py -3 tools/publish_release.py verify --url https://dl.wyrd.games/mxl2012/ [--channel stable] [--sample 200]
+  py -3 tools/publish_release.py verify --url https://files.wyrd.games/mxl2012/      (the Space mirror behind Cloudflare)
 
 promote, gc and an --assets upload write <site>/.sync/wanted last: the server then mirrors the site to the DigitalOcean
 Space (tools/dl_sync.py; the ingest does the same after a publish). `list` shows the last mirror run.
@@ -1045,7 +1045,7 @@ def main(argv=None) -> int:
     p.add_argument("--dry-run", action="store_true")
 
     p = sub.add_parser("verify", help="fetch channel, manifest, objects and the 7z over HTTP(S) and check the hashes")
-    p.add_argument("--url", required=True, help="site root, e.g. https://dl.werdegames.com/mxl2012/")
+    p.add_argument("--url", required=True, help="site root, e.g. https://dl.wyrd.games/mxl2012/")
     p.add_argument("--channel", choices=CHANNELS, default="stable")
     p.add_argument("--sample", type=int, default=0, help="check only N objects spread over the set (default: all)")
 

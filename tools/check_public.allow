@@ -23,3 +23,7 @@ docs/legacy-graphics.md | 8@[a-z0-9]+\.(dcc|cof)
 # heading. Their ordinary game wording happens to match the unrelated-project rule.
 tools/wiki/class-texts/sorceress.html | ^\t{3}<td>The sister of the flame summons a massive ball of fire and casts it at her demonic enemies\. The globe bursts on impact, engulfing the enemy in her flames of vengeance\.<br />$
 tools/wiki/pages/Hirelings.wiki | ^== The sisters ==$
+# The downloader's move of a saved site off the retired host names (MigrateRetiredSite) and its tests
+launcher/src/core/manifest.cpp | \{\"files\.werdegames\.com\", \"files\.wyrd\.games\"\}
+launcher/src/core/manifest.h | https://(files|dl)\.werdegames\.com/<x> becomes
+launcher/tests/core_tests.cpp | ^\s*moved\("

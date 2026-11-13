@@ -6062,6 +6062,28 @@ window is covered on this machine). **By hand** (window in front): enter a game 
 cell shows a small white number top right (red at 0), in HD and after G in legacy. Tell me whether it is readable and where it
 sits at your resolution. Evidence: `mxl2012-runs/beltmatch/run2`, `run3` (`run.txt`, shots, `auto-belt-refill-*.log`), `probe1`.
 
+## Lane beltpat: Auto Belt Refill's counts by byte signature (2026-11-13, slot 2)
+
+Build: `tools/build_beltrefill.ps1` (v0.35.9 at `a3b6805` + `0001` ... `0004-mxl2012-count-signatures.patch`; `BeltMatchTests`
+pass, also with env `D2R_DUMP` = the 93847 dump: `hd_mode 0x846210, screen 0x22a0d68 / 0x22a0d6c`). Same driver and scenario
+as lane beltmatch (`mxl2012-runs/beltpat/scripts/belt_pat.py`, a copy of it), character `BeltShip`, girdle `859`. Load log:
+`belt_counts: patterns resolved: hd_mode at D2R+0x846210 ..., screen_size width / height at D2R+0x22A0D68 / +0x22A0D6C`.
+Results as lane beltmatch in HD and legacy: counts 7 / 7 / 6 / 6, keys 1-4 drunk and every column refilled from the inventory
+with its own code (counts 6 / 6 / 5 / 5), emptied column left empty, `hp4` column learned, `ey2` not refilled; `belt-counts`
+reports HD / legacy and the classic screen 800 x 600 from the resolved data, overlay live. PASS hd, PASS legacy; logscan 0
+ERROR / ASSERT lines, 0 crash files. Run `checks-20261113-103457-s2`, evidence `mxl2012-runs/beltpat/run1.out`, `run1/`.
+
+## Lane beltpat: Auto Belt Refill's refill routines by byte signature (2026-11-13, slot 2)
+
+Build: `tools/build_beltrefill.ps1` (`0001` ... `0005-refill-natives-by-signature.patch`); `BeltMatchTests` pass, including the
+new `Natives()` cases (each routine missing or duplicated turns the refill off naming it, the optional `Pickup` only drops
+`belt-verify`; wrong entry bytes, wrong cross-call, target outside .text and duplicate targets are refused). With env `D2R_DUMP`
+every one of the twelve signatures resolves to the author's 93847 RVA (`GetLocalPlayer 0x9a480` ... `Pickup 0x471950`). In game,
+same driver and scenario as above: load log `natives: patterns resolved: GetLocalPlayer 0x9A480, ..., BeltTransfer 0x15F660,
+Pickup 0x471950` and the `belt_counts` line; `belt-verify` shows the resolved addresses. PASS hd, PASS legacy (exact refills,
+empty column untouched, new column learned, elixir kept, counts right); logscan 0 ERROR / ASSERT lines, 0 crash files. Run
+`checks-20261113-115434-s2`, evidence `mxl2012-runs/beltpat/run2.out`, `run2/`.
+
 ## Lane wallscan: HD walls of the other Median maps (2026-11-06, slot 2, background input)
 
 Owner request after lane tawalls: scan Median's own maps for HD wall problems. Check `wall_maps` with the new
@@ -7481,3 +7503,19 @@ lane evidence retains the selection, raw columns and manual interpretation.
 This is a bounded source check; unsupported skill formulas remain omitted and
 rolled negative ranges retain the existing bracket notation. No game, slot or
 plugin change was needed; format 1 and the Unreleased note remain unchanged.
+
+## Lane hdmaps: Fauztinville as a flat map (2026-11-12, static part only)
+
+Method and results: [Flat maps](maps-hd-method.md#flat-maps-owner-ruling-2026-11-12).
+
+- **Unit tests:** `tools/tests/test_maps_flat.py` (15) cover the tile rule, the verdict table, that no geometry stands
+  above the floor except walls, that walkable cells equal classic's, that nothing is placed in the void, and that painted
+  pieces land on their classic pixels.
+- **Static checks on the Fauztinville build:**
+  - 0 solid pieces further than one cell from a wall cell; 0 painted pieces above the paint height.
+  - Walk-through 2.9% (`maps_transplant.py walk`; the conversion is at 7.0%; D2R's own maps 0.9 to 4.3%).
+- **Not run yet: the in-game part.** The game slots went to the 3.4 port, the inventory work and the release first. The
+  first run (tag `g1`, slot 5) was stopped before the game started, and slot 5 was restored and unlocked.
+  - Planned: `wall_maps` with `MXL_WALL_LEVELS=59`, `MXL_WALL_SPOTS="59:70,49;67,42;72,68;40,53;81,57"` and
+    `MXL_WALL_WALK="59:67,47>67,42;81,56>81,60;69,49>74,49"`, with the flat scene swapped into the slot for the run.
+  - Game runs are started in the foreground only, so that stopping one always reaches the script's restore step.

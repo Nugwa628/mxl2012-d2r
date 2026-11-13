@@ -60,5 +60,25 @@ class StagedScan(unittest.TestCase):
         self.assertEqual(cp.scan_staged(repo, {}), [])
 
 
+class HostRules(unittest.TestCase):
+    OLD = "werde" + "games"  # the retired domain, built from pieces like the names above
+
+    def rules(self, line):
+        return {r for r, _ in cp.scan_line(line)}
+
+    def test_wyrd_games_hosts_pass(self):
+        for line in ("https://files.wyrd.games/mxl2012/", "https://dl.wyrd.games/mxl2012/", "git.wyrd.games:2222",
+                     "https://git.wyrd.games/WyrdGames/mxl2012-d2r", "https://wyrd.games/", "https://2012wiki.wyrd.games/"):
+            self.assertEqual(self.rules(line), set(), line)
+
+    def test_other_wyrd_games_host_is_flagged(self):
+        self.assertIn("host", self.rules("ssh build" + ".wyrd.games"))
+
+    def test_retired_domain_is_flagged(self):
+        for line in (f"https://files.{self.OLD}.com/mxl2012/", f"git.{self.OLD}.com", f"{self.OLD}.com",
+                     f"{self.OLD.title()}/mxl2012-d2r"):
+            self.assertIn("retired", self.rules(line), line)
+
+
 if __name__ == "__main__":
     unittest.main()

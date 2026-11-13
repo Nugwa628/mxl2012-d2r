@@ -4,7 +4,7 @@ Thanks for helping with D2R-XL 2012. Short version: report bugs, send small focu
 
 ## Where the code lives
 
-The **main repository is the forge** (<https://git.werdegames.com/WerdeGames/mxl2012-d2r>). The GitHub repository is a mirror
+The **main repository is the forge** (<https://git.wyrd.games/WyrdGames/mxl2012-d2r>). The GitHub repository is a mirror
 that takes issues and releases. **Pull requests on GitHub are welcome.** The maintainers apply accepted ones to the forge
 (keeping your authorship) and the next mirror push brings them back; your PR is then closed with a link to the commit.
 Because of that, keep PRs small, rebased on `main`, and one topic each.

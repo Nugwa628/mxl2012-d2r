@@ -13,12 +13,12 @@ checkout or worktree directory.
 | Display name | D2R-XL 2012 |
 | Mod folder / mod id | `mxl2012` (`<D2R>\mods\mxl2012`) |
 | Save folder | `...\mods\mxl2012-sN` (slots 2 and 3 only) |
-| Repo | `mxl2012-d2r` (forge `WerdeGames/mxl2012-d2r`, private; GitHub mirror later) |
+| Repo | `mxl2012-d2r` (forge `WyrdGames/mxl2012-d2r`, private; GitHub mirror later) |
 | Plugin | `mxl2012-core` (`mxl2012-core.dll`, `PluginVersion` 0.1.0), console command `mxl2012` |
 | Dev switch files | `mxl2012-testharness.txt`, `mxl2012-core-off.txt` |
 | Downloader | `D2R-XL-2012-Downloader.exe`, data `%LOCALAPPDATA%\mxl2012`, marker `mxl2012-install.json` |
 | Release archive | `D2R-XL-2012-<v>.7z`, top folder `mxl2012/` |
-| Download site | `files.werdegames.com/mxl2012/` (backup origin `dl.werdegames.com/mxl2012/`) |
+| Download site | `files.wyrd.games/mxl2012/` (backup origin `dl.wyrd.games/mxl2012/`) |
 | String namespace | `mxl2012` (docs/strings.md; the strings lane's tools) |
 | Test character | `Mxl2Barb` |
 | Assets | `assets/` + `assets.lock` (`tools/asset_pack.py`; pack layout `assets/median/`, `assets/hd/`); no pack and no `assets.lock` yet, `assets.lock.example` shows the format |
@@ -96,7 +96,7 @@ them to what it uses. `mxl2012_stat_names.h` is an empty placeholder (the harnes
 `HarnessGameFrame` / `HarnessCommand` exist but nothing calls `HarnessGameFrame` until a part registers a server frame.
 
 Launcher: the private-copy state migration, removal command and UI prompt have been removed.
-The D2R-XL 2012 Downloader starts at 0.1.0 and only targets `mods\mxl2012`. `DefaultSite` points at `files.werdegames.com/mxl2012/` and `IssuesUrl` at the future GitHub
+The D2R-XL 2012 Downloader starts at 0.1.0 and only targets `mods\mxl2012`. `DefaultSite` points at `files.wyrd.games/mxl2012/` and `IssuesUrl` at the future GitHub
 mirror `github.com/Nugwa628/mxl2012-d2r` (does not exist yet; the `.github` templates link there too).
 
 Docs that needed a pass by the lane owning the area: `porting-playbook.md` (reference), `testing.md`, `release.md`, `launcher.md`,

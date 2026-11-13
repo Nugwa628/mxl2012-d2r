@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Create (or update) a GitHub or Forgejo release for a D2R-XL 2012 version from its CHANGELOG.md section (docs/release.md step 5).
 
-  --forge: the release goes to the forge (git.werdegames.com, WerdeGames/mxl2012-d2r) through its API instead, with the
+  --forge: the release goes to the forge (git.wyrd.games, WyrdGames/mxl2012-d2r) through its API instead, with the
   token from $MXL_FORGE_TOKEN or ~/.mxl2012-d2r/forge_token; --commit is then the FORGE's commit (its history is not scrubbed, so ids differ).
 
   py -3 tools/github_release.py 0.1.0 --commit <sha on GitHub main> [--downloader build/launcher/Release/D2R-XL-2012-Downloader.exe]
                                        [--repo Nugwa628/mxl2012-d2r] [--latest] [--dry-run]
 
 The body is the "### <version>" section of CHANGELOG.md, plus the download links: the downloader (always the newest
-installer) and the release's 7z on files.werdegames.com. The 7z itself is not attached; it lives on the download host,
+installer) and the release's 7z on files.wyrd.games. The 7z itself is not attached; it lives on the download host,
 because hundreds of MB over the developer's uplink are too slow. --downloader attaches the exe (2 MB) to the release. The tag
 `v<version>` is created on --commit, a commit of the public (scrubbed) main: the forge's commit ids differ, see
 docs/release.md. Needs the GitHub CLI (`gh`), logged in.
@@ -27,7 +27,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SITE = "https://files.werdegames.com/mxl2012/"
+SITE = "https://files.wyrd.games/mxl2012/"
 
 
 def changelog_section(text: str, version: str) -> str:
@@ -52,7 +52,7 @@ def release_body(version: str, section: str, downloader_version: str = "") -> st
     return "\n".join(lines) + "\n"
 
 
-FORGE_API = "https://git.werdegames.com/api/v1/repos/WerdeGames/mxl2012-d2r"
+FORGE_API = "https://git.wyrd.games/api/v1/repos/WyrdGames/mxl2012-d2r"
 
 
 def forge(method, path, token, body=None, data=None, ctype="application/json"):

@@ -774,7 +774,7 @@ D2R-XL 2012 is Median XL 2012 (v005, by Brother Laz) ported to Diablo II: Resurr
 ## Install
 
 1. Install D2RLoader {loader} from https://d2rloader.net/ into your D2R folder.
-2. Run `D2R-XL-2012-Downloader.exe` (downloads from https://files.werdegames.com/mxl2012/) and press **Install** (or **Update**). It puts the mod
+2. Run `D2R-XL-2012-Downloader.exe` (downloads from https://files.wyrd.games/mxl2012/) and press **Install** (or **Update**). It puts the mod
    in `<D2R folder>\\mods\\mxl2012` and changes nothing else.
 3. How to play: press **Play** in the downloader (it starts `D2RLoader.exe -mod mxl2012` in your D2R folder). Or start
    `D2RLoader.exe` yourself: the first time, click the gear on the character screen, set Default Mod to D2R-XL 2012, Apply,
@@ -828,6 +828,8 @@ def main() -> int:
     ap.add_argument("--no-data", action="store_true", help="no mxl2012.mpq/data (CI): manifest says complete=false")
     ap.add_argument("--game", type=Path, default=Path(install_mod.DEFAULT_GAME), help="D2R folder read for maps_hd (CASC)")
     ap.add_argument("--out", type=Path, default=ROOT / "dist")
+    ap.add_argument("--launcher-min", help="oldest downloader that may install this release (manifest launcherMin): an older one "
+                    "refuses it and offers its own update first")
     ap.add_argument("--notes", type=Path, help="release notes template (str.format fields as NOTES; default NOTES)")
     ap.add_argument("--invtabs", type=Path, help="opt in to invtabs (requires --no-charminv)")
     ap.add_argument("--no-charminv", action="store_true", help="omit CharmInv")
@@ -944,8 +946,12 @@ def main() -> int:
                               charminv is not None)
     if a.invtabs is not None:
         bundled.append(invtabs_entry())
-    man_path.write_text(json.dumps(manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod),
-                                            bundled), indent=1) + "\n", encoding="utf-8")
+    man = manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod), bundled)
+    if a.launcher_min:
+        if not re.fullmatch(r"\d+\.\d+\.\d+", a.launcher_min):
+            raise SystemExit(f"--launcher-min {a.launcher_min!r}: x.y.z")
+        man["launcherMin"] = a.launcher_min
+    man_path.write_text(json.dumps(man, indent=1) + "\n", encoding="utf-8")
     notes = a.out / f"RELEASE_NOTES-{version}.md"
     notes.write_text(template.format(version=version, plugin=plugin_version(), build=D2R["build"], d2rver=D2R["version"],
                                   loader=D2RLOADER["version"], loader_url=D2RLOADER["url"], loader_sha=D2RLOADER["sha256"],

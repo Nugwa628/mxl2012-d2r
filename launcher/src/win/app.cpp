@@ -152,8 +152,15 @@ Launcher::Launcher(Options o) : opt_(std::move(o)) {
 		opt_.dataDir = Wide(DefaultDataDir(Utf8(KnownFolder(0))));
 	statePath_ = JoinPath(opt_.dataDir, L"launcher.json");
 	LoadState();
-	if (opt_.site.empty())
+	if (opt_.site.empty()) {
 		opt_.site = state_["site"].Str(DefaultSite);
+		const std::string moved = MigrateRetiredSite(opt_.site);
+		if (moved != opt_.site) {
+			Log("download site moved: " + opt_.site + " -> " + moved);
+			opt_.site = moved;
+			SaveState();
+		}
+	}
 	if (opt_.channel.empty())
 		opt_.channel = state_["channel"].Str(DefaultChannel);
 	siteRoot_ = SiteRoot(opt_.site);
@@ -1327,9 +1334,19 @@ bool Launcher::EnsureMod(bool verify, std::string& error) {
 		return sha;
 	};
 	KeepSaveCopy();
-	InstallPlan plan = PlanInstall(feed_, ListFilesUnder(mod), current);
+	// The files of the release installed before (PrepareTarget clears the record of a folder that is not ours): under
+	// d2rloader\ only these and our known plugin names are removed, the player's own plugins and configs stay.
+	std::vector<std::string> previous;
+	for (const Json& f : state_["mod"]["files"].items())
+		if (f["path"].IsString())
+			previous.push_back(f["path"].Str());
+	InstallPlan plan = PlanInstall(feed_, ListFilesUnder(mod), current, previous);
 	for (const auto& k : plan.preserved)
 		Report("Kept your " + k);
+	if (!plan.foreign.empty())
+		Report("Kept " + Count(plan.foreign.size(), "file") + " of your own in d2rloader (your plugins and their settings)");
+	for (const auto& k : plan.foreign)
+		Log("kept (not ours): " + k);
 	for (const auto& r : plan.remove) {  // not part of the release (docs/release.md "files")
 		DeleteFileW(LongPath(JoinPath(mod, Wide(r))).c_str());
 		files.Set(r, Json());

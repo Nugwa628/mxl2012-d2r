@@ -294,7 +294,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual(pr.BELTREFILL["config"], "d2rloader/config/auto-belt-refill.toml")
         names = [ln.split("  ")[1] for ln in pr.beltrefill_patches()]
         self.assertEqual(names, ["0001-pluginsdk-1.3.1.patch", "0002-mxl2012-belt-rows.patch",
-                                 "0003-mxl2012-match-first-slot.patch"])
+                                 "0003-mxl2012-match-first-slot.patch", "0004-mxl2012-count-signatures.patch",
+                                 "0005-refill-natives-by-signature.patch"])
 
     def test_beltrefill_config_matches_the_first_slot(self):
         import tomllib

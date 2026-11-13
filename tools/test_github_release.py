@@ -52,8 +52,8 @@ class ChangelogTests(unittest.TestCase):
     def test_release_body_links_this_products_site_and_names(self):
         body = gr.release_body("0.2.0", "Fixed [a thing](docs/bugs.md).", "0.3.1")
         self.assertIn("https://github.com/Nugwa628/mxl2012-d2r/blob/main/docs/bugs.md", body)
-        self.assertIn("https://files.werdegames.com/mxl2012/launcher/0.3.1/D2R-XL-2012-Downloader.exe", body)
-        self.assertIn("https://files.werdegames.com/mxl2012/releases/0.2.0/D2R-XL-2012-0.2.0.7z", body)
+        self.assertIn("https://files.wyrd.games/mxl2012/launcher/0.3.1/D2R-XL-2012-Downloader.exe", body)
+        self.assertIn("https://files.wyrd.games/mxl2012/releases/0.2.0/D2R-XL-2012-0.2.0.7z", body)
         self.assertIn("mods\\mxl2012", body)
         self.assertIn("Resurrected (Battle.net; tested on 3.3 and 3.4) and D2RLoader 1.3.1", body)
         self.assertNotIn("Resurrected 3.3", body)  # no game version is required

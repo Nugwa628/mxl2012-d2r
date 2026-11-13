@@ -1,14 +1,14 @@
-# Download host for D2R-XL 2012 (files.werdegames.com/mxl2012)
+# Download host for D2R-XL 2012 (files.wyrd.games/mxl2012)
 
 Where players' downloaders get the mod from. Owner decision 2026-10-28: D2R-XL 2012 is served from
-`https://files.werdegames.com/mxl2012/`, next to the host's existing site (`.../mxl/`), on the same server, the same
+`https://files.wyrd.games/mxl2012/`, next to the host's existing site (`.../mxl/`), on the same server, the same
 DigitalOcean Space and the same Cloudflare Worker, with the same pipeline. What is in the folder and how
 the downloader uses it: [release.md](release.md) "Hosting layout".
 
 ```
 Developer PC --sftp (key, chroot)--> /srv/dl/incoming-mxl2012/<v>/ --dl_ingest.py (systemd, as mxlup)--> /srv/dl/mxl2012/
-    --> .sync/wanted --dl_sync.py (rclone)--> Space d2r-xl, prefix mxl2012/ --> Cloudflare Worker --> files.werdegames.com/mxl2012/
-                                                     /srv/dl/mxl2012/ <--Caddy--HTTPS-- dl.werdegames.com/mxl2012/ (origin, backup)
+    --> .sync/wanted --dl_sync.py (rclone)--> Space d2r-xl, prefix mxl2012/ --> Cloudflare Worker --> files.wyrd.games/mxl2012/
+                                                     /srv/dl/mxl2012/ <--Caddy--HTTPS-- dl.wyrd.games/mxl2012/ (origin, backup)
 ```
 
 The uploader's line is slow (about 160 KB/s up), so `tools/publish_release.py` sends only the objects the host lacks, packed
@@ -26,8 +26,8 @@ shows what the server really has.
 
 | Piece | Existing site | D2R-XL 2012 (new) | Shared? |
 |---|---|---|---|
-| Public URL | `files.werdegames.com/mxl/` | `files.werdegames.com/mxl2012/` | host name, yes |
-| Origin / backup | `dl.werdegames.com/mxl/` | `dl.werdegames.com/mxl2012/` | host name, yes |
+| Public URL | `files.wyrd.games/mxl/` | `files.wyrd.games/mxl2012/` | host name, yes |
+| Origin / backup | `dl.wyrd.games/mxl/` | `dl.wyrd.games/mxl2012/` | host name, yes |
 | Site folder | `/srv/dl/mxl` | `/srv/dl/mxl2012` | no |
 | Uploads folder | `/srv/dl/incoming` | `/srv/dl/incoming-mxl2012` | no |
 | SFTP user, key, chroot | `mxlup`, `mxl_publish`, `/srv/dl` | the same | **yes** |
@@ -89,7 +89,7 @@ Decisions and why:
 
 ## 3. Owner steps
 
-`HOST` is the server (the one behind git.werdegames.com). Run as root unless it says PC (PowerShell on the publishing PC).
+`HOST` is the server (the one behind git.wyrd.games). Run as root unless it says PC (PowerShell on the publishing PC).
 Every step says what a good result looks like; stop at the first step that looks different and ask. Steps 0 to 8 and the
 Worker (section 4) can be done in one sitting; none of them changes what the existing site's players or units see.
 
@@ -130,7 +130,7 @@ last command prints `mxl/` (and nothing else yet). Write the hash of `dl_ingest.
 site's channel shows now, for the check in step 8:
 
 ```sh
-curl -s https://files.werdegames.com/mxl/channels/stable.json
+curl -s https://files.wyrd.games/mxl/channels/stable.json
 ```
 
 If a name differs (another folder, other unit names), use the server's names in the rest of this document.
@@ -393,10 +393,10 @@ Good: the ingest prints nothing and `exit 0`; the dry run prints
 site; it proves the script found its site and its rclone, and wrote nothing). If it prints a rclone error instead,
 `/etc/mxl-dl/rclone.conf` is not readable by `mxlup` (step 0).
 
-### Step 7. Caddy (the backup origin `dl.werdegames.com/mxl2012/`, optional)
+### Step 7. Caddy (the backup origin `dl.wyrd.games/mxl2012/`, optional)
 
-Players read the Space, not this; `dl.werdegames.com` is the origin, the fallback (`--site https://dl.werdegames.com/mxl2012/`) and
-what `publish_release.py verify` can check without the Space. Add these lines **inside the existing `dl.werdegames.com { ... }`
+Players read the Space, not this; `dl.wyrd.games` is the origin, the fallback (`--site https://dl.wyrd.games/mxl2012/`) and
+what `publish_release.py verify` can check without the Space. Add these lines **inside the existing `dl.wyrd.games { ... }`
 block**, next to the existing `header /mxl/...` and `handle /mxl/*` lines and before the final catch-all `handle { respond 404 }`:
 
 ```
@@ -418,8 +418,8 @@ block**, next to the existing `header /mxl/...` and `handle /mxl/*` lines and be
 
 ```sh
 caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
-curl -sI https://dl.werdegames.com/mxl2012/channels/stable.json | head -1
-curl -sI https://dl.werdegames.com/mxl/channels/stable.json | head -1
+curl -sI https://dl.wyrd.games/mxl2012/channels/stable.json | head -1
+curl -sI https://dl.wyrd.games/mxl/channels/stable.json | head -1
 ```
 
 Good: `Valid configuration`; then `HTTP/2 404` for mxl2012 (nothing published yet) and `HTTP/2 200` for the existing site's channel.
@@ -428,7 +428,7 @@ Good: `Valid configuration`; then `HTTP/2 404` for mxl2012 (nothing published ye
 
 ```sh
 systemctl is-active mxl-dl-ingest.path mxl-dl-ingest.timer mxl-dl-sync.path mxl-dl-sync.timer
-curl -s https://files.werdegames.com/mxl/channels/stable.json
+curl -s https://files.wyrd.games/mxl/channels/stable.json
 sudo -u mxlup python3 -I /opt/mxl-dl/dl_sync.py --check      # the existing site's check, with its defaults
 ```
 
@@ -436,7 +436,7 @@ Good: four times `active`; the same channel version as in step 0; the check ends
 
 ## 4. Cloudflare Worker, DigitalOcean Space, DNS (owner, in the consoles)
 
-**DNS: nothing.** `files.werdegames.com` and `dl.werdegames.com` exist; the Worker is attached to `files.werdegames.com` as a
+**DNS: nothing.** `files.wyrd.games` and `dl.wyrd.games` exist; the Worker is attached to `files.wyrd.games` as a
 custom domain, which covers every path.
 
 **DigitalOcean Space: nothing to create or change.** The Space `d2r-xl` has no folders to make (the prefix `mxl2012/`
@@ -446,7 +446,7 @@ file it uploads, as for the existing site.
 
 **Cloudflare Worker `d2r-xl-files`: one edit.** The Worker serves GET and HEAD only, and only paths under
 `/mxl/` without dot segments; it forwards them to `https://d2r-xl.fra1.digitaloceanspaces.com<path>`. Until it also accepts
-`/mxl2012/`, `files.werdegames.com/mxl2012/...` answers 404 even after the sync. The Worker's source lives only in the
+`/mxl2012/`, `files.wyrd.games/mxl2012/...` answers 404 even after the sync. The Worker's source lives only in the
 Cloudflare dashboard (it is not in this repository, and this lane could not read it), so this is the change to make there:
 
 1. Workers & Pages, `d2r-xl-files`, **Edit code**. Find the place that tests the path prefix `/mxl/` (probably
@@ -462,19 +462,19 @@ Cloudflare dashboard (it is not in this repository, and this lane could not read
 
    Keep the match on the **trailing slash**: `/mxl2012x/...` must stay a 404 and `/mxl/` must not start matching
    `/mxl2012/...` by accident (it does not: `"/mxl2012/".startsWith("/mxl/")` is false).
-3. **Save and deploy.** If the Worker is a Route (`files.werdegames.com/mxl/*`) instead of a custom domain, add the route
-   `files.werdegames.com/mxl2012/*` for the same Worker.
+3. **Save and deploy.** If the Worker is a Route (`files.wyrd.games/mxl/*`) instead of a custom domain, add the route
+   `files.wyrd.games/mxl2012/*` for the same Worker.
 4. Check from the PC, before anything is published (all four are about the Worker's own rules; the Space has no `mxl2012/` yet):
 
 ```powershell
-curl.exe -sI https://files.werdegames.com/mxl/channels/stable.json | findstr /i "HTTP"      # 200, as before
-curl.exe -sI https://files.werdegames.com/mxl2012/channels/stable.json | findstr /i "HTTP"  # 404 (no file yet) - not 403/1xxx
-curl.exe -sI https://files.werdegames.com/mxl2012x/channels/stable.json | findstr /i "HTTP" # 404
-curl.exe -sI https://files.werdegames.com/mxl2012/.sync/status.json | findstr /i "HTTP"     # 404
+curl.exe -sI https://files.wyrd.games/mxl/channels/stable.json | findstr /i "HTTP"      # 200, as before
+curl.exe -sI https://files.wyrd.games/mxl2012/channels/stable.json | findstr /i "HTTP"  # 404 (no file yet) - not 403/1xxx
+curl.exe -sI https://files.wyrd.games/mxl2012x/channels/stable.json | findstr /i "HTTP" # 404
+curl.exe -sI https://files.wyrd.games/mxl2012/.sync/status.json | findstr /i "HTTP"     # 404
 ```
 
 The first check that tells the Worker edit apart from "no file yet" comes in section 5, after the first sync. Cloudflare's cache
-rules or configuration rules are scoped to the host name `files.werdegames.com`, not to `/mxl/`, so they apply to both
+rules or configuration rules are scoped to the host name `files.wyrd.games`, not to `/mxl/`, so they apply to both
 products (if you find a rule that names the path `/mxl/*`, add `/mxl2012/*` to it). The zone's Browser Cache TTL note in
 section 8 applies to both.
 
@@ -526,12 +526,12 @@ delete. The service ends with `done: N uploaded (X MB), 0 deleted`. `--check` en
 everything once. Then:
 
 ```powershell
-curl.exe -sI https://files.werdegames.com/mxl2012/channels/test.json | findstr /i "HTTP cache-control content-type cf-cache-status"
+curl.exe -sI https://files.wyrd.games/mxl2012/channels/test.json | findstr /i "HTTP cache-control content-type cf-cache-status"
 #   200, cache-control: no-cache, content-type: application/json, cf-cache-status: REVALIDATED / EXPIRED / MISS / DYNAMIC (never a stale HIT)
-curl.exe -sI https://files.werdegames.com/mxl2012/.sync/status.json | findstr /i "HTTP"       # 404: dot files are never uploaded
-curl.exe -sI https://files.werdegames.com/mxl/channels/stable.json | findstr /i "HTTP"        # existing site still 200
-py -3 tools/publish_release.py verify --url https://files.werdegames.com/mxl2012/ --channel test
-py -3 tools/publish_release.py verify --url https://dl.werdegames.com/mxl2012/ --channel test    # the backup origin (step 7)
+curl.exe -sI https://files.wyrd.games/mxl2012/.sync/status.json | findstr /i "HTTP"       # 404: dot files are never uploaded
+curl.exe -sI https://files.wyrd.games/mxl/channels/stable.json | findstr /i "HTTP"        # existing site still 200
+py -3 tools/publish_release.py verify --url https://files.wyrd.games/mxl2012/ --channel test
+py -3 tools/publish_release.py verify --url https://dl.wyrd.games/mxl2012/ --channel test    # the backup origin (step 7)
 py -3 tools/publish_release.py list --target $t --identity $k      # last line: Space sync: ok at ...
 ```
 
@@ -542,7 +542,7 @@ is also the proof that the Worker edit works (it was 404 before, section 4). Onl
 py -3 tools/publish_release.py promote 0.1.0 --channel stable --target $t --identity $k        # a --no-data package is refused for stable
 ```
 
-and tell the coordinator the root URL works (`https://files.werdegames.com/mxl2012/` is already the downloader's default,
+and tell the coordinator the root URL works (`https://files.wyrd.games/mxl2012/` is already the downloader's default,
 `launcher/src/win/app.h`).
 
 ## 6. Day to day
@@ -643,7 +643,7 @@ keeps `PrivateNetwork=yes`: it only writes the trigger file; the network belongs
 ### Caddy notes
 
 - CORS is not needed (the downloader is a program). No `Access-Control-*` headers.
-- Objects have no file extension, so Caddy sniffs their type; if `publish_release.py verify --url https://dl.werdegames.com/mxl2012/`
+- Objects have no file extension, so Caddy sniffs their type; if `publish_release.py verify --url https://dl.wyrd.games/mxl2012/`
   shows `Range requests` failing or a `Content-Encoding` on a 206 answer, drop the `text/*` line from the site block's
   `encode ... match`: resumable downloads win over a few MB.
 - `header` also stamps error answers, so a request for an object that is not uploaded yet gets `immutable` on its 404; the
@@ -654,16 +654,16 @@ keeps `PrivateNetwork=yes`: it only writes the trigger file; the network belongs
 Cloudflare follows the origin's `Cache-Control`: objects are cached for a year (they never change), releases / launcher /
 assets for an hour, and `channels/*.json` (`no-cache`) are revalidated on every request, so a new channel version shows at once,
 and the downloader's sha256 check of the manifest catches anything half-updated. If a channel ever shows an old version after
-`list` says the sync is done (compare `curl.exe -s https://files.werdegames.com/mxl2012/channels/stable.json` with the same path on
-dl.werdegames.com), purge by hand: Cloudflare, Caching, Configuration, Purge Cache, Custom purge, URLs
-`https://files.werdegames.com/mxl2012/channels/stable.json` and `.../test.json`. A `publish --force` of an existing version
+`list` says the sync is done (compare `curl.exe -s https://files.wyrd.games/mxl2012/channels/stable.json` with the same path on
+dl.wyrd.games), purge by hand: Cloudflare, Caching, Configuration, Purge Cache, Custom purge, URLs
+`https://files.wyrd.games/mxl2012/channels/stable.json` and `.../test.json`. A `publish --force` of an existing version
 rewrites files under `releases/<v>/`: purge those URLs the same way (or wait an hour).
 
 ### The Worker, and why it exists
 
 A proxied CNAME to the Spaces CDN fails (error 1014: DigitalOcean's CDN runs on Cloudflare itself) and a grey-cloud record would
 show players the Cloudflare Origin CA certificate. So the Worker `d2r-xl-files` (free plan, custom domain
-`files.werdegames.com`) fetches `https://d2r-xl.fra1.digitaloceanspaces.com<path>`, which is not behind Cloudflare: GET and HEAD
+`files.wyrd.games`) fetches `https://d2r-xl.fra1.digitaloceanspaces.com<path>`, which is not behind Cloudflare: GET and HEAD
 only, only the product folders, no dot segments; it forwards `Range`, `If-None-Match`, `If-Modified-Since`; it fetches with
 `cf: { cacheEverything: true }` so caching follows the origin's `Cache-Control`; a 403 from the Space (missing file, listing
 restricted) becomes a 404; the `x-amz-*` headers are dropped. Cloudflare's zone **Browser Cache TTL** (4 h) rewrites the

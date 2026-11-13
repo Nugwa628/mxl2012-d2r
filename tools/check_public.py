@@ -12,7 +12,9 @@ Usage:
 Prints `path:line: [rule] text` and exits 1 on hits. In history mode the location is `<commit>:<path>:<line in diff>`.
 Intentional hits go in tools/check_public.allow: `path-glob | regex matched against the line`, one per line, `#` comments.
 The rules cover: the private words of the machine's private-terms file (machine and host names, kept out of the repo), user-home paths, e-mail addresses other than
-noreply addresses (personal e-mail included), internal host names (the public forge git.werdegames.com, the download host dl.werdegames.com and its CDN mirror files.werdegames.com are fine), and credentials.
+noreply addresses (personal e-mail included), internal host names (the public forge git.wyrd.games, the download host dl.wyrd.games, its CDN mirror files.wyrd.games and the wiki
+2012wiki.wyrd.games are fine), the retired domain (any werdegames host or the old org name: everything moved to wyrd.games), and
+credentials.
 The tree scan (not --history, not tools/asset_pack.py's scan of game data) also runs the `mention` rule: names of other
 projects that must not appear in this repository. Its regexes come from machine.json `public_check_patterns`
 (tools/localconfig.py); without one (CI, another PC) the encoded built-in copy MENTION_FALLBACK is used, so CI blocks
@@ -40,8 +42,8 @@ ALLOWED_EMAIL = re.compile(r"^(noreply@anthropic\.com|noreply@openai\.com|t3code
 # Placeholder user names that are fine in a home path.
 HOME_OK = {"public", "default", "all", "username", "user", "you", "me", "name", "yourname", "<user>", "%username%",
            "$user", "${user}", "{user}", "runner", "<name>", "x"}
-# Public hosts under our own domain: the forge, the download host and its Spaces/Cloudflare mirror (docs/hosting.md).
-HOST_OK = {"git.werdegames.com", "dl.werdegames.com", "files.werdegames.com"}
+# Public hosts under our own domain: the site, the forge, the download host and its Spaces/Cloudflare mirror (docs/hosting.md), the wiki.
+HOST_OK = {"wyrd.games", "git.wyrd.games", "dl.wyrd.games", "files.wyrd.games", "2012wiki.wyrd.games"}
 
 # Private words (machine names, the CI host, ...) are NOT listed here: this file is public. They live outside the
 # repository, one regex per line (case-insensitive, `#` comments), in $MXL_PRIVATE_TERMS or machine.json private_terms_file.
@@ -94,12 +96,14 @@ def load_private_terms():
 
 
 RULES = load_private_terms() + [
+    # werdegames.com is retired (everything moved to wyrd.games): no host of it and no old org name may come back
+    ("retired", re.compile(r"werdegames", re.I)),
     ("secret", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}\b|\bglpat-[\w-]{20,}\b|"
                           r"(?:password|passwd|token|secret|api[_-]?key)\s*[:=]\s*['\"]?[A-Za-z0-9+/_-]{20,}", re.I)),
 ]
 HOME_RE = re.compile(r"(?:\b[A-Za-z]:[\\/]{1,4}Users|(?<![\w.~-])/(?:Users|home))[\\/]{1,4}([^\\/\s\"'`<>|:*?,;)\]]+)", re.I)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
-HOST_RE = re.compile(r"\b((?:[a-z0-9-]+\.)+(?:werdegames\.com|lan|local|internal|corp|ts\.net))\b", re.I)
+HOST_RE = re.compile(r"\b((?:[a-z0-9-]+\.)*wyrd\.games|(?:[a-z0-9-]+\.)+(?:lan|local|internal|corp|ts\.net))\b", re.I)
 IPV4_RE = re.compile(r"(?<![\w.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\w.])")
 
 

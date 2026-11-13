@@ -147,7 +147,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.21";
+constexpr const char* PluginVersion = "0.1.22";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in

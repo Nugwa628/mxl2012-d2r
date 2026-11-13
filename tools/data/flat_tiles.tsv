@@ -1,0 +1,992 @@
+# Flat maps: wall / flat / unsure per map and tile kind (tools/maps_flat.py; unsure is built as flat).
+# paint: art = classic picture on the floor, biome = HD paint, void = black, none = not drawn.
+map	orientation	main	sub	folder	cells	rise_px	blocked	verdict	paint	reason
+borgir	0	0	6	act4/fort	429	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	8	act4/fort	82	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	12	act4/fort	6	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	20	act4/fort	4	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	22	act4/fort	41	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	29	act4/fort	74	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	30	act4/fort	285	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	31	act4/fort	261	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	37	act4/fort	32	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	38	act4/fort	8	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	0	39	act4/fort	8	40	0	flat	biome	plain floor: HD biome paint
+borgir	0	1	1	expansion/icecave	1	40	0	flat	biome	plain floor: HD biome paint
+borgir	1	20	1	act3/kurast	1	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	1	21	0	act3/kurast	8	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	1	21	1	act3/kurast	10	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	1	21	2	act3/kurast	9	198	5	wall	none	upright, 198 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	1	21	3	act3/kurast	9	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	1	21	4	act3/kurast	6	160	5	wall	none	upright, 160 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	1	23	0	act3/kurast	1	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	1	act3/kurast	12	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	2	act3/kurast	18	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	3	act3/kurast	12	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	4	act3/kurast	9	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	5	act3/kurast	15	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	6	act3/kurast	8	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	1	23	7	act3/kurast	2	275	0	wall	none	upright, 275 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	20	0	act3/kurast	28	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	2	20	1	act3/kurast	21	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	2	20	2	act3/kurast	46	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	2	20	3	act3/kurast	1	214	5	wall	none	upright, 214 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	2	20	4	act3/kurast	1	315	1	wall	none	upright, 315 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	2	20	5	act3/kurast	1	330	0	wall	none	upright, 330 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	20	6	act3/kurast	1	247	5	wall	none	upright, 247 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	2	23	1	act3/kurast	44	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	23	2	act3/kurast	8	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	23	3	act3/kurast	29	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	23	4	act3/kurast	24	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	23	5	act3/kurast	15	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	2	23	6	act3/kurast	2	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	3	31	0	act3/kurast	2	52	9	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 9 of 25 sub-tiles
+borgir	4	20	1	act3/kurast	1	163	9	wall	none	upright, 163 px above the cell centre, blocks 9 of 25 sub-tiles
+borgir	4	21	0	act3/kurast	16	163	9	wall	none	upright, 163 px above the cell centre, blocks 9 of 25 sub-tiles
+borgir	4	22	0	act3/kurast	2	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	4	22	2	act3/kurast	1	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	4	23	1	act3/kurast	1	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	4	31	0	act3/kurast	1	52	9	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 9 of 25 sub-tiles
+borgir	5	21	0	act3/kurast	16	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	5	22	0	act3/kurast	1	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	5	23	0	act3/kurast	29	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	5	31	0	act3/kurast	353	52	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	6	20	0	act3/kurast	27	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	6	21	0	act3/kurast	5	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	6	22	0	act3/kurast	1	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	6	22	1	act3/kurast	4	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	6	22	2	act3/kurast	2	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	6	23	0	act3/kurast	12	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	6	31	0	act3/kurast	258	52	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 5 of 25 sub-tiles
+borgir	7	20	0	act3/kurast	26	165	1	wall	none	upright, 165 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	7	23	0	act3/kurast	90	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	7	31	0	act3/kurast	18	52	1	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	8	21	0	act3/kurast	3	238	2	wall	none	upright, 238 px above the cell centre, blocks 2 of 25 sub-tiles
+borgir	9	20	0	act3/kurast	4	161	2	wall	none	upright, 161 px above the cell centre, blocks 2 of 25 sub-tiles
+borgir	9	21	0	act3/kurast	4	238	2	wall	none	upright, 238 px above the cell centre, blocks 2 of 25 sub-tiles
+borgir	10	33	0		1	0	0	unsure	none	special tile (orientation 10) with no picture: nothing to draw
+borgir	12	20	0	act3/jungle	18	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	12	20	1	act3/jungle	34	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	12	20	2	act3/jungle	20	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	12	20	3	act3/jungle	13	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+borgir	14	0	0	act3/jungle	2	215	4	wall	none	upright, 215 px above the cell centre, blocks 4 of 25 sub-tiles
+borgir	14	0	1	act3/jungle	2	172	0	wall	none	upright, 172 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	14	0	2	act3/jungle	1	197	0	wall	none	upright, 197 px above the cell centre, blocks 0 of 25 sub-tiles
+borgir	14	0	8	act3/jungle	1	154	4	wall	none	upright, 154 px above the cell centre, blocks 4 of 25 sub-tiles
+borgir	14	0	10	act3/jungle	1	198	4	wall	none	upright, 198 px above the cell centre, blocks 4 of 25 sub-tiles
+borgir	14	1	0	act3/jungle	1	178	4	wall	none	upright, 178 px above the cell centre, blocks 4 of 25 sub-tiles
+borgir	14	1	8	act3/jungle	2	89	9	wall	none	low prop that blocks movement, 89 px above the cell centre, blocks 9 of 25 sub-tiles
+borgir	14	1	10	act3/jungle	1	76	9	wall	none	low prop that blocks movement, 76 px above the cell centre, blocks 9 of 25 sub-tiles
+charismatic	0	0	0	act4/fort	7	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	1	act4/fort	7	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	2	act4/fort	6	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	3	act4/fort	7	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	4	act4/fort	5	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	5	act4/fort	6	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	6	act4/fort	240	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	7	act4/fort	163	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	9	act4/fort	5	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	10	act4/fort	147	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	11	act4/fort	186	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	12	act4/fort	53	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	13	act4/fort	42	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	14	act4/fort	112	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	15	act4/fort	142	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	16	act4/fort	3	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	17	act4/fort	5	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	20	act4/fort	59	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	22	act4/fort	51	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	25	act4/fort	1	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	26	act4/fort	1	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	30	act4/fort	13	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	31	act4/fort	275	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	33	act4/fort	24	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	35	act4/fort	1	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	0	46	act4/fort	2	37	25	flat	art	floor that blocks all 25 sub-tiles: classic picture painted, collision unchanged
+charismatic	0	1	9	act4/fort	10	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	1	13	act4/fort	21	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	1	17	act4/fort	12	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	20	0	act4/lava	1	40	0	flat	biome	plain floor: HD biome paint
+charismatic	0	41	6	act4/expansion	1	40	0	flat	biome	plain floor: HD biome paint
+charismatic	1	0	0	act4/fort	10	183	10	wall	none	upright, 183 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	0	1	act4/fort	8	85	10	wall	none	low wall (blocks movement), 85 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	0	2	act4/fort	9	210	10	wall	none	upright, 210 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	1	0	act4/fort	8	246	5	wall	none	upright, 246 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	1	1	1	act4/fort	9	246	5	wall	none	upright, 246 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	1	1	2	act4/fort	9	246	5	wall	none	upright, 246 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	1	1	3	act4/fort	3	246	5	wall	none	upright, 246 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	1	2	6	act4/fort	6	315	0	wall	none	upright, 315 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	1	2	7	act4/fort	23	315	0	wall	none	upright, 315 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	1	2	10	act4/fort	1	316	0	wall	none	upright, 316 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	1	2	12	act4/fort	3	317	0	wall	none	upright, 317 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	1	2	13	act4/fort	3	359	0	wall	none	upright, 359 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	1	3	0	act4/fort	4	212	0	wall	none	upright, 212 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	1	3	1	act4/fort	35	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+charismatic	1	3	2	act4/fort	9	183	10	wall	none	upright, 183 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	3	3	act4/fort	6	210	10	wall	none	upright, 210 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	3	4	act4/fort	24	183	10	wall	none	upright, 183 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	3	5	act4/fort	7	168	10	wall	none	upright, 168 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	3	6	act4/fort	24	150	10	wall	none	upright, 150 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	3	7	act4/fort	2	237	7	wall	none	upright, 237 px above the cell centre, blocks 7 of 25 sub-tiles
+charismatic	1	3	8	act4/fort	8	168	17	wall	none	upright, 168 px above the cell centre, blocks 17 of 25 sub-tiles
+charismatic	1	3	9	act4/fort	8	215	20	wall	none	upright, 215 px above the cell centre, blocks 20 of 25 sub-tiles
+charismatic	1	3	10	act4/fort	5	178	20	wall	none	upright, 178 px above the cell centre, blocks 20 of 25 sub-tiles
+charismatic	1	3	11	act4/fort	1	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+charismatic	1	3	12	act4/fort	5	185	17	wall	none	upright, 185 px above the cell centre, blocks 17 of 25 sub-tiles
+charismatic	1	3	13	act4/fort	5	215	20	wall	none	upright, 215 px above the cell centre, blocks 20 of 25 sub-tiles
+charismatic	1	3	14	act4/fort	7	178	20	wall	none	upright, 178 px above the cell centre, blocks 20 of 25 sub-tiles
+charismatic	1	3	15	act4/fort	18	210	10	wall	none	upright, 210 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	1	4	0	act4/fort	87	168	5	wall	none	upright, 168 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	1	4	1	act4/fort	3	177	5	wall	none	upright, 177 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	1	4	2	act4/fort	6	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+charismatic	1	4	3	act4/fort	90	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+charismatic	1	4	4	act4/fort	19	185	2	wall	none	upright, 185 px above the cell centre, blocks 2 of 25 sub-tiles
+charismatic	1	4	5	act4/fort	16	168	5	wall	none	upright, 168 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	2	0	0	act4/fort	4	61	25	flat	art	low edge or kerb, 61 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	0	1	act4/fort	8	38	25	flat	art	low edge or kerb, 38 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	0	2	act4/fort	8	29	25	flat	art	low edge or kerb, 29 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	1	0	act4/fort	5	303	1	wall	none	upright, 303 px above the cell centre, blocks 1 of 25 sub-tiles
+charismatic	2	1	1	act4/fort	5	333	3	wall	none	upright, 333 px above the cell centre, blocks 3 of 25 sub-tiles
+charismatic	2	1	2	act4/fort	2	308	5	wall	none	upright, 308 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	2	2	7	act4/fort	6	306	0	wall	none	upright, 306 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	2	2	8	act4/fort	6	349	0	wall	none	upright, 349 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	2	2	9	act4/fort	7	351	0	wall	none	upright, 351 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	2	3	0	act4/fort	8	184	10	wall	none	upright, 184 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	2	3	1	act4/fort	10	209	10	wall	none	upright, 209 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	2	3	2	act4/fort	11	149	10	wall	none	upright, 149 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	2	3	3	act4/fort	10	209	10	wall	none	upright, 209 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	2	3	4	act4/fort	7	179	20	wall	none	upright, 179 px above the cell centre, blocks 20 of 25 sub-tiles
+charismatic	2	3	5	act4/fort	5	212	17	wall	none	upright, 212 px above the cell centre, blocks 17 of 25 sub-tiles
+charismatic	2	3	6	act4/fort	2	178	5	wall	none	upright, 178 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	2	3	7	act4/fort	14	212	5	wall	none	upright, 212 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	2	3	8	act4/fort	56	149	5	wall	none	upright, 149 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	2	4	0	act4/fort	4	178	5	wall	none	upright, 178 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	2	4	2	act4/fort	6	167	25	wall	none	upright, 167 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	4	3	act4/fort	8	176	25	wall	none	upright, 176 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	4	4	act4/fort	8	167	25	wall	none	upright, 167 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	4	5	act4/fort	8	180	25	wall	none	upright, 180 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	2	4	6	act4/fort	21	184	25	wall	none	upright, 184 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	3	0	0	act4/fort	3	161	19	wall	none	upright, 161 px above the cell centre, blocks 19 of 25 sub-tiles
+charismatic	3	1	0	act4/fort	3	265	9	wall	none	upright, 265 px above the cell centre, blocks 9 of 25 sub-tiles
+charismatic	3	3	0	act4/fort	2	218	16	wall	none	upright, 218 px above the cell centre, blocks 16 of 25 sub-tiles
+charismatic	3	3	1	act4/fort	6	218	24	wall	none	upright, 218 px above the cell centre, blocks 24 of 25 sub-tiles
+charismatic	3	4	0	act4/fort	8	363	9	wall	none	upright, 363 px above the cell centre, blocks 9 of 25 sub-tiles
+charismatic	4	1	0	act4/fort	5	246	9	wall	none	upright, 246 px above the cell centre, blocks 9 of 25 sub-tiles
+charismatic	4	3	0	act4/fort	1	215	16	wall	none	upright, 215 px above the cell centre, blocks 16 of 25 sub-tiles
+charismatic	4	3	1	act4/fort	1	214	24	wall	none	upright, 214 px above the cell centre, blocks 24 of 25 sub-tiles
+charismatic	4	4	0	act4/fort	3	359	9	wall	none	upright, 359 px above the cell centre, blocks 9 of 25 sub-tiles
+charismatic	5	2	0	act4/fort	6	323	0	wall	none	upright, 323 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	5	3	1	act4/fort	8	226	20	wall	none	upright, 226 px above the cell centre, blocks 20 of 25 sub-tiles
+charismatic	6	2	1	act4/fort	2	275	0	wall	none	upright, 275 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	6	3	1	act4/fort	6	224	10	wall	none	upright, 224 px above the cell centre, blocks 10 of 25 sub-tiles
+charismatic	6	3	2	act4/fort	13	218	5	wall	none	upright, 218 px above the cell centre, blocks 5 of 25 sub-tiles
+charismatic	6	4	0	act4/fort	2	275	25	wall	none	upright, 275 px above the cell centre, blocks 25 of 25 sub-tiles
+charismatic	7	2	0	act4/fort	2	391	0	wall	none	upright, 391 px above the cell centre, blocks 0 of 25 sub-tiles
+charismatic	7	3	0	act4/fort	44	223	4	wall	none	upright, 223 px above the cell centre, blocks 4 of 25 sub-tiles
+charismatic	8	3	0	act4/fort	16	313	3	wall	none	upright, 313 px above the cell centre, blocks 3 of 25 sub-tiles
+charismatic	8	3	1	act4/fort	16	268	4	wall	none	upright, 268 px above the cell centre, blocks 4 of 25 sub-tiles
+charismatic	10	33	0		1	0	0	unsure	none	special tile (orientation 10) with no picture: nothing to draw
+charismatic	15	2	1	act4/fort	1	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	2	act4/fort	1	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	10	act4/fort	3	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	13	act4/fort	4	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	14	act4/fort	1	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	16	act4/fort	1	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	18	act4/fort	1	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+charismatic	15	2	19	act4/fort	1	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	0	0	0	act2/tomb	1	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	0	29	act4/fort	67	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	0	30	act4/fort	47	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	0	31	act4/fort	33	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	0	33	act4/fort	95	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	0	34	act4/fort	147	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	0	35	act4/fort	37	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	1	8	act4/fort	860	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	1	12	act4/fort	427	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	1	16	act4/fort	751	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	4	18	act3/docktown	5095	40	25	flat	void	black floor (mean brightness under 16): the void, kept black
+cypherpunk	0	8	2	act2/tomb	15	40	25	flat	art	floor that blocks all 25 sub-tiles: classic picture painted, collision unchanged
+cypherpunk	0	8	3	act2/tomb	15	40	25	flat	art	floor that blocks all 25 sub-tiles: classic picture painted, collision unchanged
+cypherpunk	0	10	0	act2/tomb	751	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	10	1	act2/tomb	151	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	10	2	act2/tomb	100	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	12	1	act2/tomb	18	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	12	2	act2/tomb	33	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	12	24	act4/mesa	65	39	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	13	20	act4/mesa	7	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	20	0	act3/kurast	61	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	20	1	act3/kurast	43	40	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	30	0		3	0	0	flat	biome	plain floor: HD biome paint
+cypherpunk	0	30	12	act3/kurast	3	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	30	15	act3/kurast	11	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	0	act3/kurast	4	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	3	act3/kurast	1	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	4	act3/kurast	3	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	6	act3/kurast	10	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	7	act3/kurast	11	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	8	act3/kurast	12	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	9	act3/kurast	11	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	10	act3/kurast	28	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	11	act3/kurast	12	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	12	act3/kurast	502	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	13	act3/kurast	512	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	14	act3/kurast	555	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	15	act3/kurast	874	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	18	act3/kurast	1	40	13	flat	art	terrace-set floor that blocks 13 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	19	act3/kurast	1	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	20	act3/kurast	8	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	21	act3/kurast	26	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	22	act3/kurast	6	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	23	act3/kurast	212	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	25	act3/kurast	1	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+cypherpunk	0	31	26	act3/kurast	290	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+cypherpunk	0	31	27	act3/kurast	1	40	7	flat	art	terrace-set floor that blocks 7 sub-tiles: classic picture painted (colour matched)
+cypherpunk	1	1	1	act4/fort	17	246	5	wall	none	upright, 246 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	1	2	act4/fort	16	246	5	wall	none	upright, 246 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	2	6	act4/fort	63	315	0	wall	none	upright, 315 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	16	0	act2/tomb	6	77	0	unsure	art	low upright (fence or railing height), 77 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	16	1	act2/tomb	13	76	0	unsure	art	low upright (fence or railing height), 76 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	16	2	act2/tomb	5	83	0	unsure	art	low upright (fence or railing height), 83 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	16	3	act2/tomb	1	83	0	unsure	art	low upright (fence or railing height), 83 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	16	4	act2/tomb	1	83	0	unsure	art	low upright (fence or railing height), 83 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	16	5	act2/tomb	1	87	0	unsure	art	low upright (fence or railing height), 87 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	24	0	act3/kurast	148	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	24	1	act3/kurast	76	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	24	2	act3/kurast	8	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	24	3	act3/kurast	32	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	24	4	act3/kurast	7	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	1	25	0	act3/kurast	119	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	25	1	act3/kurast	95	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	25	2	act3/kurast	11	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	25	3	act3/kurast	19	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	1	31	0	act3/kurast	431	51	5	flat	art	low edge or kerb, 51 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	0	0	act2/tomb	1	187	5	wall	none	upright, 187 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	0	1	act2/tomb	1	187	5	wall	none	upright, 187 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	0	4	act2/tomb	1	202	5	wall	none	upright, 202 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	2	7	act4/fort	11	306	0	wall	none	upright, 306 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	2	8	act4/fort	12	349	0	wall	none	upright, 349 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	2	9	act4/fort	12	351	0	wall	none	upright, 351 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	24	0	act3/kurast	193	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	24	1	act3/kurast	20	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	24	2	act3/kurast	15	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	24	3	act3/kurast	51	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	24	4	act3/kurast	16	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	2	25	0	act3/kurast	41	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	25	1	act3/kurast	214	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	25	2	act3/kurast	29	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	25	3	act3/kurast	17	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	2	31	0	act3/kurast	936	51	5	flat	art	low edge or kerb, 51 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	3	24	0	act3/kurast	1	160	9	wall	none	upright, 160 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	3	24	1	act3/kurast	1	162	9	wall	none	upright, 162 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	3	25	0	act3/kurast	1	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	3	31	0	act3/kurast	3	52	9	flat	art	low edge or kerb, 52 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	4	0	1	act2/tomb	1	202	9	wall	none	upright, 202 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	4	24	0	act3/kurast	2	160	9	wall	none	upright, 160 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	4	24	1	act3/kurast	1	161	9	wall	none	upright, 161 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	4	31	0	act3/kurast	17	52	9	flat	art	low edge or kerb, 52 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	5	2	0	act4/fort	6	323	0	wall	none	upright, 323 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	5	10	0	act3/jungle	37	368	7	wall	none	upright, 368 px above the cell centre, blocks 7 of 25 sub-tiles
+cypherpunk	5	10	1	act3/jungle	17	286	2	wall	none	upright, 286 px above the cell centre, blocks 2 of 25 sub-tiles
+cypherpunk	5	24	0	act3/kurast	19	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	5	24	1	act3/kurast	4	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	5	24	2	act3/kurast	2	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	5	25	0	act3/kurast	9	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	5	25	1	act3/kurast	25	263	0	wall	none	upright, 263 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	5	31	0	act3/kurast	322	52	5	flat	art	low edge or kerb, 52 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	5	31	1	act3/kurast	246	65	5	flat	art	low edge or kerb, 65 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	6	2	1	act4/fort	1	275	0	wall	none	upright, 275 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	6	10	0	act3/jungle	19	389	9	wall	none	upright, 389 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	6	10	1	act3/jungle	17	267	5	wall	none	upright, 267 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	6	10	2	act3/jungle	18	327	8	wall	none	upright, 327 px above the cell centre, blocks 8 of 25 sub-tiles
+cypherpunk	6	24	0	act3/kurast	12	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	6	24	1	act3/kurast	19	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	6	24	2	act3/kurast	1	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	6	25	0	act3/kurast	59	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	6	25	1	act3/kurast	14	263	0	wall	none	upright, 263 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	6	31	0	act3/kurast	75	52	5	flat	art	low edge or kerb, 52 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	6	31	1	act3/kurast	138	66	5	flat	art	low edge or kerb, 66 px above the cell centre, blocks 5 of 25 sub-tiles
+cypherpunk	7	0	1	act2/arcane	173	217	1	wall	none	upright, 217 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	7	24	0	act3/kurast	17	166	1	wall	none	upright, 166 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	7	31	0	act3/kurast	111	52	1	flat	art	low edge or kerb, 52 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	7	31	1	act3/kurast	92	63	1	flat	art	low edge or kerb, 63 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	7	31	2	act3/kurast	47	64	1	flat	art	low edge or kerb, 64 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	8	24	0	act3/kurast	67	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	9	24	0	act3/kurast	43	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	11	0	4	act2/tomb	1	203	5	unsure	none	special tile (orientation 11): classic does not draw it in play
+cypherpunk	12	24	0	act3/kurast	8	170	1	wall	none	upright, 170 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	12	24	1	act3/kurast	43	170	1	wall	none	upright, 170 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	12	24	2	act3/kurast	30	166	1	wall	none	upright, 166 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	12	24	3	act3/kurast	6	166	1	wall	none	upright, 166 px above the cell centre, blocks 1 of 25 sub-tiles
+cypherpunk	14	0	0	act3/jungle	4	215	4	wall	none	upright, 215 px above the cell centre, blocks 4 of 25 sub-tiles
+cypherpunk	14	0	1	act3/jungle	5	172	0	wall	none	upright, 172 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	14	0	2	act3/jungle	4	197	0	wall	none	upright, 197 px above the cell centre, blocks 0 of 25 sub-tiles
+cypherpunk	14	0	4	act3/jungle	6	192	4	wall	none	upright, 192 px above the cell centre, blocks 4 of 25 sub-tiles
+cypherpunk	14	0	6	act3/jungle	5	218	4	wall	none	upright, 218 px above the cell centre, blocks 4 of 25 sub-tiles
+cypherpunk	14	0	8	act3/jungle	5	154	4	wall	none	upright, 154 px above the cell centre, blocks 4 of 25 sub-tiles
+cypherpunk	14	0	10	act3/jungle	2	198	4	wall	none	upright, 198 px above the cell centre, blocks 4 of 25 sub-tiles
+cypherpunk	14	0	18	act3/jungle	2	242	9	wall	none	upright, 242 px above the cell centre, blocks 9 of 25 sub-tiles
+cypherpunk	15	2	1	act4/fort	12	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	2	act4/fort	12	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	3	act4/fort	12	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	5	act4/fort	226	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	6	act4/fort	226	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	15	act4/fort	226	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	18	act4/fort	32	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	19	act4/fort	29	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	15	2	20	act4/fort	16	240	0	wall	none	roof: classic draws it 240 px up over a building's walls
+cypherpunk	16	0	2	act2/arcane	13	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	16	0	3	act2/arcane	1	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	16	0	4	act2/arcane	14	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	16	0	5	act2/arcane	1	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	17	0	0	act2/arcane	4	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	17	0	1	act2/arcane	3	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	17	0	2	act2/arcane	2	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+cypherpunk	17	0	4	act2/arcane	2	2	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+desertpeak	0	4	18	act3/docktown	13113	40	25	flat	void	black floor (mean brightness under 16): the void, kept black
+desertpeak	0	4	27	act3/docktown	1	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	11	6	act4/mesa	1	21	16	flat	biome	plain floor: HD biome paint
+desertpeak	0	15	19	act2/tomb	1	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	15	21	act2/tomb	1	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	15	23	act2/tomb	1	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	0	act3/kurast	1	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	1	act3/kurast	562	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	2	act3/kurast	213	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	3	act3/kurast	71	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	4	act3/kurast	71	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	5	act3/kurast	71	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	6	act3/kurast	71	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	7	act3/kurast	17	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	8	act3/kurast	17	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	9	act3/kurast	17	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	20	10	act3/kurast	17	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	22	0	act3/kurast	1498	40	0	flat	biome	plain floor: HD biome paint
+desertpeak	0	31	0	act3/kurast	10	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	31	3	act3/kurast	3	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	31	4	act3/kurast	186	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	31	5	act3/kurast	151	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	31	7	act3/kurast	1	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+desertpeak	0	31	8	act3/kurast	1	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	31	9	act3/kurast	5	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	31	10	act3/kurast	9	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+desertpeak	0	31	11	act3/kurast	6	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+desertpeak	0	32	6	act3/kurast	14	40	15	flat	biome	plain floor: HD biome paint
+desertpeak	1	4	7	act3/docktown	13	75	1	wall	none	low wall (blocks movement), 75 px above the cell centre, blocks 1 of 25 sub-tiles
+desertpeak	1	4	8	act3/docktown	9	116	5	wall	none	low wall (blocks movement), 116 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	1	4	9	act3/docktown	9	95	3	wall	none	low wall (blocks movement), 95 px above the cell centre, blocks 3 of 25 sub-tiles
+desertpeak	1	4	10	act3/docktown	24	57	3	wall	none	wall stub (ruling 2026-11-12: blocks 3 of 25 sub-tiles), 57 px
+desertpeak	1	4	11	act3/docktown	29	75	5	wall	none	low wall (blocks movement), 75 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	1	4	16	act3/docktown	367	116	5	wall	none	low wall (blocks movement), 116 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	1	4	17	act3/docktown	15	114	4	wall	none	low wall (blocks movement), 114 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	1	4	18	act3/docktown	2	75	3	wall	none	low wall (blocks movement), 75 px above the cell centre, blocks 3 of 25 sub-tiles
+desertpeak	1	4	19	act3/docktown	252	116	5	wall	none	low wall (blocks movement), 116 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	1	10	0	act3/jungle	36	451	10	wall	none	upright, 451 px above the cell centre, blocks 10 of 25 sub-tiles
+desertpeak	1	10	1	act3/jungle	47	406	10	wall	none	upright, 406 px above the cell centre, blocks 10 of 25 sub-tiles
+desertpeak	1	10	2	act3/jungle	31	474	8	wall	none	upright, 474 px above the cell centre, blocks 8 of 25 sub-tiles
+desertpeak	1	10	3	act3/jungle	50	420	5	wall	none	upright, 420 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	1	10	4	act3/jungle	73	350	5	wall	none	upright, 350 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	1	16	0	act2/tomb	5	77	0	unsure	art	low upright that blocks nothing (railing), 77 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	1	16	1	act2/tomb	13	76	0	unsure	art	low upright that blocks nothing (railing), 76 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	1	16	2	act2/tomb	3	83	0	unsure	art	low upright that blocks nothing (railing), 83 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	1	16	3	act2/tomb	2	83	0	unsure	art	low upright that blocks nothing (railing), 83 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	1	16	4	act2/tomb	6	83	0	unsure	art	low upright that blocks nothing (railing), 83 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	1	16	5	act2/tomb	2	87	0	unsure	art	low upright that blocks nothing (railing), 87 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	1	31	0	act3/kurast	16	51	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 51 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	0	3	act2/tomb	1	202	5	wall	none	upright, 202 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	8	act3/docktown	18	115	5	wall	none	low wall (blocks movement), 115 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	11	act3/docktown	35	76	5	wall	none	low wall (blocks movement), 76 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	13	act3/docktown	15	33	2	flat	art	low edge or kerb, 33 px above the cell centre, blocks 2 of 25 sub-tiles
+desertpeak	2	4	16	act3/docktown	1	80	8	wall	none	low wall (blocks movement), 80 px above the cell centre, blocks 8 of 25 sub-tiles
+desertpeak	2	4	17	act3/docktown	3	180	8	wall	none	upright, 180 px above the cell centre, blocks 8 of 25 sub-tiles
+desertpeak	2	4	18	act3/docktown	3	212	5	wall	none	upright, 212 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	19	act3/docktown	4	219	2	wall	none	upright, 219 px above the cell centre, blocks 2 of 25 sub-tiles
+desertpeak	2	4	20	act3/docktown	4	202	5	wall	none	upright, 202 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	21	act3/docktown	26	115	5	wall	none	low wall (blocks movement), 115 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	23	act3/docktown	467	115	5	wall	none	low wall (blocks movement), 115 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	4	24	act3/docktown	31	115	3	wall	none	low wall (blocks movement), 115 px above the cell centre, blocks 3 of 25 sub-tiles
+desertpeak	2	4	25	act3/docktown	1	76	4	wall	none	low wall (blocks movement), 76 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	2	4	26	act3/docktown	463	115	5	wall	none	low wall (blocks movement), 115 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	2	10	0	act3/jungle	4	471	14	wall	none	upright, 471 px above the cell centre, blocks 14 of 25 sub-tiles
+desertpeak	2	10	1	act3/jungle	4	432	10	wall	none	upright, 432 px above the cell centre, blocks 10 of 25 sub-tiles
+desertpeak	2	10	3	act3/jungle	32	431	5	wall	none	upright, 431 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	4	4	1	act3/docktown	3	60	9	wall	none	wall stub (ruling 2026-11-12: blocks 9 of 25 sub-tiles), 60 px
+desertpeak	5	10	0	act3/jungle	97	368	7	wall	none	upright, 368 px above the cell centre, blocks 7 of 25 sub-tiles
+desertpeak	5	10	1	act3/jungle	33	286	2	wall	none	upright, 286 px above the cell centre, blocks 2 of 25 sub-tiles
+desertpeak	5	10	2	act3/jungle	1	290	5	wall	none	upright, 290 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	6	0	1	act2/tomb	1	202	5	wall	none	upright, 202 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	6	10	0	act3/jungle	142	389	9	wall	none	upright, 389 px above the cell centre, blocks 9 of 25 sub-tiles
+desertpeak	6	10	1	act3/jungle	34	267	5	wall	none	upright, 267 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	6	10	2	act3/jungle	24	327	8	wall	none	upright, 327 px above the cell centre, blocks 8 of 25 sub-tiles
+desertpeak	7	0	0	act2/tomb	1	203	1	wall	none	upright, 203 px above the cell centre, blocks 1 of 25 sub-tiles
+desertpeak	7	4	0	act3/docktown	31	116	1	wall	none	low wall (blocks movement), 116 px above the cell centre, blocks 1 of 25 sub-tiles
+desertpeak	11	0	4	act2/tomb	1	203	5	flat	art	special tile with art (doorway, orientation 11): painted at its classic pixels
+desertpeak	12	4	2	act3/docktown	7	90	12	wall	none	low prop that blocks movement, 90 px above the cell centre, blocks 12 of 25 sub-tiles
+desertpeak	12	20	1	act3/jungle	5	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+desertpeak	14	0	0	act3/jungle	43	215	4	wall	none	upright, 215 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	1	act3/jungle	42	172	0	wall	none	upright, 172 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	14	0	2	act3/jungle	16	197	0	wall	none	upright, 197 px above the cell centre, blocks 0 of 25 sub-tiles
+desertpeak	14	0	4	act3/jungle	35	192	4	wall	none	upright, 192 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	6	act3/jungle	11	218	4	wall	none	upright, 218 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	8	act3/jungle	9	154	4	wall	none	upright, 154 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	12	act3/jungle	7	129	4	wall	none	upright, 129 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	14	act3/jungle	5	90	13	wall	none	low prop that blocks movement, 90 px above the cell centre, blocks 13 of 25 sub-tiles
+desertpeak	14	0	19	act3/jungle	59	364	5	wall	none	upright, 364 px above the cell centre, blocks 5 of 25 sub-tiles
+desertpeak	14	0	20	act3/jungle	68	349	4	wall	none	upright, 349 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	22	act3/jungle	68	344	4	wall	none	upright, 344 px above the cell centre, blocks 4 of 25 sub-tiles
+desertpeak	14	0	23	act3/jungle	58	304	3	wall	none	upright, 304 px above the cell centre, blocks 3 of 25 sub-tiles
+desertpeak	14	1	4	act3/jungle	75	257	4	wall	none	upright, 257 px above the cell centre, blocks 4 of 25 sub-tiles
+downtown	0	0	0	act1/crypt	2	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	11	37	expansion/town	7939	40	25	flat	void	black floor (mean brightness under 16): the void, kept black
+downtown	0	16	17	act4/mesa	2293	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	18	act4/mesa	1976	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	19	act4/mesa	2161	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	20	act4/mesa	2284	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	21	act4/mesa	2033	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	22	act4/mesa	3009	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	23	act4/mesa	2320	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	24	act4/mesa	2161	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	29	act4/mesa	2513	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	30	act4/mesa	2368	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	31	act4/mesa	2067	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	16	32	act4/mesa	2115	40	0	flat	biome	plain floor: HD biome paint
+downtown	0	47	29	act3/travincal	58	40	0	flat	biome	plain floor: HD biome paint
+downtown	1	1	0	expansion/town	243	334	5	wall	none	upright, 334 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	1	1	1	expansion/town	240	334	5	wall	none	upright, 334 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	1	1	2	expansion/town	215	350	5	wall	none	upright, 350 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	1	3	0	expansion/town	85	124	5	wall	none	upright, 124 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	1	3	1	expansion/town	60	125	5	wall	none	upright, 125 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	1	0	expansion/town	262	334	5	wall	none	upright, 334 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	1	1	expansion/town	264	334	5	wall	none	upright, 334 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	1	2	expansion/town	239	348	5	wall	none	upright, 348 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	3	0	expansion/town	28	128	5	wall	none	upright, 128 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	3	1	expansion/town	9	127	5	wall	none	upright, 127 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	3	3	expansion/town	10	126	5	wall	none	upright, 126 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	14	20	expansion/town	111	139	5	wall	none	upright, 139 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	14	21	expansion/town	82	135	5	wall	none	upright, 135 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	14	22	expansion/town	107	139	5	wall	none	upright, 139 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	2	16	0	expansion/town	1	357	0	wall	none	upright, 357 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	2	16	1	expansion/town	1	409	0	wall	none	upright, 409 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	2	16	2	expansion/town	1	423	0	wall	none	upright, 423 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	3	1	0	expansion/town	3	344	9	wall	none	upright, 344 px above the cell centre, blocks 9 of 25 sub-tiles
+downtown	3	1	1	expansion/town	6	331	13	wall	none	upright, 331 px above the cell centre, blocks 13 of 25 sub-tiles
+downtown	4	1	0	expansion/town	1	343	9	wall	none	upright, 343 px above the cell centre, blocks 9 of 25 sub-tiles
+downtown	5	1	0	expansion/town	8	368	5	wall	none	upright, 368 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	5	3	0	expansion/town	61	124	5	wall	none	upright, 124 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	5	4	0	expansion/town	1	188	25	wall	none	upright, 188 px above the cell centre, blocks 25 of 25 sub-tiles
+downtown	6	1	0	expansion/town	6	368	5	wall	none	upright, 368 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	6	3	0	expansion/town	1	94	3	wall	none	low wall (blocks movement), 94 px above the cell centre, blocks 3 of 25 sub-tiles
+downtown	7	0	0	act1/crypt	2	171	4	wall	none	upright, 171 px above the cell centre, blocks 4 of 25 sub-tiles
+downtown	7	3	0	expansion/town	1	145	0	wall	none	upright, 145 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	8	3	0	expansion/town	23	377	5	wall	none	upright, 377 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	8	3	1	expansion/town	23	358	5	wall	none	upright, 358 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	8	3	2	expansion/town	22	356	2	wall	none	upright, 356 px above the cell centre, blocks 2 of 25 sub-tiles
+downtown	8	3	3	expansion/town	22	390	2	wall	none	upright, 390 px above the cell centre, blocks 2 of 25 sub-tiles
+downtown	8	3	4	expansion/town	22	358	5	wall	none	upright, 358 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	8	3	5	expansion/town	21	334	5	wall	none	upright, 334 px above the cell centre, blocks 5 of 25 sub-tiles
+downtown	10	1	0	act1/crypt	1	171	5	flat	art	special tile with art (doorway, orientation 10): painted at its classic pixels
+downtown	10	1	1	act1/crypt	1	172	5	flat	art	special tile with art (doorway, orientation 10): painted at its classic pixels
+downtown	14	14	10	expansion/town	1	363	3	wall	none	upright, 363 px above the cell centre, blocks 3 of 25 sub-tiles
+downtown	14	14	11	expansion/town	91	326	0	wall	none	upright, 326 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	14	14	12	expansion/town	168	359	4	wall	none	upright, 359 px above the cell centre, blocks 4 of 25 sub-tiles
+downtown	14	14	13	expansion/town	78	363	0	wall	none	upright, 363 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	14	14	14	expansion/town	77	214	0	wall	none	upright, 214 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	14	14	15	expansion/town	63	316	7	wall	none	upright, 316 px above the cell centre, blocks 7 of 25 sub-tiles
+downtown	14	14	16	expansion/town	63	227	0	wall	none	upright, 227 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	14	14	17	expansion/town	63	165	0	wall	none	upright, 165 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	14	15	3	expansion/town	55	306	9	wall	none	upright, 306 px above the cell centre, blocks 9 of 25 sub-tiles
+downtown	14	15	4	expansion/town	55	270	0	wall	none	upright, 270 px above the cell centre, blocks 0 of 25 sub-tiles
+downtown	16	10	0	act4/mesa	228	33	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+downtown	16	10	1	act4/mesa	70	32	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+downtown	16	10	2	act4/mesa	1	20	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+downtown	17	10	1	act4/mesa	83	35	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+downtown	17	10	2	act4/mesa	211	33	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+downtown	18	10	0	act4/mesa	3	33	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+epicwhiners	0	0	10	act1/caves	4	40	3	wall	biome	cave floor whose rock wall blocks 3 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	11	act1/caves	3	40	14	wall	biome	cave floor whose rock wall blocks 14 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	12	act1/caves	4	40	13	wall	biome	cave floor whose rock wall blocks 13 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	13	act1/caves	3	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	16	act1/caves	7	40	8	wall	biome	cave floor whose rock wall blocks 8 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	17	act1/caves	7	40	24	wall	biome	cave floor whose rock wall blocks 24 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	19	act1/caves	40	40	15	wall	biome	cave floor whose rock wall blocks 15 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	20	act1/caves	8	40	23	wall	biome	cave floor whose rock wall blocks 23 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	21	act1/caves	9	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	0	24	act1/caves	51	40	15	wall	biome	cave floor whose rock wall blocks 15 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	27	act1/caves	37	40	21	wall	biome	cave floor whose rock wall blocks 21 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	28	act1/caves	24	40	21	wall	biome	cave floor whose rock wall blocks 21 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	29	act1/caves	20	40	15	wall	biome	cave floor whose rock wall blocks 15 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	30	act1/caves	4	40	6	wall	biome	cave floor whose rock wall blocks 6 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	31	act1/caves	10	40	15	wall	biome	cave floor whose rock wall blocks 15 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	32	act1/caves	4	40	6	wall	biome	cave floor whose rock wall blocks 6 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	33	act1/caves	8	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	34	act1/caves	20	40	21	wall	biome	cave floor whose rock wall blocks 21 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	0	35	act1/caves	12	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	0	36	act1/caves	8	40	19	wall	biome	cave floor whose rock wall blocks 19 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	20	act1/caves	1	40	5	wall	biome	cave floor whose rock wall blocks 5 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	21	act1/caves	2	40	14	wall	biome	cave floor whose rock wall blocks 14 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	26	act1/caves	1	40	2	wall	biome	cave floor whose rock wall blocks 2 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	27	act1/caves	1	40	5	wall	biome	cave floor whose rock wall blocks 5 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	36	act1/caves	4	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	37	act1/caves	4	40	19	wall	biome	cave floor whose rock wall blocks 19 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	38	act1/caves	3	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	1	39	act1/caves	3	40	16	wall	biome	cave floor whose rock wall blocks 16 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	0	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	1	act1/caves	8	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	2	act1/caves	11	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	3	act1/caves	2	40	1	wall	biome	cave floor whose rock wall blocks 1 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	12	act1/caves	7	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	2	13	act1/caves	8	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	14	act1/caves	11	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	2	15	act1/caves	7	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	24	act1/caves	4	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	25	act1/caves	3	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	26	act1/caves	3	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	27	act1/caves	2	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	28	act1/caves	9	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	2	29	act1/caves	10	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	2	30	act1/caves	6	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	2	31	act1/caves	16	40	16	wall	biome	cave floor whose rock wall blocks 16 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	2	60	act1/caves	12	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	2	61	act1/caves	12	40	10	wall	biome	cave floor whose rock wall blocks 10 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	3	8	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	3	9	act1/caves	5	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	3	10	act1/caves	1	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	3	11	act1/caves	1	40	20	wall	biome	cave floor whose rock wall blocks 20 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	3	12	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	3	13	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	3	14	act1/caves	1	40	4	wall	biome	cave floor whose rock wall blocks 4 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	3	15	act1/caves	1	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	3	16	act1/caves	5	40	25	wall	void	black cave rock that blocks 25 sub-tiles: kept black, the scene's cave walls stand on it
+epicwhiners	0	3	17	act1/caves	7	40	15	wall	biome	cave floor whose rock wall blocks 15 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	5	0	act1/caves	3385	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	8	act1/caves	7	40	1	wall	biome	cave floor whose rock wall blocks 1 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	5	10	act1/caves	20	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	11	act1/caves	25	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	12	act1/caves	20	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	13	act1/caves	19	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	14	act1/caves	96	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	15	act1/caves	78	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	16	act1/caves	4	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	17	act1/caves	5	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	5	20	act1/caves	1	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	0	act1/cathedrl	8	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	1	act1/cathedrl	42	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	2	act1/cathedrl	1	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	3	act1/cathedrl	52	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	4	act1/cathedrl	314	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	5	act1/cathedrl	74	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	6	act1/cathedrl	6	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	7	act1/cathedrl	44	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	8	act1/cathedrl	5	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	9	act1/cathedrl	6	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	14	10	act1/cathedrl	2	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	0	act1/cathedrl	20	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	1	act1/cathedrl	38	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	2	act1/cathedrl	27	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	3	act1/cathedrl	98	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	4	act1/cathedrl	106	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	5	act1/cathedrl	95	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	6	act1/cathedrl	30	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	7	act1/cathedrl	39	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	8	act1/cathedrl	28	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	15	9	act1/cathedrl	9	40	0	flat	biome	plain floor: HD biome paint
+epicwhiners	0	21	0	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	21	1	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	21	2	act1/caves	1	40	25	wall	biome	cave floor whose rock wall blocks 25 sub-tiles: the scene's cave walls stand on it
+epicwhiners	0	21	3	act1/caves	1	40	15	wall	biome	cave floor whose rock wall blocks 15 sub-tiles: the scene's cave walls stand on it
+epicwhiners	1	0	0	act1/cathedrl	1	214	5	wall	none	upright, 214 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	1	0	act1/cathedrl	5	214	5	wall	none	upright, 214 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	1	1	act1/cathedrl	6	174	5	wall	none	upright, 174 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	1	3	act1/court	5	174	10	wall	none	upright, 174 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	1	5	act1/court	4	174	10	wall	none	upright, 174 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	1	12	act1/court	9	215	10	wall	none	upright, 215 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	4	1	act1/court	1	174	10	wall	none	upright, 174 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	0	act1/monastry	29	312	10	wall	none	upright, 312 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	1	act1/monastry	236	308	10	wall	none	upright, 308 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	2	act1/monastry	133	304	10	wall	none	upright, 304 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	3	act1/monastry	74	312	10	wall	none	upright, 312 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	4	act1/monastry	1	289	25	wall	none	upright, 289 px above the cell centre, blocks 25 of 25 sub-tiles
+epicwhiners	1	6	5	act1/monastry	1	351	25	wall	none	upright, 351 px above the cell centre, blocks 25 of 25 sub-tiles
+epicwhiners	1	6	8	act1/monastry	1	404	10	wall	none	upright, 404 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	9	act1/monastry	7	445	10	wall	none	upright, 445 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	10	act1/monastry	10	404	10	wall	none	upright, 404 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	11	act1/monastry	10	403	15	wall	none	upright, 403 px above the cell centre, blocks 15 of 25 sub-tiles
+epicwhiners	1	6	12	act1/monastry	10	402	10	wall	none	upright, 402 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	13	act1/monastry	4	441	10	wall	none	upright, 441 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	6	14	act1/monastry	4	362	10	wall	none	upright, 362 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	1	14	0	act1/cathedrl	1	215	5	wall	none	upright, 215 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	1	act1/cathedrl	1	175	5	wall	none	upright, 175 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	2	act1/cathedrl	2	215	5	wall	none	upright, 215 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	3	act1/cathedrl	2	176	5	wall	none	upright, 176 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	4	act1/cathedrl	2	215	5	wall	none	upright, 215 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	5	act1/cathedrl	3	176	5	wall	none	upright, 176 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	8	act1/cathedrl	2	215	5	wall	none	upright, 215 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	1	14	19	act1/cathedrl	1	175	5	wall	none	upright, 175 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	0	1	act1/caves	1	66	12	flat	art	low edge or kerb, 66 px above the cell centre, blocks 12 of 25 sub-tiles
+epicwhiners	2	1	0	act1/cathedrl	2	214	5	wall	none	upright, 214 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	1	1	act1/cathedrl	1	175	5	wall	none	upright, 175 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	1	7	act1/court	22	175	10	wall	none	upright, 175 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	1	9	act1/court	6	175	10	wall	none	upright, 175 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	1	10	act1/court	9	214	10	wall	none	upright, 214 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	1	15	act1/court	20	175	10	wall	none	upright, 175 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	1	16	act1/court	10	214	10	wall	none	upright, 214 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	2	26	act1/monastry	1	66	11	flat	art	low edge or kerb, 66 px above the cell centre, blocks 11 of 25 sub-tiles
+epicwhiners	2	2	27	act1/monastry	1	108	15	wall	none	low wall (blocks movement), 108 px above the cell centre, blocks 15 of 25 sub-tiles
+epicwhiners	2	4	1	act1/court	8	175	10	wall	none	upright, 175 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	6	0	act1/monastry	1	305	5	wall	none	upright, 305 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	1	act1/monastry	25	337	5	wall	none	upright, 337 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	2	act1/monastry	31	337	5	wall	none	upright, 337 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	3	act1/monastry	25	338	5	wall	none	upright, 338 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	4	act1/monastry	1	338	12	wall	none	upright, 338 px above the cell centre, blocks 12 of 25 sub-tiles
+epicwhiners	2	6	5	act1/monastry	1	338	14	wall	none	upright, 338 px above the cell centre, blocks 14 of 25 sub-tiles
+epicwhiners	2	6	6	act1/monastry	1	344	21	wall	none	upright, 344 px above the cell centre, blocks 21 of 25 sub-tiles
+epicwhiners	2	6	7	act1/monastry	1	336	5	wall	none	upright, 336 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	8	act1/monastry	30	360	5	wall	none	upright, 360 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	9	act1/monastry	31	348	5	wall	none	upright, 348 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	10	act1/monastry	31	353	5	wall	none	upright, 353 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	11	act1/monastry	32	343	5	wall	none	upright, 343 px above the cell centre, blocks 5 of 25 sub-tiles
+epicwhiners	2	6	12	act1/monastry	27	312	8	wall	none	upright, 312 px above the cell centre, blocks 8 of 25 sub-tiles
+epicwhiners	2	6	19	act1/monastry	47	366	10	wall	none	upright, 366 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	6	20	act1/monastry	46	445	10	wall	none	upright, 445 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	6	21	act1/monastry	5	404	11	wall	none	upright, 404 px above the cell centre, blocks 11 of 25 sub-tiles
+epicwhiners	2	6	25	act1/monastry	42	404	9	wall	none	upright, 404 px above the cell centre, blocks 9 of 25 sub-tiles
+epicwhiners	2	6	26	act1/monastry	48	404	15	wall	none	upright, 404 px above the cell centre, blocks 15 of 25 sub-tiles
+epicwhiners	2	6	27	act1/monastry	48	403	10	wall	none	upright, 403 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	6	28	act1/monastry	49	447	10	wall	none	upright, 447 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	2	6	29	act1/monastry	48	403	13	wall	none	upright, 403 px above the cell centre, blocks 13 of 25 sub-tiles
+epicwhiners	2	7	0	act1/monastry	35	229	6	wall	none	upright, 229 px above the cell centre, blocks 6 of 25 sub-tiles
+epicwhiners	2	7	1	act1/monastry	36	293	1	wall	none	upright, 293 px above the cell centre, blocks 1 of 25 sub-tiles
+epicwhiners	2	7	2	act1/monastry	139	167	10	wall	none	upright, 167 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	3	4	0	act1/court	1	215	16	wall	none	upright, 215 px above the cell centre, blocks 16 of 25 sub-tiles
+epicwhiners	4	4	0	act1/court	1	215	16	wall	none	upright, 215 px above the cell centre, blocks 16 of 25 sub-tiles
+epicwhiners	5	1	0	act1/cathedrl	2	218	7	wall	none	upright, 218 px above the cell centre, blocks 7 of 25 sub-tiles
+epicwhiners	6	1	0	act1/cathedrl	1	218	7	wall	none	upright, 218 px above the cell centre, blocks 7 of 25 sub-tiles
+epicwhiners	6	4	0	act1/court	8	217	10	wall	none	upright, 217 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	7	2	0	act1/monastry	26	93	13	wall	none	low wall (blocks movement), 93 px above the cell centre, blocks 13 of 25 sub-tiles
+epicwhiners	7	4	0	act1/court	2	217	4	wall	none	upright, 217 px above the cell centre, blocks 4 of 25 sub-tiles
+epicwhiners	7	6	0	act1/monastry	151	354	8	wall	none	upright, 354 px above the cell centre, blocks 8 of 25 sub-tiles
+epicwhiners	8	1	0	act1/cathedrl	1	214	1	wall	none	upright, 214 px above the cell centre, blocks 1 of 25 sub-tiles
+epicwhiners	8	1	1	act1/cathedrl	2	175	3	wall	none	upright, 175 px above the cell centre, blocks 3 of 25 sub-tiles
+epicwhiners	9	1	0	act1/court	26	214	10	wall	none	upright, 214 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	9	1	1	act1/court	3	175	4	wall	none	upright, 175 px above the cell centre, blocks 4 of 25 sub-tiles
+epicwhiners	9	4	0	act1/court	14	214	4	wall	none	upright, 214 px above the cell centre, blocks 4 of 25 sub-tiles
+epicwhiners	9	4	1	act1/court	15	175	8	wall	none	upright, 175 px above the cell centre, blocks 8 of 25 sub-tiles
+epicwhiners	9	4	2	act1/court	2	214	10	wall	none	upright, 214 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	9	4	3	act1/court	2	295	2	wall	none	upright, 295 px above the cell centre, blocks 2 of 25 sub-tiles
+epicwhiners	9	4	4	act1/court	1	238	10	wall	none	upright, 238 px above the cell centre, blocks 10 of 25 sub-tiles
+epicwhiners	9	4	5	act1/court	2	255	6	wall	none	upright, 255 px above the cell centre, blocks 6 of 25 sub-tiles
+epicwhiners	10	1	21		1	0	0	unsure	none	special tile (orientation 10) with no picture: nothing to draw
+epicwhiners	12	0	1	act1/caves	27	50	15	flat	art	low edge or kerb, 50 px above the cell centre, blocks 15 of 25 sub-tiles
+epicwhiners	12	0	2	act1/caves	7	64	8	flat	art	low edge or kerb, 64 px above the cell centre, blocks 8 of 25 sub-tiles
+epicwhiners	12	0	4	act1/caves	2	47	6	flat	art	low edge or kerb, 47 px above the cell centre, blocks 6 of 25 sub-tiles
+epicwhiners	12	0	5	act1/caves	12	68	6	flat	art	low edge or kerb, 68 px above the cell centre, blocks 6 of 25 sub-tiles
+glados	0	16	1	act4/mesa	271	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	17	act4/mesa	258	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	18	act4/mesa	266	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	19	act4/mesa	198	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	20	act4/mesa	278	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	21	act4/mesa	293	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	22	act4/mesa	273	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	23	act4/mesa	290	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	24	act4/mesa	281	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	29	act4/mesa	256	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	30	act4/mesa	268	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	31	act4/mesa	230	40	0	flat	biome	plain floor: HD biome paint
+glados	0	16	32	act4/mesa	257	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	0	act3/kurast	1544	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	1	act3/kurast	327	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	3	act3/kurast	4	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	4	act3/kurast	7	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	5	act3/kurast	7	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	6	act3/kurast	4	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	7	act3/kurast	7	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	8	act3/kurast	4	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	9	act3/kurast	4	40	0	flat	biome	plain floor: HD biome paint
+glados	0	20	10	act3/kurast	7	40	0	flat	biome	plain floor: HD biome paint
+glados	0	29	12	act3/kurast	513	40	25	flat	void	black floor (mean brightness under 16): the void, kept black
+glados	0	31	10	act3/kurast	3	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+glados	0	31	11	act3/kurast	3	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+glados	0	31	12	act3/kurast	313	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+glados	0	31	14	act3/kurast	14	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+glados	0	31	15	act3/kurast	21	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+glados	0	31	21	act3/kurast	3	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+glados	0	31	25	act3/kurast	3	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+glados	0	33	0	act3/kurast	13	40	0	flat	biome	plain floor: HD biome paint
+glados	0	33	1	act3/kurast	156	40	0	flat	biome	plain floor: HD biome paint
+glados	0	33	4	act3/kurast	2	40	0	flat	biome	plain floor: HD biome paint
+glados	0	47	0	act3/travincal	4	40	15	flat	biome	plain floor: HD biome paint
+glados	0	47	1	act3/travincal	2	40	15	flat	biome	plain floor: HD biome paint
+glados	0	47	4	act3/travincal	1	40	15	flat	biome	plain floor: HD biome paint
+glados	0	47	6	act3/travincal	23	40	5	flat	biome	plain floor: HD biome paint
+glados	0	47	7	act3/travincal	159	40	0	flat	biome	plain floor: HD biome paint
+glados	0	47	8	act3/travincal	24	40	10	flat	biome	plain floor: HD biome paint
+glados	0	47	9	act3/travincal	43	40	10	flat	biome	plain floor: HD biome paint
+glados	0	47	10	act3/travincal	125	40	0	flat	biome	plain floor: HD biome paint
+glados	0	47	11	act3/travincal	43	40	5	flat	biome	plain floor: HD biome paint
+glados	0	47	21	act3/travincal	8	40	15	flat	biome	plain floor: HD biome paint
+glados	0	47	22	act3/travincal	8	40	5	flat	biome	plain floor: HD biome paint
+glados	0	47	23	act3/travincal	8	40	0	flat	biome	plain floor: HD biome paint
+glados	0	47	24	act3/travincal	8	40	10	flat	biome	plain floor: HD biome paint
+glados	0	47	25	act3/travincal	6	40	10	flat	biome	plain floor: HD biome paint
+glados	0	47	27	act3/travincal	6	40	5	flat	biome	plain floor: HD biome paint
+glados	0	47	28	act3/travincal	30	40	0	flat	biome	plain floor: HD biome paint
+glados	0	47	52	act3/travincal	354	40	20	flat	biome	plain floor: HD biome paint
+glados	0	47	53	act3/travincal	34	40	20	flat	biome	plain floor: HD biome paint
+glados	0	47	55	act3/travincal	344	40	21	flat	biome	plain floor: HD biome paint
+glados	0	47	56	act3/travincal	33	40	24	flat	void	black floor (mean brightness under 16): the void, kept black
+glados	0	47	57	act3/travincal	44	40	16	flat	biome	plain floor: HD biome paint
+glados	1	4	0	act4/fort	1	168	5	wall	none	upright, 168 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	1	4	1	act4/fort	41	177	5	wall	none	upright, 177 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	1	4	2	act4/fort	4	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+glados	1	4	3	act4/fort	15	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+glados	1	4	4	act4/fort	4	185	2	wall	none	upright, 185 px above the cell centre, blocks 2 of 25 sub-tiles
+glados	1	4	5	act4/fort	44	168	5	wall	none	upright, 168 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	1	27	0	act3/kurast	124	137	5	wall	none	upright, 137 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	1	27	2	act3/kurast	1	137	5	wall	none	upright, 137 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	1	27	4	act3/kurast	15	137	5	wall	none	upright, 137 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	2	4	2	act4/fort	30	167	25	wall	none	upright, 167 px above the cell centre, blocks 25 of 25 sub-tiles
+glados	2	4	3	act4/fort	30	176	25	wall	none	upright, 176 px above the cell centre, blocks 25 of 25 sub-tiles
+glados	2	21	0	act3/kurast	1	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	2	26	4	act3/kurast	1	195	5	wall	none	upright, 195 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	2	26	5	act3/kurast	1	222	5	wall	none	upright, 222 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	2	27	0	act3/kurast	101	139	5	wall	none	upright, 139 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	2	27	2	act3/kurast	1	139	5	wall	none	upright, 139 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	2	27	4	act3/kurast	23	139	5	wall	none	upright, 139 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	3	4	0	act4/fort	1	363	9	wall	none	upright, 363 px above the cell centre, blocks 9 of 25 sub-tiles
+glados	3	24	0	act3/kurast	1	160	9	wall	none	upright, 160 px above the cell centre, blocks 9 of 25 sub-tiles
+glados	3	27	0	act3/kurast	1	127	9	wall	none	upright, 127 px above the cell centre, blocks 9 of 25 sub-tiles
+glados	4	24	1	act3/kurast	1	161	9	wall	none	upright, 161 px above the cell centre, blocks 9 of 25 sub-tiles
+glados	4	27	0	act3/kurast	1	128	9	wall	none	upright, 128 px above the cell centre, blocks 9 of 25 sub-tiles
+glados	5	3	2	act4/fort	5	223	10	wall	none	upright, 223 px above the cell centre, blocks 10 of 25 sub-tiles
+glados	5	25	0	act3/kurast	1	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+glados	5	27	0	act3/kurast	1	151	5	wall	none	upright, 151 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	6	4	0	act4/fort	30	275	25	wall	none	upright, 275 px above the cell centre, blocks 25 of 25 sub-tiles
+glados	7	3	0	act4/fort	6	223	4	wall	none	upright, 223 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	7	27	0	act3/kurast	1	151	1	wall	none	upright, 151 px above the cell centre, blocks 1 of 25 sub-tiles
+glados	11	1	0	act3/kurast	1	237	5	flat	art	special tile with art (doorway, orientation 11): painted at its classic pixels
+glados	14	0	0	act3/jungle	57	215	4	wall	none	upright, 215 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	14	0	1	act3/jungle	37	172	0	wall	none	upright, 172 px above the cell centre, blocks 0 of 25 sub-tiles
+glados	14	0	2	act3/jungle	15	197	0	wall	none	upright, 197 px above the cell centre, blocks 0 of 25 sub-tiles
+glados	14	0	4	act3/jungle	53	192	4	wall	none	upright, 192 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	14	0	6	act3/jungle	68	218	4	wall	none	upright, 218 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	14	0	8	act3/jungle	35	154	4	wall	none	upright, 154 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	14	0	18	act3/jungle	49	242	9	wall	none	upright, 242 px above the cell centre, blocks 9 of 25 sub-tiles
+glados	14	0	19	act3/jungle	39	364	5	wall	none	upright, 364 px above the cell centre, blocks 5 of 25 sub-tiles
+glados	14	0	20	act3/jungle	46	349	4	wall	none	upright, 349 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	14	0	22	act3/jungle	76	344	4	wall	none	upright, 344 px above the cell centre, blocks 4 of 25 sub-tiles
+glados	14	0	23	act3/jungle	76	304	3	wall	none	upright, 304 px above the cell centre, blocks 3 of 25 sub-tiles
+macumba	0	0	0	act4/fort	1227	40	0	flat	biome	plain floor: HD biome paint
+macumba	0	1	1	expansion/icecave	1	40	0	flat	biome	plain floor: HD biome paint
+macumba	0	6	0	expansion/icecave	225	40	0	flat	biome	plain floor: HD biome paint
+macumba	1	10	0	act1/graveyard	79	155	5	wall	none	upright, 155 px above the cell centre, blocks 5 of 25 sub-tiles
+macumba	1	10	1	act1/graveyard	2	123	4	wall	none	upright, 123 px above the cell centre, blocks 4 of 25 sub-tiles
+macumba	1	10	2	act1/graveyard	1	155	4	wall	none	upright, 155 px above the cell centre, blocks 4 of 25 sub-tiles
+macumba	1	30	0	act3/kurast	2	59	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 59 px above the cell centre, blocks 5 of 25 sub-tiles
+macumba	1	30	1	act3/kurast	2	58	2	flat	art	stair, ramp or kerb piece (D2R's terrace set), 58 px above the cell centre, blocks 2 of 25 sub-tiles
+macumba	1	30	3		2	0	0	flat	none	no tile with this key in the map's tile sets: classic draws nothing
+macumba	1	30	4		2	0	0	flat	none	no tile with this key in the map's tile sets: classic draws nothing
+macumba	2	10	0	act1/graveyard	61	154	5	wall	none	upright, 154 px above the cell centre, blocks 5 of 25 sub-tiles
+macumba	2	10	1	act1/graveyard	11	106	2	wall	none	low wall (blocks movement), 106 px above the cell centre, blocks 2 of 25 sub-tiles
+macumba	2	10	2	act1/graveyard	18	145	4	wall	none	upright, 145 px above the cell centre, blocks 4 of 25 sub-tiles
+macumba	2	10	3	act1/graveyard	15	112	13	wall	none	low wall (blocks movement), 112 px above the cell centre, blocks 13 of 25 sub-tiles
+macumba	2	10	4	act1/graveyard	14	141	12	wall	none	upright, 141 px above the cell centre, blocks 12 of 25 sub-tiles
+macumba	2	30	1	act3/kurast	1	73	2	flat	art	stair, ramp or kerb piece (D2R's terrace set), 73 px above the cell centre, blocks 2 of 25 sub-tiles
+macumba	2	30	2		1	0	0	flat	none	no tile with this key in the map's tile sets: classic draws nothing
+macumba	3	10	0	act1/graveyard	10	228	0	wall	none	upright, 228 px above the cell centre, blocks 0 of 25 sub-tiles
+macumba	5	10	0	act1/graveyard	32	179	7	wall	none	upright, 179 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	5	10	1	act1/graveyard	4	178	7	wall	none	upright, 178 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	5	10	2	act1/graveyard	15	123	11	wall	none	upright, 123 px above the cell centre, blocks 11 of 25 sub-tiles
+macumba	5	10	3	act1/graveyard	16	155	6	wall	none	upright, 155 px above the cell centre, blocks 6 of 25 sub-tiles
+macumba	5	10	6	act1/graveyard	11	228	7	wall	none	upright, 228 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	6	10	0	act1/graveyard	36	228	7	wall	none	upright, 228 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	6	10	1	act1/graveyard	20	178	7	wall	none	upright, 178 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	6	10	2	act1/graveyard	13	179	7	wall	none	upright, 179 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	6	30	0	act3/kurast	2	85	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 85 px above the cell centre, blocks 5 of 25 sub-tiles
+macumba	7	10	0	act1/graveyard	13	228	4	wall	none	upright, 228 px above the cell centre, blocks 4 of 25 sub-tiles
+macumba	7	30	0	act3/kurast	1	91	1	flat	art	stair, ramp or kerb piece (D2R's terrace set), 91 px above the cell centre, blocks 1 of 25 sub-tiles
+macumba	8	10	0	act1/graveyard	38	241	7	wall	none	upright, 241 px above the cell centre, blocks 7 of 25 sub-tiles
+macumba	10	33	0		1	0	0	unsure	none	special tile (orientation 10) with no picture: nothing to draw
+macumba	12	5	0	expansion/icecave	1	85	3	wall	none	low prop that blocks movement, 85 px above the cell centre, blocks 3 of 25 sub-tiles
+macumba	12	5	1	expansion/icecave	1	76	6	wall	none	low prop that blocks movement, 76 px above the cell centre, blocks 6 of 25 sub-tiles
+macumba	12	10	16	act1/graveyard	1	51	4	flat	art	low edge or kerb, 51 px above the cell centre, blocks 4 of 25 sub-tiles
+macumba	14	10	0	act1/graveyard	1	160	0	wall	none	upright, 160 px above the cell centre, blocks 0 of 25 sub-tiles
+macumba	14	10	1	act1/graveyard	1	274	2	wall	none	upright, 274 px above the cell centre, blocks 2 of 25 sub-tiles
+macumba	14	10	2	act1/graveyard	1	290	0	wall	none	upright, 290 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	0	16	1	act4/mesa	14	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	17	act4/mesa	17	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	18	act4/mesa	18	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	19	act4/mesa	20	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	20	act4/mesa	19	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	21	act4/mesa	18	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	22	act4/mesa	11	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	23	act4/mesa	13	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	24	act4/mesa	23	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	29	act4/mesa	25	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	30	act4/mesa	23	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	16	31	act4/mesa	16	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	16	act4/mesa	4	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	17	act4/mesa	6	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	18	act4/mesa	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	19	act4/mesa	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	20	act4/mesa	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	21	act4/mesa	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	22	act4/mesa	2	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	23	act4/mesa	3	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	24	act4/mesa	4	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	26	act4/mesa	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	17	27	act4/mesa	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	0	act3/kurast	29	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	1	act3/kurast	25	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	2	act3/kurast	24	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	3	act3/kurast	2	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	4	act3/kurast	2	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	5	act3/kurast	2	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	6	act3/kurast	2	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	7	act3/kurast	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	8	act3/kurast	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	9	act3/kurast	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	20	10	act3/kurast	1	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	22	0	act3/kurast	29	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	30	14	act3/kurast	1	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+moskvich	0	30	15	act3/kurast	11	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	3	act3/kurast	1	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	4	act3/kurast	5	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	5	act3/kurast	3	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	6	act3/kurast	3	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	7	act3/kurast	3	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	8	act3/kurast	3	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	9	act3/kurast	2	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	10	act3/kurast	27	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	11	act3/kurast	5	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	14	act3/kurast	3	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	15	act3/kurast	5	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	16	act3/kurast	7	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	17	act3/kurast	1	40	13	flat	art	terrace-set floor that blocks 13 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	18	act3/kurast	2	40	13	flat	art	terrace-set floor that blocks 13 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	19	act3/kurast	1	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	20	act3/kurast	8	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	21	act3/kurast	2	40	15	flat	art	terrace-set floor that blocks 15 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	22	act3/kurast	1	40	5	flat	art	terrace-set floor that blocks 5 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	23	act3/kurast	1	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	24	act3/kurast	1	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	25	act3/kurast	1	40	10	flat	art	terrace-set floor that blocks 10 sub-tiles: classic picture painted (colour matched)
+moskvich	0	31	26	act3/kurast	1	40	0	flat	biome	terrace-set floor (paving, stair or kerb art), nothing blocked: Kurast's HD street paving
+moskvich	0	31	27	act3/kurast	2	40	7	flat	art	terrace-set floor that blocks 7 sub-tiles: classic picture painted (colour matched)
+moskvich	0	32	1	act3/kurast	1	40	15	flat	biome	plain floor: HD biome paint
+moskvich	0	32	2	act3/kurast	2	40	15	flat	biome	plain floor: HD biome paint
+moskvich	0	33	4	act3/kurast	5	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	33	5	act3/kurast	4	40	0	flat	biome	plain floor: HD biome paint
+moskvich	0	46	0	act3/travincal	4	40	25	flat	void	black floor (mean brightness under 16): the void, kept black
+moskvich	0	46	1	act3/travincal	1	40	25	flat	void	black floor (mean brightness under 16): the void, kept black
+moskvich	1	2	6	act4/fort	3	315	0	wall	none	upright, 315 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	2	7	act4/fort	19	315	0	wall	none	upright, 315 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	3	6	act4/fort	1	150	10	wall	none	upright, 150 px above the cell centre, blocks 10 of 25 sub-tiles
+moskvich	1	3	7	act4/fort	1	237	7	wall	none	upright, 237 px above the cell centre, blocks 7 of 25 sub-tiles
+moskvich	1	4	1	act4/fort	5	177	5	wall	none	upright, 177 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	4	2	act4/fort	6	212	1	wall	none	upright, 212 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	1	4	4	act4/fort	5	185	2	wall	none	upright, 185 px above the cell centre, blocks 2 of 25 sub-tiles
+moskvich	1	4	5	act4/fort	5	168	5	wall	none	upright, 168 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	10	0	act3/jungle	1	451	10	wall	none	upright, 451 px above the cell centre, blocks 10 of 25 sub-tiles
+moskvich	1	10	2	act3/jungle	1	474	8	wall	none	upright, 474 px above the cell centre, blocks 8 of 25 sub-tiles
+moskvich	1	10	3	act3/jungle	1	420	5	wall	none	upright, 420 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	13	0	act4/mesa	1	140	5	wall	none	upright, 140 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	20	0	act3/kurast	4	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	20	1	act3/kurast	3	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	20	2	act3/kurast	3	160	5	wall	none	upright, 160 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	22	2	act3/kurast	5	161	1	wall	none	upright, 161 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	1	22	3	act3/kurast	3	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	23	0	act3/kurast	1	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	23	1	act3/kurast	4	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	23	2	act3/kurast	4	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	23	3	act3/kurast	3	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	23	4	act3/kurast	2	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	23	5	act3/kurast	4	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	23	6	act3/kurast	3	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	1	24	0	act3/kurast	6	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	24	1	act3/kurast	8	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	24	2	act3/kurast	2	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	24	3	act3/kurast	2	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	24	4	act3/kurast	1	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	25	4	act3/kurast	2	222	5	wall	none	upright, 222 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	25	5	act3/kurast	1	195	5	wall	none	upright, 195 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	1	31	0	act3/kurast	4	51	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 51 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	2	7	act4/fort	1	306	0	wall	none	upright, 306 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	2	8	act4/fort	1	349	0	wall	none	upright, 349 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	2	9	act4/fort	1	351	0	wall	none	upright, 351 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	3	6	act4/fort	1	178	5	wall	none	upright, 178 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	3	7	act4/fort	6	212	5	wall	none	upright, 212 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	4	0	act4/fort	1	178	5	wall	none	upright, 178 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	4	2	act4/fort	4	167	25	wall	none	upright, 167 px above the cell centre, blocks 25 of 25 sub-tiles
+moskvich	2	4	3	act4/fort	7	176	25	wall	none	upright, 176 px above the cell centre, blocks 25 of 25 sub-tiles
+moskvich	2	4	4	act4/fort	6	167	25	wall	none	upright, 167 px above the cell centre, blocks 25 of 25 sub-tiles
+moskvich	2	4	5	act4/fort	6	180	25	wall	none	upright, 180 px above the cell centre, blocks 25 of 25 sub-tiles
+moskvich	2	10	0	act3/jungle	2	471	14	wall	none	upright, 471 px above the cell centre, blocks 14 of 25 sub-tiles
+moskvich	2	10	1	act3/jungle	2	432	10	wall	none	upright, 432 px above the cell centre, blocks 10 of 25 sub-tiles
+moskvich	2	10	2	act3/jungle	3	480	5	wall	none	upright, 480 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	10	6	act3/jungle	1	398	5	wall	none	upright, 398 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	20	0	act3/kurast	8	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	20	1	act3/kurast	20	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	20	2	act3/kurast	5	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	20	3	act3/kurast	1	214	5	wall	none	upright, 214 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	20	4	act3/kurast	1	315	1	wall	none	upright, 315 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	2	20	5	act3/kurast	1	330	0	wall	none	upright, 330 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	20	6	act3/kurast	1	247	5	wall	none	upright, 247 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	22	0	act3/kurast	12	161	1	wall	none	upright, 161 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	2	22	2	act3/kurast	1	161	1	wall	none	upright, 161 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	2	22	3	act3/kurast	2	161	5	wall	none	upright, 161 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	2	23	0	act3/kurast	3	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	23	1	act3/kurast	10	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	23	2	act3/kurast	6	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	23	3	act3/kurast	10	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	23	4	act3/kurast	7	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	23	5	act3/kurast	4	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	2	23	6	act3/kurast	4	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	3	4	0	act4/fort	1	363	9	wall	none	upright, 363 px above the cell centre, blocks 9 of 25 sub-tiles
+moskvich	3	22	1	act3/kurast	1	164	5	wall	none	upright, 164 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	4	13	1	act4/mesa	1	224	10	wall	none	upright, 224 px above the cell centre, blocks 10 of 25 sub-tiles
+moskvich	4	20	0	act3/kurast	2	163	9	wall	none	upright, 163 px above the cell centre, blocks 9 of 25 sub-tiles
+moskvich	4	23	0	act3/kurast	3	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	4	24	2	act3/kurast	1	164	9	wall	none	upright, 164 px above the cell centre, blocks 9 of 25 sub-tiles
+moskvich	4	31	0	act3/kurast	1	52	9	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 9 of 25 sub-tiles
+moskvich	5	2	0	act4/fort	1	323	0	wall	none	upright, 323 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	5	20	0	act3/kurast	4	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	5	20	1	act3/kurast	1	163	5	wall	none	upright, 163 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	5	22	0	act3/kurast	1	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	5	23	0	act3/kurast	1	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	5	25	0	act3/kurast	1	267	0	wall	none	upright, 267 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	5	31	0	act3/kurast	7	52	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 52 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	5	31	1	act3/kurast	4	65	5	flat	art	stair, ramp or kerb piece (D2R's terrace set), 65 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	6	10	0	act3/jungle	1	389	9	wall	none	upright, 389 px above the cell centre, blocks 9 of 25 sub-tiles
+moskvich	6	22	0	act3/kurast	1	163	1	wall	none	upright, 163 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	6	23	0	act3/kurast	3	269	0	wall	none	upright, 269 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	6	24	0	act3/kurast	3	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	6	24	1	act3/kurast	1	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	6	24	2	act3/kurast	3	162	5	wall	none	upright, 162 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	7	3	0	act4/fort	2	223	4	wall	none	upright, 223 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	7	20	0	act3/kurast	1	165	1	wall	none	upright, 165 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	7	23	0	act3/kurast	1	268	0	wall	none	upright, 268 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	7	31	1	act3/kurast	3	63	1	flat	art	stair, ramp or kerb piece (D2R's terrace set), 63 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	8	3	0	act4/fort	2	313	3	wall	none	upright, 313 px above the cell centre, blocks 3 of 25 sub-tiles
+moskvich	8	3	1	act4/fort	2	268	4	wall	none	upright, 268 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	9	20	0	act3/kurast	8	161	2	wall	none	upright, 161 px above the cell centre, blocks 2 of 25 sub-tiles
+moskvich	9	21	0	act3/kurast	5	238	2	wall	none	upright, 238 px above the cell centre, blocks 2 of 25 sub-tiles
+moskvich	9	24	0	act3/kurast	1	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	10	0	0	act3/kurast	1	237	5	flat	art	special tile with art (doorway, orientation 10): painted at its classic pixels
+moskvich	12	20	0	act3/kurast	2	160	1	wall	none	upright, 160 px above the cell centre, blocks 1 of 25 sub-tiles
+moskvich	14	0	0	act3/jungle	7	215	4	wall	none	upright, 215 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	14	0	1	act3/jungle	4	172	0	wall	none	upright, 172 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	14	0	2	act3/jungle	1	197	0	wall	none	upright, 197 px above the cell centre, blocks 0 of 25 sub-tiles
+moskvich	14	0	4	act3/jungle	4	192	4	wall	none	upright, 192 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	14	0	14	act3/jungle	2	90	13	wall	none	low prop that blocks movement, 90 px above the cell centre, blocks 13 of 25 sub-tiles
+moskvich	14	0	18	act3/jungle	1	242	9	wall	none	upright, 242 px above the cell centre, blocks 9 of 25 sub-tiles
+moskvich	14	0	19	act3/jungle	2	364	5	wall	none	upright, 364 px above the cell centre, blocks 5 of 25 sub-tiles
+moskvich	14	0	20	act3/jungle	3	349	4	wall	none	upright, 349 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	14	0	22	act3/jungle	1	344	4	wall	none	upright, 344 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	14	1	0	act3/jungle	1	178	4	wall	none	upright, 178 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	14	1	4	act3/jungle	1	257	4	wall	none	upright, 257 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	14	1	6	act3/jungle	1	245	4	wall	none	upright, 245 px above the cell centre, blocks 4 of 25 sub-tiles
+moskvich	16	10	0	act4/mesa	10	33	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+moskvich	16	10	1	act4/mesa	9	32	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+moskvich	16	10	2	act4/mesa	1	20	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+moskvich	17	10	0	act4/mesa	1	18	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+moskvich	17	10	1	act4/mesa	5	35	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+moskvich	17	10	2	act4/mesa	15	33	0	flat	none	lower wall: hangs below the floor line into the void, which stays black
+moskvich	18	10	0	act4/mesa	2	33	0	flat	none	lower wall: hangs below the floor line into the void, which stays black

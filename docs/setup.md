@@ -34,8 +34,8 @@ base game files are taken from the D2R install and are never committed or packed
      `MXL_ASSETS` to that path (then `tools/build.py` fetches a missing `assets/` by itself). With `--link` and an unpacked
      tree, `assets/` becomes a junction/symlink to the tree (no copy; CI and the game PC use this).
    - Download cache: `~/.cache/mxl2012-d2r/assets` (`MXL_ASSETS_CACHE` moves it). The URL in `assets.lock` is a release of the
-     private forge repo `WerdeGames/mxl2012-assets` (section "CI asset pack"): it needs a Forgejo token with `read:repository`
-     in `MXL_ASSETS_TOKEN`, which is only sent to git.werdegames.com (a GitHub token, `MXL_ASSETS_TOKEN` or `GITHUB_TOKEN`,
+     private forge repo `WyrdGames/mxl2012-assets` (section "CI asset pack"): it needs a Forgejo token with `read:repository`
+     in `MXL_ASSETS_TOKEN`, which is only sent to git.wyrd.games (a GitHub token, `MXL_ASSETS_TOKEN` or `GITHUB_TOKEN`,
      only to github.com).
    - The build PC (lane worktrees under `R\mxl2012-wt\`): the pack is built into `R\mxl2012-runs\assetpack\pack\`
      (`assets-1.zip` and its unpacked tree `1\assets\`). `fetch` looks there after the download cache, and `tools/build.py`
@@ -56,7 +56,7 @@ base game files are taken from the D2R install and are never committed or packed
      `py -3 tools/asset_pack.py build --version <N> --write-lock` (writes `build/asset-pack/assets-<N>.zip` + manifest and
      `assets.lock`; `build` first scans the text files with `tools/check_public.py`'s rules and refuses on a hit, `asset_pack.py scan`
      runs only that), then the owner uploads it as in "CI asset pack" (new tag `assets-<N>`) and the coordinator commits
-     `assets.lock`. Public hosting (`tools/publish_release.py --assets`, `https://dl.werdegames.com/mxl2012/assets/`,
+     `assets.lock`. Public hosting (`tools/publish_release.py --assets`, `https://dl.wyrd.games/mxl2012/assets/`,
      docs/hosting.md) only after the owner approves publishing Median's files; then add that URL to `assets.lock`'s `urls`.
 5. Extract the D2R baseline, all sets the build reads:
    ```
@@ -99,19 +99,19 @@ pack, every file against its manifest, `--strict`), scans its text files and run
 prints a notice and passes. Setting it up is the owner's (it puts Median's files on the forge, privately); nothing in the
 repo changes:
 
-1. Create the private repository `WerdeGames/mxl2012-assets` on git.werdegames.com (empty; it only holds releases) with
-   the same members as `WerdeGames/mxl2012-d2r`.
+1. Create the private repository `WyrdGames/mxl2012-assets` on git.wyrd.games (empty; it only holds releases) with
+   the same members as `WyrdGames/mxl2012-d2r`.
 2. In it, create a release with tag **`assets-1`** (pre-release; notes e.g. "Median XL 2012 v005 patch_d2.mpq, extracted.
    Median XL 2012 by Brother Laz. Private: not for redistribution.") and attach **`assets-1.zip`** from
    the build PC: `R\mxl2012-runs\assetpack\pack\assets-1.zip`, 151,094,751 bytes, sha256
    `7ad1b448d0ed00305a4aa139c20fdf75cbcc05b362c9cc8c9ae21be9e14c2246` (`py -3 tools/asset_pack.py check-pack
    R\mxl2012-runs\assetpack\pack` checks it). Its download URL is then the one in `assets.lock`:
-   `https://git.werdegames.com/WerdeGames/mxl2012-assets/releases/download/assets-1/assets-1.zip`.
+   `https://git.wyrd.games/WyrdGames/mxl2012-assets/releases/download/assets-1/assets-1.zip`.
 3. Make a read token: an account that can read `mxl2012-assets` (best a bot user that is only a read collaborator there),
    Settings -> Applications -> Generate new token, scope **`read:repository`** only.
-4. In `WerdeGames/mxl2012-d2r` -> Settings -> Actions -> Secrets, add **`MXL_ASSETS_TOKEN`** with that token. The next
+4. In `WyrdGames/mxl2012-d2r` -> Settings -> Actions -> Secrets, add **`MXL_ASSETS_TOKEN`** with that token. The next
    CI run's `assets` job fetches and checks the pack instead of skipping. The token goes to that one step only, is sent only
-   to git.werdegames.com and is unset right after the download.
+   to git.wyrd.games and is unset right after the download.
 5. Optional, once it is green: `MXL_ASSETS_REQUIRED: "1"` in the `assets` job's env makes a lost secret fail CI instead of
    skipping.
 
@@ -216,7 +216,7 @@ made them, into `Saved Games\Diablo II Resurrected\mods\mxl2012` (the mod's `sav
 
 ## CI
 
-CI runs on a private CI server (`<ci-server>`; its address is deliberately not published) with a Forgejo runner scoped to `WerdeGames/mxl2012-d2r`, label `mxl-cross`, a Docker image with clang-cl, lld, xwin and g++, capacity 1, and a cap of 6 CPUs / 8 GB. The runner is not exposed to GitHub: pull requests on GitHub are applied to the forge by maintainers and then run there.
+CI runs on a private CI server (`<ci-server>`; its address is deliberately not published) with a Forgejo runner scoped to `WyrdGames/mxl2012-d2r`, label `mxl-cross`, a Docker image with clang-cl, lld, xwin and g++, capacity 1, and a cap of 6 CPUs / 8 GB. The runner is not exposed to GitHub: pull requests on GitHub are applied to the forge by maintainers and then run there.
 
 `.forgejo/workflows/ci.yml` runs on every PR and push to `main`. `plugin` cross-builds `mxl2012-core.dll` with clang-cl + lld-link and the xwin MSVC CRT/SDK (`/opt/xwin/xwin`) via `plugin/cmake/xwin-toolchain.cmake` (pass it as an absolute path). `native-tests` builds `plugin/tests` and `launcher/tests` (standalone CMake projects) with g++ and runs the unit test binaries listed in the workflow. `tools` runs the Python unit tests (`unittest discover` over `tools` and `tools/tests`) and `tools/check_public.py` (no private paths, host names, addresses or credentials in tracked text).
 

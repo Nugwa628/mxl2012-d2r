@@ -122,18 +122,19 @@ manifest's `launcher` as a self-update). `package_release.py` writes the fields 
 | `saveFolder` | characters live in `Saved Games/Diablo II Resurrected/mods/<saveFolder>` (modinfo.json `savepath`); the downloader never writes there |
 | `preserve` | files the player may edit: write them only when missing, never overwrite (`legacy169.toml` and `buff-panel.toml` from 0.1.12: the bundled plugins' settings, docs/bundled-plugins.md; `mxl2012-core.toml`, our plugin's settings, from the release after 0.1.14) |
 | `bundledPlugins` | (information, from 0.1.12) our other plugins in the mod folder: name, version, repository, source commit and their files (which are also in `files`); the downloader does not read it |
-| `files` | the complete mod folder, sorted by path. Update = for each entry, download when the local file is missing or its size / sha256 differ; then delete local files under the mod folder that are not listed (except `preserve` entries and their `.retail-backup` copies (bug #512), and `d2rloader/logs/`, which D2RLoader writes) |
+| `files` | the complete mod folder, sorted by path. Update = for each entry, download when the local file is missing or its size / sha256 differ; then delete local files under the mod folder that are not listed (except `preserve` entries and their `.retail-backup` copies (bug #512), and `d2rloader/logs/`, which D2RLoader writes). Under `d2rloader/` only files that are ours are deleted: listed by the release installed before, or a name our releases shipped; the player's own plugins and configs there stay (docs/launcher.md "The player's own plugins stay"). A plugin we rename or drop therefore keeps its old name in `KnownBundledFile` (launcher/src/core/manifest.cpp) or is listed by the previous release |
 | `emptyDirs` | folders of the mod folder that hold no file (`d2rloader/patches`): the downloader creates them, the 7z has them |
 | `archive` | the same content as a solid `.7z`: `format` `"7z"`, `name`, `size`, `sha256`; `archive.path` is where the host has it. The downloader uses it when the objects it would fetch add up to more than `size` (a fresh install): download resumable, check sha256, unpack with the built-in decoder, check every file (docs/launcher.md). Manual installs use it too |
 | `objectsBase` | (published manifests, required by the downloader) where the file bytes are, relative to the site root: `objects/`. The bytes of `files[i]` are at `<root>/<objectsBase><sha256[0:2]>/<sha256>` |
 | `launcher` | (published manifests, optional) the downloader build published with this release: `version`, `path` relative to the site root, `size`, `sha256` |
+| `launcherMin` | (optional, `package_release.py --launcher-min x.y.z`) the oldest downloader that may install this release. An older one refuses it with "needs downloader x.y.z or newer" and offers the manifest's `launcher` as its self-update first; publish that downloader with the release (`--launcher`) |
 
 ## Hosting layout (tools/publish_release.py, tools/dl_ingest.py)
 
 Owner decision 2026-10-26: the release files live on our own server, not on GitHub (the forge needs a sign-in for
-everything). A static HTTPS host serves one folder; the root URL is `https://dl.werdegames.com/mxl2012/` ("the site root"
+everything). A static HTTPS host serves one folder; the root URL is `https://dl.wyrd.games/mxl2012/` ("the site root"
 below; the downloader takes it as its one setting). Setting it up: docs/hosting.md. Players get the same layout from the DigitalOcean Space
-mirror behind Cloudflare, `https://files.werdegames.com/mxl2012/`: the server copies the site there after every ingest,
+mirror behind Cloudflare, `https://files.wyrd.games/mxl2012/`: the server copies the site there after every ingest,
 promote and gc (tools/dl_sync.py, channel files last; docs/hosting.md section 7).
 
 ```
@@ -215,7 +216,7 @@ Rules the downloader can rely on:
 py -3 tools/publish_release.py publish --version 0.1.0 --channel test --target sftp://user@host/mxl2012 [--launcher EXE] [--assets DIR]
 py -3 tools/publish_release.py promote 0.1.0 --channel stable --target ...
 py -3 tools/publish_release.py list | gc --keep 3 [--dry-run] --target ...
-py -3 tools/publish_release.py verify --url https://dl.werdegames.com/mxl2012/ --channel stable   # fetch + sha256 over HTTPS
+py -3 tools/publish_release.py verify --url https://dl.wyrd.games/mxl2012/ --channel stable   # fetch + sha256 over HTTPS
 py -3 tools/serve_dir.py <folder>                                                              # local Range-capable test host
 python3 tools/dl_ingest.py --root <folder that holds incoming-mxl2012/ and mxl2012/> --site mxl2012 --incoming incoming-mxl2012 \
     --archive-prefix D2R-XL-2012 --launcher-name D2R-XL-2012-Downloader.exe --mod-folder mxl2012 [--retry VERSION]   # what the server runs
@@ -281,7 +282,7 @@ not tested in game: no other D2RLoader image is installed here; the decision is 
    **Or run all of it at once:** `bash tools/release.sh <version>` (Git Bash on the game PC, from `main` at the release
    commit) checks the clean tree, `PluginVersion == <version>` and the `### <version>` CHANGELOG section, runs the pipeline's
    unit tests, then (steps 1, 2 and 4 below) packages, publishes, waits until the channel shows the version on
-   `files.werdegames.com/mxl2012/`, and runs `verify`; with `--with-github` it also does step 5. `--check-only` stops after
+   `files.wyrd.games/mxl2012/`, and runs `verify`; with `--with-github` it also does step 5. `--check-only` stops after
    the checks; `--channel test` is for a first run; settings (`MXL_PUBLISH_TARGET`, `MXL_PUBLISH_IDENTITY`) are environment
    variables, listed in the script's header. Publish output is never piped through `tail`: the upload takes minutes and a
    pipe would hide its exit status.
@@ -294,7 +295,7 @@ not tested in game: no other D2RLoader image is installed here; the decision is 
    2. Mirror main to GitHub with the scrub script (outside the repo).
    3. Run `py -3 tools/github_release.py <version> --commit <full sha of that commit on GitHub main> --latest`, plus
       `--downloader <exe>` when a new downloader ships. The release notes are the CHANGELOG section and the download
-      links. The 7z stays on files.werdegames.com and is not attached.
+      links. The 7z stays on files.wyrd.games and is not attached.
    4. Make the **forge** release the same way: `py -3 tools/github_release.py <version>
       --forge --commit <full sha of the forge's own commit> [--downloader <exe>]` (token: ~/.mxl2012-d2r/forge_token or MXL_FORGE_TOKEN). The forge's history is not scrubbed,
       so its commit ids differ from GitHub's.

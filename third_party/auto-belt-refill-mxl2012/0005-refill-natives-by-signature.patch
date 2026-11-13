@@ -1,0 +1,468 @@
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+index d99b7f7..45670fb 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
++++ b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+@@ -71,6 +71,7 @@
+ #include <D2RLPlugin/api.h>
+ 
+ #include "belt_match_logic.h"
++#include "belt_natives.h"
+ 
+ #include <array>
+ #include <atomic>
+@@ -1007,56 +1008,14 @@ auto ColumnTargetCode(const Snapshot& snapshot, uint32_t column, uint32_t rows)
+ //
+ // The SDK cannot write to the belt (ItemContainer::Belt is rejected as a
+ // create/transaction destination), so the refill drives the game's own
+-// routines directly. All RVAs are for D2R 3.2.0 build 92777 and are guarded
+-// by byte-pattern checks before each hook is installed.
+-
+-constexpr uint64_t GetLocalDataContextRva = 0x08B2D0;
+-constexpr uint64_t GetLocalPlayerRva      = 0x09A480;
+-constexpr uint64_t GetUnitInventoryRva     = 0x34A360;
+-constexpr uint64_t GetItemDataRva          = 0x34A500;
+-constexpr uint64_t GetUnitTypeRva          = 0x34B9D0;
+-constexpr uint64_t GetFirstItemRva         = 0x388C10;
+-constexpr uint64_t GetNextItemRva          = 0x38ABA0;
+-constexpr uint64_t GetItemCodeRva          = 0x36EF50;
+-constexpr uint64_t GetFreeBeltSlotRva      = 0x3862D0;
+-constexpr uint64_t CanPutInBeltRva         = 0x15A110;
+-constexpr uint64_t BeltTransferRva         = 0x15F660;
+-constexpr uint64_t PickupRva                = 0x471950;
++// routines directly. Their addresses are found once at load by byte
++// signatures (belt_natives.h, resolved in InstallBeltHook), never taken from
++// one build's fixed RVAs. When a signature is missing every native stays
++// null and the refill is off (logged), instead of calling a wrong address.
+ 
+ constexpr uint64_t ItemDataPageOffset = 0x55; // byte: inventory page id; 0 = main inventory, 0xFF = belt/equipment
+ constexpr uint32_t ItemUnitType       = 4;
+ 
+-// The game asks this routine which belt slot a potion should use. We hook it
+-// both to observe the real placement paths (for the upcoming automatic mode)
+-// and to call the original ourselves when probing whether a candidate fits.
+-constexpr uint8_t GetFreeBeltSlotBytes[32] = {
+-	0x40, 0x53, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41,
+-	0x56, 0x41, 0x57, 0x48, 0x81, 0xEC, 0x70, 0x01,
+-	0x00, 0x00, 0x48, 0x8B, 0x05, 0xDF, 0x4F, 0x64,
+-	0x02, 0x48, 0x33, 0xC4, 0x48, 0x89, 0x84, 0x24
+-};
+-
+-constexpr uint8_t CanPutInBeltBytes[32] = {
+-	0x40, 0x53, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B,
+-	0xD9, 0xE8, 0x22, 0x9D, 0x21, 0x00, 0x85, 0xC0,
+-	0x74, 0x40, 0xE8, 0xA9, 0x11, 0xF3, 0xFF, 0x8B,
+-	0xC8, 0xE8, 0x52, 0x03, 0xF4, 0xFF, 0x48, 0x8B
+-};
+-
+-constexpr uint8_t BeltTransferBytes[32] = {
+-	0x40, 0x53, 0x55, 0x56, 0x57, 0x41, 0x57, 0x48,
+-	0x83, 0xEC, 0x60, 0x48, 0x8B, 0x05, 0x56, 0xBC,
+-	0x86, 0x02, 0x48, 0x33, 0xC4, 0x48, 0x89, 0x44,
+-	0x24, 0x40, 0x48, 0x8B, 0xB4, 0x24, 0xB0, 0x00
+-};
+-
+-constexpr uint8_t PickupBytes[32] = {
+-	0x48, 0x89, 0x5C, 0x24, 0x18, 0x55, 0x56, 0x57,
+-	0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57,
+-	0x48, 0x8D, 0x6C, 0x24, 0xE9, 0x48, 0x81, 0xEC,
+-	0xA0, 0x00, 0x00, 0x00, 0x45, 0x33, 0xE4, 0x44
+-};
+-
+ using GetLocalDataContextFn = int32_t(__fastcall*)() noexcept;
+ using GetLocalPlayerFn      = void*(__fastcall*)(int32_t) noexcept;
+ using GetUnitInventoryFn    = void*(__fastcall*)(void*) noexcept;
+@@ -1078,7 +1037,7 @@ GetUnitTypeFn          GetUnitType         = nullptr;
+ GetFirstItemFn        GetFirstItem         = nullptr;
+ GetNextItemFn         GetNextItem          = nullptr;
+ GetItemCodeFn         GetItemCode          = nullptr;
+-GetFreeBeltSlotFn     GetFreeBeltSlotDirect   = nullptr; // v0.35.9: direct call, NO inline hook (RuffnecKk compat, RVA 0x3862D0)
++GetFreeBeltSlotFn     GetFreeBeltSlotDirect   = nullptr; // v0.35.9: direct call, NO inline hook (RuffnecKk compat)
+ CanPutInBeltFn        OriginalCanPutInBelt    = nullptr;
+ BeltTransferFn        OriginalBeltTransfer    = nullptr;
+ 
+@@ -1088,20 +1047,12 @@ const D2RL::PluginContext* g_hookLogContext = nullptr;
+ uint32_t                   g_hookHits       = 0;
+ bool                       g_debugLogs      = false; // v0.35.0: master diagnostics switch, synced from g_config.debugLogs after load
+ 
+-auto ResolveNatives(const D2RL::PluginContext* context) noexcept -> bool {
+-	if (context == nullptr || g_moduleBase == 0) {
+-		return false;
+-	}
++BeltNatives::Resolved g_nativeRvas {};           // where each routine was found (-1: not found)
++bool                  g_nativesResolved = false; // every required routine found: the pointers above are set
+ 
+-	GetLocalDataContext = reinterpret_cast<GetLocalDataContextFn>(g_moduleBase + GetLocalDataContextRva);
+-	GetLocalPlayer     = reinterpret_cast<GetLocalPlayerFn>(g_moduleBase + GetLocalPlayerRva);
+-	GetUnitInventory   = reinterpret_cast<GetUnitInventoryFn>(g_moduleBase + GetUnitInventoryRva);
+-	GetItemData        = reinterpret_cast<GetItemDataFn>(g_moduleBase + GetItemDataRva);
+-	GetUnitType        = reinterpret_cast<GetUnitTypeFn>(g_moduleBase + GetUnitTypeRva);
+-	GetFirstItem       = reinterpret_cast<GetFirstItemFn>(g_moduleBase + GetFirstItemRva);
+-	GetNextItem        = reinterpret_cast<GetNextItemFn>(g_moduleBase + GetNextItemRva);
+-	GetFreeBeltSlotDirect = reinterpret_cast<GetFreeBeltSlotFn>(g_moduleBase + GetFreeBeltSlotRva); // v0.35.9: direct, unhooked
+-	return GetUnitInventory != nullptr && GetFirstItem != nullptr && GetItemData != nullptr;
++// True when the natives were resolved at load (InstallBeltHook); nothing is resolved later.
++auto ResolveNatives(const D2RL::PluginContext* context) noexcept -> bool {
++	return context != nullptr && g_nativesResolved;
+ }
+ 
+ // ------------------------------------------------------------------ policy
+@@ -3485,26 +3436,17 @@ auto ConsoleVerify(D2R::Game::Client*, const D2RL::ConsoleCommandContext* comman
+ 		return D2RL::ConsoleCommandResult::Failed;
+ 	}
+ 
+-	struct RvaProbe {
+-		const char*    name;
+-		uint64_t       rva;
+-		const uint8_t* expected;
+-		uint32_t       size;
+-	};
+-	static const RvaProbe probes[4] = {
+-		{ "GetFreeBeltSlot", GetFreeBeltSlotRva, GetFreeBeltSlotBytes, sizeof(GetFreeBeltSlotBytes) },
+-		{ "CanPutInBelt",    CanPutInBeltRva,    CanPutInBeltBytes,    sizeof(CanPutInBeltBytes) },
+-		{ "BeltTransfer",    BeltTransferRva,    BeltTransferBytes,    sizeof(BeltTransferBytes) },
+-		{ "Pickup",          PickupRva,          PickupBytes,          sizeof(PickupBytes) },
+-	};
+-
+-	for (const RvaProbe& probe : probes) {
+-		const auto ok = command->plugin->CheckExpectedBytes(probe.rva, probe.expected, probe.size);
+-		Log(command->plugin,
+-			"AutoBeltRefill: verify: %-16s rva=0x%llX -> %s",
+-			probe.name,
+-			static_cast<unsigned long long>(probe.rva),
+-			ok ? "MATCH (address is correct)" : "bytes differ (wrong build or address)");
++	// v0.35.9's fixed-RVA byte checks are now the signature lookups of belt_natives.h: report what was found.
++	Log(command->plugin, "AutoBeltRefill: verify: natives %s.",
++		g_nativesResolved ? "resolved" : (g_nativeRvas.missing != nullptr ? "NOT resolved (refill off)" : "not resolved yet"));
++	for (const BeltNatives::Sig& sig : BeltNatives::Sigs) {
++		const int64_t rva = g_nativeRvas.rva[sig.id];
++		if (rva >= 0) {
++			Log(command->plugin, "AutoBeltRefill: verify: %-19s D2R+0x%llX (0x%llX on 93847)", sig.name,
++				static_cast<unsigned long long>(rva), static_cast<unsigned long long>(sig.rva93847));
++		} else {
++			Log(command->plugin, "AutoBeltRefill: verify: %-19s NOT FOUND%s", sig.name, sig.required ? "" : " (optional)");
++		}
+ 	}
+ 	return D2RL::ConsoleCommandResult::Handled;
+ }
+@@ -3536,50 +3478,111 @@ auto OnSnapshotKey(const D2RL::PluginContext* context, const D2RL::Input::Action
+ 
+ // ------------------------------------------------------------------ hook setup
+ 
++// Finds every native by signature (belt_natives.h). All or nothing: when a required one is missing the pointers stay
++// null, no hook is installed and the fill / place / auto paths report "natives not resolved" instead of calling anything.
++auto ResolveNativeAddresses(const D2RL::PluginContext* context) noexcept -> bool {
++	g_nativesResolved = false;
++	g_nativeRvas      = BeltNatives::Resolved {};
++	size_t imageSize = 0;
++	size_t textRva   = 0;
++	size_t textSize  = 0;
++	if (g_moduleBase == 0 || !ImageText(g_moduleBase, imageSize, textRva, textSize)) {
++		g_nativeRvas.missing = "the game's .text section";
++		Log(context, "AutoBeltRefill: natives: OFF - the game's .text section was not found; the refill is off.");
++		return false;
++	}
++	g_nativeRvas = BeltNatives::Resolve(reinterpret_cast<const uint8_t*>(g_moduleBase), imageSize, textRva, textSize);
++	if (!g_nativeRvas.ok()) {
++		Log(context, "AutoBeltRefill: natives: OFF - pattern %s not found exactly once (or its checks failed) in this D2R build; "
++			"the refill is off, nothing is hooked or called.", g_nativeRvas.missing);
++		return false;
++	}
++	const auto at = [](BeltNatives::Id id) { return g_moduleBase + static_cast<uintptr_t>(g_nativeRvas.rva[id]); };
++	GetLocalDataContext   = reinterpret_cast<GetLocalDataContextFn>(at(BeltNatives::LocalDataContext));
++	GetLocalPlayer        = reinterpret_cast<GetLocalPlayerFn>(at(BeltNatives::LocalPlayer));
++	GetUnitInventory      = reinterpret_cast<GetUnitInventoryFn>(at(BeltNatives::UnitInventory));
++	GetItemData           = reinterpret_cast<GetItemDataFn>(at(BeltNatives::ItemData));
++	GetUnitType           = reinterpret_cast<GetUnitTypeFn>(at(BeltNatives::UnitType));
++	GetFirstItem          = reinterpret_cast<GetFirstItemFn>(at(BeltNatives::FirstItem));
++	GetNextItem           = reinterpret_cast<GetNextItemFn>(at(BeltNatives::NextItem));
++	GetItemCode           = reinterpret_cast<GetItemCodeFn>(at(BeltNatives::ItemCode));
++	GetFreeBeltSlotDirect = reinterpret_cast<GetFreeBeltSlotFn>(at(BeltNatives::FreeBeltSlot)); // v0.35.9: direct, unhooked
++	g_nativesResolved     = true;
++	char   list[640] {};
++	size_t used = 0;
++	for (const BeltNatives::Sig& sig : BeltNatives::Sigs) {
++		const int64_t rva = g_nativeRvas.rva[sig.id];
++		const int written = rva >= 0 ? std::snprintf(list + used, sizeof(list) - used, "%s%s 0x%llX", used ? ", " : "", sig.name,
++		                                             static_cast<unsigned long long>(rva))
++		                             : std::snprintf(list + used, sizeof(list) - used, "%s%s not found (optional)",
++		                                             used ? ", " : "", sig.name);
++		if (written < 0 || static_cast<size_t>(written) >= sizeof(list) - used) {
++			break;
++		}
++		used += static_cast<size_t>(written);
++	}
++	Log(context, "AutoBeltRefill: natives: patterns resolved: %s.", list);
++	return true;
++}
++
+ auto InstallBeltHook(const D2RL::PluginContext* context) noexcept -> bool {
+ 	// v0.35.9: NO inline hook on GetFreeBeltSlot anymore - RuffnecKk's Potion
+-	// Auto Pickup fingerprints the same function (RVA 0x3862D0) and refuses
+-	// to load when our detour has changed its bytes. The refill path calls
+-	// the function directly (GetFreeBeltSlotDirect, set in ResolveNatives).
++	// Auto Pickup fingerprints the same function and refuses to load when our
++	// detour has changed its bytes. The refill path calls the function
++	// directly (GetFreeBeltSlotDirect, found by ResolveNativeAddresses).
+ 	g_moduleBase     = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+-	g_hookLogContext        = context;
+-	GetItemCode             = reinterpret_cast<GetItemCodeFn>(g_moduleBase + GetItemCodeRva);
++	g_hookLogContext = context;
++	if (!ResolveNativeAddresses(context)) {
++		return false;
++	}
++
++	// The hooks expect the routine's own first bytes: its signature matched them exactly once just now (the wildcarded
++	// rel32 / disp32 operands are this build's), so the loader's own byte check re-confirms the same place.
++	const auto entryBytes = [](BeltNatives::Id id, uint8_t (&out)[BeltNatives::HookBytes]) {
++		std::memcpy(out, reinterpret_cast<const void*>(g_moduleBase + static_cast<uintptr_t>(g_nativeRvas.rva[id])), sizeof(out));
++	};
+ 
+ 	// Observation probe on the belt-availability test: the automatic mode
+ 	// will need to know when the game itself asks "can this go in the belt?".
+ 	{
+-		void* canOriginal = nullptr;
+-		auto  canRegistration = D2RL::MakeInlineHook(
+-			 CanPutInBeltRva,
+-			 CanPutInBeltBytes,
+-			 static_cast<uint32_t>(sizeof(CanPutInBeltBytes)),
+-			 reinterpret_cast<void*>(&HookCanPutInBelt),
+-			 &canOriginal);
++		static uint8_t canBytes[BeltNatives::HookBytes] {};
++		entryBytes(BeltNatives::CanPutInBelt, canBytes);
++		const auto canRva          = static_cast<uint64_t>(g_nativeRvas.rva[BeltNatives::CanPutInBelt]);
++		void*      canOriginal     = nullptr;
++		auto       canRegistration = D2RL::MakeInlineHook(
++			canRva,
++			canBytes,
++			static_cast<uint32_t>(sizeof(canBytes)),
++			reinterpret_cast<void*>(&HookCanPutInBelt),
++			&canOriginal);
+ 		if (context->InstallInlineHook(canRegistration)) {
+ 			OriginalCanPutInBelt = reinterpret_cast<CanPutInBeltFn>(canOriginal);
+-			LogDebug(context, "AutoBeltRefill: hook: CanPutInBelt probe installed at 0x%llX.", static_cast<unsigned long long>(CanPutInBeltRva));
++			LogDebug(context, "AutoBeltRefill: hook: CanPutInBelt probe installed at 0x%llX.", static_cast<unsigned long long>(canRva));
+ 		} else {
+ 			Log(context, "AutoBeltRefill: hook: CanPutInBelt probe NOT installed (bytes differ).");
+ 		}
+ 	}
+ 
+ 	// v0.35.9: the Pickup observation hook was REMOVED - Potion Auto Pickup
+-	// also references RVA 0x471950 and must not find our detour bytes there.
++	// also references that routine and must not find our detour bytes there.
+ 
+ 	// Hook on the belt-transfer routine we drive. Logging what the game hands
+ 	// it during a real shift-click documents the calling convention for the
+ 	// automatic mode.
+ 	{
+-		void* beltOriginal = nullptr;
+-		auto  beltRegistration = D2RL::MakeInlineHook(
+-			 BeltTransferRva,
+-			 BeltTransferBytes,
+-			 static_cast<uint32_t>(sizeof(BeltTransferBytes)),
+-			 reinterpret_cast<void*>(&HookBeltTransfer),
+-			 &beltOriginal);
++		static uint8_t beltBytes[BeltNatives::HookBytes] {};
++		entryBytes(BeltNatives::BeltTransfer, beltBytes);
++		const auto beltRva          = static_cast<uint64_t>(g_nativeRvas.rva[BeltNatives::BeltTransfer]);
++		void*      beltOriginal     = nullptr;
++		auto       beltRegistration = D2RL::MakeInlineHook(
++			beltRva,
++			beltBytes,
++			static_cast<uint32_t>(sizeof(beltBytes)),
++			reinterpret_cast<void*>(&HookBeltTransfer),
++			&beltOriginal);
+ 		if (context->InstallInlineHook(beltRegistration)) {
+ 			OriginalBeltTransfer = reinterpret_cast<BeltTransferFn>(beltOriginal);
+-			LogDebug(context, "AutoBeltRefill: hook: BeltTransfer logger installed at 0x%llX.", static_cast<unsigned long long>(BeltTransferRva));
++			LogDebug(context, "AutoBeltRefill: hook: BeltTransfer logger installed at 0x%llX.", static_cast<unsigned long long>(beltRva));
+ 		} else {
+ 			Log(context, "AutoBeltRefill: hook: BeltTransfer logger NOT installed (bytes differ).");
+ 		}
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/belt_natives.h b/Auto-belt-refill-v0.35.9-EN/src/belt_natives.h
+new file mode 100644
+index 0000000..6ff204b
+--- /dev/null
++++ b/Auto-belt-refill-v0.35.9-EN/src/belt_natives.h
+@@ -0,0 +1,182 @@
++#pragma once
++
++// The game routines the refill drives, found by byte signatures in the game's .text at load instead of one D2R build's
++// fixed addresses. Pure logic (no game access, no Windows headers), so it has unit tests (belt_match_tests.cpp).
++//
++// Every signature was taken from D2R 3.3 build 93847 (image 0x6ab3782c, the same image under 3.4 95032); rva93847 is that
++// build's address, kept only for logs and the dump test. Rules: each signature must match exactly once in .text; the target
++// must lie inside .text; where given, the target's own entry bytes must match `entry`, and the rel32 calls listed in `calls`
++// must point to routines resolved before it. A required signature that fails leaves every address unresolved (the refill
++// stays off); the optional one (Pickup, only reported by belt-verify) just stays unresolved.
++
++#include <cstddef>
++#include <cstdint>
++
++// The repo's signature scan (invtabs/src, the same helper as the tab and summary plugins): ParsePattern / FindPattern /
++// RipTarget. Pure, standard headers only.
++#include "invtabs_logic.h"
++
++namespace BeltNatives {
++
++enum Id : int {
++	LocalPlayer,
++	LocalDataContext,
++	UnitInventory,
++	UnitType,
++	ItemData,
++	FirstItem,
++	NextItem,
++	ItemCode,
++	FreeBeltSlot,
++	CanPutInBelt,
++	BeltTransfer,
++	Pickup,
++	Count
++};
++
++struct CallCheck {
++	int offset = -1; // rel32 at match + offset
++	int target = -1; // must point to this routine
++};
++
++struct Sig {
++	Id            id;
++	const char*   name;
++	const char*   pattern;
++	int           rip;    // >= 0: the rel32 / disp32 at this offset in the match is the routine
++	std::int64_t  adjust; // else the routine starts at the match + adjust
++	const char*   entry;  // the routine's own first bytes, checked at the target (nullptr: the match is the entry)
++	CallCheck     calls[2];
++	bool          required;
++	std::uint64_t rva93847;
++};
++
++// In resolution order: a call check names only routines above it.
++inline constexpr Sig Sigs[Count] = {
++	// GetLocalPlayer(context): `cmp ecx, 8; jae` on the client slot, then the player table.
++	{LocalPlayer, "GetLocalPlayer",
++	 "48 89 5c 24 08 57 48 83 ec 20 83 f9 08 0f 83 ?? ?? ?? ?? 8b d9 48 89 5c 24 38 48 83 fb 08 72", -1, 0, nullptr, {}, true,
++	 0x9a480},
++	// GetLocalDataContext(): `mov eax, [rip+X]; ret`, taken from a caller that hands it straight to GetLocalPlayer.
++	{LocalDataContext, "GetLocalDataContext",
++	 "e8 ?? ?? ?? ?? 8b c8 e8 ?? ?? ?? ?? 48 85 c0 74 11 e8 ?? ?? ?? ?? e8 ?? ?? ?? ?? b0 01 48 83 c4 28 c3", 1, 0,
++	 "8b 05 ?? ?? ?? ?? c3", {{8, LocalPlayer}, {}}, true, 0x8b2d0},
++	{UnitInventory, "GetUnitInventory",
++	 "48 89 5c 24 18 56 48 83 ec 20 48 8b f1 48 85 c9 75 13 88 4c 24 30 48 8d 4c 24 30 e8", -1, 0, nullptr, {}, true, 0x34a360},
++	// GetUnitType / GetItemData: a caller that asks the unit type, compares it with 4 (item), then reads the item data.
++	{UnitType, "GetUnitType",
++	 "74 4f 48 8b cf e8 ?? ?? ?? ?? 83 f8 04 75 30 48 8b cf e8 ?? ?? ?? ?? 48 85 c0 75 15 48 8d 4c 24 30 88 44 24 30 e8", 6, 0,
++	 "48 83 ec 28 48 85 c9 75 ?? 88 4c 24 30", {}, true, 0x34b9d0},
++	{ItemData, "GetItemData",
++	 "74 4f 48 8b cf e8 ?? ?? ?? ?? 83 f8 04 75 30 48 8b cf e8 ?? ?? ?? ?? 48 85 c0 75 15 48 8d 4c 24 30 88 44 24 30 e8", 19, 0,
++	 "40 53 48 83 ec 20 48 8b d9 48 85 c9 75 ?? 88 4c 24 30", {{6, UnitType}, {}}, true, 0x34a500},
++	// GetFirstItem(inventory): checks the inventory's magic 0x01020304.
++	{FirstItem, "GetFirstItem", "40 53 48 83 ec 20 48 8b d9 48 85 c9 74 2e 81 39 04 03 02 01 74 1c 48 8d 4c 24 30 c6 44 24 30 00",
++	 -1, 0, nullptr, {}, true, 0x388c10},
++	// GetNextItem(item): from the game's own inventory walk, GetFirstItem then a loop that ends in GetNextItem.
++	{NextItem, "GetNextItem",
++	 "49 8b cd e8 ?? ?? ?? ?? 48 8b d8 48 85 c0 74 55 0f 1f 40 00 48 8b cb e8 ?? ?? ?? ?? 85 c0 75 35 48 8b cb e8 ?? ?? ?? ?? 84 c0 "
++	 "75 29 48 8b cb e8 ?? ?? ?? ?? 44 8b c0 48 8d 4c 24 50 33 d2 e8 ?? ?? ?? ?? 48 8b d0 4c 8d 85 c0 01 00 00 48 8b cb e8 ?? ?? ?? "
++	 "?? 48 8b cb e8 ?? ?? ?? ?? 48 8b d8 48 85 c0 75 af",
++	 89, 0, "40 53 48 83 ec 20 48 8b d9 48 85 c9 75 ?? 88 4c 24 30", {{4, FirstItem}, {}}, true, 0x38aba0},
++	// GetItemCode(item): a caller that compares the code with "box " (the Horadric Cube).
++	{ItemCode, "GetItemCode", "48 8b cb e8 ?? ?? ?? ?? 3d 62 6f 78 20 74 08 b0 01 48 83 c4 20 5b c3", 4, 0,
++	 "48 89 5c 24 10 57 48 83 ec 20 48 8b f9 48 85 c9", {}, true, 0x36ef50},
++	{FreeBeltSlot, "GetFreeBeltSlot",
++	 "40 53 55 56 57 41 54 41 56 41 57 48 81 ec 70 01 00 00 48 8b 05 ?? ?? ?? ?? 48 33 c4 48 89 84 24 60 01 00 00 45 0f b6 e1", -1,
++	 0, nullptr, {}, true, 0x3862d0},
++	// CanPutInBelt(item): asks GetLocalPlayer(GetLocalDataContext()) right at its start.
++	{CanPutInBelt, "CanPutInBelt",
++	 "40 53 48 83 ec 20 48 8b d9 e8 ?? ?? ?? ?? 85 c0 74 40 e8 ?? ?? ?? ?? 8b c8 e8 ?? ?? ?? ?? 48 8b c8", -1, 0, nullptr,
++	 {{19, LocalDataContext}, {26, LocalPlayer}}, true, 0x15a110},
++	{BeltTransfer, "BeltTransfer",
++	 "40 53 55 56 57 41 57 48 83 ec 60 48 8b 05 ?? ?? ?? ?? 48 33 c4 48 89 44 24 40 48 8b b4 24 b0 00 00 00", -1, 0, nullptr, {},
++	 true, 0x15f660},
++	{Pickup, "Pickup",
++	 "48 89 5c 24 18 55 56 57 41 54 41 55 41 56 41 57 48 8d 6c 24 e9 48 81 ec a0 00 00 00 45 33 e4 44 88 45 c7", -1, 0, nullptr,
++	 {}, false, 0x471950},
++};
++
++// Bytes an inline hook may take from a routine's start (CanPutInBelt, BeltTransfer); both signatures cover them.
++inline constexpr std::size_t HookBytes = 32;
++
++struct Resolved {
++	std::int64_t rva[Count] {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
++	const char*  missing = nullptr; // the first required signature that failed
++	auto ok() const noexcept -> bool { return missing == nullptr; }
++	auto has(Id id) const noexcept -> bool { return rva[id] >= 0; }
++};
++
++// Does `pattern` match at image[at] (inside [0, size))?
++inline auto MatchesAt(const std::uint8_t* image, std::size_t size, std::size_t at, const char* pattern) -> bool {
++	const auto bytes = invtabs::ParsePattern(pattern);
++	if (bytes.empty() || at > size || size - at < bytes.size()) {
++		return false;
++	}
++	for (std::size_t k = 0; k < bytes.size(); ++k) {
++		if (bytes[k] >= 0 && image[at + k] != static_cast<std::uint8_t>(bytes[k])) {
++			return false;
++		}
++	}
++	return true;
++}
++
++// One routine: -1 when its signature does not match exactly once or a check fails.
++inline auto ResolveOne(const std::uint8_t* image, std::size_t textRva, std::size_t textSize, const Sig& sig,
++                       const std::int64_t (&rva)[Count]) -> std::int64_t {
++	const auto hits = invtabs::FindPattern(image + textRva, textSize, invtabs::ParsePattern(sig.pattern), 2);
++	if (hits.size() != 1) {
++		return -1;
++	}
++	const std::size_t  at     = textRva + hits.front();
++	const std::int64_t target = sig.rip >= 0 ? invtabs::RipTarget(image, at + static_cast<std::size_t>(sig.rip))
++	                                         : static_cast<std::int64_t>(at) + sig.adjust;
++	const auto         inText = [&](std::int64_t r) {
++		return r >= static_cast<std::int64_t>(textRva) && r < static_cast<std::int64_t>(textRva + textSize);
++	};
++	if (target < 0 || !inText(target)) {
++		return -1;
++	}
++	if (sig.entry != nullptr && !MatchesAt(image, textRva + textSize, static_cast<std::size_t>(target), sig.entry)) {
++		return -1;
++	}
++	for (const CallCheck& call : sig.calls) {
++		if (call.offset < 0) {
++			continue;
++		}
++		if (call.target < 0 || call.target >= Count || rva[call.target] < 0
++		    || invtabs::RipTarget(image, at + static_cast<std::size_t>(call.offset)) != rva[call.target]) {
++			return -1;
++		}
++	}
++	return target;
++}
++
++// Every routine in the image (`image`, `imageSize` bytes, .text at `textRva`, `textSize`). The routines must be distinct.
++inline auto Resolve(const std::uint8_t* image, std::size_t imageSize, std::size_t textRva, std::size_t textSize) -> Resolved {
++	Resolved out;
++	static_assert(Count == 12, "Resolved::rva's initialiser lists one -1 per routine");
++	if (image == nullptr || textRva >= imageSize || textSize > imageSize - textRva) {
++		out.missing = "image";
++		return out;
++	}
++	for (const Sig& sig : Sigs) {
++		std::int64_t target = ResolveOne(image, textRva, textSize, sig, out.rva);
++		for (int other = 0; other < Count && target >= 0; ++other) {
++			if (out.rva[other] == target) {
++				target = -1; // two routines at one address: a signature found the wrong one
++			}
++		}
++		out.rva[sig.id] = target;
++		if (target < 0 && sig.required) {
++			for (auto& r : out.rva) {
++				r = -1;
++			}
++			out.missing = sig.name;
++			return out;
++		}
++	}
++	return out;
++}
++
++} // namespace BeltNatives

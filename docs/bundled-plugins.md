@@ -15,7 +15,7 @@ PC); lane legacy169ship, docs/testing.md "Lane legacy169ship".
 
 - **In the package:** `mods\mxl2012\d2rloader\plugins\legacy169.dll` (mod-scoped: it loads only with this mod) and its default
   `mods\mxl2012\d2rloader\config\legacy169.toml`. D2RLoader would write that file itself at the first start (the config is
-  embedded in the DLL), but the downloader removes files the release does not list, so the package lists it as a `preserve`
+  embedded in the DLL), but the downloader removes our files the release does not list, so the package lists it as a `preserve`
   file: written when missing, never overwritten, and a player's `enabled = false` survives Update and Repair. The manifest's
   `bundledPlugins` names the plugin, version, repository and commit.
 - **Reproducible build:** the gitlink `third_party/D2R-Legacy169` pins the commit (v0.1.2, `c1ec651`: v0.1.1 plus the game-build tie removed, D2R 3.4).
@@ -182,7 +182,19 @@ customise it. Credit: README, CHANGELOG / release notes, NOTICE.md and this file
   check below.
 - **Patches:** `0001-pluginsdk-1.3.1.patch`, API renames for D2RLoader 1.3.1 / ABI 4 (`abiVersion`, `InventoryService`,
   `ThreadService`, `InputService`, `LifecycleService`, the one-argument `QueryService`), no behaviour change.
-  `0002-mxl2012-belt-rows.patch`, the Median belt sizes (next point). `0003-mxl2012-match-first-slot.patch`, our behaviour
+  `0002-mxl2012-belt-rows.patch`, the Median belt sizes (next point). `0004-mxl2012-count-signatures.patch`, the counts' game
+  data found by signature (`belt_counts` below). `0005-refill-natives-by-signature.patch` (written so it can go to the author):
+  the twelve game routines the refill drives (`GetLocalPlayer`, `GetLocalDataContext`, `GetUnitInventory`, `GetUnitType`,
+  `GetItemData`, `GetFirstItem`, `GetNextItem`, `GetItemCode`, `GetFreeBeltSlot`, `CanPutInBelt`, `BeltTransfer`, and
+  `Pickup`, which only `belt-verify` reports) are found at load by byte signatures in `.text` (new `belt_natives.h`, the
+  repo's scan in `invtabs/src/invtabs_logic.h`) instead of the author's fixed RVAs. Each must match exactly once, its target
+  must lie in `.text` and be distinct, and it is cross-checked: getters taken from a caller site must have their own entry
+  bytes, and the calls inside the match must reach routines already found (`GetLocalDataContext`'s caller hands it to
+  `GetLocalPlayer`, `CanPutInBelt` starts with both, `GetNextItem`'s loop starts with `GetFirstItem`). A missing required
+  routine logs `natives: OFF - pattern ...`: nothing is hooked or called and fill / auto / place report "natives not
+  resolved". The two inline hooks take the routine's own first 32 bytes once its signature matched. The load log lists every
+  address (`natives: patterns resolved: ...`); `belt-verify` prints them. `BeltMatchTests` with `D2R_DUMP` checks all twelve
+  against the 93847 addresses. `0003-mxl2012-match-first-slot.patch`, our behaviour
   for D2R-XL 2012 (lane beltmatch, owner request 2026-11-06), each part off unless the config turns it on:
   - `match_first_slot`: each column refills with exactly the item code in its first (bottom) slot; no families, no
     `prefer_large`, and no "follow the game" extension of a column's list. Upstream has no such mode: an unlocked column learns
@@ -194,8 +206,13 @@ customise it. Credit: README, CHANGELOG / release notes, NOTICE.md and this file
   - `belt_counts`: a count on the top right of each column's first cell, how many items of that column's code the inventory and
     the belt hold together (white, red at 0; none on an empty or elixir column), drawn with D2RLoader's `OverlayService`.
     The cells come from D2R's own layouts (`hudpanelhd.json`: HUD anchored bottom centre in a 2160-high UI space, belt cell 98,
-    pitch 125; `hudpanel.json`: the classic screen letterboxed, belt at the centred middle part, cell 29, pitch 31); HD or legacy
-    from D2R's getter `0x846210` (bytes checked), the classic screen size from `0x22a0d68` / `0x22a0d6c`. The watcher refreshes
+    pitch 125; `hudpanel.json`: the classic screen letterboxed, belt at the centred middle part, cell 29, pitch 31). HD or legacy
+    and the classic screen size are found at load by byte signatures (`0004-mxl2012-count-signatures.patch`, the repo's scan in
+    `invtabs/src/invtabs_logic.h`): D2R's HD test (`0x846210` in 93847) and the screen-size function (`0x7f4d0`, whose classic
+    branch reads `0x22a0d68` / `0x22a0d6c`), each unique in `.text` and cross-checked (the function calls the HD test, the height
+    follows the width, the data lies outside `.text`). A signature that does not match exactly once logs `belt_counts: OFF -
+    pattern ...` and the counts stay off; refilling is not affected. The load log names what was found (`patterns resolved`).
+    `BeltMatchTests` with env `D2R_DUMP` resolves both in the 93847 dump. The watcher refreshes
     the counts every `auto_poll_frames`; out of a game they are hidden. Console `belt-counts` logs them, the cells and the
     overlay's frame / draw counters.
   - **Known limit (D2R):** the game routes a potion by item type, not by code. Two columns of one kind (say `hp3` and `hp5`)

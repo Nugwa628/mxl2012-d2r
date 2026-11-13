@@ -10239,6 +10239,21 @@ def wall_spots(env=None):
     return out
 
 
+def wall_walks(env=None):
+    """MXL_WALL_WALK="59:67,48>67,42;75,45>80,45" -> {level: [((cell x, cell y), (cell x, cell y))]}: after a map's views
+    wall_visit puts the player on the first cell and walks toward the second (`move`: the server's own walk, so the map's
+    collision decides; monsters near the player are killed before each step, since a hit stops a walk): does the player get
+    where the scene draws a way, and stay out of where it draws none. A screenshot where each leg ended. Needs the map's
+    MXL_WALL_SPOTS."""
+    out = {}
+    for part in (os.environ if env is None else env).get("MXL_WALL_WALK", "").split("|"):
+        lv, _, walks = part.partition(":")
+        if lv.strip().isdigit():
+            legs = [[tuple(int(v) for v in c.split(",")) for c in w.split(">") if c.count(",") == 1] for w in walks.split(";")]
+            out[int(lv)] = [tuple(leg) for leg in legs if len(leg) == 2]
+    return out
+
+
 def wall_place(x, y, rings=(0, 6, 12)):
     """`place` straight at (x, y), else at points round it (rings of 8, `rings` sub-tiles out): a far room that is already loaded
     takes the player even across a void. -> where the player is."""
@@ -10279,6 +10294,23 @@ def wall_hop(x, y, step=15, hops=40):
     return cx, cy
 
 
+def wall_settle(log, where, mode):
+    """MXL_WALL_CLEAR=1: before a wall_maps view, the monsters within MXL_WALL_KILL_RADIUS (default 30) of the player are
+    killed, at most MXL_WALL_KILLS (default 150) (clean shots, the frame rate of the scene alone); an HD view is then held
+    MXL_WALL_SETTLE seconds (default 11: the overlay's frame rate is a 10 s mean)."""
+    if not os.environ.get("MXL_WALL_CLEAR"):
+        return
+    radius = int(os.environ.get("MXL_WALL_KILL_RADIUS", "30"))
+    killed = 0
+    for _ in range(int(os.environ.get("MXL_WALL_KILLS", "150"))):
+        if not hostiles_near(hstate(), radius) or not H("kill nearest")[0]:
+            break
+        killed += 1
+    time.sleep(float(os.environ.get("MXL_WALL_SETTLE", "11")) if mode == "hd" else 1.0)
+    left = len(hostiles_near(hstate(), radius))
+    log.append("%s: %d monsters killed, %d left within %d" % (where, killed, left, radius))
+
+
 def wall_visit(mode, log, shots):
     """Every map of WALL_MAPS in the current graphics mode: travel by `h level`, three screenshots, the asserts per map.
     -> {level: 'reached' | 'not reached'}."""
@@ -10297,11 +10329,12 @@ def wall_visit(mode, log, shots):
             continue
         time.sleep(5)  # the scene and its models stream in
         x0, y0 = p.get("x"), p.get("y")
-        views, mems, walk_ok = WALL_OFFSETS, [], True
+        views, mems, walk_ok, origin = WALL_OFFSETS, [], True, None
         if wall_spots().get(lv) and x0 is not None:   # MXL_WALL_SPOTS: map cells to look at, from the level's origin
             rooms = [(int(r["x"]), int(r["y"])) for r in (kv(ln) for ln in H("presets rooms")[1] if ln.startswith("room x="))]
             if rooms:
                 ox, oy = wall_spots().get((lv, "origin")) or (min(x for x, _ in rooms), min(y for _, y in rooms))
+                origin = (ox, oy)
                 views = [(0, 0)] + [(ox + 5 * cx + 2 - x0, oy + 5 * cy + 2 - y0) for cx, cy in wall_spots()[lv]]
                 log.append("%s %d %s: origin %d,%d, spots %s" % (mode, lv, name, ox, oy, wall_spots()[lv]))
         for n, (dx, dy) in enumerate(views):
@@ -10332,8 +10365,28 @@ def wall_visit(mode, log, shots):
                             f.write("\n".join(wm["grid"]) + "\n")
                 time.sleep(3)
                 log.append("%s %d %s: spot %d -> %s,%s (wanted %d,%d)" % (mode, lv, name, n, at[0], at[1], x0 + dx, y0 + dy))
+            wall_settle(log, "%s %d %s: view %d" % (mode, lv, name, n), mode)
             shots.append(sh("wall_%s_%s_%d" % (name, mode, n)))
             mems.append(game_private_mb())   # lane stairs: the game's memory with a larger scene
+        for n, (a, b) in enumerate(wall_walks().get(lv, ()) if origin else ()):   # MXL_WALL_WALK: a leg on foot
+            (sx, sy), (tx, ty) = [(origin[0] + 5 * cx + 2, origin[1] + 5 * cy + 2) for cx, cy in (a, b)]
+            at = wall_place(sx, sy)
+            ok, t0 = False, time.time()
+            while not ok and time.time() - t0 < 30:     # monsters in the way stop a walk: they are removed first
+                for _ in range(8):
+                    if not H("kill nearest")[0]:
+                        break
+                H("move %d %d" % (tx, ty))
+                time.sleep(1.5)
+                p2 = hstate()["player"]
+                ok = abs(p2.get("x", 0) - tx) <= 3 and abs(p2.get("y", 0) - ty) <= 3
+            time.sleep(1)
+            p2 = hstate()["player"]
+            log.append("%s %d %s: walk %d from cell %s (at %s,%s) toward cell %s: %s, ended at %s,%s = cell %d,%d" % (
+                mode, lv, name, n, a, at[0], at[1], b, "got there" if ok else "did not get there", p2.get("x"), p2.get("y"),
+                (p2.get("x", 0) - origin[0]) // 5, (p2.get("y", 0) - origin[1]) // 5))
+            wall_settle(log, "%s %d %s: walk %d" % (mode, lv, name, n), mode)
+            shots.append(sh("wall_%s_%s_walk%d" % (name, mode, n)))
         bad, known = engine_issues(mark)
         caches = ["AssetCache DefaultCapacity %s capacity %s path %s" % (a["default"], a["capacity"], a["path"])
                   for a in cache_new_asserts(mark)]  # which cache overflowed (bug #360)
@@ -10357,11 +10410,13 @@ def wall_maps():
     goto(1, timeout=60)
     hd_ok = set_graphics("hd")
     hd = wall_visit("hd", log, shots) if hd_ok else {}
-    goto(1, timeout=60)
-    legacy_ok = set_graphics("legacy")
-    classic = wall_visit("classic", log, shots) if legacy_ok else {}
-    goto(1, timeout=60)
-    set_graphics("hd")
+    classic, legacy_ok = {}, True
+    if os.environ.get("MXL_WALL_MODES", "hd,classic").find("classic") >= 0:   # MXL_WALL_MODES=hd: HD views only
+        goto(1, timeout=60)
+        legacy_ok = set_graphics("legacy")
+        classic = wall_visit("classic", log, shots) if legacy_ok else {}
+        goto(1, timeout=60)
+        set_graphics("hd")
     cheat("god 0")
     reached = [lv for lv in WALL_MAPS if hd.get(lv) == "reached" and classic.get(lv) == "reached"]
     wanted = [lv for lv in WALL_MAPS if lv in hd or lv in classic] or list(WALL_MAPS)

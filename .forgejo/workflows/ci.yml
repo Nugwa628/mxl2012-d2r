@@ -15,7 +15,7 @@ jobs:
   plugin:
     runs-on: mxl-cross
     steps:
-      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - uses: https://git.wyrd.games/actions-mirror/checkout@v4
       - name: Initialize PluginSDK
         run: git submodule update --init --depth 1 third_party/PluginSDK
       - name: Build plugin
@@ -32,7 +32,7 @@ jobs:
   launcher:
     runs-on: mxl-cross
     steps:
-      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - uses: https://git.wyrd.games/actions-mirror/checkout@v4
       - name: Build launcher and verify checksum
         run: |
           cmake -S launcher -B build-launcher -DCMAKE_TOOLCHAIN_FILE="$PWD/plugin/cmake/xwin-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
@@ -43,7 +43,7 @@ jobs:
   native-tests:
     runs-on: mxl-cross
     steps:
-      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - uses: https://git.wyrd.games/actions-mirror/checkout@v4
       - name: Build and run plugin tests
         run: |
           set -e
@@ -64,7 +64,7 @@ jobs:
   tools:
     runs-on: mxl-cross
     steps:
-      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - uses: https://git.wyrd.games/actions-mirror/checkout@v4
       - name: Python venv (numpy, Pillow)
         # The shared CI image has python3 and a system pip but no ensurepip: a venv without pip, filled by the system pip.
         run: |
@@ -82,7 +82,7 @@ jobs:
     # while the secret is not set (docs/setup.md, "CI asset pack"). The runner keeps no cache: every run downloads the pack.
     runs-on: mxl-cross
     steps:
-      - uses: https://git.werdegames.com/actions-mirror/checkout@v4
+      - uses: https://git.wyrd.games/actions-mirror/checkout@v4
       - name: Fetch and verify the asset pack, Median-only checks
         env:
           MXL_ASSETS_TOKEN: ${{ secrets.MXL_ASSETS_TOKEN }}

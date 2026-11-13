@@ -1,7 +1,7 @@
 # Port plan
 
 Target: **Median XL 2012 (v005)** on retail D2R 3.3 build 93847 + D2RLoader 1.3.1 (SDK 0.3.0, ABI 4), extended save format. Display
-name "D2R-XL 2012", mod and save folder `mxl2012`, plugin `mxl2012-core`, repo `WerdeGames/mxl2012-d2r`.
+name "D2R-XL 2012", mod and save folder `mxl2012`, plugin `mxl2012-core`, repo `WyrdGames/mxl2012-d2r`.
 The phases follow docs/porting-playbook.md. Median
 XL 2012 is plain 1.13c data (no D2Sigma tables, no engine DLL), so phases 1, 3 and 4 are small.
 The numbers in the progress column are our own estimate of each phase, not a measurement; the lead agent updates them.
@@ -76,7 +76,7 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
 ## Phase 6: Test and release
 - [x] Game checks on slots 2/3 (tools/game_checks.py; lanes boot, harness, datafix, qa)
 - [ ] All open bugs in docs/bugs.md triaged/fixed; Warlock in-game check (needs a RotW account)
-- [x] Release package, publish to files.werdegames.com/mxl2012/ (0.1.0 to 0.1.4)
+- [x] Release package, publish to files.wyrd.games/mxl2012/ (0.1.0 to 0.1.4)
 - [ ] Downloader signing
 - [ ] Ship PyreFly's plugins with the mod (controller-qol, pyre-lootfilter, pyre-stashsearch, item-roll-ranges,
   inventory-deposit),

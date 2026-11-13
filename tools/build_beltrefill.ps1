@@ -7,7 +7,7 @@
 # Source: -Src DIR, else MXL_BELTREFILL_DIR (env or .mxl-local.json: any clone of the author's repo that has the pinned commit),
 # else the submodule third_party\auto-belt-refill. Whatever that checkout has checked out, the pinned commit is exported (git
 # archive) into build\beltrefill-src, patched there and built from there. Nothing is downloaded here.
-# PluginSDK and CMake: as tools\build_plugin.ps1. The upstream plugin has no unit tests; our additions' pure logic (0003,
+# PluginSDK and CMake: as tools\build_plugin.ps1. The upstream plugin has no unit tests; our additions' pure logic (0003 - 0005,
 # belt_match_logic.h) has BeltMatchTests, built and run here.
 param([string]$Src, [string]$Sdk)
 $ErrorActionPreference = 'Stop'

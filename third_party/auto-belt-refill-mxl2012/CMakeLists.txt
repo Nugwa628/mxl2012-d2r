@@ -14,6 +14,9 @@ add_subdirectory("${ABR_SDK}" "${CMAKE_CURRENT_BINARY_DIR}/_sdk")
 
 add_library(AutoBeltRefill SHARED "${ABR_SRC}/auto_belt_refill_plugin.cpp" "${ABR_SRC}/auto_belt_refill_plugin.rc")
 target_link_libraries(AutoBeltRefill PRIVATE D2RLPlugin::D2RLPlugin)
+# belt_match_logic.h (0004) finds the game data of the counts with the repo's signature scan, invtabs/src/invtabs_logic.h.
+set(ABR_SCAN "${CMAKE_CURRENT_SOURCE_DIR}/../../invtabs/src")
+target_include_directories(AutoBeltRefill PRIVATE "${ABR_SCAN}")
 set_target_properties(AutoBeltRefill PROPERTIES
 	CXX_STANDARD 20
 	CXX_STANDARD_REQUIRED TRUE
@@ -21,8 +24,10 @@ set_target_properties(AutoBeltRefill PROPERTIES
 	OUTPUT_NAME "d2rl-auto-belt-refill")
 target_compile_options(AutoBeltRefill PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /EHsc /utf-8>)
 
-# Unit tests of our additions' pure logic (belt_match_logic.h, added by 0003): tools/build_beltrefill.ps1 builds and runs them.
+# Unit tests of our additions' pure logic (belt_match_logic.h, added by 0003, signatures by 0004; belt_natives.h, 0005): tools/build_beltrefill.ps1
+# builds and runs them; with env D2R_DUMP (a memory-layout dump of D2R 93847, tools/dump_image.py) they also resolve the
+# signatures in the real image.
 add_executable(BeltMatchTests tests/belt_match_tests.cpp)
-target_include_directories(BeltMatchTests PRIVATE "${ABR_SRC}")
+target_include_directories(BeltMatchTests PRIVATE "${ABR_SRC}" "${ABR_SCAN}")
 set_target_properties(BeltMatchTests PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED TRUE CXX_EXTENSIONS FALSE)
 target_compile_options(BeltMatchTests PRIVATE /W4 /permissive- /EHsc /utf-8)

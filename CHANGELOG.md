@@ -7,6 +7,25 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.22 (2026-11-13)
+
+- **Downloader 0.1.5.** Your downloader offers this update when it starts: say Yes. This release needs it; an older
+  downloader updates itself first and then installs 0.1.22.
+
+- The downloader now uses files.wyrd.games; existing installs switch automatically.
+
+- Updating the mod no longer deletes plugins you added yourself: the downloader replaces and removes only the mod's own
+  files in `d2rloader\`, your own plugins and their settings stay.
+
+- Auto Belt Refill is no longer tied to one game build: it finds the game code it needs when the game starts, and turns
+  itself off cleanly if it cannot find it.
+
+- Fauztinville and eight other hand-built maps now look flat in HD graphics, the way they look in classic graphics: Duncraig,
+  Tran Athulua, Vizjun, Ureh, Rathma Square, Toraja, Old Bremmtown and Khalimgrad. Only their walls, trees and other
+  upright pieces stand; stairs, kerbs, low edges and floor markings are painted on the ground, and pillars, benches and
+  slabs no longer stick out of the floor or stand in the way. The black void around Fauztinville is black in HD too.
+  Where you can walk is unchanged. Rathma Square and Khalimgrad still look plainer than in classic; they will get more work.
+
 ### 0.1.21 (2026-11-12)
 
 - New in-game wiki: press J in a game (rebindable in Options > Controls, "Wiki"). It lists the mod's uniques, sets, runewords, gemwords, base items, cube recipes, monsters, skills, ubers and guide pages, with a search by name or by stat, categories, and links between entries. It works offline, in single player and multiplayer, and needs HD graphics. See [docs/wiki-guide.md](docs/wiki-guide.md).

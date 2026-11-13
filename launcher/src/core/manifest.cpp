@@ -279,6 +279,30 @@ std::string SiteRoot(const std::string& setting) {
 	return u.back() == '/' ? u : u + "/";
 }
 
+std::string MigrateRetiredSite(const std::string& site) {
+	static const struct {
+		const char* from;
+		const char* to;
+	} moves[] = {{"files.werdegames.com", "files.wyrd.games"}, {"dl.werdegames.com", "dl.wyrd.games"}};
+	auto lower = [](std::string s) {
+		for (char& c : s)
+			if (c >= 'A' && c <= 'Z')
+				c = char(c - 'A' + 'a');
+		return s;
+	};
+	const std::string scheme = "https://";
+	if (lower(site.substr(0, scheme.size())) != scheme)
+		return site;
+	size_t end = site.find_first_of("/?#", scheme.size());
+	if (end == std::string::npos)
+		end = site.size();
+	const std::string host = lower(site.substr(scheme.size(), end - scheme.size()));
+	for (const auto& m : moves)
+		if (host == m.from)
+			return scheme + m.to + site.substr(end);
+	return site;
+}
+
 std::string ObjectPath(const std::string& objectsBase, const std::string& sha256) {
 	return objectsBase + sha256.substr(0, 2) + "/" + sha256;
 }
@@ -301,10 +325,50 @@ bool RuntimeOutput(const std::string& path) {
 	       p.rfind("mxl2012-download/", 0) == 0 || p == "d2rloader/plugins/mxl2012-core-off.txt";
 }
 
+bool PlayerPluginArea(const std::string& path) {
+	return Lower(path).rfind("d2rloader/", 0) == 0;
+}
+
+bool KnownBundledFile(const std::string& path) {
+	static const std::set<std::string> known = {
+		"d2rloader/config/d2rloader.toml",
+		"d2rloader/config/mxl2012-core.toml",
+		"d2rloader/plugins/invtabs.dll",
+		"d2rloader/config/invtabs.toml",
+		"d2rloader/plugins/drawcap.dll",
+		"d2rloader/config/drawcap.toml",
+		"d2rloader/plugins/legacy169.dll",
+		"d2rloader/config/legacy169.toml",
+		"d2rloader/plugins/d2rl-buff-panel.dll",
+		"d2rloader/plugins/d2rl-buff-panel.mpq",
+		"d2rloader/plugins/d2rl-buff-panel-license.txt",
+		"d2rloader/plugins/d2rl-buff-panel-pluginsdk-license.txt",
+		"d2rloader/config/buff-panel.toml",
+		"d2rloader/plugins/d2rl-auto-belt-refill.dll",
+		"d2rloader/config/auto-belt-refill.toml",
+		"d2rloader/plugins/d2rl-charm-inv.dll",
+		"d2rloader/plugins/d2rl-charm-inv.mpq",
+		"d2rloader/config/charm-inv.toml",
+		"d2rloader/plugins/controller qol updates.dll",
+		"d2rloader/plugins/controller qol updates-license.txt",
+		"d2rloader/plugins/controller qol updates-pluginsdk-license.txt",
+		"d2rloader/config/controller-qol-updates.toml",
+	};
+	std::string p = Lower(path);
+	if (known.count(p))
+		return true;
+	const std::string core = "d2rloader/plugins/mxl2012-core";  // our plugin, also under an older build's suffix
+	return p.rfind(core, 0) == 0 && p.find('/', core.size()) == std::string::npos && p.size() >= core.size() + 4 &&
+	       p.compare(p.size() - 4, 4, ".dll") == 0;
+}
+
 InstallPlan PlanInstall(const Manifest& next, const std::vector<std::string>& local,
-                        const std::function<std::string(const std::string&)>& current) {
+                        const std::function<std::string(const std::string&)>& current,
+                        const std::vector<std::string>& previous) {
 	InstallPlan plan;
-	std::set<std::string> listed, keep;
+	std::set<std::string> listed, keep, ours;
+	for (const auto& p : previous)
+		ours.insert(Lower(p));
 	for (const auto& k : next.preserve) {
 		keep.insert(Lower(k));
 		keep.insert(Lower(k + SaveFormatBackupSuffix));
@@ -321,9 +385,15 @@ InstallPlan PlanInstall(const Manifest& next, const std::vector<std::string>& lo
 		plan.fetch.push_back(f);
 		plan.fetchBytes += f.size;
 	}
-	for (const auto& p : local)
-		if (!listed.count(Lower(p)) && !keep.count(Lower(p)) && !RuntimeOutput(p))
+	for (const auto& p : local) {
+		std::string l = Lower(p);
+		if (listed.count(l) || keep.count(l) || RuntimeOutput(p))
+			continue;
+		if (PlayerPluginArea(p) && !ours.count(l) && !KnownBundledFile(p))
+			plan.foreign.push_back(p);  // the player's own plugin, config or patch
+		else
 			plan.remove.push_back(p);
+	}
 	return plan;
 }
 

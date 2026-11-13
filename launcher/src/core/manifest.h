@@ -77,6 +77,11 @@ std::string ChannelReadError(const std::string& channel, const std::string& url,
 // ("D:\site", "\\server\share\mxl") becomes file:///D:/site/.
 std::string SiteRoot(const std::string& setting);
 
+// A saved site on a retired host name moved to its new name: https://files.werdegames.com/<x> becomes
+// https://files.wyrd.games/<x>, https://dl.werdegames.com/<x> becomes https://dl.wyrd.games/<x> (scheme and host in any
+// case, the rest kept as written). Every other setting (other hosts, a port, http://, file://, folders) is returned unchanged.
+std::string MigrateRetiredSite(const std::string& site);
+
 // <objectsBase><sha[0:2]>/<sha>
 std::string ObjectPath(const std::string& objectsBase, const std::string& sha256);
 
@@ -112,17 +117,27 @@ bool RuntimeOutput(const std::string& path);
 // savemode): <preserve path> + this suffix is the player's too, never removed.
 constexpr const char* SaveFormatBackupSuffix = ".retail-backup";
 
+// The mod's D2RLoader folder (d2rloader/: plugins, their configs, patches) is shared with the player, who puts their own
+// plugins and configs there. An update removes an unlisted file there only when it is ours (docs/release.md "files").
+bool PlayerPluginArea(const std::string& path);
+// Files under d2rloader/ that releases of ours shipped before the downloader kept the previous release's file list: our
+// plugins, their companion files and configs. An install without that list (an older state, a manual 7z install) is
+// judged by these names only.
+bool KnownBundledFile(const std::string& path);
+
 struct InstallPlan {
 	std::vector<ManifestFile> fetch;      // missing or different: download and install
 	std::vector<std::string> remove;      // on disk under the mod folder, not in the release (docs/release.md "files")
 	std::vector<std::string> preserved;   // preserve entries that exist: left as they are
+	std::vector<std::string> foreign;     // the player's own files under d2rloader/ (never shipped by us): left alone
 	uint64_t fetchBytes = 0;
 };
 
 // current(path) gives the sha256 of the installed file, or "" when it is missing; `local` lists every file now under
-// the mod folder (relative, '/' separators).
+// the mod folder (relative, '/' separators); `previous` the files of the release installed before (empty: not known).
 InstallPlan PlanInstall(const Manifest& next, const std::vector<std::string>& local,
-                        const std::function<std::string(const std::string&)>& current);
+                        const std::function<std::string(const std::string&)>& current,
+                        const std::vector<std::string>& previous = {});
 
 // "1.2.10" > "1.2.9"; a "-beta" style suffix sorts before the plain version.
 int CompareVersions(const std::string& a, const std::string& b);
