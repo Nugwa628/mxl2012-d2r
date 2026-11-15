@@ -199,11 +199,18 @@ def d2r_keys() -> set[str]:
             for p in (D2R_LNG / f).glob("*.json") for e in json.loads(p.read_text("utf-8-sig"))}
 
 
+# D2R string files the game's string table does not load: D2RLoader refuses an override of their keys ("override targets
+# unknown string 'd2r:presenceA1Normal'") and the whole string table then fails to initialise (lane diffnames, 2026-11-13).
+NOT_LOADED = {"presence-states.json"}
+
+
 def d2r_loaded() -> dict[str, list[dict]]:
     """key -> its records in D2R's strings/ files: what the loader knows as `d2r:<key>` (a key can repeat in D2R's own
-    files). Keys that exist only in strings-legacy/ are not in it."""
+    files). Keys that exist only in strings-legacy/ or in a NOT_LOADED file are not in it."""
     out: dict[str, list[dict]] = {}
     for p in sorted((D2R_LNG / "strings").glob("*.json")):
+        if p.name in NOT_LOADED:
+            continue
         for e in json.loads(p.read_text("utf-8-sig")):
             out.setdefault(e["Key"], []).append(e)
     return out

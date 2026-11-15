@@ -902,9 +902,11 @@ def main() -> int:
             n_own_m += 1
             continue  # D2R's own missile with D2R's art and HD effect
         c, art_in = None, where_m[m.art_name]
-        if m.art_name in ("", "null"):
+        no_art = m.art_name in ("", "null")
+        row_pick = bool((pick_line(picks, "missile", m) or {}).get("rows"))  # a row pick also gives a missile without art an effect
+        if no_art and not row_pick:
             model, cls, scale, conf, why = "null", "exact", 1.0, "high", "no art (logic missile)"
-        elif not art_in:
+        elif not art_in and not no_art:
             res("missile", m, "no-art", "", 1.0, "", no_art_why(fixes, "missile", m), art_in="missing")
             continue
         else:

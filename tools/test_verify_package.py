@@ -22,6 +22,7 @@ class VerifyPackageTests(unittest.TestCase):
         self.dll.write_bytes(b"MZ..." + pr.plugin_version().encode() + b"\0...")
         data = self.tmp / "data"
         files = {"global/excel/armor.txt": b"Median armor\n", "global/dataversionbuild.txt": b"93847",
+                 pr.STATBOOK_DATA: b"statbook\t1\n",
                  **{f"local/lng/{rel % 'mxl2012'}": b"[]" for rel in vp.STRING_FILES}}
         for rel, body in files.items():
             (data / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -29,7 +30,9 @@ class VerifyPackageTests(unittest.TestCase):
         self.mod = self.tmp / "stage" / "mxl2012"
         drawcap = self.tmp / "drawcap.dll"
         drawcap.write_bytes(b"MZ Draw List Cap" + bytes(1) + b"drawcap" + bytes(1) + pr.drawcap_version().encode() + bytes(1))
-        pr.stage(self.mod, pr.plugin_version(), self.dll, self.tmp, data_from=data, drawcap=drawcap)
+        statbook = self.tmp / "statbook.dll"
+        statbook.write_bytes(b"MZ Stat Book" + bytes(1) + b"statbook" + bytes(1) + pr.statbook_version().encode() + bytes(1))
+        pr.stage(self.mod, pr.plugin_version(), self.dll, self.tmp, data_from=data, drawcap=drawcap, statbook=statbook)
         # this fixture is a CharmInv package; the default is invtabs, which a test sets back where it is its subject
         switch = mock.patch.object(pr, "CHARM_INVENTORY", "charminv")
         switch.start()
@@ -139,6 +142,8 @@ class VerifyPackageTests(unittest.TestCase):
         (self.mod / pr.CONTROLLERQOL["licence"]).unlink()
         (self.mod / pr.DRAWCAP["dll"]).write_bytes(b"MZ Draw List Cap" + bytes(1) + b"drawcap" + bytes(1) + b"0.0.0" + bytes(1))
         (self.mod / pr.DRAWCAP["config"]).unlink()
+        (self.mod / pr.STATBOOK["dll"]).unlink()
+        (self.mod / pr.STATBOOK["config"]).unlink()
         (self.mod / pr.CHARMINV["mpq"]).write_bytes(b"MPQ\x1a other")
         (self.mod / pr.CHARMINV["config"]).write_text("[charm-inv]\nallow_inventory_charms = false\n", encoding="utf-8")
         problems = vp.check_mod_folder(self.mod, "9.9.9")
@@ -148,7 +153,7 @@ class VerifyPackageTests(unittest.TestCase):
                      "not a packed MPQ", "d2rl-buff-panel-LICENSE.txt is missing",
                      "Auto Belt Refill version 0.35.9", "auto-belt-refill.toml is missing",
                      "not our patched build", "Controller QOL Updates-LICENSE.txt is missing",
-                     "is not drawcap", "drawcap.toml is missing",
+                     "is not drawcap", "drawcap.toml is missing", "statbook.dll is missing", "statbook.toml is missing",
                      "d2rl-charm-inv.mpq is not CharmInv 1.0.1", "lacks allow_inventory_charms = true"):
             self.assertIn(want, text)
 

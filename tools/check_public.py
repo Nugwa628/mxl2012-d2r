@@ -6,7 +6,8 @@ Usage:
   py -3 tools/check_public.py --history    also scan every added line of `git log --all -p` and all commit messages
   py -3 tools/check_public.py --repo DIR   scan another checkout / bare repo (for example a rewritten mirror)
   py -3 tools/check_public.py --strings    list the distinct private strings found (input for the history scrub)
-  py -3 tools/check_public.py --staged --quiet                 scan the staged files only (the git pre-commit hook)
+  py -3 tools/check_public.py --dir DIR        scan every file under a plain folder (an exported tree, no git)
+  py -3 tools/check_public.py --staged --quiet                scan the staged files only (the git pre-commit hook)
   py -3 tools/check_public.py --message-file FILE --quiet      scan a commit message (the git commit-msg hook)
 
 Prints `path:line: [rule] text` and exits 1 on hits. In history mode the location is `<commit>:<path>:<line in diff>`.
@@ -153,11 +154,20 @@ def git(repo, *args, text=True):
 
 
 def scan_tree(repo, allow):
-    out = []
     files = git(repo, "ls-files", "-z").decode("utf-8", "replace").split("\0")
+    return scan_files(repo, [r for r in files if r and not r.startswith("assets/") and r not in SELF], allow)
+
+
+def scan_dir(root, allow):
+    """Every file under a plain folder (no git needed), for example an exported tree before it becomes a repository."""
+    root = Path(root)
+    files = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file() and ".git" not in p.parts)
+    return scan_files(root, files, allow)
+
+
+def scan_files(repo, files, allow):
+    out = []
     for rel in files:
-        if not rel or rel.startswith("assets/") or rel in SELF:
-            continue
         p = Path(repo) / rel
         try:
             if not p.is_file() or p.stat().st_size > MAX_BYTES:
@@ -261,12 +271,15 @@ def main():
     ap.add_argument("--no-allow", action="store_true", help="ignore tools/check_public.allow")
     ap.add_argument("--staged", action="store_true", help="scan only the staged content (pre-commit hook)")
     ap.add_argument("--message-file", help="scan only this commit message file (commit-msg hook)")
+    ap.add_argument("--dir", help="scan every file under this plain folder (no git) with the tree scan's rules")
     ap.add_argument("--quiet", action="store_true", help="print nothing when there are no hits")
     a = ap.parse_args()
     allow = [] if a.no_allow else load_allow()
     hits = []
     if a.message_file:
         hits += scan_message(a.message_file, allow)
+    elif a.dir:
+        hits += scan_dir(a.dir, allow)
     elif a.staged:
         hits += scan_staged(a.repo, allow)
     elif not a.history_only:

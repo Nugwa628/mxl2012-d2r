@@ -270,12 +270,13 @@ rebuilt from this branch). Unit tests: `tools/tests/test_charm_inventory.py`, `t
 |-|-|
 | `global/excel/d2rloader/invtabs/tabs.txt`, `types_charms.txt` | `invtabs_tables.py build` |
 | `hd/global/ui/panel/invtabs/stockgrid.sprite`, `.lowend.sprite` | `invtabs_hdart.py build` |
+| `hd/global/ui/panel/invtabs/button.sprite`, `.lowend.sprite` (the HD Charms button, `tools/hd_buttons.py`) | `invtabs_hdart.py build` |
 | `global/ui/panel/invtabs_charms.dc6`, `invtabs_tab_charms.dc6`, `invtabs_button.dc6` | `invtabs_art.py build` |
 | the classic Charms button in `playerinventory*layout.json` | `invtabs_legacy.py button` |
 | (CharmInv only) `global/excel/d2rloader/charm-inv/*.txt` | `charm_inv.py apply` |
 
-The HD, classic and controller panel layouts and the HD panel, button and controller art are made by the plugin at run
-time. The classic Charms button used to be added by `ui_layouts.py` in every build, also while CharmInv shipped (a
+The HD, classic and controller panel layouts and the HD panel and controller art are made by the plugin at run
+time. The HD Charms button uses the mod's `button.sprite` (D2R's stone rim and stash cell with a drawn charm, bug #592); without it the plugin draws its own stand-in at run time (log line `inventory button:`). The classic Charms button used to be added by `ui_layouts.py` in every build, also while CharmInv shipped (a
 button that opened nothing); it now exists only in an invtabs build (`check_buttons`, tests `ClassicButton`).
 
 A player who updates by unpacking the 7z over an older install must delete CharmInv's three files

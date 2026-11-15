@@ -27,7 +27,7 @@ Median XL 2012 is a 1.13c data mod, so its UI is the classic 640 x 480 UI with t
 | Horadric Cube (`Transmogrify Box`) | 10 x 8 | 3 x 4 | new panel art + layout |
 | Stash (`Big Bank`) | 10 x 10, one personal page | 10 x 10 | **D2R's HD stash unchanged** (nothing to generate; the mod's `tradestash.dc6` is vanilla expansion bank art) |
 | Trade 10 x 4, vendor 10 x 10, hireling | as D2R | | D2R's, unchanged (checked against the layouts' `cellCount`) |
-| Character sheet (`invchar6.dc6` set 0) | vanilla layout | | D2R's HD sheet unchanged |
+| Character sheet (`invchar6.dc6` set 0) | vanilla layout | | D2R's sheet plus Magic / Physical Resistance rows (below) |
 
 `ui_check.py` prints the table comparison (grid sizes of every `inventory.txt` row, mod against D2R's baseline copy).
 
@@ -151,9 +151,39 @@ with text edits (checked for balanced brackets, existing sprite references, grid
 Items draw at D2R's HD size (98 px per cell) whatever `cellSize` says, so the HD grids keep `cellSize` 98 x 94 and get
 `scale` 1.0746 (cell 105.3 x 101.2 = 29 classic px scaled), a mechanism verified in game.
 
+### Magic and Physical Resistance on the character sheet (`tools/sheet_resists.py`, plugin part `sheetres`)
+
+Median's sheet has no row for magic (`magicresist`, stat 37) or physical (`damageresist`, stat 36) resistance; D2R's has
+none either. Owner ruling: show them in the elemental resistances' style.
+
+- **How.** D2R's sheet code fills only the widgets it knows by name (`FireText`, `ColdText`, ...): a layout cannot bind a
+  text box to a stat. So the mod serves its own copies of the three sheet layouts with a literal title and three value
+  boxes per row, one per colour (`MxlMagicText`, `...Capped`, `...Negative`; a text box has the one colour of its style,
+  colour codes print as text), and the plugin part `sheetres` (statbook/src/sheet_resist.cpp) fills them every 100 ms on the
+  UI thread: it finds the open sheet by its name `CharacterStatsPanel`, reads the client player's stats 36 / 37 / 38 and
+  sets the box of the row's colour, emptying the other two. Nothing of D2R's code is patched. Without the plugin the rows
+  stay empty; with D2R's own layouts the part does nothing. Every `@key` of the served layouts is written out (bugs #30, #33).
+- **Values.** What the damage code applies (D2R's resist step 0x4523e0, the damage-type table built in 0x44df10):
+  physical uses `damageresist` with no maximum stat, ceiling **50**; magic uses `magicresist` with `maxmagicresist`
+  (stat 38), ceiling **75 + maxmagicresist**; every ceiling is held to at most **95**, the floor is **-100**, and neither
+  gets the difficulty penalty of the elements. The row shows the clamped value; white, **gold at the ceiling**, red below
+  0, as the elemental rows. Rules and tests: statbook/src/sheet_resist_logic.h, statbook/tests/sheet_resist_test.cpp.
+- **PC HD.** Magic under Fire, Physical under Lightning, in a third row of boxes. The background
+  (`PANEL\Character_Sheet\Character_Background`, sprite and lowend) repeats D2R's separator and Cold / Poison row under the
+  Poison row and squeezes the ledge below to 20 px, so the frame keeps its size; the stat points line moves down 15 px
+  into the rest of its bar.
+- **Legacy (Alt+G).** The classic panel ends 8 px under the Poison box, so there is no room under the stack. The rows sit
+  left of it instead, Magic beside Lightning and Physical beside Poison (x 4-122, between the stat points plate, which ends
+  at y 364, and the close button at x 127), in boxes cut from the Fire box (title cell narrowed) drawn into the mod's
+  `invchar6.dc6` set 0. Titles in two lines ("Magic / Resistance") and values without "%", as D2R's classic elemental rows (the plugin sees the empty `MxlSheetLegacy` widget of that layout).
+- **Gamepad.** Two more resistance insets under Poison's (y 823, 932) in the free part of D2R's gamepad sheet. The gamepad
+  layout is `basedOn` the PC one, so every new widget is named there too.
+- **Block chance** (not done; asked for a report): the same route works (a row filled by the plugin), with D2R's own block
+  formula (shield block + `toblock`, dexterity, level, class; at most 75) whose function is not located yet; the HD sheet
+  has no third free row, so it would go in the Advanced Stats panel or replace something.
 ## Not generated (and why)
 
-- **Stash, trade, vendor, hireling, character sheet panels**: sizes equal D2R's, so D2R's HD panels stay. The stash is one 10 x 10
+- **Stash, trade, vendor, hireling panels**: sizes equal D2R's, so D2R's HD panels stay (the character sheet too, apart from the two resistance rows above). The stash is one 10 x 10
   personal page (no extra pages: PlugY's pages were a repack feature) and D2R's shared pages (2 more by D2RLoader's
   `add_shared_tabs`, bug #535: a data setting, no panel work), so no stash-page work applies.
 - **Warlock keeps D2R's HD UI**: its HD and gamepad skill pages (`waskilltree`) and tab strings are untouched; its classic

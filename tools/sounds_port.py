@@ -52,6 +52,10 @@ CHANNEL_MONSTER, CHANNEL_ITEMS, CHANNEL_SKILLS = "sfx/monster_sd", "sfx/items_sd
 CHANNEL_BOSS = "vo/eax/boss-dialog_sd"  # D2R's monster_*_taunt rows (their _hd rows: vo/eax/boss-dialog_hd)
 OUR_CHANNELS = {CHANNEL_MONSTER, CHANNEL_ITEMS, CHANNEL_SKILLS, CHANNEL_BOSS}  # set by this step: a rerun may change them
 TYPO_FIXES = {"taunt/ecstaticfrenzy1,": "taunt/ecstaticfrenzy1"}  # maenad1: the sounds.txt name has a stray comma
+# D2R rows (kept D2R's) on which v005 plays another vanilla file that Median's own rows rely on: the row plays v005's file in both
+# modes (the main bank's FileName is asked for under data/hd/global/sfx too, #521; D2R ships the file in both trees).
+# wussie_over_here: the cry of Sacrifices' corpses and of 8 summoning missiles; v005 plays "Help us" (bug #584), D2R "Over here".
+MEDIAN_FILE_ROWS = {"wussie_over_here": "act5\\soldier\\sol_helpus.flac"}
 
 
 def read_tsv(path: Path) -> tuple[list[str], list[list[str]]]:
@@ -212,6 +216,18 @@ class Converter:
         return True
 
 
+def median_file_rows(header: list[str], rows: list[list[str]]) -> list[tuple[str, str]]:
+    """MEDIAN_FILE_ROWS: those rows' FileName set to v005's file (in place); returns (row, file) for each row changed."""
+    si, fi = header.index("Sound"), header.index("FileName")
+    done = []
+    for r in rows:
+        f = MEDIAN_FILE_ROWS.get(r[si]) if len(r) > fi else None
+        if f and r[fi] != f:
+            r[fi] = f
+            done.append((r[si], f))
+    return done
+
+
 def run(median: Path, d2r_excel: Path, mod: Path, write: bool) -> tuple[int, list[str]]:
     excel = mod / "global" / "excel"
     sfx_out, hd_out = mod / "global" / "sfx", mod / "hd" / "global" / "sfx"  # D2R asks for hd_out in both modes (#521)
@@ -244,6 +260,9 @@ def run(median: Path, d2r_excel: Path, mod: Path, write: bool) -> tuple[int, lis
             if bank == "":
                 report.append(f"| {key} | {st}.flac | {'Median' if src else '**missing** (silent, as in 1.13c)'} | "
                               f"{ch or rows[i][ci]} | {', '.join(uses) or '-'} |")
+        swapped = median_file_rows(h, rows)
+        if bank == "":
+            report += [f"| {k} | {f} | D2R's file, v005's choice (MEDIAN_FILE_ROWS) | | |" for k, f in swapped]
         if write:
             write_tsv(p, h, rows)
         if bank == "":

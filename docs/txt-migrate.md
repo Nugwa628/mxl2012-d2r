@@ -133,7 +133,16 @@ rows had none (the column is neutral by default; only 9 rows D2R alone has kept 
 of the v005 MPQ, by stat id) plus 21 rows D2R lists that mean the same in Median (flat absorbs, magic resist, knockback, cannot be
 frozen ...; D2R's per-level rows left out, see above). Always listed (12): MF, GF, the five speeds, life and mana leech,
 crushing blow, deadly strike, open wounds. A listed stat missing from the table, not Median's, or without a descfunc fails the
-step. The order is the table's (D2R has no order column).
+step. The order is the table's (D2R has no order column) when the plugin part `advstats` is off.
+
+With the part on (bugs #581 / #582, docs/plugin-plan.md section 37) the panel lists the same file in groups with a "- Group -" heading
+each (Offense, Spell Damage, Defense, Resistances, Speed, Life & Mana, Attributes, Skills, Summons, Other), in the file's order
+inside a group, and adds the rows whose `row` column names a kind of its own: `avoid` (passive_dodge / avoid / evade, whose own
+descstr is a placeholder: one line "x% Chance to Avoid Damage" when the three are equal, else one line each), `range:<Key>`
+(the elemental adds as "Adds x-y Fire Damage") and `value:<Key>` (the skill speeds `attackrate` / `velocitypercent`, which have no
+descfunc). Those rows get no advdisplay. `tools/advanced_stats.py header` writes the part's table `statbook/src/advstats_table.h`
+(stat ids from `work/named/itemstatcost.txt`; `check` and test_advanced_stats tell when it is out of date), and the step writes the
+headings' and own rows' strings to `strings[-legacy]/mxl2012/advanced_stats.json` (English in every language).
 
 A misc item spell whose timed state 1.13c skipped in silence (a state name states.txt lacks, emptied above, or a `len` <= 0)
 makes D2R assert `spellState > 0` (SkillItem.cpp:545 / :823) or `len` > 0 (:548 / :826) on the drink (bug #191). After

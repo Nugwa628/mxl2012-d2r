@@ -1,108 +1,125 @@
-stat	show	source
-game_craftpoints	nonzero	plugy page 1
-enr_factor	nonzero	plugy page 1
-item_magicbonus	always	plugy page 1
-item_goldbonus	always	plugy page 1
-item_fastercastrate	always	plugy page 1
-item_fasterattackrate	always	plugy page 1
-item_fastergethitrate	always	plugy page 1
-item_fasterblockrate	always	plugy page 1
-lifedrainmindam	always	plugy page 1
-manadrainmindam	always	plugy page 1
-item_fastermovevelocity	always	plugy page 1
-item_reducedprices	nonzero	plugy page 1
-item_addexperience	nonzero	plugy page 1
-item_damagetomana	nonzero	plugy page 1
-manarecoverybonus	nonzero	plugy page 1
-hpregen	nonzero	plugy page 1
-damagepercent	nonzero	plugy page 1
-skill_armor_percent	nonzero	plugy page 1
-thorns_percent	nonzero	plugy page 1
-item_attackertakesfiredamage	nonzero	plugy page 1
-item_attackertakeslightdamage	nonzero	plugy page 1
-item_attackertakescolddamage	nonzero	plugy page 1
-item_freeze	nonzero	plugy page 2
-item_howl	nonzero	plugy page 2
-item_slow	nonzero	plugy page 2
-item_stupidity	nonzero	plugy page 2
-item_freezethorns	nonzero	plugy page 2
-item_howlthorns	nonzero	plugy page 2
-item_slowthorns	nonzero	plugy page 2
-item_stupiditythorns	nonzero	plugy page 2
-item_strength_percent	nonzero	plugy page 2
-item_dexterity_percent	nonzero	plugy page 2
-item_energy_percent	nonzero	plugy page 2
-item_vitality_percent	nonzero	plugy page 2
-passive_fire_mastery	nonzero	plugy page 2
-passive_fire_pierce	nonzero	plugy page 2
-passive_ltng_mastery	nonzero	plugy page 2
-passive_ltng_pierce	nonzero	plugy page 2
-passive_cold_mastery	nonzero	plugy page 2
-passive_cold_pierce	nonzero	plugy page 2
-passive_pois_mastery	nonzero	plugy page 2
-passive_pois_pierce	nonzero	plugy page 2
-passive_pm_mastery	nonzero	plugy page 2
-item_openwounds	always	plugy page 2
-item_crushingblow	always	plugy page 3
-item_deadlystrike	always	plugy page 3
-item_demondamage_percent	nonzero	plugy page 3
-item_undeaddamage_percent	nonzero	plugy page 3
-fireresist	nonzero	plugy page 3
-maxfireresist	nonzero	plugy page 3
-lightresist	nonzero	plugy page 3
-maxlightresist	nonzero	plugy page 3
-coldresist	nonzero	plugy page 3
-maxcoldresist	nonzero	plugy page 3
-poisonresist	nonzero	plugy page 3
-maxpoisonresist	nonzero	plugy page 3
-item_absorbfire_percent	nonzero	plugy page 3
-item_absorbcold_percent	nonzero	plugy page 3
-item_absorblight_percent	nonzero	plugy page 3
-item_poisonlengthresist	nonzero	plugy page 3
-curse_resistance	nonzero	plugy page 3
-damageresist	nonzero	plugy page 3
-normal_damage_reduction	nonzero	plugy page 3
-magic_damage_reduction	nonzero	plugy page 3
-skill_bloodymary_bonus	nonzero	plugy page 3
-skill_paganheart_bonus	nonzero	plugy page 3
-skill_elixirs_synergy	nonzero	plugy page 4
-skill_paganheart_synergy	nonzero	plugy page 4
-profession_duration_mod	nonzero	plugy page 4
-skill_poison_dur	nonzero	plugy page 4
-skill_minion_dmg_percent	nonzero	plugy page 4
-item_minion_attack	nonzero	plugy page 4
-skill_minion_hp_percent	nonzero	plugy page 4
-minion_resist_all	nonzero	plugy page 4
-passive_aura_addmax	nonzero	plugy page 4
-skill_ancientspirits_synergy	nonzero	plugy page 4
-skill_concentration	nonzero	plugy page 4
-item_targettakesdamage	nonzero	plugy page 4
-item_healwhenstruck	nonzero	plugy page 4
-item_faster_potions	nonzero	plugy page 4
-item_lightradius	nonzero	plugy page 4
-item_healafterkill	nonzero	plugy page 4
-item_manaafterkill	nonzero	plugy page 4
-item_healonstriking	nonzero	plugy page 4
-item_manaonstriking	nonzero	plugy page 4
-skill_healonstrikingmelee	nonzero	plugy page 4
-item_manaonstrikingmelee	nonzero	plugy page 4
-staminarecoverybonus	nonzero	d2r
-magicresist	nonzero	d2r
-maxmagicresist	nonzero	d2r
-item_attackertakesdamage	nonzero	d2r
-item_knockback	nonzero	d2r
-item_restinpeace	nonzero	d2r
-item_ignoretargetac	nonzero	d2r
-item_fractionaltargetac	nonzero	d2r
-item_preventheal	nonzero	d2r
-item_halffreezeduration	nonzero	d2r
-item_damagetargetac	nonzero	d2r
-item_healafterdemonkill	nonzero	d2r
-item_absorbfire	nonzero	d2r
-item_absorblight	nonzero	d2r
-item_absorbmagic_percent	nonzero	d2r
-item_absorbmagic	nonzero	d2r
-item_absorbcold	nonzero	d2r
-item_cannotbefrozen	nonzero	d2r
-item_staminadrainpct	nonzero	d2r
-item_pierce	nonzero	d2r
+stat	show	group	row	source
+damagepercent	nonzero	offense		plugy page 1
+item_tohit_percent	nonzero	offense		bugs 581 582
+firemindam,firemaxdam	nonzero	offense	range:AdvStatsAddsFire	bugs 581 582
+lightmindam,lightmaxdam	nonzero	offense	range:AdvStatsAddsLightning	bugs 581 582
+coldmindam,coldmaxdam	nonzero	offense	range:AdvStatsAddsCold	bugs 581 582
+magicmindam,magicmaxdam	nonzero	offense	range:AdvStatsAddsMagic	bugs 581 582
+item_crushingblow	always	offense		plugy page 3
+item_deadlystrike	always	offense		plugy page 3
+item_openwounds	always	offense		plugy page 2
+item_pierce	nonzero	offense		d2r
+item_ignoretargetac	nonzero	offense		d2r
+item_fractionaltargetac	nonzero	offense		d2r
+item_damagetargetac	nonzero	offense		d2r
+item_demondamage_percent	nonzero	offense		plugy page 3
+item_undeaddamage_percent	nonzero	offense		plugy page 3
+item_targettakesdamage	nonzero	offense		plugy page 4
+item_knockback	nonzero	offense		d2r
+item_preventheal	nonzero	offense		d2r
+item_restinpeace	nonzero	offense		d2r
+item_freeze	nonzero	offense		plugy page 2
+item_slow	nonzero	offense		plugy page 2
+item_howl	nonzero	offense		plugy page 2
+item_stupidity	nonzero	offense		plugy page 2
+skill_concentration	nonzero	offense		plugy page 4
+enr_factor	nonzero	spell		plugy page 1
+enr_factor_percent	nonzero	spell		bugs 581 582
+str_factor	nonzero	spell		bugs 581 582
+passive_fire_mastery	nonzero	spell		plugy page 2
+passive_fire_pierce	nonzero	spell		plugy page 2
+passive_ltng_mastery	nonzero	spell		plugy page 2
+passive_ltng_pierce	nonzero	spell		plugy page 2
+passive_cold_mastery	nonzero	spell		plugy page 2
+passive_cold_pierce	nonzero	spell		plugy page 2
+passive_pois_mastery	nonzero	spell		plugy page 2
+passive_pois_pierce	nonzero	spell		plugy page 2
+passive_pm_mastery	nonzero	spell		plugy page 2
+passive_dodge,passive_avoid,passive_evade	nonzero	defense	avoid	bugs 581 582
+skill_armor_percent	nonzero	defense		plugy page 1
+armorclass_vs_hth	nonzero	defense		bugs 581 582
+armorclass_vs_missile	nonzero	defense		bugs 581 582
+armor_override_percent	nonzero	defense		bugs 581 582
+damageresist	nonzero	defense		plugy page 3
+normal_damage_reduction	nonzero	defense		plugy page 3
+magic_damage_reduction	nonzero	defense		plugy page 3
+curse_resistance	nonzero	defense		plugy page 3
+item_poisonlengthresist	nonzero	defense		plugy page 3
+item_cannotbefrozen	nonzero	defense		d2r
+item_halffreezeduration	nonzero	defense		d2r
+thorns_percent	nonzero	defense		plugy page 1
+item_attackertakesdamage	nonzero	defense		d2r
+item_attackertakesfiredamage	nonzero	defense		plugy page 1
+item_attackertakeslightdamage	nonzero	defense		plugy page 1
+item_attackertakescolddamage	nonzero	defense		plugy page 1
+item_freezethorns	nonzero	defense		plugy page 2
+item_slowthorns	nonzero	defense		plugy page 2
+item_howlthorns	nonzero	defense		plugy page 2
+item_stupiditythorns	nonzero	defense		plugy page 2
+fireresist	nonzero	resist		plugy page 3
+maxfireresist	nonzero	resist		plugy page 3
+lightresist	nonzero	resist		plugy page 3
+maxlightresist	nonzero	resist		plugy page 3
+coldresist	nonzero	resist		plugy page 3
+maxcoldresist	nonzero	resist		plugy page 3
+poisonresist	nonzero	resist		plugy page 3
+maxpoisonresist	nonzero	resist		plugy page 3
+magicresist	nonzero	resist		d2r
+maxmagicresist	nonzero	resist		d2r
+item_absorbfire_percent	nonzero	resist		plugy page 3
+item_absorbfire	nonzero	resist		d2r
+item_absorblight_percent	nonzero	resist		plugy page 3
+item_absorblight	nonzero	resist		d2r
+item_absorbcold_percent	nonzero	resist		plugy page 3
+item_absorbcold	nonzero	resist		d2r
+item_absorbmagic_percent	nonzero	resist		d2r
+item_absorbmagic	nonzero	resist		d2r
+item_fasterattackrate	always	speed		plugy page 1
+attackrate	nonzero	speed	value:AdvStatsSkillAttackSpeed	bugs 581 582
+item_fastercastrate	always	speed		plugy page 1
+item_fastergethitrate	always	speed		plugy page 1
+item_fasterblockrate	always	speed		plugy page 1
+item_fastermovevelocity	always	speed		plugy page 1
+velocitypercent	nonzero	speed	value:AdvStatsSkillMoveSpeed	bugs 581 582
+lifedrainmindam	always	lifemana		plugy page 1
+manadrainmindam	always	lifemana		plugy page 1
+item_maxhp_percent	nonzero	lifemana		bugs 581 582
+item_maxmana_percent	nonzero	lifemana		bugs 581 582
+hpregen	nonzero	lifemana		plugy page 1
+manarecoverybonus	nonzero	lifemana		plugy page 1
+item_healafterkill	nonzero	lifemana		plugy page 4
+item_healafterdemonkill	nonzero	lifemana		d2r
+item_manaafterkill	nonzero	lifemana		plugy page 4
+item_healonstriking	nonzero	lifemana		plugy page 4
+skill_healonstrikingmelee	nonzero	lifemana		plugy page 4
+item_manaonstriking	nonzero	lifemana		plugy page 4
+item_manaonstrikingmelee	nonzero	lifemana		plugy page 4
+item_healwhenstruck	nonzero	lifemana		plugy page 4
+item_manawhenstruck	nonzero	lifemana		bugs 581 582
+item_damagetomana	nonzero	lifemana		plugy page 1
+item_faster_potions	nonzero	lifemana		plugy page 4
+staminarecoverybonus	nonzero	lifemana		d2r
+item_staminadrainpct	nonzero	lifemana		d2r
+item_strength_percent	nonzero	attributes		plugy page 2
+item_dexterity_percent	nonzero	attributes		plugy page 2
+item_vitality_percent	nonzero	attributes		plugy page 2
+item_energy_percent	nonzero	attributes		plugy page 2
+item_allskills	nonzero	skills		bugs 581 582
+profession_duration_mod	nonzero	skills		plugy page 4
+skill_poison_dur	nonzero	skills		plugy page 4
+skill_elixirs_synergy	nonzero	skills		plugy page 4
+skill_bloodymary_bonus	nonzero	skills		plugy page 3
+skill_paganheart_bonus	nonzero	skills		plugy page 3
+skill_paganheart_synergy	nonzero	skills		plugy page 4
+skill_minion_dmg_percent	nonzero	summons		plugy page 4
+item_minion_attack	nonzero	summons		plugy page 4
+skill_minion_hp_percent	nonzero	summons		plugy page 4
+minion_resist_all	nonzero	summons		plugy page 4
+passive_aura_addmax	nonzero	summons		plugy page 4
+skill_ancientspirits_synergy	nonzero	summons		plugy page 4
+item_magicbonus	always	other		plugy page 1
+item_goldbonus	always	other		plugy page 1
+item_addexperience	nonzero	other		plugy page 1
+item_reducedprices	nonzero	other		plugy page 1
+item_lightradius	nonzero	other		plugy page 4
+game_craftpoints	nonzero	other		plugy page 1

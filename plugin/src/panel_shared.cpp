@@ -268,8 +268,10 @@ auto AddClient(Client* client) noexcept -> bool {
 }
 
 auto RegisterLayout(const D2RL::PluginContext* context, const char* file, const char* json, size_t size) noexcept -> bool {
-	char path[96];
-	std::snprintf(path, sizeof(path), "data/global/ui/layouts/mxl2012-core/%s.json", file);
+	// D2RLoader serves a plugin's resources only under layouts/<plugin id>/: each DLL that compiles this file uses its own
+	char path[160];
+	const char* id = context != nullptr && context->pluginId != nullptr && context->pluginId[0] != '\0' ? context->pluginId : "mxl2012-core";
+	std::snprintf(path, sizeof(path), "data/global/ui/layouts/%s/%s.json", id, file);
 	D2RL::Resources::ResourceRegistration resource{};
 	resource.structSize = D2RL::Resources::ResourceRegistrationSize;
 	resource.path = path;
@@ -277,6 +279,15 @@ auto RegisterLayout(const D2RL::PluginContext* context, const char* file, const 
 	resource.byteCount = size;
 	D2RL::Resources::RegistrationHandle handle = D2RL::Resources::InvalidHandle;
 	return g_resources != nullptr && g_resources->registerResource(context, &resource, &handle) == D2RL::Resources::Result::Success;
+}
+
+auto RegisterPanelName(const D2RL::PluginContext* context, const char* local) noexcept -> bool {
+	D2RL::Panels::PanelRegistration name{};
+	name.structSize = D2RL::Panels::PanelRegistrationSize;
+	name.flags = D2RL::Panels::PanelFlags::None;
+	name.localId = local;
+	D2RL::Panels::RegistrationHandle h = 0;
+	return g_panels != nullptr && g_panels->registerPanel(context, &name, &h) == D2RL::Panels::Result::Success;
 }
 
 auto RegisterButtons(const D2RL::PluginContext* context, const char* localPrefix, int count) noexcept -> int {

@@ -51,6 +51,11 @@ CORE_CONFIG = ROOT / "plugin" / "mxl2012-core.toml"
 DRAWCAP = Path(os.environ.get("MXL_DRAWCAP") or ROOT / "build" / "drawcap" / "Release" / "drawcap.dll")
 INVTABS = {"dll": "d2rloader/plugins/invtabs.dll", "config": "d2rloader/config/invtabs.toml"}
 DRAWCAP_CONFIG = ROOT / "drawcap" / "drawcap.toml"
+# The standalone Stat Book plugin (docs/statbook.md: the character sheet's resistance rows, the grouped Advanced Stats and the
+# book; built by tools/build_plugin.ps1) and its default settings (installed when missing, never overwritten). The book file
+# itself is mod data (data/statbook/statbook.txt, tools/statbook.py).
+STATBOOK = Path(os.environ.get("MXL_STATBOOK") or ROOT / "build" / "statbook" / "Release" / "statbook.dll")
+STATBOOK_CONFIG = ROOT / "statbook" / "statbook.toml"
 D2R_FILELIST = fxpaths.D2R_FILELIST
 
 
@@ -375,10 +380,11 @@ def medtab_pair_problem(data: Path, plugin: Path) -> str:
 
 
 def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, metadata: dict = None,
-                    drawcap: Path = DRAWCAP) -> None:
+                    drawcap: Path = DRAWCAP, statbook: Path = STATBOOK) -> None:
     """Everything of the mod folder except <name>.mpq/data: modinfo.json, d2rloader/{metadata.json, plugins, config, patches}.
     metadata: modVersion / description / website for d2rloader/metadata.json (default: the dev install's).
     drawcap: the drawcap plugin DLL put next to mxl2012-core.dll (None or a missing file: left out, with a note).
+    statbook: the Stat Book plugin DLL, the same way.
     Refuses (SystemExit) when <name>.mpq/data and `plugin` are not a pair (medtab_pair_problem)."""
     mpq = mod / f"{name}.mpq"
     problem = medtab_pair_problem(mpq / "data", plugin)
@@ -410,6 +416,13 @@ def write_mod_files(mod: Path, name: str, savepath: str, plugin: Path = PLUGIN, 
             shutil.copy2(DRAWCAP_CONFIG, d2rl / "config" / "drawcap.toml")
     elif drawcap is not None:
         print(f"no drawcap plugin at {drawcap} (run tools/build_plugin.ps1); left out")
+    if statbook is not None and statbook.exists():
+        shutil.copy2(statbook, d2rl / "plugins" / "statbook.dll")
+        print(f"plugin statbook.dll ({statbook.stat().st_size // 1024} KB)")
+        if not (d2rl / "config" / "statbook.toml").exists():
+            shutil.copy2(STATBOOK_CONFIG, d2rl / "config" / "statbook.toml")
+    elif statbook is not None:
+        print(f"no statbook plugin at {statbook} (run tools/build_plugin.ps1); left out")
     core_config = d2rl / "config" / "mxl2012-core.toml"
     if CORE_CONFIG.is_file() and not core_config.exists():
         shutil.copy2(CORE_CONFIG, core_config)

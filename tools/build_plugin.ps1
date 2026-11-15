@@ -2,7 +2,8 @@
 # by tools\install_mod.py) and, with -Release, the player DLL (-DMXL_RELEASE=ON, no harness) into build\plugin-release\Release.
 # Also the standalone drawcap plugin (drawcap\, its own CMake project, no harness: the same DLL for dev installs and releases)
 # into build\drawcap\Release\drawcap.dll, and the standalone invtabs plugin (invtabs\, the same way) into
-# build\invtabs\Release\invtabs.dll; -Tests runs their unit tests too.
+# build\invtabs\Release\invtabs.dll, and the standalone Stat Book (statbook\) into build\statbook\Release\statbook.dll
+# (and its test DLL with the harness, for plain-D2R runs only, into build\statbook-test\Release); -Tests runs their unit tests too.
 # PluginSDK: -Sdk DIR, else env MXL2012_PLUGINSDK_DIR, else MXL2012_PLUGINSDK_DIR of .mxl-local.json (tools\lane_setup.py puts the
 # shared <runs>\shared\native\src\PluginSDK there), else the submodule third_party\PluginSDK; an empty submodule stops the
 # script with the way to fill it (nothing is downloaded here).
@@ -35,6 +36,19 @@ if ($LASTEXITCODE) { exit $LASTEXITCODE }
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 & $cmake --build build\invtabs --config Release --target invtabs
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
+& $cmake -S statbook -B build\statbook -A x64 "-DSTATBOOK_PLUGINSDK_DIR=$($Sdk -replace '\\', '/')"
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
+& $cmake --build build\statbook --config Release --target statbook
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
+# the player DLL must not carry the test harness (neither its report text nor its switch file name)
+if (Select-String -Path build\statbook\Release\statbook.dll -Pattern 'TEST HARNESS ON', 'statbook-testharness' -SimpleMatch -Quiet) {
+    Write-Host 'FAILED: build\statbook\Release\statbook.dll contains the test harness'; exit 1
+}
+# the Stat Book test DLL (-DSTATBOOK_TEST_HARNESS=ON): drives plain D2R without mxl2012-core; never installed for players or packaged
+& $cmake -S statbook -B build\statbook-test -A x64 "-DSTATBOOK_PLUGINSDK_DIR=$($Sdk -replace '\\', '/')" -DSTATBOOK_TEST_HARNESS=ON
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
+& $cmake --build build\statbook-test --config Release --target statbook
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
 if ($Release) {
     & $cmake -S plugin -B build\plugin-release -A x64 -DMXL_RELEASE=ON $sdkArg
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -61,5 +75,12 @@ if ($Tests) {
                      'Release\invtabs_pad_tests.exe', 'Release\invtabs_natives_off_tests.exe')) {
         & "build\invtabs\$t"
         if ($LASTEXITCODE) { Write-Host "FAILED: $t"; exit $LASTEXITCODE }
+    }
+    # the Stat Book's pure parts: the book, the config, the sheet's resistance rows, the grouped Advanced Stats
+    & $cmake --build build\statbook --config Release --target statbook_all_tests
+    if ($LASTEXITCODE) { exit $LASTEXITCODE }
+    foreach ($t in Get-ChildItem build\statbook\tests\Release\statbook_*tests.exe) {
+        & $t.FullName
+        if ($LASTEXITCODE) { Write-Host "FAILED: $($t.Name)"; exit $LASTEXITCODE }
     }
 }

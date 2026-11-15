@@ -28,5 +28,55 @@
     "key": "d2r:ItemExpcharmdesc",
     "text": "Keep in inventory or Charm Inventory to gain bonus",
     "why": "CharmInv (Dimentio's D2RLoader plugin, bundled; docs/bundled-plugins.md): owner decision 2026-11-10, charms grant their bonus from the normal inventory and from the Charm Inventory (charm-inv.toml allow_inventory_charms = true). CharmInv's own strings.json says \"Keep in Charm Inventory to Gain Bonus\"; Median's .tbl says \"Keep in Inventory to Gain Bonus\". Mod overrides win over plugin overrides, so this text names both places."
+  },
+  {
+    "key": "d2r:strCreateGameNormalText",
+    "text": "Hatred",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (5156) under the key 'x', so tbl2json writes it as mxl_5156 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strCreateGameNightmareText",
+    "text": "Terror",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (5155) under the key 'x', so tbl2json writes it as mxl_5155 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strCreateGameHellText",
+    "text": "Destruction",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has \"Destruction (Level 120)\" at the same string id (5154) under the key 'x', so tbl2json writes it as mxl_5154 and D2R's key kept \"Hell\". The name alone: D2R's HD difficulty dialog button wraps \"Destruction (Level 120)\" onto two lines (lane diffnames run checks-20261113-233107-s3)."
+  },
+  {
+    "key": "d2r:strCreateGameNormalTextPatch",
+    "text": "HATRED",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (10018) under the key 'x', so tbl2json writes it as mxl_10018 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strCreateGameNightmareTextPatch",
+    "text": "TERROR",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (10017) under the key 'x', so tbl2json writes it as mxl_10017 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strCreateGameHellTextPatch",
+    "text": "DESTRUCTION",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (10016) under the key 'x', so tbl2json writes it as mxl_10016 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strgamefailillegaljoinXE",
+    "text": "Unable to enter game. Your character must kill Baal in Terror difficulty to play in a Destruction game.",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (21793) under the key 'x', so tbl2json writes it as mxl_21793 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strgamefailillegaljoinXD",
+    "text": "Unable to enter game. Your character must kill Baal to play in a Terror difficulty game.",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Its .tbl has this text at the same string id (21794) under the key 'x', so tbl2json writes it as mxl_21794 and D2R's key kept D2R's wording."
+  },
+  {
+    "key": "d2r:strgamefailillegaljoinE",
+    "text": "Unable to enter game. Your character must kill Diablo in Terror difficulty to play in a Destruction game.",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Median's .tbl keeps vanilla's wording here (the classic, non-expansion message); renamed like its expansion twin strgamefailillegaljoinXE."
+  },
+  {
+    "key": "d2r:strgamefailillegaljoinD",
+    "text": "Unable to enter game. Your character must kill Diablo to play in a Terror difficulty game.",
+    "why": "Difficulty names (median-rules-audit DF13): Median 2012 calls the difficulties Hatred, Terror and Destruction. Median's .tbl keeps vanilla's wording here (the classic, non-expansion message); renamed like its expansion twin strgamefailillegaljoinXD."
   }
 ]

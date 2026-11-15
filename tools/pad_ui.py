@@ -7,7 +7,7 @@ A step of tools/build.py after tools/median_tabs.py (it reads the finished keybo
   controller/playerinventoryoriginallayouthd.json, controller/playerinventoryexpansionlayouthd.json
       D2R's gamepad inventories (`basedOn` the PC ones, so they inherited the mod's PC grid scale 1.0745 and cell size: the
       right column and rows 5-6 ran out of the 10 x 4 frame) with their own grid fields: Median's 10 x 6 at GRID_SCALE on
-      D2R's gamepad art grown to 6 rows (PANEL\\mxl\\padinventory, _classic), the gold button and the three Send to stash
+      D2R's gamepad art grown to 6 rows (PANEL\\mxl\\padinventory, _classic), the gold button and the Send to stash
       buttons (tools/send_stash.py; the plugin part send_stash finds them by name in either panel) in the free stone left and
       right of the belt row, and navigation through them (gloves -> send -> grid, boots -> gold -> grid).
   controller/bankexpansionlayouthd.json (tools/ui_layouts.stash_hd: D2R's with the mod's stash cube; rewritten here)
@@ -94,7 +94,7 @@ def panel_rect(x: float, y: float, w: float | None = None, h: float | None = Non
 
 
 def send_buttons() -> list[dict]:
-    """tools/send_stash.py's three buttons at SEND_RECT with the gamepad's legend and navigation."""
+    """tools/send_stash.py's Send to stash buttons at SEND_RECT with the gamepad's legend and navigation."""
     import send_stash
     x, y, w, h = SEND_RECT
     out = []

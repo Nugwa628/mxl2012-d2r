@@ -112,13 +112,18 @@ auto IsSlotCode(uint32_t code, const char (&codes)[N][5]) noexcept -> bool {
 	return CodeIndex(code, codes) >= 0;
 }
 
-// Which of the three buttons shows. `hasPlayer`: the client has a local player; `joined`: no server game of this process has that
-// player (a joiner of another player's game); `hasStash`: the player has the RotW stash unit.
-enum class Show { None, Button, NoSlots, Joined };
+// Which of the four buttons shows. `hasPlayer`: the client has a local player; `joined`: no server game of this process has that
+// player (a joiner of another player's game); `hasStash`: the player has the RotW stash unit; `rotwOwned`: items may go into the
+// RotW pages (part rotwwarn's answer, RotwWarnStoreBlocked: an account without Reign of the Warlock keeps those pages closed, so
+// items sent there could not be taken out again; bug #591). That reason comes first: it holds in every game of the account.
+enum class Show { None, Button, NoSlots, Joined, NoRotw };
 
-constexpr auto Decide(bool hasPlayer, bool joined, bool hasStash, bool joinersOn = JoinersOn) noexcept -> Show {
+constexpr auto Decide(bool hasPlayer, bool joined, bool hasStash, bool rotwOwned, bool joinersOn = JoinersOn) noexcept -> Show {
 	if (!hasPlayer) {
 		return Show::None;
+	}
+	if (!rotwOwned) {
+		return Show::NoRotw;
 	}
 	if (joined && !joinersOn) {
 		return Show::Joined;
@@ -133,6 +138,8 @@ constexpr auto RefusalLine(Show show) noexcept -> const char* {
 		return "Send to stash works in Reign of the Warlock games only (its Gems, Materials, Runes, Median and Orbs stash pages).";
 	case Show::Joined:
 		return "Send to stash is not available when joined to another player's game.";
+	case Show::NoRotw:
+		return "Send to stash needs Reign of the Warlock: without it the Gems, Materials, Runes, Median and Orbs stash pages stay closed.";
 	default:
 		return nullptr;
 	}

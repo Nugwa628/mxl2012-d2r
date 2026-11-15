@@ -7,6 +7,7 @@ inline constexpr char MessagePanel[] = "mxl2012-core/SendStash";
 inline constexpr char Button[] = "MxlSendStash";
 inline constexpr char NoSlots[] = "MxlSendStashNoSlots";
 inline constexpr char Joined[] = "MxlSendStashJoined";
+inline constexpr char NoRotw[] = "MxlSendStashNoRotw";
 inline constexpr char Panel0[] = "PlayerInventoryExpansionLayout";
 inline constexpr char Panel1[] = "PlayerInventoryOriginalLayout";
 // the codes of the slot widgets of the mod's HD stash layout (343)

@@ -221,7 +221,10 @@ def art_sources(work: Path) -> dict[str, str]:
 
 
 def scaled_base(model: str | None) -> str | None:
-    """The D2R model of a scaled variant `mxl_<model>_s<percent>` (effects_hd.py), else the model itself."""
+    """The D2R model of a scaled variant `mxl_<model>_s<percent>` (effects_hd.py) or of a `<model>_free` copy (missile_release.py),
+    else the model itself."""
+    if model and model.endswith("_free"):
+        model = model.removesuffix("_free")
     m = re.fullmatch(r"mxl_(.+)_s\d+", model or "")
     return m.group(1) if m else model
 

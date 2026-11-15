@@ -114,6 +114,13 @@ def check_mod_folder(mod: Path, version: str) -> list:
         problems.append(f"{pr.DRAWCAP['dll']} is missing")
     if not (mod / pr.DRAWCAP["config"]).is_file():
         problems.append(f"{pr.DRAWCAP['config']} is missing")
+    sb = mod / pr.STATBOOK["dll"]
+    if sb.is_file():
+        problems += pr.check_statbook(sb)
+    else:
+        problems.append(f"{pr.STATBOOK['dll']} is missing")
+    if not (mod / pr.STATBOOK["config"]).is_file():
+        problems.append(f"{pr.STATBOOK['config']} is missing")
     l169 = mod / pr.LEGACY169["dll"]
     if l169.is_file():
         problems += pr.check_legacy169(l169)
@@ -169,6 +176,8 @@ def check_mod_folder(mod: Path, version: str) -> list:
         problems.append(f"global/dataversionbuild.txt is not {install_mod.D2R_BUILD}")
     if not (data / "global" / "excel").is_dir():
         problems.append("no global/excel tables")
+    if not (data / pr.STATBOOK_DATA).is_file():  # without it the Stat Book shows its plain D2R book, no Median stats
+        problems.append(f"{pr.STATBOOK_DATA} is missing (tools/statbook.py book)")
     for rel in STRING_FILES:
         if not (data / "local" / "lng" / (rel % install_mod.NAMESPACE)).is_file():
             problems.append(f"local/lng/{rel % install_mod.NAMESPACE} is missing")

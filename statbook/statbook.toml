@@ -1,0 +1,21 @@
+# Stat Book: D2R's character sheet as a book with folder tabs (docs/statbook.md). Changes apply at the next game start.
+[statbook]
+# the Magic / Physical Resistance rows on page 1 (in sheet layouts that have them)
+sheet_rows = true
+# D2R's Advanced Stats panel sorted into groups
+advanced_stats = true
+# the themed pages and All Stats
+book = true
+# where the book's tabs are: "top" (folder tabs on the sheet) or "side" (the book as a panel beside the sheet, its tabs
+# down its side; HD PC sheet with the mod). The book's toggle button and the "Stat Book: Top/Side Tabs" key switch it in
+# game and write it back here.
+tabs = "top"
+# gamepad tab buttons on the sheet: auto (the bumpers LB / RB with the Controller QOL plugin, else the triggers LT / RT),
+# bumpers, triggers or off
+pad_tabs = "auto"
+# D2R's controller action ids of those buttons (-1: off); pad_log = true writes each action the gamepad menu gets to statbook.log
+pad_bumper_left = 19
+pad_bumper_right = 20
+pad_trigger_left = 7
+pad_trigger_right = 8
+pad_log = false

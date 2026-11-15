@@ -45,13 +45,21 @@ int main() {
 	Check(std::strcmp(mxl_send_stash::MessagePanel, "mxl2012-core/SendStash") == 0, "the click message's panel");
 
 	// which button shows
-	Check(Decide(false, false, true) == Show::None, "no player: nothing set");
-	Check(Decide(true, false, true) == Show::Button, "single player / host with the RotW stash: the button");
-	Check(Decide(true, false, false) == Show::NoSlots, "classic / expansion game: greyed");
-	Check(Decide(true, true, true) == Show::Joined, "a joiner: greyed while joiners are off");
-	Check(Decide(true, true, false) == Show::Joined, "a joiner of a classic game: the joiner reason");
-	Check(Decide(true, true, true, true) == Show::Button, "joiners switched on: the button");
-	Check(!JoinersOn, "joiners stay off until a two-instance game test (owner, 2026-11-05)");
+	Check(Decide(false, false, true, true) == Show::None, "no player: nothing set");
+	Check(Decide(true, false, true, true) == Show::Button, "single player / host with the RotW stash: the button");
+	Check(Decide(true, false, false, true) == Show::NoSlots, "classic / expansion game: greyed");
+	Check(Decide(true, true, true, true) == Show::Joined, "a joiner: greyed while joiners are off");
+	Check(Decide(true, true, false, true) == Show::Joined, "a joiner of a classic game: the joiner reason");
+	Check(Decide(true, true, true, true, true) == Show::Button, "joiners switched on: the button");
+	// #591: an account without Reign of the Warlock: the RotW pages stay closed, nothing may go there
+	Check(Decide(true, false, true, false) == Show::NoRotw, "#591: not owned, RotW stash unit there: greyed, nothing sent");
+	Check(Decide(true, false, false, false) == Show::NoRotw, "#591: not owned in an expansion game: the RotW reason");
+	Check(Decide(true, true, true, false) == Show::NoRotw && Decide(true, true, true, false, true) == Show::NoRotw, "#591: not owned joiner: the RotW reason");
+	Check(Decide(false, false, true, false) == Show::None, "#591: no player: nothing set");
+	Check(std::strstr(RefusalLine(Show::NoRotw), "Reign of the Warlock") != nullptr && std::strlen(RefusalLine(Show::NoRotw)) < ChatTextSize,
+	      "#591: a greyed click says why (not owned), fits the chat record");
+	Check(ButtonActive(Show::NoRotw, Show::NoRotw) && !ButtonActive(Show::Button, Show::NoRotw) && !ButtonActive(Show::NoSlots, Show::NoRotw),
+	      "#591: the RotW greyed button shown, the live one hidden and disabled");
 	Check(RefusalLine(Show::Button) == nullptr && RefusalLine(Show::None) == nullptr, "no refusal line when the button works");
 	Check(std::strstr(RefusalLine(Show::NoSlots), "Reign of the Warlock") != nullptr, "#554: a greyed click says why (classic / expansion)");
 	Check(std::strstr(RefusalLine(Show::Joined), "joined") != nullptr, "#554: a greyed click says why (joiner)");

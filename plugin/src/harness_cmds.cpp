@@ -14,6 +14,7 @@
 //
 // A verb ends with a line "h: <verb> OK" or "h: <verb> FAIL <reason>" in the harness console file.
 #include "harness_cmds_logic.h"
+#include "block_rate_logic.h"
 #include "pad_input_logic.h"
 
 #include "client_skills.h"
@@ -30,6 +31,7 @@
 #include "send_stash.h"
 #include "clear_fonts.h"
 #include "map_reveal.h"
+#include "panel_shared.h"
 
 #include <D2RLPlugin/api.h>
 
@@ -2562,6 +2564,47 @@ auto CmdClientStat(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `block` (server) / `cblock` (client, UI thread): D2R's Chance to Block, GetBlockRate 0x347da0(unit, expansion), next to the
+// replica of block_rate_logic.h from the same unit's stats 20 / 2 / 12 and its class's charstats BlockFactor. The server's
+// expansion flag is the game's (+0x106 != 1) as its block roll passes it; the client's is !0x8d3b0() as the sheet's tooltip.
+// `replica` assumes a shield; GetBlockRate 0 with a non-zero replica means no shield is worn.
+constexpr uint64_t RvaCharStatsRecord = 0xfcfc0;  // (data flag byte, class id) -> charstats record
+using CharStatsRecordFn = const uint8_t* (*)(uint32_t, int32_t);
+using ClientIsClassicFn = bool (*)();
+
+void PrintBlock(const char* who, Unit* u, bool expansion) noexcept {
+	const int32_t game = Fn<block_rate::GetBlockRateFn>(block_rate::GetBlockRateRva)(u, expansion ? 1 : 0);
+	const uint8_t* cs = Fn<CharStatsRecordFn>(RvaCharStatsRecord)(d2r::At<uint8_t>(u, 0x1bd), ClassOf(u));
+	block_rate::Inputs in;
+	in.hasShield = true;
+	in.toBlock = Stat(u, block_rate::StatToBlock);
+	in.blockFactor = cs != nullptr ? cs[block_rate::CharStatsBlockFactor] : -1;
+	in.dexterity = Stat(u, block_rate::StatDexterity);
+	in.level = Stat(u, block_rate::StatLevel);
+	in.expansion = expansion;
+	const int32_t replica = block_rate::Rate(in);
+	Out("%s block game=%d replica=%d running=%d class=%d toblock=%d blockfactor=%d dex=%d level=%d expansion=%d match=%s", who, game, replica,
+	    block_rate::RateWhileRunning(game), ClassOf(u), in.toBlock, in.blockFactor, in.dexterity, in.level, expansion ? 1 : 0,
+	    game == replica ? "yes" : game == 0 ? "no-shield?" : "NO");
+}
+
+auto CmdBlock(Ctx* c, const hcmd::Tokens&) noexcept -> bool {
+	PrintBlock("server", c->player, d2r::At<uint8_t>(c->game, d2r::GameDataFlag) != 1);
+	return true;
+}
+
+auto CmdClientBlock(Ctx* c, const hcmd::Tokens&) noexcept -> bool {
+	if (g_playerId == 0) {
+		return Fail(c, "cblock: no player seen yet (run a server verb such as state first)");
+	}
+	Unit* unit = Fn<ClientFindFn>(RvaClientFind)(static_cast<uint32_t>(g_playerId), 0);
+	if (unit == nullptr) {
+		return Fail(c, "cblock: no client unit");
+	}
+	PrintBlock("client", unit, !Fn<ClientIsClassicFn>(block_rate::ClientIsClassicRva)());
+	return true;
+}
+
 // `durwatch on|show|off`: counts packet 0x3e for stat 0x48 (durability) on its way: the server sender 0x47a190 (D2RLoader's slot
 // 0x3e2a1b8 behind its `jmp [rip]` thunk, wrapped), the client packet table's 0x3e handler (entry 0x22bc210, wrapped) and the
 // client's stat apply 0x1c7710 (id, set flag, stat, value, param; inline hook), with the client item's stat 0x48 after the apply.
@@ -3258,6 +3301,182 @@ auto CmdClearFonts(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `sbperf frames start | frames | fill <n> [stable] | fill off | fill` (UI thread): cost of a big sheet layout (lane sbresearch, the
+// Stat Book's ~500 widgets). `frames` times every frame through the loader's overlay frame callback (QPC between two callbacks):
+// count, mean, max and how many took longer than 20 / 33 / 50 / 100 ms since `frames start`. `fill <n>` starts a 100 ms tick (as
+// sheetres') that sets the text of the sheet's (CharacterStatsPanel) TextBoxWidgets MxlPerf0 .. MxlPerf<n-1> through
+// panel_shared::SetLine: a new value in every box each tick, or with `stable` the same values (SetLine skips them: the steady
+// state of a sheet whose stats do not change). The tick's own time on the UI thread is measured (mean / max per tick).
+const D2RL::OverlayService* g_overlay = nullptr;
+D2RL::Overlay::CallbackHandle g_perfFrameCb = D2RL::Overlay::InvalidCallbackHandle;
+SRWLOCK g_perfLock = SRWLOCK_INIT;
+struct PerfFrames {
+	LARGE_INTEGER last{};
+	long n = 0, over20 = 0, over33 = 0, over50 = 0, over100 = 0;
+	double sumMs = 0, maxMs = 0;
+} g_perfFrames;
+constexpr int PerfMaxBoxes = 1024;
+volatile LONG g_perfFillN = 0;
+volatile LONG g_perfStable = 0;
+volatile LONG g_perfTickQueued = 0;
+bool g_perfThread = false;
+panel_shared::Client g_perfSheet;
+std::string g_perfShown[PerfMaxBoxes];
+long g_perfTicks = 0, g_perfNoPanel = 0, g_perfFilled = 0, g_perfSerial = 0;
+double g_perfTickSumMs = 0, g_perfTickMaxMs = 0;
+
+auto PerfNowMs(const LARGE_INTEGER& from, const LARGE_INTEGER& to) noexcept -> double {
+	LARGE_INTEGER f;
+	QueryPerformanceFrequency(&f);
+	return static_cast<double>(to.QuadPart - from.QuadPart) * 1000.0 / static_cast<double>(f.QuadPart);
+}
+
+void __cdecl PerfFrame(const D2RL::PluginContext*, const D2RL::Overlay::Frame*, void*) noexcept {
+	LARGE_INTEGER now;
+	QueryPerformanceCounter(&now);
+	AcquireSRWLockExclusive(&g_perfLock);
+	PerfFrames& p = g_perfFrames;
+	if (p.last.QuadPart != 0) {
+		const double ms = PerfNowMs(p.last, now);
+		++p.n;
+		p.sumMs += ms;
+		p.maxMs = ms > p.maxMs ? ms : p.maxMs;
+		p.over20 += ms > 20 ? 1 : 0;
+		p.over33 += ms > 33.4 ? 1 : 0;
+		p.over50 += ms > 50 ? 1 : 0;
+		p.over100 += ms > 100 ? 1 : 0;
+	}
+	p.last = now;
+	ReleaseSRWLockExclusive(&g_perfLock);
+}
+
+int g_perfRegResult = -1;  // -1 not tried, -2 no overlay service, else the loader's Overlay::Result
+
+void PerfRegisterFrames(const D2RL::PluginContext* context) noexcept {
+	if (g_perfFrameCb != D2RL::Overlay::InvalidCallbackHandle) {
+		return;
+	}
+	if (context->QueryService(&g_overlay) != D2RL::ServiceQueryResult::Success ||
+	    !D2RL::HasOverlayServiceField(g_overlay, D2RL::OverlayServiceRequiredSize)) {
+		g_overlay = nullptr;
+		g_perfRegResult = -2;
+		return;
+	}
+	D2RL::Overlay::CallbackRegistration reg{D2RL::Overlay::CallbackRegistrationSize, 0, D2RL::Overlay::Phase::AfterGameUi, -1000, &PerfFrame, nullptr};
+	g_perfRegResult = static_cast<int>(g_overlay->registerFrameCallback(context, &reg, &g_perfFrameCb));
+	if (g_perfRegResult != 0) {
+		g_perfFrameCb = D2RL::Overlay::InvalidCallbackHandle;
+	}
+}
+
+void PerfFillInner() {
+	const long n = g_perfFillN;
+	if (n <= 0) {
+		return;
+	}
+	void* panel = panel_shared::NativePanel(g_perfSheet);
+	if (panel == nullptr) {
+		++g_perfNoPanel;
+		return;
+	}
+	const long serial = g_perfStable != 0 ? 0 : ++g_perfSerial;
+	char name[32], value[32];
+	for (long i = 0; i < n && i < PerfMaxBoxes; ++i) {
+		std::snprintf(name, sizeof(name), "MxlPerf%ld", i);
+		std::snprintf(value, sizeof(value), "%ld%%", (serial * 7 + i) % 1000);
+		panel_shared::SetLine(g_perfSheet, panel, name, g_perfShown[i], value, false);
+	}
+	++g_perfFilled;
+}
+
+void __cdecl PerfTickOnUi(const D2RL::PluginContext*, void*) noexcept {
+	InterlockedExchange(&g_perfTickQueued, 0);
+	LARGE_INTEGER a, b;
+	QueryPerformanceCounter(&a);
+	__try {
+		PerfFillInner();
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+	}
+	QueryPerformanceCounter(&b);
+	const double ms = PerfNowMs(a, b);
+	++g_perfTicks;
+	g_perfTickSumMs += ms;
+	g_perfTickMaxMs = ms > g_perfTickMaxMs ? ms : g_perfTickMaxMs;
+}
+
+DWORD WINAPI PerfTimer(LPVOID) {
+	const D2RL::ThreadService* threads = nullptr;
+	if (g_context->QueryService(&threads) != D2RL::ServiceQueryResult::Success) {
+		return 0;
+	}
+	for (;;) {
+		Sleep(100);
+		if (g_perfFillN > 0 && InterlockedExchange(&g_perfTickQueued, 1) == 0 &&
+		    threads->runOnUiThread(g_context, &PerfTickOnUi, nullptr) != D2RL::Threads::Result::Success) {
+			InterlockedExchange(&g_perfTickQueued, 0);
+		}
+	}
+}
+
+auto CmdSbPerf(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	constexpr const char* Usage = "usage: sbperf frames start | frames | fill <n> [stable] | fill off | fill";
+	if (t.n < 2) {
+		return Fail(c, Usage);
+	}
+	if (hcmd::LowerEq(t.tok[1], "frames")) {
+		if (g_perfFrameCb == D2RL::Overlay::InvalidCallbackHandle) {
+			char why[96];
+			std::snprintf(why, sizeof(why), "sbperf: no frame callback (registration at load: result %d)", g_perfRegResult);
+			return Fail(c, why);
+		}
+		AcquireSRWLockExclusive(&g_perfLock);
+		const PerfFrames p = g_perfFrames;
+		if (t.n > 2 && hcmd::LowerEq(t.tok[2], "start")) {
+			g_perfFrames = PerfFrames{};
+		}
+		ReleaseSRWLockExclusive(&g_perfLock);
+		Out("sbperf frames n=%ld mean=%.2fms max=%.2fms over20=%ld over33=%ld over50=%ld over100=%ld", p.n, p.n > 0 ? p.sumMs / p.n : 0.0, p.maxMs,
+		    p.over20, p.over33, p.over50, p.over100);
+		return true;
+	}
+	if (!hcmd::LowerEq(t.tok[1], "fill")) {
+		return Fail(c, Usage);
+	}
+	if (t.n > 2) {
+		long long n = 0;
+		if (hcmd::LowerEq(t.tok[2], "off")) {
+			n = 0;
+		} else if (!hcmd::ParseInt(t.tok[2], &n) || n < 0 || n > PerfMaxBoxes) {
+			return Fail(c, Usage);
+		}
+		if (!g_perfThread) {
+			if (!panel_shared::Init(g_context)) {
+				return Fail(c, "sbperf: panel_shared is off");
+			}
+			g_perfSheet.panelName = "CharacterStatsPanel";
+			HANDLE th = CreateThread(nullptr, 0, PerfTimer, nullptr, 0, nullptr);
+			if (th == nullptr) {
+				return Fail(c, "sbperf: no timer thread");
+			}
+			CloseHandle(th);
+			g_perfThread = true;
+		}
+		InterlockedExchange(&g_perfStable, t.n > 3 && hcmd::LowerEq(t.tok[3], "stable") ? 1 : 0);
+		for (std::string& s : g_perfShown) {
+			s.clear();
+		}
+		g_perfTicks = g_perfNoPanel = g_perfFilled = 0;
+		g_perfTickSumMs = g_perfTickMaxMs = 0;
+		g_perfSheet.textsSet.store(0);
+		g_perfSheet.textFails.store(0);
+		InterlockedExchange(&g_perfFillN, static_cast<LONG>(n));
+	}
+	Out("sbperf fill n=%ld stable=%ld ticks=%ld filled=%ld nopanel=%ld texts=%ld fails=%ld tick mean=%.3fms max=%.3fms", static_cast<long>(g_perfFillN),
+	    static_cast<long>(g_perfStable), g_perfTicks, g_perfFilled, g_perfNoPanel, g_perfSheet.textsSet.load(), g_perfSheet.textFails.load(),
+	    g_perfTicks > 0 ? g_perfTickSumMs / g_perfTicks : 0.0, g_perfTickMaxMs);
+	return true;
+}
+
 using VerbFn = bool (*)(Ctx*, const hcmd::Tokens&) noexcept;
 struct Verb {
 	const char* name;
@@ -3288,6 +3507,7 @@ const Verb Verbs[] = {
     {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true}, {"devmenu", CmdDevMenu, true}, {"wiki", CmdWiki, true},
     {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true}, {"padui", CmdPadUi, true},
     {"pad", CmdPad, true},
+    {"block", CmdBlock, false},       {"cblock", CmdClientBlock, true},  {"sbperf", CmdSbPerf, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {
@@ -3362,6 +3582,8 @@ void HarnessCmdsContext(const D2RL::PluginContext* context) noexcept {
 	                                                  reinterpret_cast<void**>(&g_requestInputOriginal));
 	context->LogInfo(g_requestInputHooked ? "mxl2012-core: test harness input method hook on (0x8a5440)"
 	                                      : "mxl2012-core: test harness input method hook FAILED (entry bytes differ): no padui");
+	// `sbperf frames`: the loader takes frame callbacks only while the plugin loads
+	PerfRegisterFrames(context);
 }
 
 void HarnessCmdsInit(uint64_t exeBase) noexcept {

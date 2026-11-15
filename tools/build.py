@@ -17,6 +17,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   warlock_scale.py apply  the Warlock's skills on Median's rules and power (data/warlock_rules.tsv, data/warlock_balance.tsv,
                      docs/warlock-balance.md)
   string_gaps.py     keys no .tbl defines: names and description lines have text in words, blank names get a key (docs/text-audit.md)
+  level_entries.py apply  the red "Entering ..." banner (levels LevelEntry, D2R's key) reads the level's Median name: `d2r:`
+                     overrides for the levels Median renamed (Duncraig, bug #612); `check` again after the last string merge
   shared_icons.py tables  class-less skills' icons: the shared icon sheet in pairs (IconCel + 1 = the pressed button), class
                      rows an item skill shares split into `<row>~shared`, plan -> work/mod/shared_icons.json (docs/hd-icons.md)
   objstr.py          object ids of the maps vs D2R's ObjPreset, the automap, work/mod/ds1_ids.json (docs/id-mapping.md)
@@ -38,6 +40,7 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
                      MXL_SLOT 2|3 and cached in work/d2r-cache when the baseline extraction lacks them)
   missile_hd.py      HD models for Median's missiles (by CelFile) -> hd/missiles/missiles.json
   missile_looks.py   after effects_hd: rows that fly get a model vanilla uses on rows that travel, rows that stay one that loops, rows with no picture one that draws
+  missile_release.py after skill_looks: rows another missile makes (not the caster) get their model without D2R's glide from the hand
   skill_looks.py     every skill's chain (missiles, overlays, states) walked in HD: overlays with no picture get the closest D2R overlay that draws; report of every skill;
                      --check fails a skill that shows something in legacy and nothing in HD (docs/hd-effects.md section 11)
   effects_hd.py      every Median missile/overlay row -> exact D2R HD effect, scaled variant or closest stand-in; a
@@ -69,6 +72,11 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
                      both stash layouts, the slots, the pages' art; needs the plugin part medtab
   pad_ui.py build     the gamepad UI's inventory (Median's 10 x 6, Send to stash) and stash (7 tabs, Median's pages) from the
                      finished PC layouts (docs/controller-support.md)
+  sheet_resists.py build  Magic and Physical Resistance rows on the character sheet (PC HD, legacy, gamepad layouts,
+                     the HD background, the classic sheet's boxes; plugin part sheetres fills them; docs/hd-ui.md)
+  statbook.py book    the Stat Book's book file (pages and All Stats with the built itemstatcost's ids; docs/statbook.md)
+  statbook_layout.py build  the Stat Book's folder tabs, page lines and All Stats in the HD sheet layouts (PC, gamepad) and
+                     their art from D2R's HD sprites (widget names: docs/statbook-layout.md)
   legacy_fonts.py    the clearer classic Latin fonts in data/local/font/latin/clear/ for the in-game setting (plugin part
                      clearfonts), from the local repack archive (MXL2012_LEGACY_FONT_ARCHIVE, default under
                      <MXL2012_RUNS>/extract-merged; MXL2012_LEGACY_FONTS=0 leaves them out); stock dialogue/chat pairs
@@ -144,12 +152,15 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["stash_retire_data.py"],  # bounded reader widths for the old stash-page cleanup
               ["string_gaps.py", "apply", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"),
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
+              ["level_entries.py", "apply", "--mod", str(MOD), "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
               ["shared_icons.py", "tables", "--d2r", str(D2R_EXTRACT)],
               ["objstr.py", "--mod", str(SRC), "--tiles", str(SRC.parent / "tiles")],
               ["cube_rules_check.py", "--src", str(SRC)],
               ["strings_check.py", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"), "--rewritten", "--warn-missing",
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")]]
 STRING_MERGE = [["merge_string_overrides.py"], DATA_STEPS[-1]]
+# after the last override merge: every level's red "Entering ..." banner reads its Median name (bug #612)
+LEVEL_ENTRY_CHECK = ["level_entries.py", "check", "--mod", str(MOD), "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")]
 # The hand-built maps drawn as flat HD maps (tools/maps_flat.py, docs/maps-hd-method.md "Flat maps"): each built in place
 # from the scene walls_cache.py wrote, its painted models added to the mod's model_lod_desc.bin
 FLAT_MAPS = ("expansion/ghetto/cypherpunk", "expansion/morework/epicwhiners", "expansion/dystopic/desertpeak",
@@ -161,7 +172,7 @@ FLAT_STEPS = [["maps_flat.py", "--lod-base", str(MOD / "data" / "hd" / "model_lo
 ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"], ["art_provenance.py"],
              ["hd_monsters.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],
              ["hd_translvl.py", "build", "--d2r", str(D2R_EXTRACT)],
-             ["animdata_merge.py"], ["hd_skill_anims.py"], ["missile_hd.py"], ["effects_hd.py"], ["missile_looks.py"], ["skill_looks.py"],
+             ["animdata_merge.py"], ["hd_skill_anims.py"], ["missile_hd.py"], ["effects_hd.py"], ["missile_looks.py"], ["skill_looks.py"], ["missile_release.py"],
              ["build_effects.py", "--check-only"],
              ["hd_icons.py", "baseline", str(D2R_EXTRACT)], ["hd_icons.py", "build", {"MXL2012_HD_OUT": str(MOD)}],
              ["hd_ui.py", "baseline", str(D2R_EXTRACT)], ["hd_ui.py", "build", {"MXL2012_UI_OUT": str(MOD)}],
@@ -183,6 +194,13 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["median_tabs.py", "apply", str(MOD / "data")],
              # after median_tabs: the gamepad UI's inventory and stash from the finished PC layouts (bugs #556, #557)
              ["pad_ui.py", "build", str(MOD / "data")],
+             # after legacy_art: the character sheet's Magic / Physical Resistance rows (layouts, HD background, invchar6.dc6 set 0)
+             ["sheet_resists.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
+             # the Stat Book's pages and All Stats list for the built itemstatcost (plugin statbook reads it from the mod)
+             ["statbook.py", "book", "--isc", str(MOD / "data" / "global" / "excel" / "itemstatcost.txt"),
+              "--out", str(MOD / "data" / "statbook" / "statbook.txt")],
+             # after statbook.py book: the Stat Book's tabs, pages and All Stats in the sheet layouts, and their art
+             ["statbook_layout.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
              ["legacy_fonts.py", "--mod", str(MOD)]]  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
 # The steps that depend on the charm inventory (tools/charm_inventory.py). DATA_STEPS / ART_STEPS above are the `charminv` build.
 CHARMINV_STEP = ["charm_inv.py", "apply", "--mod", str(MOD)]
@@ -205,8 +223,8 @@ def steps_for(charm_inv: str, data_only: bool = False) -> list:
     elif charm_inv != "charminv":
         raise SystemExit(f"charm inventory {charm_inv!r}: one of {', '.join(charm_inventory.CHARM_INVENTORIES)}")
     if data_only:
-        return [*data, STRING_MERGE[0], ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]]
-    return [*data, *art, *STRING_MERGE, ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]]
+        return [*data, STRING_MERGE[0], LEVEL_ENTRY_CHECK, ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]]
+    return [*data, *art, *STRING_MERGE, LEVEL_ENTRY_CHECK, ["devmenu_catalog.py"], ["wikipanel_export.py"], ["validate.py"]]
 
 
 STEPS = steps_for("charminv")

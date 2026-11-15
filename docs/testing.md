@@ -4,6 +4,43 @@ Changes that are built and installed but not yet confirmed in the game. Restart 
 "Confirmed" (or into docs/bugs.md) once tested. Console command `mxl` shows the plugin version and how many skill
 functions it installed.
 
+## Lane zonenames: the "Entering ..." banner names the area as Median does (2026-11-15, slot 2, HD and legacy, foreground)
+
+docs/bugs.md #612. Based on main 0511af9, full build of the lane, dev DLLs of the lane (no plugin change). Check `zonenames`
+(tools/game_checks.py): `MXL_SLOT=2 MXL_RUN=zonenames MXL_CHAR=ZoneNames py -3 <runs>/tools/heavy_lock.py game zonenames --
+py -3 <runs>/zonenames/session.py <worktree>` (slot lock, install with `--invtabs`, the check, the slot back). It travels by
+harness to each area of `MXL_ZONES` (default 13, 14, 16, 18, then 1) in HD and in legacy graphics (god mode) and takes three
+shots 1 s apart from arrival; the banner is judged by eye.
+
+- **Strings, every level:** `tools/level_entries.py check` on the build: 274 named levels (both banks), 0 whose banner does not read
+  the name (before the fix: 17 levels x 2 banks, list in `mxl2012-runs/zonenames/levels_diff.txt`). Build step and test
+  `tools/tests/test_level_banners.py` (6 tests, one over the built mod).
+- **In game** (`checks-20261115-162257-s2`, new Barbarian ZoneNames, Hatred): "Entering Duncraig", "Entering Cathedral of Vanity",
+  "Entering Infernal Cave", "Entering Ureh", and D2R's own "Entering The Rogue Encampment", in HD and in legacy graphics; 10 of 10
+  arrivals. Shots `mxl2012-runs/zonenames/shots/` (`zonenames_<mode>_<area>_<n>.png`; `_0` is still the load screen, `_1` shows the
+  banner), overview `zonenames_banners_montage.png`. 0 ERROR/ASSERT lines in d2rloader.log; one handled first-chance access
+  violation report (`d2r-lastresort-crash-report (2026_11_15 07_22_58 UTC pid-6300).log`, a module in the Windows DLL range, the
+  game went on; copied to the shots folder).
+- Unit tests: `tools/tests` 1688 OK (16 skipped), `tools -p "test_*.py"` 590 OK (5 skipped).
+- **Not seen in game:** the other 13 renamed levels (Fauztinville, Vizjun, the Hell areas' "Welcome to ..." and so on; same
+  override mechanism, checked by the strings test), Terror / Destruction (the banner key does not depend on the difficulty),
+  non-English clients (Median's names are English in all 13 languages).
+
+## Lane diffnames: Hatred / Terror / Destruction (2026-11-13)
+
+Based on main bcf9871. `data/d2r_string_fixes.json` names D2R's difficulty strings as Median does (median-rules-audit DF13).
+Check `diffnames` (tools/game_checks.py): `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<throwaway> py -3 tools/game_checks.py all
+diffnames`; it sets progression 10 on the character by a closed save edit, so use a throwaway one. Run
+`checks-20261113-234724-s3` (slot 3, new Barbarian DiffNames, background input, full build of the lane, dev DLL of the lane):
+PARTIAL by design (names judged on the shots), 0 ERROR/ASSERT lines, no crash file. **Seen:** the HD difficulty dialog reads
+Hatred / Terror / Destruction; Destruction entered from its button; the automap line reads "Difficulty: Destruction" in HD and
+in legacy graphics (D2R shows no difficulty line in the first difficulty). The front end (character select, difficulty dialog)
+is HD only in D2R, so legacy is seen in game only. Earlier runs: `checks-20261113-231341-s3` stopped at startup (an override of
+D2R's `presenceA1Normal` made D2RLoader fail the whole string table; `strings_check.py` now refuses such keys),
+`checks-20261113-233107-s3` showed Median's "Destruction (Level 120)" wrapped onto two lines in the HD button (now
+"Destruction"). Shots: `mxl2012-runs/diffnames/`. **Not seen:** the lobby create / join game panels (Battle.net / TCP/IP
+only), the join refusal messages, the legacy front end (none in D2R).
+
 ## Lane stashfix: retirement startup blocker (2026-11-11)
 
 Based on main a4091c8. No data build: copied the main checkout's completed `work/mod/data`.
@@ -81,6 +118,8 @@ layouts only; the stash is checked in both HD and legacy.
 ## Waiting
 
 Lane advstats (2026-11-11, slot 3, background input; slot 3's installed mod of 2026-11-01 with only the two built itemstatcost.txt swapped in, which differ from it in `advdisplay` alone): check `advstats` (tools/advstats_checks.py) PARTIAL by design (rows judged on the shots, `mxl2012-runs/advstats/shots/`). Seen: the HD panel lists the 12 always rows, then every worn stat with the worn value (8% life stolen, 100% GF, 53% MF = server stat 80, 15% IAS, 20% FRW, 30% FHR, 20% FCR, 10% CB, 15% DS, Fire Resist +30%, +5% max fire, Fire Absorb 10%, +15% fire spell damage, -12% enemy fire resistance, 10% Bonus to Strength, attacker takes fire damage 25, +20% minion damage, light radius, vendor prices, cannot be frozen, life after kill), worded as the ring's tooltip. The per-level MF stat (240) is 0 on the player (folded into MF), so D2R's per-level rows were taken off the list. Not seen: a release install with the full build (the full build did not finish under the host lock), the rows of Laz's pages 3-4 for a character that has them (apple, minion counts), legacy (no button there).
+
+Lane advstats2 (2026-11-14, slot 2, background input, dev DLL, bugs #581 / #582): check `advgroups` (tools/advstats_checks.py run_groups, `py -3 tools/game_checks.py --slot 2 all advgroups`) PASS on every row it can judge (run checks-20261114-023059-s2, shots and overview.png in `mxl2012-runs/advstats2/`). Seen in HD: the rows in groups with "- Offense -", "- Defense -", "- Speed -", "- Life & Mana -" headings; an Amazon's Ecstatic Frenzy cast with the panel open rebuilt the list at once (client stats velocitypercent 110 -> 135, attackrate 95 -> 145, magic damage 52-53, armor_override_percent -100) and the panel read "+45% Attack Speed from Skills", "+35% Movement Speed from Skills", "Adds 52-53 Magic Damage", "Total Character Defense = 0" (unbuffed: -5% / +10%, the passives); an Assassin with Perfect Being read "9% Chance to Avoid Damage" (dodge / avoid / evade all 9). A colour code in a heading is printed as is by the panel, so headings are plain text between dashes. Legacy graphics: D2R has no Advanced Stats panel there (shot of the legacy screen only). Not seen: a non-English client (strings fall back to English), unequal dodge / avoid / evade.
 
 Lane skills5 (2026-10-29, slot 3, background input, dev DLL): player bugs #490-#493, #496 (docs/bugs.md). Seen with the harness:
 Signet of Gold text (#490) in HD; Bane Hunter's HD overlay (#492) calm after the `firecrown` pick. Still to check: the #490 line in
@@ -369,7 +408,7 @@ Use test-sessions.md to run these checks by character.
 | data | **Median stash size: 14 x 14** (personal and shared pages; inventory.txt Big Bank, HD stash panel with Median's art) | Open the stash: personal tab and the shared tabs. Put items in the far corners (column 14, row 14), switch tabs, leave and reload; check the shared stash still loads for another character | Median's stash art, 14 x 14 grid lined up with it (grid, tabs and gold box confirmed 2026-10-14), items scaled like the inventory; Personal/Shared tabs centred above the grid where Median's gold box was; Median's gold box now at the bottom with D2R's gold button and amount on it; shared-stash arrows and gold withdraw work; items stay put after reload. D2R's Gems/Materials/Runes tabs unchanged. Backup: mxl-manual-backups/all-before-14x14-stash. Also note: since this build the game logs a 'leaked Stats' check when it closes; tell me if anything misbehaves around quitting |
 | data | **Median inventory and cube sizes: 15 x 10** (inventory.txt gridX/gridY; HD panels with Median's own art, tools/ui_panels.py + ui_layouts.py) | Open the inventory (I) and the Horadric Cube in HD. Move items into the new rows/columns, equip items in every slot, swap weapons (W), transmute something; save and reload; press G for classic | Inventory: Median's panel, 15 x 10 grid lined up with the art, equipment slots where Median has them, gold box bottom left. Cube: Median's crafting panel, 15 x 10 grid, transmute button under it. Items stay where they were after reload. Report anything misplaced (a screenshot helps). Press G: classic mode now has Median's art for inventory and cube (15 x 10 on scaled grids; items are smaller than in HD), check I / cube / C / stash (both tabs and shared pages) / a vendor: items on the grid cells, nothing overlapping (screenshot). Backup of all characters: mxl-manual-backups/all-before-15x10-inventory |
 | data | **Median character sheet** (statsheet page 0 as the HD background, D2R stat widgets moved into its boxes; tools/ui_panels.py 'charsheet', tools/ui_layouts.py char_sheet()) | In HD press C; check with points to spend and with a weapon equipped; hover the stat labels | Median's panel with: name and Level / Class in the top bar, Life / Mana / Stamina and experience in the four bars around the circle, Strength / Dexterity / Vitality / Energy (value box left of the label) with the +1 buttons right of the rows, Fire / Cold / Lightning / Poison and Defense in the boxes, damage and attack rating of the left and right skill beside the weapon portraits, stat points remaining at the bottom. Report text outside its box, missing numbers or buttons off the rows (screenshot). Known: pages 2 and 3 of Median's sheet (extra stats) are not built |
-| data | **Advanced Stats panel rows** (itemstatcost advdisplay from data/advanced_stats.tsv: Laz's PlugY stat pages + 21 vanilla rows; tools/txt_migrate.py advanced_stats; docs/txt-migrate.md) | `py -3 tools/game_checks.py all advstats` (lane advstats), or by hand: in HD press C, click the arrow on the sheet's right edge, scroll; equip items with speed / absorb / resist / mastery / minion mods | Twelve rows always (leech, GF, MF, the five speeds, open wounds, crushing blow, deadly strike), then only the stats the character has, worded like the item tooltip ("20% Faster Cast Rate", "Fire Resist +30%"). Per-level item stats have no row (their amount is in the target stat, e.g. MF). Legacy graphics has no Advanced Stats button (D2R's legacy layout has none). Report garbled lines or a missing / wrong number |
+| data | **Advanced Stats panel rows** (itemstatcost advdisplay from data/advanced_stats.tsv: Laz's PlugY stat pages + 21 vanilla rows; tools/txt_migrate.py advanced_stats; docs/txt-migrate.md; in groups with Avoid, skill speeds, elemental adds and a live refresh by the plugin part `advstats`, bugs #581 / #582) | `py -3 tools/game_checks.py all advstats` (lane advstats), `all advgroups` (lane advstats2: cast Ecstatic Frenzy as an Amazon, learn Perfect Being as an Assassin), or by hand: in HD press C, click the arrow on the sheet's right edge, scroll; equip items with speed / absorb / resist / mastery / minion mods | Group headings ("- Offense -", "- Defense -", "- Speed -" ...), each followed by its rows. Twelve rows always (leech, GF, MF, the five speeds, open wounds, crushing blow, deadly strike), then only the stats the character has, worded like the item tooltip ("20% Faster Cast Rate", "Fire Resist +30%"). Per-level item stats have no row (their amount is in the target stat, e.g. MF). Legacy graphics has no Advanced Stats button (D2R's legacy layout has none). A buff (Ecstatic Frenzy: "+x% Attack / Movement Speed from Skills", "Adds x-y Magic Damage") shows and goes away while the panel is open; Perfect Being shows "x% Chance to Avoid Damage". Report garbled lines or a missing / wrong number |
 | data | **Median trade window, NPC store and in-stash cube sizes** (inventory.txt Trade Page 1/2 = 7 x 15 each, Monster = 15 x 15; HD panels tradelayouthd / vendorpanellayouthd / bankexpansionlayouthd with Median's trade.dc6 and store.dc6 art; materials tab cube view 15 x 10; tools/txt_migrate.py, ui_panels.py, ui_layouts.py) | In HD: (1) trade with a second player (TCP/IP test): open the trade window, move items into both columns, accept; (2) open Gheed, Charsi, Akara and a gambler: all four tabs, buy and sell, repair (Charsi), refresh (gambler); (3) open the stash, Materials tab, put items into the cube view and transmute | (1) Two 7 x 15 grids side by side on Median's trade art, names and accept buttons in the header bars, gold under each grid; check which side is yours (left is 'them', right is 'us' in the layout, swap TRADE_GRIDS/TRADE_BARS in ui_layouts.py if wrong). (2) 15 x 15 store grid on Median's store art, D2R's tabs lined up over the four tab slots (none drawn pressed in the art), gold text in Median's gold bar at the top, repair/refresh buttons under the grid not overlapping it. (3) The cube view is a 15 x 10 grid on pasted art over the old recess (side stubs of D2R's art may show), items match the Horadric Cube panel; transmute button below. Classic (G): the trade window has Median's art and two 7 x 15 grids, untested (needs two players): check names, accept buttons and gold under the grids. Report where the item cells and art disagree (screenshot) |
 | data | **Cold effect on monsters** (coldeffect -20, was read as 236) | Chill monsters (any cold skill or cold damage item) | Chilled monsters slow down (Median: -20%) instead of speeding up |
 | data | **Monster sequence skills** (monstats Sk*mode `mqN` -> sequence names, 1,152 slots) | Fight monsters that raise or revive (Fallen Shamans, Greater Mummies, skeleton-raising casters), charging monsters, Sand Maggots | Shamans revive Fallen, mummies raise, maggots burrow and lay eggs, chargers charge; no monster stands still where it should use a skill |
@@ -7519,3 +7558,239 @@ Method and results: [Flat maps](maps-hd-method.md#flat-maps-owner-ruling-2026-11
   - Planned: `wall_maps` with `MXL_WALL_LEVELS=59`, `MXL_WALL_SPOTS="59:70,49;67,42;72,68;40,53;81,57"` and
     `MXL_WALL_WALK="59:67,47>67,42;81,56>81,60;69,49>74,49"`, with the flat scene swapped into the slot for the run.
   - Game runs are started in the foreground only, so that stopping one always reaches the script's restore step.
+
+## Lane bug568: the community report #568 split into #569-#586 (2026-11-13, slot 2, foreground)
+
+- **Unit tests:** `tools/tests/test_missile_release.py` (8: the release rule on synthetic rows, `thrown`, `free_copy`,
+  `apply`, `scaled_base` through `_free`, and `--check` on the built mod), `test_sounds_port.py` (15, with
+  `MedianFileRows`), `test_missile_looks.py` (29), `test_skill_looks.py` (25): all pass on the built mod.
+- **Build:** `missile_release.py` moved 133 rows to 23 `_free` models; `build_effects --check-only` 0 problems.
+  Built `sounds.txt`: `wussie_over_here` -> `act5\soldier\sol_helpus.flac`.
+- **In game (real right-click casts, 8 frames each, HD):** main's build (`mxl2012-runs/bug568/before-hd2`) against this
+  lane's build (`after-hd`), 15 skills of the report, contact sheets `sheet_<skill id>.png` in both folders.
+  - Fireball Sentry (339): before, the fire burst flew out of the caster in four clusters; after, the fireball ring forms
+    around the explosion at the trap (#569).
+  - Storm Crows, Broadside, Barrage, Phalanx, Widowmaker cast and make the same missiles before and after (counts in
+    `lab.json`); at the lab's crop the change is not visible frame by frame.
+  - Seismic Charge (Limpet Laser) and Beacon made no missile in the lab (no placed target, Beacon at level 7), so #572
+    and #574 are not seen in game.
+- **Legacy (`after-legacy`, lane build, 6 skills):** Ghost Arrow draws its spread of arrows in legacy and none in HD
+  (#571 reproduced, not fixed); Fireball Sentry, Broadside, Barrage, Sacrifices cast as before (the release step only
+  changes the HD missile map). Widowmaker made no missile in this run (skill level 18, no minion out yet).
+
+## Lane rotwwarn: stash tabs without Reign of the Warlock (2026-11-14, slot 2, HD, legacy and gamepad, background input)
+
+Plugin part `rotwwarn` (docs/bugs.md #590). Probe script and logs in `mxl2012-runs/rotwwarn/` (`probe*.log`, `session.py`, `probe.py`),
+screenshots there.
+
+- **Unit tests** `rotwwarn_tests` (signature parser and unique match, which tabs need RotW, the decision, the tab kept instead, the 2 s
+  line limit, the warning line with D2R's name and the English fallback, the dev switch): pass; dev and player DLL built.
+- **Not owned (the part's answer only, `MXL_ROTW_OWNED_TEST=no`)**, MedStashA (RotW game), run `checks-20261114-025238-s2`: HD clicks on
+  tabs 2-6, legacy clicks on tabs 2-6, gamepad RT x4 / LT x5: 17 asks, 17 blocked, 17 lines; the tab shown before stays (Personal or
+  Shared), the message log shows "This stash tab needs Reign of the Warlock."; the game lives, no crash file. Shots
+  `notowned_hd_materials_blocked.png`, `notowned_legacy_median_blocked.png`, `notowned_pad_rt_blocked_warning.png`.
+- **Owned**, MedStashA, run `checks-20261114-024452-s2`: the same steps, 17 asks, 0 blocked, every tab opens as before. Shots
+  `owned_hd_materials_open.png`, `owned_pad_rt.png`. StashTab (expansion game), run `checks-20261114-023620-s2`: tabs 2-6 hidden by D2R
+  as before, 0 asks.
+- Both runs report only the Inventory.cpp:2035 / 2036 asserts seen before this part (probe runs of 2026-11-13).
+- **Not covered:** an account that really lacks RotW (every test slot reports it owned; slot 3 checked too, `slot3_owned_charselect.png`),
+  so the reported crash was not reproduced and D2R's own non-owner path (its classic bank tables, BankOriginalLayout) is untested.
+  `MXL_ROTW_OWNED_TEST=d2r-no` patches D2R's check itself: the character screen greys the RotW characters (`sim_d2rno_charselect.png`);
+  a game with it was only tried with an incomplete data build (below). A keyboard tab key was not tested.
+- **Banner over the stash (2026-11-14, later the same day; owner ruling: the warning in the foreground, centre, huge).** Unit tests
+  `rotwwarn_tests` (banner time, both layouts name the panel, priority 9000, no click catcher): pass. Probe `probe_big.py`, logs
+  `probe13`-`probe18`. Not owned (`MXL_ROTW_OWNED_TEST=no`, MedStashA), run `checks-20261114-173452-s2`: 18 asks, 18 blocked, 18 lines;
+  banner shows 18, opens 10, closes 10, fails 0; the red band with the line is drawn over the stash in HD, legacy and on gamepad RT / LT
+  and is gone 4.5 s later; a click on the cube under the band picked it up (put back after). Shots `big_hd_blocked.png`,
+  `big_legacy_blocked.png`, `big_pad_rt_blocked.png`, `big_pad_lt_blocked.png`, `big_hd_after_gone.png`, `big_hd_click_through.png`.
+  Owned (no env), run `checks-20261114-174019-s2`: 0 blocked, 0 banners, the tabs open (`big_owned_hd_tab4_open.png`,
+  `big_owned_pad_rt_open.png`). `=d2r-no` (StashTab, HD), run `checks-20261114-174515-s2`: D2R shows its original 2-tab stash, 0 asks
+  (`big_d2rno_hd_original_stash.png`). Only the Inventory.cpp:2035 / 2036 asserts seen before. Not covered: a real non-owner account,
+  ultrawide screens, Escape while the banner is up.
+- A half-built `work/mod` (only `data/global/excel`; necromorb kept `mKB`, bug #3) made every game quit on load with Gfx.cpp:4056
+  "Could not add cof file ... IMghhth.COF" (runs `checks-20261113-235131-s2`, `checks-20261114-003019-s2`); a full `tools/build.py`
+  fixed it. Not a RotW issue.
+
+## Lane looks568: HD looks of Singularity (#573) and Wychwind (#575) (2026-11-14, slot 2, foreground)
+
+- **Change:** hand picks only (`data/hd-effects-picks.tsv`); no tool changed. Singularity: hole rows -> `abyss_meteor_target_indicator`,
+  `voidsparkles` -> `miasma_sparks`, `blackexplosion` -> `miasma_smoke_puff`. Wychwind: `wychknife`, `wychblade` -> `missile_dagger` at 2
+  (built `mxl_missile_dagger_s200`, `_free` for `wychblade`), `wychoverpower` -> `expansion_mindblast`.
+- **Build:** full build, `build_effects --check-only` 0 problems. A pick with both a scale and a `tint` on `sanctuary` fails the check:
+  `sanctuary` has no colour ramp to tint.
+- **Candidates in game (HD, real right-click casts, 12 frames each; Wychwind first, with 8 zombies around the target so the blades hit):**
+  `mxl2012-runs/looks568/` runs `before2-hd` (base picks), `c1-hd` (chosen set), `c2-hd` (Mephisto's hell hole `smithholeneutral`,
+  `miasma_smoke_puff` sparkles, knife at 1, `sanctuary` at 0.6), `c3-hd` (`expansion_baaldeathswirl`, knife at 1.4, `teethexplode`), `after-hd`
+  (final build). Crops `zoom_340.png`, `zoom_343.png` in each folder.
+  - Singularity: before, white lightning over the whole field and an orange blast; after, a dark purple void column at the centre and no
+    lightning. The hell hole draws a dirt mound with red sparks (runner-up); the Baal swirl draws nothing.
+  - Wychwind: before, pale shuriken stars; after, dark knife blades. At scale 1 the knife hardly shows; at 1.4 it shows small (runner-up).
+    The hit glow under the blades was not seen in any run (the zombies die fast).
+- **Legacy (`before-legacy` against `after-legacy`):** Singularity makes the same missiles (768 sparkles) and looks the same (faint dark
+  specks); Wychwind throws the same knives (the after run had the zombie pack, so its blades hit and made the hit pieces).
+- **Overviews:** `mxl2012-runs/looks568/overview_573_singularity.png`, `overview_575_wychwind.png` (before / chosen / runner-up).
+- **Singularity's size against its damage reach (2026-11-14, HD, slot 2):** the damage comes from `seismicfieldmininovatile` (1850),
+  rings of tiles from the field's centre on the caster at `Vel` 16 for `Range` 10 frames; no column has a level term, so the reach is the
+  same at every level. Polling `missiles` during a cast found tiles out to 7.2 sub-tiles (345 samples); with the tile's size 1 the reach
+  is about 7.5 sub-tiles. The abyss hole draws about 0.7 sub-tiles across its centre. A pick scale of 13 (`_s1300`, about 7.5 sub-tiles)
+  was built and cast with 8 zombies on a 7.5 ring: the hole drew the same size as at 1.2. `vfx_chaos_abyss_hole.particles` ignores the
+  transform scale (as in docs/hd-effects.md section 12), so the pick stays at `auto`. Runs `r-before-hd`, `r-s13-hd`; overview
+  `mxl2012-runs/looks568/overview_573_radius.png`.
+- **Singularity, the bigger dark area (owner ruling 2026-11-14, HD, slot 2):** `voidsparkles` -> `miasma_chains_cloud`, hole rows unchanged; full build, 8 zombies on the 7.5 ring (`big-final-hd`, reach measured 7.21 again). A dark purple cloud covers the ring and runs a little past it. In frames 3, 5, 7, 8 and 9 of 10 nothing of the skill draws, the hole included, and frames 0 and 4 show a white flash with red sparks; the committed abyss-hole-only set (`r-before-hd`) shows the hole in all 10. Candidates: `seal_death` on the field rows (`big-d2-hd`, a bright blast), `miasma_chains_cloud` on the field rows (`big-d5-hd`) or on the client hole row (`big-d6-hd`): no cloud drawn; cloud on every sparkle (`big-d4-hd`, picked); cloud on the sparkle ends `blackexplosion` (`big-d7-hd`, runner-up: cloud gone in 3 of 10 frames, flash in 5). `sealdeathlarge` cannot be picked, because no D2R row draws it. Legacy was not run again: the change is only in `missiles.json` (HD). Unit tests: `discover -s tools/tests` 1588 OK (16 skipped), `-s tools -p "test_*.py"` 590 OK (1 skipped). Overview `mxl2012-runs/looks568/big_overview_573.png`.
+- **Singularity flicker (owner ruling 2026-11-14: keep the cloud, remove the flicker; HD and legacy, slot 2):** `torch.py` counts the bright pixels of the two torch flames per frame; they go dark in exactly the frames where the skill's effects vanish, and only when every sparkle draws a cloud (about 200 live), so D2R drops all particles of the scene that frame. Tries on `work/mod`: one cloud per `voidfield` (`big2-e1-hd`), a spread step 13 (`big2-e2-hd`) and 9 (`big2-e3-hd`, with `seismicfieldexplode` drawing nothing): 0 gaps each. Repo fix `txt_migrate.py` `void_clouds` (step 9, `voidcloud` -> `miasma_chains_cloud`), full build: `big2-final-hd` 0 gaps in 10 (torch 78-182), hole in 10 of 10, no flash, 0 asserts, reach 7.21; `big2-final-legacy` native look, 0 asserts, reach 7.21. Overview `mxl2012-runs/looks568/big2_overview_573.png`.
+
+## Lane hd587: HD skill looks of bug #587 (#593-#611) (2026-11-15, slot 2, HD and legacy, foreground)
+
+- **Change:** hand picks only (`data/hd-effects-picks.tsv`); no tool changed. Row picks: `carpetofspidersbolt` -> `finger_mage_spider`,
+  `turbofront` -> `paladin/aura_resistcold`, `cyclonearmor2back` -> `druid/cyclonearmor_1back`, `aura_resistall_back` ->
+  `paladin/aura_resistall_front`, `druidsideattacker` and `eggspikemissile` -> `spike_fiend_missle` at 3. Art picks: `extra/cursehit`
+  -> `explosion_spark_small` at 1, `laughingghost` -> `bone_spirit`, `egg_dead` -> `corpse_explode_guts` at 1.
+  `tools/data/d2r_vfx_files.txt` gains the Resist Cold overlay files (`hd_recolour.py list`).
+- **Build:** full build, `build_effects --check-only` 0 problems. Overlay tints need the D2R particle files in the shared cache
+  (`MXL_SLOT=2` reads them from the slot's CASC once); `druid/cyclonearmor_1back` has no colour ramp, so Hive's wind cannot be tinted green.
+- **Lab (`mxl2012-runs/hd587/`, real right-click casts on a monster pack, 12 frames each):** `before-hd`, `before-legacy` (20 skills of
+  #587), `c1-hd`, `c2-hd`, `c3-hd` (candidates), `after-hd`, `after-legacy` (final build). Before/after crops per skill in `shots/<skill>/`.
+  - Carpet of Spiders: before, a white fan of blades out of the sorceress; after, small red-glowing spiders spreading from the target.
+  - Rapture: rainbow ring -> blue ring (runner-up: the Salvation ring in the violet ramp, reads pink).
+  - Hammerstrike: thick white glowing disc -> a dotted ring of small sparks (runner-up: `expansion_iceglint`, hardly visible).
+  - Hive: nothing -> a pale wind around the caster. Faerie Fire: nothing -> the rainbow ring under the druid.
+  - Quill Storm: specks -> a fan of grey quills. Laughing Ghost: invisible -> a pale wisp (runner-up `redemption_ghost`, a red flame).
+  - Egg Trap: fiery blast at the end -> a dark splat (runner-up `queen_death_guts`, a spray that reads as fire).
+  - Not fixed: Thunderstone (`rock_small` 2.5, `expansion_volcano_rock`, `expansion_hurricane_rocks` 2 tried; no stone seen in the
+    frames), Bladestorm's blades (`expansion_bladefury` at 3 not seen).
+- **Legacy (`after-legacy`):** the picks are HD only; the paladin and sorceress casts look as in `before-legacy`. The druid casts of
+  both legacy runs came out in HD (the lab's graphics switch did not hold after the switch to the druid), so the druid's legacy look
+  was not compared in this lane.
+
+## Lane sendrotw: no deposits into the RotW pages without Reign of the Warlock (2026-11-14, slot 3, HD, foreground input)
+
+docs/bugs.md #591. Check `sendstashrotw` (`tools/sendstash_checks.py` `run_rotw`):
+`MXL_RUN=<lock> MXL_SLOT=3 MXL_CHAR=<RotW character> [MXL_ROTW_OWNED_TEST=no] py -3 tools/game_checks.py all sendstashrotw`.
+Runner, logs and screenshots in `mxl2012-runs/sendrotw/` (`session.py`, `checks.py`, `game_*.log`). Character `SendRotw` (new RotW
+Barbarian, `mxl2012-s3`).
+
+- **Unit tests** `rotwwarn_tests` (the Store / Send lines, StoreBlocked, the transfer's return addresses, the hook entry sizes) and
+  `send_stash` (Decide with NoRotw first, its refusal line, the button greyed): pass; dev and player DLL built; `tools/tests` 1593 OK.
+- **Not owned** (`MXL_ROTW_OWNED_TEST=no`), run `checks-20261114-193230-s3`: PASS. The button shows `norotw` (greyed; tooltip "Needs
+  Reign of the Warlock ..."); backpack gcr gcr gfv r01 r02 r03 hp1 key: a click moves nothing (runs 0, refused 1), the message log gets
+  "Send to stash needs Reign of the Warlock: ..." and the centred banner shows; the harness press moves nothing. Ctrl+click of `gcr` and
+  `r01` with the stash open on Personal: both land on Personal (page 4), none in a RotW page (0x15f320 answered "no slot" 201 / 140
+  times; no transfer ask, so no banner). Shots `sendrotw_notowned_inventory.png`, `_hover`, `_click_banner`, `_click_after`, `_press`, `_ctrl_gcr`, `_ctrl_r01`.
+- **Owned** (no env), run `checks-20261114-193026-s3`: PASS. The button is live, a click sends the 6 slot items (backpack keeps hp1 and
+  key); Ctrl+click puts `gcr` and `r01` into the RotW pages; the hook counters stay 0. Shots `sendrotw_owned_inventory.png`, `_hover`,
+  `_click`, `_ctrl_gcr`, `_ctrl_r01`.
+- Both runs: no crash file, only the known Save and Exit pool asserts. The first not-owned run (`checks-20261114-192548-s3`) failed only
+  the Ctrl+click rows, because the check expected the item to stay in the backpack; D2R puts it on Personal, and the check now accepts that.
+- **Not covered:** a real non-owner account, legacy graphics, the gamepad quick-move and controller-qol Deposit All in game (they reach
+  the same hooked functions by disassembly only), the slot widget at 0x2cf953.
+
+## Lane hdicons: HD art of the Send to stash and Charms buttons (2026-11-14, slot 3, HD, background input)
+
+docs/bugs.md #592. Runner, shots and logs in `mxl2012-runs/hdicons/` (`session.py`, `shots.py`, `overview.py`, `game_*.log`).
+`MXL_SLOT=3 MXL_RUN=hdicons MXL_CHAR=HdIcons [MXL_ROTW_OWNED_TEST=no] [HDICONS_SIZES=1600x900,...] py -3 <runs>/tools/heavy_lock.py game hdicons --
+py -3 <runs>/hdicons/session.py <worktree> <tag>` (installs with `--invtabs`; character `HdIcons`, new RotW Barbarian, `mxl2012-s3`).
+
+- **Before** (`checks-20261114-201249-s3`, old Send to stash art, no `button.sprite`): HD draws the mod's own HD sprite for Send to stash
+  (no classic fallback) and invtabs' drawn stand-in (`invtabs.log`: `inventory button: drawn stand-in`). Shots `hdicons_before_*`.
+- **After** (`checks-20261114-202558-s3`, full build): both buttons in the new art at 1600 x 900, 1920 x 1080 and 2560 x 1440: normal,
+  hovered, pressed (left button held through the harness's virtual input) for both; the Charms click still opens the tab
+  (`_charm_open`). `invtabs.log`: `inventory button: the mod's art (button.sprite)`. Shots `hdicons_after_*`.
+- **Greyed** (`checks-20261114-202824-s3`, `MXL_ROTW_OWNED_TEST=no`): `MxlSendStashNoRotw` greyed at 1600 and 1920, its click refused
+  with the reason line (refused 2). Shots `hdicons_greyed_*`.
+- Overview `hdicons_overview_before_after.png`; art sheets `hd_buttons_x1.png`, `hd_buttons_x3.png` (`tools/hd_buttons.py preview`).
+- Unit tests: `tools/tests` 1605 OK (16 skipped, new `test_hd_buttons`), `tools -p "test_*.py"` 590 OK, `build_plugin.ps1 -Tests` all native tests pass (invtabs included). No crash file in the three runs.
+- **Not covered:** the Charms button's disabled frame (never disabled in game; preview only), the low texture quality (.lowend)
+  setting, the `MxlSendStashNoSlots` / `Joined` greyed buttons (same frame as NoRotw), the gamepad `sendstash_pad` copy in game, legacy
+  graphics (classic art unchanged).
+
+## Lane statbook: Stat Book data and core, sheet art fix, advstats ids (2026-11-14, no game run)
+
+Merge of lane/sheetres and lane/advstats2 on main: plugin and mod build pass. New: `data/statbook_pages.tsv`,
+`tools/statbook.py` (book file for the mod, plain D2R book in `statbook/src/default_book.inc`), `statbook/src/book_logic.h`
+(parse, row values and tones, page lines, search, tabs). `tools/sheet_resists.py` hd_art: the third row uses the Fire /
+Lightning row's art and the ledge is cut (ragged, 4-row blend), not scaled. `tools/advanced_stats.py` maps Median's stat ids
+through idmap (33 rows had pre-idmap ids). Tests: `tools/build_plugin.ps1 -Tests` all pass (new `statbook_tests`);
+`py -3 -m pytest tools/tests -q`: 1,640 pass, 43 subtests (new `test_statbook.py`, `test_sheet_resists.py` HdArt).
+Not verified in game: the fixed advstats ids, the new sheet art.
+
+### Stat Book plugin DLL (2026-11-15, slot 3 and slot 1, background input)
+
+`statbook/` is its own CMake project and DLL (`tools/build_plugin.ps1` builds it with the other plugins; `-Tests` runs
+`statbook_tests`, `statbook_config_tests`, `statbook_sheetres_tests`, `statbook_advstats_tests`). sheetres and advstats
+moved from mxl2012-core into it (git mv); their status lines are in the `statbook` console command
+(`game_checks.statbook_text()`). New check `statbook` (`tools/statbook_checks.py`): the parts' lines, an Amazon with a shield,
+a ring (FCR 25, Fire Resistance 37) and dexterity 200; the book's Chance to Block against the harness `cblock`, the Fire
+Resistance, Faster Cast Rate and Attack Speed from Skills rows against the client's stats.
+
+- `checks-20261115-002522-s3` (runner `mxl2012-runs/statbook/work/session.py`, slot 3, dev install with invtabs): `statbook`
+  PARTIAL (every judged row ok: book 12% = GetBlockRate 12, `match=yes`; Fire 37%; FCR 25%; skill speed +0%; shots
+  `statbook_hd_sheet`, `statbook_hd_advstats`, copies in `mxl2012-runs/statbook/shots/`), `advgroups` PARTIAL (every judged
+  row ok; the Ecstatic Frenzy rebuild counted 1). The first run (`checks-20261115-001410-s3`) found two check faults, fixed:
+  a level-1 Amazon has 15 mana, too little for Ecstatic Frenzy (`run_groups` now raises max mana for the cast and puts it
+  back), and a server `stat ... set` of FCR never reaches the client (the check wears a ring instead); and one data fault:
+  the skill speed rows showed +100% (base -100 added).
+- Plain D2R (`mxl2012-runs/statbook/work/plain_run.py`, owner-approved plain runs): slot 1, `mods\statbook-plain` (its
+  modinfo, statbook.dll, statbook.toml; left in place), `-mod statbook-plain -w`: the menu reached, the plugin loaded with the
+  built-in book, advstats off (no mod book), sheetres / block / pad on, shared files restored, no crash. Log only: without
+  mxl2012-core there is no background console or input harness, so no game was entered. On slot 3 the same plain start never
+  reached "D2R startup complete" with or without the plugin (the game ended at "Preparing frontend launch task"): a slot 3
+  matter, not the plugin.
+- Not seen: the double panel_shared window proc (statbook subclasses nothing yet).
+
+### Stat Book: gamepad hook and plain D2R in game (2026-11-15, lane statbook)
+
+`tools/build_plugin.ps1` also builds the Stat Book test DLL (`build/statbook-test`, `-DSTATBOOK_TEST_HARNESS=ON`, D2R-Legacy169's
+cut-down harness, switch file `statbook-testharness.txt`) and fails when the player DLL carries the harness. New check
+`statbook_pad` (`tools/statbook_checks.py` run_pad).
+
+- `checks-20261115-011730-s3` (`session.py` with `SB_TOML=pad_log=true`, slot 3): `statbook_pad` FAIL as a finding: the
+  scripted pad is polled, Start + LB reach D2R's gamepad Character page (shot `statbook_pad_sheet`), the hooked sheet slot
+  got 8 messages as the page opened (InputMessage, sub-type 0x681c0f1f0a501eb1) and none for LT, RT, up, down, X, LB, RB:
+  the gamepad menu does not pass the buttons to CharacterStatsPanel's slot 4, so no ids were learned and no defaults set.
+- Plain D2R in game (`mxl2012-runs/statbook/work/plain_book.py`, slot 1, slot lock, `mods\statbook-plain` with the test DLL,
+  background input): an Amazon made (SbPlain, in the plain mod's own save folder), `statbook` answers through the harness
+  console, advstats off (no mod book), the built-in book's 6 pages (Offense, Spells, Defense, Resistances, Skills & Procs,
+  Utility), Chance to Block 75% (the starting buckler, GetBlockRate), shot `statbook_plain_sheet` (D2R's own sheet, no panel
+  over it: that needs the layout contract), switch file removed and shared files restored after the run.
+
+### Stat Book: the sheet host in game (2026-11-15, lane statbook)
+
+New check `statbook_host` (`tools/statbook_checks.py` run_host): an Amazon with a ring (Faster Cast Rate 25, Fire
+Resistance 37), the HD sheet opened, every tab clicked, the Advanced Stats arrow, "fire" typed in the search box, the first
+row's arrow, the sheet closed and opened on a page, `statbook vis` on `StatBookPage` and on one heading text, the client at
+1920 x 1080 and 2560 x 1440, the legacy sheet.
+
+- `checks-20261115-021753-s3`: the sheet never opened (also in legacy). The first host version calibrated the visible flag by
+  hiding and showing widgets of the closed sheet with their vfuncs. With `book = false` (`checks-20261115-022730-s3`) the
+  sheet opened: the host was the cause. Fixed: WidgetService for the Stat Book's widgets, calibration by hides only.
+- `checks-20261115-023759-s3` / `-024608-s3`: 903 names without a WidgetService handle (about 256 per plugin): only groups get
+  one now. The group shot showed that hiding `StatBookPage` hides its lines.
+- `checks-20261115-030024-s3`: `statbook_host` PARTIAL, every judged row ok (tabs 1-7 and back to 0, arrow -> All Stats,
+  typed query "fire" read back, the Fire Resist row's arrow -> Resistances, reopened on Defense, 1080p and 1440p tabs,
+  legacy not bound). Shots `statbook_*.png`, copies in `mxl2012-runs/statbook/shots/cp4/`.
+
+### Stat Book: gamepad host, plain D2R panel (2026-11-15, lane statbook)
+
+- `statbook_host` now opens mxl2012-core's developer menu once (shot `statbook_devmenu_open`, Ctrl+F12 closes it) before the
+  search is typed, so both copies of panel_shared have subclassed the game window. `checks-20261115-041533-s3`: every row ok,
+  the query read back as "fire" (each key once), the orange match highlight and the wider values in the shots, the held
+  heading text shown again after `statbook vis ... -1` (shot `statbook_vis_leaf_released`).
+- New check `statbook_host_pad` (`tools/statbook_checks.py` run_host_pad, scripted pad): Start and the paging button reach
+  the gamepad Character page, the host is bound on the gamepad layout, next, next, previous step its tab 0, 1, 2, 1, then the
+  paging buttons page D2R's menu away and back. `SB_PAD_SETUP=cqol` (lane `session.py`) puts Controller QOL Updates into the
+  mod for the run and removes it afterwards. `checks-20261115-042217-s3` (plain mod: LT / RT tabs, LB / RB pages) and
+  `checks-20261115-042449-s3` (Controller QOL: LB / RB tabs, LT / RT pages): every row ok, shots `statbook_pad_<setup>_*`.
+- Plain D2R panel (`mxl2012-runs/statbook/work/plain_panel.py`, slot 1, `mods\statbook-plain` with the test DLL, background
+  input): the plugin's own panel opens with the sheet and binds, each tab click selects its tab, "fire" typed in All Stats,
+  the panel closes with the sheet and opens again; shots `statbook_plain_*` (copies in `mxl2012-runs/statbook/shots/cp5/`),
+  shared files restored after the run. First runs: every open refused ("Plugin panel open failed ... fallback-resource=found")
+  while the panel was named `statbook/StatBookPlain`; the same layout under trial names opened, so it is now
+  `statbook/SbPlainPanel`.
+- Plain panel tab strip: with the Stat Book's tab sprites in the plain mod's data the strip matches the mod's (shot
+  `statbook_plain_tabs_vs_mod`), D2R's "Character" title no longer shows under it; `SB_TABART=0` (no art) swaps in D2R's
+  stash tab, status `tab art D2R's stash tab`. Both runs every row ok (shots in `mxl2012-runs/statbook/shots/cp6/`).
+- `statbook_host_pad` with Controller QOL loaded after the Stat Book (`SB_PAD_SETUP=cqol-after`: the DLL placed as
+  `zz Controller QOL Updates.dll`): `checks-20261115-055033-s3` FAIL, tabs stayed 0: the pad choice found QOL by file name
+  only and kept LT / RT. Fixed (QOL found by plugin id): `checks-20261115-055601-s3` PASS; QOL before
+  (`checks-20261115-055831-s3`) and no QOL (`checks-20261115-060024-s3`) PASS again. The check now writes the load order
+  from the loader log as an INFO row.

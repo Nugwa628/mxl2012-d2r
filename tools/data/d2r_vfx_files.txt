@@ -1,6 +1,7 @@
 # D2R files tools/hd_recolour.py reads (cached by tools/lane_setup.py); written by `py -3 tools/hd_recolour.py list`
 data/hd/vfx/particles/character/enemy/diablo/vfx_DiabloFire_Skill3.particles
 data/hd/vfx/particles/missiles/bone_spirit/vfx_bone_spirit.particles
+data/hd/vfx/particles/missiles/charged_bolt/ChragedBolt.particles
 data/hd/vfx/particles/missiles/diabwall/vfx_diabwall.particles
 data/hd/vfx/particles/missiles/diabwallmaker/vfx_diabwallmaker.particles
 data/hd/vfx/particles/missiles/expansion_imp_fireball/fx_imp_fireball.particles
@@ -54,6 +55,7 @@ data/hd/vfx/textures/gradient/T_FX_flame_gradient_02.texture
 data/hd/vfx/textures/gradient/T_FX_flame_gradient_07.texture
 data/hd/vfx/textures/gradient/T_FX_flame_gradient_09.texture
 data/hd/vfx/textures/gradient/T_FX_gradient_fallen_shaman.texture
+data/hd/vfx/textures/gradient/T_FX_lightning_Grad_04.texture
 data/hd/vfx/textures/gradient/T_FX_linearGradient_SharFallOff.texture
 data/hd/vfx/textures/gradient/T_FX_linearGradient_SharFallOff_exponent_notinvert.texture
 data/hd/vfx/textures/gradient/T_FX_linearGradient_SharFallOff_exponent_notinvert_tight.texture

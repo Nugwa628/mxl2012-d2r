@@ -55,7 +55,8 @@ class Inventory(unittest.TestCase):
         self.assertNotIn("down", grid.get("navigation", {}))
         order = [c.get("name") for c in lay["children"]]
         at = order.index("gold_button")
-        self.assertEqual(order[at + 1:at + 4], [b["name"] for b in send_stash.widgets(hd=True)])
+        sends = [b["name"] for b in send_stash.widgets(hd=True)]
+        self.assertEqual(order[at + 1:at + 1 + len(sends)], sends)
         self.assertEqual(pad_ui.child(lay, "slot_feet")["fields"]["navigation"]["down"], {"name": "gold_button"})
 
     def test_expansion_names_the_send_buttons(self):

@@ -40,7 +40,7 @@ OUT_WORDS = {"mod": "keeps its modifiers", "uns": "socket fillers destroyed", "r
              "rch": "recharged"}
 CLASSES = {"ama": "Amazon", "sor": "Sorceress", "nec": "Necromancer", "pal": "Paladin", "bar": "Barbarian", "dru": "Druid",
            "ass": "Assassin"}
-DIFFICULTY = {"1": "Nightmare (Terror)", "2": "Hell (Destruction)"}
+DIFFICULTY = {"1": "Terror", "2": "Destruction"}
 OP_TEXT = {3: "{who} {stat} above {v}", 4: "{who} {stat} below {v}", 5: "{who} {stat} not {v}", 6: "{who} {stat} = {v}",
            7: "{who} base {stat} above {v}", 8: "{who} base {stat} below {v}", 9: "{who} base {stat} not {v}",
            10: "{who} base {stat} = {v}", 15: "{who} {stat} above {v}", 16: "{who} {stat} below {v}",

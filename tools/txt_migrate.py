@@ -447,6 +447,9 @@ FORMAT_KEY_FUNCS = {"27": "ItemModifierClassSkill", "28": "ItemModifierNonClassS
 # like 1.13c, tools/srcdamage.py) and the swarm then killed a 30,000-life character within 5 s (checks-20261029-052254-s2).
 MISSILE_LOAD = {**{f"skullswarm{i}": {"Param1": ("1", "2")} for i in range(5)},
                 "skullswarmimpact": {"NextDelay": ("4", "2")}}
+# Bug #573: the spread step of `voidcloudfield`'s burst (Migrator.void_clouds): 64 / 9 -> 8 clouds per burst (spread entries
+# 0, 9, .. 63); with 16 per burst (the sparkles' own step 4) HD dropped every particle effect in about half the frames.
+VOID_CLOUD_STEP = "9"
 
 # Monster rows dropped by the owner, row -> column -> (Median's value, ours); Migrator.dropped_monsters. The row stays (every
 # later monstats row keeps its id), but nothing spawns, names or links it any more. `cougar` (owner 2026-10-29): Median's own
@@ -463,19 +466,26 @@ read_tsv = idmap.read_tsv  # one record rule for the whole pipeline (tools/idmap
 # applied, then the item tooltip formatter 0x2d6520, so a row reads like the stat's tooltip line and needs a descfunc. Never
 # shown: stats with a parameter (skill on hit, auras; the panel reads layer 0) and per-level item stats (op 2-5: the player holds
 # them at 0, their amount is in the target stat, e.g. MF; seen in game, lane advstats).
-# Median's rows come from data/advanced_stats.tsv: Laz's PlugY stat pages (plugy/statsinterface.txt of the v005 MPQ) plus the
-# vanilla rows D2R lists that mean the same in Median. D2R's own rows that Median has no row for keep D2R's value.
+# Median's rows come from data/advanced_stats.tsv: Laz's PlugY stat pages (plugy/statsinterface.txt of the v005 MPQ), the
+# vanilla rows D2R lists that mean the same in Median, and rows added for bugs #581 / #582. D2R's own rows that Median has no row
+# for keep D2R's value. The plugin part `advstats` (statbook/src/advstats.cpp, table from tools/advanced_stats.py) lists the same
+# rows in groups with headings and adds the rows with a `row` kind (Avoid, elemental adds, skill speeds), which have no
+# advdisplay of their own. Without the plugin the panel shows the advdisplay rows as before.
 ADVANCED_STATS = ROOT / "data" / "advanced_stats.tsv"
 ADVDISPLAY = {"always": "1", "nonzero": "2"}
 
 
 def read_advanced_stats(path: Path = ADVANCED_STATS) -> dict[str, str]:
-    """Stat name -> advdisplay value of data/advanced_stats.tsv (columns stat, show, source)."""
+    """Stat name -> advdisplay value of data/advanced_stats.tsv (columns stat, show, group, row, source). Rows with a `row`
+    kind are the plugin's own (several stats, or a stat without descfunc) and get no advdisplay."""
     lines = [line.split("\t") for line in path.read_text("utf-8").splitlines() if line.strip()]
     h = lines[0]
     si, wi = h.index("stat"), h.index("show")
+    ri = h.index("row") if "row" in h else None
     out = {}
     for r in lines[1:]:
+        if ri is not None and r[ri]:
+            continue
         if r[si] in out:
             raise ValueError(f"{path.name}: {r[si]} listed twice")
         if r[wi] not in ADVDISPLAY:
@@ -920,6 +930,47 @@ class Migrator:
                            f"monster row in sHitPar1, remapped through the monstats id map; game-check)")
 
 
+
+    def void_clouds(self) -> None:
+        """Bug #573 (owner ruling 2026-11-14): Singularity's dark area in HD. Every `voidfield` (CltHitFunc 30, a burst of
+        64 / cHitPar1 = 16 `voidsparkles`) gives HD one Miasma Chains cloud per sparkle when the sparkles carry it, about
+        200 clouds at once; D2R then drops every particle effect of the scene in about half the frames (torches included,
+        lane looks568). Two client rows only HD draws carry the cloud instead: `voidfield` also runs client do 19 (spawns
+        CltSubMissile1 every CltParam1 frames, once in its 1-frame life) and makes one `voidcloudfield`, a copy of
+        `voidfield` that bursts every VOID_CLOUD_STEP-th spread entry (8 instead of 16) of `voidcloud`, a copy of
+        `voidsparkles` without art (CelFile null, no explosion), so it flies like a sparkle and legacy draws nothing new.
+        The sparkles keep their own burst. The new rows go at the end (no other row's id moves). A cell that no longer
+        holds Median's value leaves the rule out and is reported."""
+        want = {"pCltDoFunc": "1", "CltParam1": "", "CltParam2": "", "CltSubMissile1": "", "pCltHitFunc": "30",
+                "CltHitSubMissile1": "voidsparkles"}
+        for bank in ("base", ""):
+            p = OUT / "data" / "global" / "excel" / bank / "missiles.txt"
+            h, rows = read_tsv(p)
+            ix = {c: i for i, c in enumerate(h)}
+            by = {r[0]: r for r in rows if is_record(r)}
+            vf, vs = by.get("voidfield"), by.get("voidsparkles")
+            bad = ([f"{c}={vf[ix[c]]!r} (expected {v!r})" for c, v in want.items() if vf[ix[c]].strip() != v] if vf else ["no voidfield"]) \
+                + ([] if vs else ["no voidsparkles"]) + (["voidcloud already there"] if "voidcloud" in by else [])
+            if bad:
+                if bank == "base":
+                    self.report.append("\nmissiles: Singularity's HD clouds (bug #573) NOT applied: " + "; ".join(bad))
+                continue
+            idc = ix.get("*ID", ix.get("Id"))
+            last = max(int(r[idc]) for r in rows if is_record(r) and r[idc].strip().lstrip("-").isdigit())
+            for c, v in (("pCltDoFunc", "19"), ("CltParam1", "1"), ("CltParam2", "0"), ("CltSubMissile1", "voidcloudfield")):
+                vf[ix[c]] = v
+            field = list(vf)
+            field[0], field[idc] = "voidcloudfield", str(last + 1)
+            for c, v in (("pCltDoFunc", "1"), ("CltParam1", ""), ("CltParam2", ""), ("CltSubMissile1", ""),
+                         ("cHitPar1", VOID_CLOUD_STEP), ("CltHitSubMissile1", "voidcloud")):
+                field[ix[c]] = v
+            cloud = list(vs)
+            cloud[0], cloud[idc], cloud[ix["CelFile"]], cloud[ix["ExplosionMissile"]] = "voidcloud", str(last + 2), "null", ""
+            rows += [field, cloud]
+            write_tsv(p, h, rows)
+            if bank == "base":
+                self.report.append(f"\nmissiles: Singularity's HD clouds (bug #573): voidfield -> voidcloudfield ({last + 1}) "
+                                   f"-> voidcloud ({last + 2}), every {VOID_CLOUD_STEP}th spread entry")
 
     def missile_load(self) -> None:
         """Bug #395: the Heretics' attack (`skullswarmcenter`, monstats MissA1 of cultist2 / hell_cultist and their elite
@@ -1462,6 +1513,11 @@ class Migrator:
                 shown = Counter(r[ad] for r in rows if idmap.is_record(r) and r[ad])
                 self.report.append(f"\nAdvanced Stats panel (itemstatcost advdisplay, data/advanced_stats.tsv): {shown['1']} rows always, "
                                    f"{shown['2']} while not 0 (D2R's own rows included)")
+        # the plugin part advstats: group headings and its own rows' texts
+        import advanced_stats
+        written = advanced_stats.write_strings(OUT / "data")
+        self.report.append(f"Advanced Stats groups: {len(advanced_stats.strings())} strings -> {', '.join(p.name for p in written[:1])} "
+                           f"(strings and strings-legacy)")
         return problems
 
     def namespace_cells(self) -> None:
@@ -1662,7 +1718,8 @@ class Migrator:
         level, and a blank cell reads "Missing string" (the Rogue Encampment on game start). 1.13c has no such column (its
         EntryFile is not mapped), so the merge left it blank on every Median row. A level whose LevelName is the one D2R's
         row of the same Id has gets D2R's key (EnteringTheRogueEncampment); any other named level gets its LevelName key (the
-        banner then reads the area name; namespace_cells qualifies it like the name)."""
+        banner then reads the area name; namespace_cells qualifies it like the name). Median kept vanilla's name keys and renamed
+        their text (Cave Level 2 reads Duncraig): tools/level_entries.py gives D2R's Entering key the Median name then (bug #612)."""
         counts = Counter()
         for bank in ("base", ""):
             d = OUT / "data" / "global" / "excel" / bank
@@ -2287,6 +2344,7 @@ def main() -> int:
     m.stat_save_add()
     m.missile_slot_report()
     m.missile_load()
+    m.void_clouds()
     m.dropped_monsters()
     m.median_stat_wording()
     m.median_skill_wording()

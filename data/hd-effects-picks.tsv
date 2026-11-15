@@ -9,7 +9,7 @@ kind	art	effect	scale	confidence	reason	tint	rows
 missile	boneghosttrail	yellow_ball_glow_2	auto	high	small pulsing golden glow (arrow trail of Ghost Arrow, Barrage, Great Hunt...); was a fiery exploding-arrow burst
 missile	bonfire	ground_fire_small	auto	high	burning log pile on the ground; was a falling Armageddon meteor
 missile	doomsmoke	fire_smoke	auto	high	grey smoke wisps; was a meteor's fire trail
-missile	extra/cursehit	teethexplode	auto	medium	small star flash (Hammerstrike); was a meteor's fire trail. Colour stays pale (red in classic)
+missile	extra/cursehit	explosion_spark_small	1	medium	Hammerstrike's ring: a small burst of sparks on every piece, a dotted ring like classic's ring of stars (#595). Teeth's burst on every piece made a thick glowing white ring; Mephisto's ice glint hardly showed (lane hd587). Was a meteor's fire trail before that
 missile	extra/cursemissle	firebolt	auto	medium	bright star with an orange flame tail (Bear Claw, Stampede, Rebound); was a green poison skull
 missile	extra/explodingarrowdebris01	ceiling_chunk_vanish_02	auto	high	faint grey rock dust spreading on the ground (Shower of Rocks); was a blue bone-cast spark. Same pick as debris02
 missile	extra/explodingarrowdebris03	ceiling_chunk_vanish_02	auto	high	faint grey rock dust (Pummel); was a fiery exploding-arrow burst. Same pick as debris02
@@ -33,7 +33,7 @@ missile	discoball	yellow_ball_glow_2	auto	medium	small glowing orb (its colour c
 missile	psiorb	ice_orb	auto	medium	blue glowing sphere (Bionetic Slam); was a scatter of sparkles
 missile	psiorbexplode	bighead_lightning_explosion	auto	medium	blue sphere bursting with lightning (Bionetic Slam); was a fiery exploding-arrow burst (weak stand-in)
 missile	swarmhovers	poison_sparks	auto	low	faint specks hovering over an area (Swarm, a poison skill); was a bright blue nova glow (weak stand-in)
-missile	laughingghost	expansion_baaldeathghostie_01	auto	medium	a flying ghost (Laughing Ghost); was a thrown rock
+missile	laughingghost	bone_spirit	auto	medium	Laughing Ghost's ghost: Bone Spirit's pale flying wisp, like classic's pale ghost (#599); Baal's death ghost hardly showed, Redemption's spirit read as a red flame (lane hd587). Was a thrown rock before that
 missile	expansion/deathsentrymissile	expansion_throwing_star_missile	auto	high	small spinning shuriken (Fairy Ring); was a flying skull
 missile	extra/missileflamesword	fire_arrow	auto	high	small flaming blade, the size of a fire arrow; one row (Pillar of Faith) had the Fire Nova burst
 missile	extra/spikefiendmamamissle	spike_fiend_missle	auto	high	a flying quill (Quill Storm); was a plain arrow. D2R's spike fiend quill is the same kind
@@ -78,10 +78,24 @@ missile	teethexplodered	exp_arrow_explode	1	medium	big burst of Queen of Blades 
 missile	izualdeathparticles	chill_blood_puff	1.2	medium	Moonbeam's long trail of pale particles; Izual's death particles hardly showed behind the bolt (lane skillfix)		cath2tail
 missile	expansion/baaldeathghostie01	bone_spirit	1	medium	Moonbeam's bolt: a bright flying wisp with a tail, like classic's long beam; was a small bone spear swirl (lane skillfix)		cath2arrow
 missile	expansion/hurricane_swoosh	expansion_shockwave	1	medium	Psychic Scream's wide ring; the small swoosh hardly showed (lane skillfix)		mindwavenova
-missile	missiledagger	expansion_bladefury_c	1	medium	Wychwind's pale streaking knives; D2R's dagger mesh hardly shows at this speed (lane skillfix)		wychknife,wychblade
 missile	egg_alive	meteor_target_indicator	1	medium	Egg Trap's glowing rings on the ground: Meteor's ground ring (orange, its colours cannot be tinted); was a meteor glow; the red glow ball does not grow with its scale (lane skillfix)
 missile	dopplezonexplode	exp_arrow_explode	1	medium	Phalanx's big orange blast: the Exploding Arrow blast; D2R's dopplezon_explode does not grow with its scale (lane skillfix)		dopplezonexplode
 overlay	bigblam	sorceress/light_cast_1	1.6	medium	Buckshot's muzzle flash: a white burst on the unit; the prior common/valkyriestart (the Valkyrie's summon) drew a tall pillar of light (lane skillfix)
 missile	chillbloodpuff	chill_blood_puff	1.5	medium	Hypnotoad Prince's blue clouds, about classic's size; anyasteam hardly showed (lane skillfix)		hypnoprinceaura
 missile	TeethExplode	ice_bolt	1.5	medium	Mana Coil keeps the bolt tested in game; the automatic choice, Teeth's burst, is a weak match in the skill audit		manacoil
 missile	TeethExplodeViolet	ice_bolt	1.5	medium	Scatter Shot keeps its expanding ring of sparks; an arrow draws no ring at all		scattershotarrow
+missile	ExpArrowExplode	exp_arrow_explode	1	medium	Beacon's nuke: the ring of Exploding Arrow blasts that flies outward (legacy art ExpArrowExplode); the flying-row rule had given it Diablo's red lightning (bug #574)		beaconblastmissile
+missile	blackholeexplode	abyss_meteor_target_indicator	auto	medium	Singularity's void (Seismic Field): the Warlock's dark purple abyss hole, the closest D2R has to a black void; was an orange blast (#573)		seismicfieldlonger,seismicfieldblackhole,seismicfieldmob
+missile	boiling	miasma_sparks	auto	medium	Singularity's sparkles drawn into the void: a faint dark chaos cloud, as faint as legacy's dark specks; was charged_bolt, which read as lightning; the big purple cloud rides on voidcloud, half as many (#573)		voidsparkles
+missile	null	miasma_chains_cloud	auto	medium	Singularity's dark area (owner ruling 2026-11-14): the Warlock's Miasma Chains cloud on voidcloud, a row without art that flies like the sparkles (tools/txt_migrate.py void_clouds); on every sparkle HD dropped every particle effect in about half the frames (#573)		voidcloud
+missile	dopplezonexplode	miasma_smoke_puff	auto	medium	Singularity's field end (seismicfieldexplode) draws nothing in HD: D2R's Dopplezon blast showed as a white flash with red sparks over the dark field (#573)		seismicfieldexplode
+missile	blackholeexplode	miasma_smoke_puff	auto	medium	the end of each void sparkle: a small dark puff; was an orange blast (#573)		blackexplosion
+missile	missiledagger	missile_dagger	2	medium	Wychwind's knives: D2R's thrown-knife mesh at twice its size so it shows at this speed; was expansion_bladefury_c, which read as shurikens (#575)		wychknife,wychblade
+missile	holyboltdeepblue	expansion_mindblast	auto	medium	Wychwind's hit flash: the Assassin's Mind Blast pulse; was sanctuary, a bright blue ground glow (#575)		wychoverpower
+missile	littlespider	finger_mage_spider	auto	medium	Carpet of Spiders' little spiders: D2R's small walking spider, which starts where the spider is made; Blade Fury's blades flew out of the player's hand as a white fan (#593)		carpetofspidersbolt
+overlay	extra/salvationaura_front	paladin/aura_resistcold	auto	medium	Rapture's aura ring at the feet: Resist Cold's blue ring, like classic's blue-violet ring; Salvation's ring drew all the colours of the rainbow, and in a violet ramp it read pink (#594)		turbofront
+overlay	expansion/cyclonearmorbback	druid/cyclonearmor_1back	auto	medium	Swarm (Hive) buff: the pale wind of the one cyclone armor overlay D2R draws (classic's art is Cyclone Armor's too; it has no colour ramp to tint); D2R's cyclonearmor_2back is an empty stub, so the buff drew nothing (#596)		cyclonearmor2back
+overlay	auraresistallback	paladin/aura_resistall_front	auto	medium	Faerie Fire buff: the rainbow Salvation ring at the feet; D2R's aura_resistall_back is an empty stub, so the buff drew nothing (#597)		aura_resistall_back
+missile	extra/spikefiendmamamissle	spike_fiend_missle	3	medium	Quill Storm's quills at three times the quill's size, like classic's big crystal spikes; at the art's size they were specks and their red hit glows looked like spheres from nothing (#598)		druidsideattacker
+missile	egg_dead	corpse_explode_guts	1	medium	Egg Trap's burst egg: a small dark splat, like classic's plain broken egg (#601); was a fiery shaman fireball blast; the Maggot Queen's death guts still read as a spray of fire (lane hd587)		
+missile	spikefiendmissle	spike_fiend_missle	3	medium	Egg Trap's quills at three times the quill's size, like Quill Storm's: at D2R's size they were specks and their red hit glows looked like balls of fire from nothing (#598)		eggspikemissile

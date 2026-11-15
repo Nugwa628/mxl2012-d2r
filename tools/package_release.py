@@ -11,6 +11,8 @@ here unless --plugin is given) it writes into dist/:
                                    d2rloader/metadata.json     (modVersion = <version>, website = the GitHub repo)
                                    d2rloader/plugins/drawcap.dll, d2rloader/config/drawcap.toml (our standalone draw list
                                    cap plugin, drawcap/, built by tools/build_plugin.ps1 unless --drawcap is given)
+                                   d2rloader/plugins/statbook.dll, d2rloader/config/statbook.toml (our standalone Stat Book
+                                   plugin, statbook/, the same way unless --statbook is given)
                                    d2rloader/plugins/legacy169.dll, d2rloader/config/legacy169.toml (D2R Legacy 16:9 at
                                    the pinned commit, tools/build_legacy169.ps1 unless --legacy169 is given)
                                    d2rloader/plugins/d2rl-buff-panel.dll + .mpq + licences, d2rloader/config/buff-panel.toml
@@ -98,6 +100,9 @@ INVTABS_DLL = ROOT / "build" / "invtabs" / "Release" / "invtabs.dll"  # tools/bu
 INVTABS_DATA = charm_inventory.INVTABS_DATA
 
 DRAWCAP = {"name": "Draw List Cap", "dll": "d2rloader/plugins/drawcap.dll", "config": "d2rloader/config/drawcap.toml"}
+# Our own standalone Stat Book plugin (docs/statbook.md), shipped like drawcap; the book it shows is mod data (STATBOOK_DATA).
+STATBOOK = {"name": "Stat Book", "dll": "d2rloader/plugins/statbook.dll", "config": "d2rloader/config/statbook.toml"}
+STATBOOK_DATA = "statbook/statbook.txt"  # relative to mxl2012.mpq/data (tools/statbook.py book)
 # Our own D2R Legacy 16:9 plugin (docs/bundled-plugins.md), shipped in the mod folder: built from its source at the commit
 # the gitlink third_party/D2R-Legacy169 pins (tools/build_legacy169.ps1), unless --legacy169 is given. Its default config goes
 # in too, as a `preserve` file: D2RLoader would write it at the first start, but the downloader removes files the release does
@@ -186,6 +191,11 @@ def drawcap_version() -> str:
     return m.group(1) if m else "?"
 
 
+def statbook_version() -> str:
+    m = re.search(r'PluginVersion = "([^"]+)"', (ROOT / "statbook" / "src" / "statbook.cpp").read_text("utf-8"))
+    return m.group(1) if m else "?"
+
+
 def plugin_manifest_abi(data: bytes):
     """The plugin ABI in a DLL's D2RLoader plugin manifest (RCDATA resource 0x3e9, one DWORD; D2RLoader rejects a DLL without
     it as "an old alpha plugin"): None when the bytes are not a PE image, 0 when the PE has no manifest."""
@@ -238,6 +248,16 @@ def check_drawcap(dll: Path) -> list:
         return [f"{dll} is not drawcap {drawcap_version()} (build it with tools/build_plugin.ps1)"]
     if plugin_manifest_abi(b) == 0:
         return [f"{dll} has no D2RLoader plugin manifest, D2RLoader rejects it (drawcap/src/drawcap.rc)"]
+    return []
+
+
+def check_statbook(dll: Path) -> list:
+    """Problems of a statbook.dll for a release, as check_drawcap."""
+    b = dll.read_bytes()
+    if b"Stat Book\0" not in b or b"statbook\0" not in b or statbook_version().encode() + b"\0" not in b:
+        return [f"{dll} is not statbook {statbook_version()} (build it with tools/build_plugin.ps1)"]
+    if plugin_manifest_abi(b) == 0:
+        return [f"{dll} has no D2RLoader plugin manifest, D2RLoader rejects it (statbook/src/statbook.rc)"]
     return []
 
 
@@ -443,7 +463,8 @@ def sha256(path: Path) -> str:
 
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
           legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None, controllerqol: Path = None,
-          profile: Path = None, drawcap: Path = None, charminv: Path = None, invtabs: Path = None) -> None:
+          profile: Path = None, drawcap: Path = None, charminv: Path = None, invtabs: Path = None,
+          statbook: Path = None) -> None:
     if invtabs is not None and charminv is not None:
         raise SystemExit("invtabs and CharmInv cannot be staged together")
     if data_from is not None:
@@ -459,7 +480,7 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
     install_mod.write_mod_files(mod, NAME, f"{NAME}/", plugin, {
         "modVersion": version, "website": REPO_URL,
         "description": "D2R-XL 2012: Median XL 2012 (v005) for Diablo II: Resurrected through D2RLoader."},
-        drawcap)
+        drawcap, statbook)
     if legacy169 is not None:
         stage_legacy169(mod, legacy169)
     if buffhud is not None:
@@ -588,7 +609,7 @@ def stage_charminv(mod: Path, folder: Path, ours: Path = CHARMINV_OURS) -> None:
 
 def preserve_list(mod: Path) -> list:
     """PRESERVE plus the bundled plugins' configs the package holds."""
-    return PRESERVE + [c for c in (DRAWCAP["config"], INVTABS["config"], LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"],
+    return PRESERVE + [c for c in (DRAWCAP["config"], STATBOOK["config"], INVTABS["config"], LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"],
                                    CHARMINV["config"])
                        if (mod / c).is_file()]
 
@@ -809,6 +830,8 @@ def main() -> int:
     ap.add_argument("--plugin", type=Path, help="a release mxl2012-core.dll (default: build it with -DMXL_RELEASE=ON)")
     ap.add_argument("--drawcap", type=Path, help="a drawcap.dll of this source (default: build/drawcap/Release/drawcap.dll, "
                     "built by tools/build_plugin.ps1; --no-data builds leave it out when there is none)")
+    ap.add_argument("--statbook", type=Path, help="a statbook.dll of this source (default: build/statbook/Release/statbook.dll, "
+                    "built by tools/build_plugin.ps1; --no-data builds leave it out when there is none)")
     ap.add_argument("--legacy169", type=Path, help="a release legacy169.dll of the pinned commit (default: build it with "
                     "tools/build_legacy169.ps1; --no-data builds leave it out unless given)")
     ap.add_argument("--buffhud", type=Path, help="a release d2rl-buff-panel.dll of the pinned fork commit, its .mpq next to it "
@@ -888,6 +911,13 @@ def main() -> int:
         drawcap = None
     else:
         problems.append(f"no drawcap.dll at {drawcap} (run tools/build_plugin.ps1)")
+    statbook = a.statbook or install_mod.STATBOOK
+    if statbook.is_file():
+        problems += check_statbook(statbook)
+    elif a.no_data and a.statbook is None:
+        statbook = None
+    else:
+        problems.append(f"no statbook.dll at {statbook} (run tools/build_plugin.ps1)")
     legacy169 = a.legacy169 or (None if a.no_data or a.no_bundled else build_legacy169())
     if legacy169 is not None:
         problems += check_legacy169(legacy169) if legacy169.is_file() else [f"no legacy169.dll at {legacy169}"]
@@ -916,7 +946,8 @@ def main() -> int:
 
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
-    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile, drawcap, charminv, a.invtabs)
+    stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile, drawcap, charminv, a.invtabs,
+          statbook)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")

@@ -55,12 +55,16 @@ auto IsHd() noexcept -> bool;
 inline constexpr int MaxClients = 4;
 auto AddClient(Client* client) noexcept -> bool;
 
-// Registers `json` as data/global/ui/layouts/mxl2012-core/<file>.json (`file` is "DevMenuhd", "DevMenu", ...). The bytes must stay valid.
+// Registers `json` as data/global/ui/layouts/<plugin id>/<file>.json (mxl2012-core: "DevMenuhd", "DevMenu", ...; statbook: its own
+// folder). The bytes must stay valid.
 auto RegisterLayout(const D2RL::PluginContext* context, const char* file, const char* json, size_t size) noexcept -> bool;
 
 // Registers the empty panels <localPrefix>0 .. <localPrefix><count - 1> ("DevMenuB_"): D2R hands a button's PanelManager message to UI
 // listeners only when it names a known panel. Returns -1, or the index that could not be registered.
 auto RegisterButtons(const D2RL::PluginContext* context, const char* localPrefix, int count) noexcept -> int;
+
+// Registers the one empty panel <local> (statbook: "StatBook", the name every Stat Book button sends). False when refused.
+auto RegisterPanelName(const D2RL::PluginContext* context, const char* local) noexcept -> bool;
 
 // The panel's native widget (null while it is not loaded), and a child of it by name.
 auto NativePanel(const Client& client) noexcept -> void*;

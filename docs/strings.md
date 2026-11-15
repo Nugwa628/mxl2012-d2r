@@ -81,6 +81,10 @@ merely because their strings contain newlines. Single-line strings remain unchan
 | `strings_map.json` | what the tables lane reads, below |
 | `strings_report.md` | counts, kept keys, aliases, case clashes, encoding facts |
 
+D2R's `strings/presence-states.json` (Battle.net presence lines) is not part of the game's string table: an override of one of
+its keys is refused by D2RLoader and the whole table then fails to initialise, so `strings_ns.d2r_loaded()` leaves it out
+(`NOT_LOADED`) and `strings_check.py` reports such an override as an error.
+
 Rules that carry over unchanged: 342 strings with the key `x` or none get `mxl_<id>`; a key in several tables resolves patchstring >
 expansionstring > string (669 shadowed); 47 keys whose text equals D2R's get no record; 280 keys whose printf placeholders differ from
 D2R's keep D2R's text and Median's wording is under `<key>_mxl` (group 2); `d2r:` keys that exist only in `strings-legacy/` are
@@ -131,6 +135,17 @@ Result on the MPQ's raw tables: 23,764 cells, **108 cells with a missing key** (
 `misc.namestr` 8 (`bpl bps hpf hpo mpf mpo rpl rps`), `objects.name` 7, `misc.spelldescstr` 4, `montype.strplur` 4, `levels.levelwarp` 3
 (`To The Pandemonium Run 1-3`, a vanilla quirk), itemstatcost 6 (`ModitemColdSkills`, `ModitemLevReq`, `ModitemPeril`), and one each in
 `monstats.descstr`, `pettype.name`, `superuniques.name`.
+
+## Area banners: `level_entries.py` (bug #612)
+
+D2R draws levels.txt `LevelEntry` in red on every arrival in a level ("Entering The Blood Moor"), in HD and legacy graphics alike
+(D2R's `strings-legacy/` has no Entering keys). Median kept vanilla's `LevelName` keys and renamed only their text (`Cave Level 2`
+reads "Duncraig"), so the `d2r:` override renames the automap name while D2R's own Entering key keeps vanilla's text.
+`tools/level_entries.py apply` (build step after string_gaps.py) resolves each level's name and banner as the player reads them
+(enUS; mod namespace, then `d2r:` override, then D2R's `strings/` record, the Chinese overlay last) and gives every level whose banner
+does not read its name a `d2r:<LevelEntry key>` override "Entering <name>" in all 13 languages (a name that is a phrase, "Welcome to
+Toraja", stands alone): 17 levels, both banks. It folds the records into `overrides.json` at once (merge_string_overrides.py). The
+`check` mode runs again after the last string merge and fails the build on a level whose banner does not read its name.
 
 ## Known problems
 

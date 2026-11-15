@@ -1,0 +1,13 @@
+# build output
+/build/
+/out/
+/dist/
+*.zip
+# D2R files extracted for the tools (D2R_DATA): never commit game files
+/d2r-data/
+# Python
+__pycache__/
+*.pyc
+# editors
+.vs/
+.vscode/

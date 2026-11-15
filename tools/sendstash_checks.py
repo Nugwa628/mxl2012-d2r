@@ -16,7 +16,10 @@ rest stay: "stack full (El Rune ...)"); 99 and one more; Save and Exit, one more
 shot of the stash's Runes page; legacy graphics: the button's shot and a click; the stash OPEN (bug #554), HD and legacy: a
 click sends slot items, Mystic Orbs and Elixirs (MEDIAN / ORBS slots) too. `sendstashclassic` (an expansion character,
 MXL_CHAR=StashTab): the greyed button, its tooltip on hover (shot) and a click that moves nothing but answers with the reason
-line (bug #554: the hidden live button used to take the greyed one's click and hover).
+line (bug #554: the hidden live button used to take the greyed one's click and hover). `sendstashrotw` (a RotW character, bug
+#591): with MXL_ROTW_OWNED_TEST=no (part rotwwarn's answer "not owned") the RotW greyed button, its tooltip, a click that moves
+no item and answers with the reason line and the centred banner, and a Ctrl-click of a gem and a rune with the stash open on
+Personal that puts nothing into the RotW pages; without it (owned) the same steps send and store every slot item as before.
 """
 import os
 import re
@@ -34,6 +37,8 @@ HD_CLICK = (1071, 669)
 LEGACY_CLICK = (897, 690)  # 4:3 legacy (pillarboxed 1200 x 900), run checks-20261106-014339-s2
 LEGACY169_CLICK = (1096, 690)  # 16:9 legacy (the bundled legacy169 puts the inventory at the right edge), lane sendopen
 NOSLOTS_LINE = "Send to stash works in Reign of the Warlock games only"
+NOROTW_LINE = "Send to stash needs Reign of the Warlock"
+CTRL_ITEMS = ["gcr", "r01"]  # a Chipped Ruby and an El: both have a RotW slot (Gems, Runes)
 
 
 def parse_state(lines):
@@ -305,3 +310,131 @@ def run_classic(gc):
     gc.finish("sendstashclassic", all(r[1] for r in rows), "; ".join("%s %s" % (r[0], "ok" if r[1] else "FAIL") for r in rows)
               + "; greyed tooltip judged on the shots", mark, shots, log)
 
+
+
+def parse_rotw(text):
+    """`mxl2012 rotwwarn` -> {owned, guard, slotno, tries, deposits, shows, blocked}."""
+    out = {}
+    m = re.search(r"owned (yes|no|-)", text)
+    if m:
+        out["owned"] = m.group(1)
+    m = re.search(r"store guard (on|off)", text)
+    if m:
+        out["guard"] = m.group(1)
+    for key, pat in (("slotno", r"slot no (\d+)"), ("tries", r"store tries (\d+)"), ("deposits", r"deposits blocked (\d+)"),
+                     ("shows", r"banner shows (\d+)"), ("blocked", r"blocked (\d+), lines")):
+        m = re.search(pat, text)
+        if m:
+            out[key] = int(m.group(1))
+    return out
+
+
+def rotw(gc, log):
+    import game_ctl
+    st = parse_rotw(game_ctl.console_text("mxl2012 rotwwarn") or "")
+    log.append("rotwwarn %s" % st)
+    return st
+
+
+def run_rotw(gc):
+    """Bug #591: Send to stash and Ctrl-click on an account without Reign of the Warlock (MXL_ROTW_OWNED_TEST=no) keep every item
+    out of the RotW pages; owned (no switch), both work as before."""
+    import medtab_checks as mt
+    mark = gc.engine_mark()
+    log, shots, rows = [], [], []
+    owned = os.environ.get("MXL_ROTW_OWNED_TEST", "").lower() != "no"
+    tag = "owned" if owned else "notowned"
+
+    def row(name, ok, note):
+        rows.append((name, ok, note))
+        log.append("ROW %s %s: %s" % (name, "PASS" if ok else ("SKIP" if ok is None else "FAIL"), note))
+
+    gc.enable_debug()
+    gc.goto(1, timeout=60)
+    gc.set_graphics("hd")
+    gc.close_right_panel()
+    gc.H("packclear")
+    r0 = rotw(gc, log)
+    row("rotwwarn", r0.get("owned") == ("yes" if owned else "no") and r0.get("guard") == "on", "%s" % r0)
+    st = state(gc, log)
+    row("button", st.get("show") == ("button" if owned else "norotw"), "%s" % st)
+
+    # 1. the button, the stash closed: gems, runes, materials and two items without a slot
+    open_inventory(gc)
+    make(gc, log, SLOT_ITEMS + OTHER_ITEMS)
+    pack0 = backpack(gc.rc_items(log))
+    shots.append(gc.sh("sendrotw_%s_inventory" % tag))
+    gc.g.click(HD_CLICK[0] / 1600, HD_CLICK[1] / 900, move_only=True)
+    time.sleep(1.5)
+    shots.append(gc.sh("sendrotw_%s_hover" % tag))
+    if owned:
+        d, s1 = send(gc, log, shots, "rotw_owned_click", click(gc, HD_CLICK), len(SLOT_ITEMS))
+        pack1 = backpack(gc.rc_items(log))
+        stayed = [c for c in pack1 if c in SLOT_ITEMS]
+        row("send (owned)", d.get("clicks") == 1 and d.get("sent") == len(SLOT_ITEMS) - len(stayed) and d.get("full", 0) == len(stayed)
+            and sorted(c for c in pack1 if c not in SLOT_ITEMS) == sorted(OTHER_ITEMS),
+            "backpack %s -> %s, counters %s, line %r" % (pack0, pack1, d, s1.get("last")))
+    else:
+        s0 = state(gc, log)
+        rb = rotw(gc, log)
+        gc.g.click(HD_CLICK[0] / 1600, HD_CLICK[1] / 900)
+        time.sleep(0.8)
+        shots.append(gc.sh("sendrotw_notowned_click_banner"))
+        time.sleep(1.5)
+        s1 = state(gc, log)
+        ra = rotw(gc, log)
+        pack1 = backpack(gc.rc_items(log))
+        shots.append(gc.sh("sendrotw_notowned_click_after"))
+        row("send moves nothing", s1.get("runs") == s0.get("runs") and s1.get("clicks", 0) == s0.get("clicks", 0) + 1 and pack1 == pack0,
+            "runs %s -> %s, clicks %s -> %s, backpack %s -> %s" % (s0.get("runs"), s1.get("runs"), s0.get("clicks"), s1.get("clicks"), pack0, pack1))
+        row("send says why", s1.get("refused", 0) == s0.get("refused", 0) + 1 and (s1.get("last") or "").startswith(NOROTW_LINE)
+            and ra.get("shows", 0) == rb.get("shows", 0) + 1,
+            "refused %s -> %s, line %r, banner shows %s -> %s" % (s0.get("refused"), s1.get("refused"), s1.get("last"), rb.get("shows"), ra.get("shows")))
+        d, s2 = send(gc, log, shots, "rotw_notowned_press", press(gc, log), 1)  # the harness press runs the same code path
+        row("harness press moves nothing", d.get("runs") == 0 and backpack(gc.rc_items(log)) == pack0, "counters %s, line %r" % (d, s2.get("last")))
+    gc.close_right_panel()
+    gc.H("packclear")
+
+    # 2. Ctrl-click with the stash open on Personal (D2R's own route into the RotW pages)
+    if gc.sp2_open_stash(log):
+        mt.tab(gc, "personal")
+        time.sleep(1)
+        for code in CTRL_ITEMS:
+            before = mt.backpack_ids(gc)
+            gc.Hl("item %s inv" % code, log)
+            time.sleep(0.6)
+            new = [i for i in gc.rp_items_now() if i.get("page") == 0 and i["id"] not in before]
+            if not new:
+                row("ctrl-click %s" % code, False, "not made")
+                continue
+            it = new[0]
+            r1 = rotw(gc, log)
+            xy = gc.rp_inv_xy(it["x"], it["y"], gc.RP_INV)
+            gc.g.click(*xy, move_only=True)
+            time.sleep(0.4)
+            gc.g.click(*xy, mods=("ctrl",))
+            time.sleep(0.7)
+            shots.append(gc.sh("sendrotw_%s_ctrl_%s" % (tag, code)))
+            time.sleep(1.0)
+            if gc.held_item():
+                log.append("Ctrl+click left the item on the cursor")
+                gc.release_held_item()
+            r2 = rotw(gc, log)
+            mine = {i["id"]: i.get("page") for i in gc.rp_items_now()}
+            where = {0: "backpack", 4: "Personal"}.get(mine.get(it["id"]), "player page %s" % mine.get(it["id"])) if it["id"] in mine else "gone (RotW page)"
+            if owned:
+                ok = it["id"] not in mine
+            else:
+                # D2R then treats it like any item without a RotW slot: it lands on Personal (page 4) or stays in the backpack
+                ok = mine.get(it["id"]) in (0, 4) and r2.get("slotno", 0) > r1.get("slotno", 0)
+            row("ctrl-click %s" % code, ok, "%s: %s; rotwwarn %s -> %s" % (code, where, r1, r2))
+        gc.close_right_panel()
+    else:
+        row("ctrl-click", False, "the stash did not open")
+    gc.H("packclear")
+    st = state(gc, log)
+    log.append("final %s %s" % (st, rotw(gc, log)))
+    judged = [r for r in rows if r[1] is not None]
+    ok = bool(judged) and all(r[1] for r in judged) and not st.get("faults")
+    gc.finish("sendstashrotw", ok, "%s: " % tag + "; ".join("%s %s" % (r[0], "ok" if r[1] else "FAIL") for r in rows)
+              + "; SHORTCUT: items made by the harness", mark, shots, log)

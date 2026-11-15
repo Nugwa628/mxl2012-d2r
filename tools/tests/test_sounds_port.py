@@ -227,5 +227,19 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(first, (self.mod / "global" / "excel" / "sounds.txt").read_bytes())
 
 
+class MedianFileRows(unittest.TestCase):
+    """bug #584: a D2R row on which v005 plays another vanilla file plays v005's file; other rows are left alone."""
+
+    def test_over_here_plays_help_us(self):
+        h = ["Sound", "*Index", "Redirect", "Channel", "FileName"]
+        rows = [["wussie_help_me", "1", "wussie_hdhelp_me", "vo/eax/dialog_sd", "act5\\soldier\\sol_helpus.flac"],
+                ["wussie_over_here", "2", "", "vo/eax/dialog_sd", "act5\\soldier\\sol_overhere.flac"]]
+        self.assertEqual(sp.median_file_rows(h, rows), [("wussie_over_here", "act5\\soldier\\sol_helpus.flac")])
+        self.assertEqual(rows[1][4], "act5\\soldier\\sol_helpus.flac")
+        self.assertEqual(rows[0][4], "act5\\soldier\\sol_helpus.flac")
+        self.assertEqual(rows[1][2], "", "no Redirect: HD mode asks for the main bank's file under data/hd/global/sfx")
+        self.assertEqual(sp.median_file_rows(h, rows), [], "a second run changes nothing")
+
+
 if __name__ == "__main__":
     unittest.main()

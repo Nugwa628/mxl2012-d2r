@@ -544,7 +544,9 @@ The skills the two passes above left for hand work, and the regressions they cau
 - A pick with `rows` also works on D2R's own rows (same name and art): `effects_hd.py` skipped those rows before looking at the picks, and kept D2R's key in `missiles.json`.
 - A hand pick with an explicit scale reaches definitions without a transform (`scaled_definition(add_missing=True)`). Most of D2R's overlays have none, so the scale was lost on them. An `auto` scale is left as it was: 43 overlay rows have a scale that never applied and were looked at in that size. Of the older picks only `firecrown` (0.6) changes.
 
-**What a scale does.** A transform scale makes meshes and some effects larger. Most particle effects keep their size: `yellow_ball_glow_2` looked the same at 1.8, 2.6 and 4, `common/valkyrie` at 1 and 2.4, `paladin/holyfreeze` at 1 and 1.6. For a bigger picture take an effect drawn big (Exploding Arrow's blast), not a larger scale.
+**What a scale does.** A transform scale makes meshes and some effects larger. Most particle effects keep their size: `yellow_ball_glow_2` looked the same at 1.8, 2.6 and 4, `common/valkyrie` at 1 and 2.4, `paladin/holyfreeze` at 1 and 1.6. The Warlock's abyss hole (`abyss_meteor_target_indicator`) looked the same at 1.2 and 13 (lane looks568, #573). For a bigger picture take an effect drawn big (Exploding Arrow's blast), not a larger scale.
+
+**Too many particles at once.** When a scene has too many live particle effects, D2R skips every particle effect of the scene for that frame, also unrelated ones (torch flames): Singularity with `miasma_chains_cloud` on all of its about 200 live sparkles flickered in 5 of 10 frames (lane looks568, #573). The fix spawns the cloud on fewer missiles: `txt_migrate.py` `void_clouds` adds art-less rows (`voidcloudfield`, `voidcloud`) for it, and a row pick (`rows` column) gives an art-less row an effect. `miasma_chains_cloud` draws only on moving missiles, not on stationary field rows.
 
 **Tints.** `exp_arrow_explode` and `meteor_target_indicator` have no gradient to tint, so Queen of Blades, Seismic Charge and Egg Trap stay orange where classic is red.
 
@@ -555,3 +557,19 @@ The skills the two passes above left for hand work, and the regressions they cau
 - Fairy Ring: classic's red light on the ground has no counterpart, a pick cannot add a light. Totems unchanged.
 
 **Art statistics cache.** `work/effects_hd_art.json` is git-ignored and survives rebuilds, so it records which code measured it (`_stats_version`, a fingerprint of `ArtCache.stats`, `_hues` and the DCC decoder). A file written by other code is dropped and measured again, so every checkout builds the same map from the same sources. Heights measured before commit 78a5e54 were too tall for art drawn wholly above its anchor: 243 files were affected, and with correct heights 171 missile rows and one overlay changed scale or picture. Twenty-nine skills that use them were compared in game (`docs/testing.md`, lane artcache). The correct numbers are kept, except for Scatter Shot's ring and Mana Coil's bolt, which are pinned in `data/hd-effects-picks.tsv`.
+
+## 13. Missiles another missile makes (`tools/missile_release.py`, lane bug568, 2026-11-13, bug #569)
+
+48 of D2R's 374 missile definitions (the arrow, bolt, dagger, javelin and throwing-weapon meshes, `fireball`, `firebolt`, the
+Blade Fury blades, the skulls) have a `TrackReleasePointDefinitionComponent`: the picture starts at the owner's release point (the
+hand or the bow) and glides to the missile's place in 0.5 s. For a missile the unit throws that is right. Median makes many
+projectiles from another missile: Storm Crows' homing knives where the blade stopped, Widowmaker's bolts from the minion, Barrage's
+and Phalanx's arrows from spawner points, Fireball Sentry's fire burst from the trap, Broadside's daggers. Their owner is still the
+player, so in HD they flew out of the player.
+
+**The step** (after `skill_looks.py`): a row that only another missile makes (a sub, hit sub or explosion missile; never in a skill's
+missile columns, a monster's `MissA1`..`MissSQ` or an item's `missiletype`) and whose model tracks the release point gets
+`<model>_free`, the same definition without that component. D2R's own rows keep D2R's model (vanilla's Blade Fury fragments track
+too). `scaled_base()` and `build_effects.py` read `<model>_free` as its model, so the look checks and the picks see through it.
+`missile_release.py --check` and `tools/tests/test_missile_release.py` fail when such a row still tracks.
+In the build of 2026-11-13 the step moved 133 rows to 23 `_free` models.

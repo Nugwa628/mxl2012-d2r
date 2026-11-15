@@ -64,6 +64,8 @@
 //   +  the stash wires its RotW pages (Gems, Materials, Runes) in classic graphics too, as D2R does in HD (its own RotW rule
 //      keeps them closed without RotW), the classic item picture skips an item without a draw record, and classic draws
 //      the pages' empty slot icons dimmed as HD does, the cube window's items small (rotw_stash.cpp, off word rotwstash, #516);
+//   +  on an account without Reign of the Warlock the stash's RotW tabs (Gems, Materials, Runes, MEDIAN, ORBS) stay closed and the
+//      message log says the tab needs Reign of the Warlock, by mouse, keyboard or gamepad (rotw_warn.cpp, off word rotwwarn, #590);
 //   +  a unit other than the player that the client's unit reassign (server command 0x15) leaves without a client room is left
 //      so instead of D2R's "Could not get act!" end of the game (reassign_guard.cpp, off word reassign, #511 / #292);
 //   +  HD draws no ground plane on Median's Ancient Tunnels (level 65) either, as D2R does on 74, so its void shows round the
@@ -112,6 +114,7 @@
 #include "pet_spread.h"
 #include "median_tabs.h"
 #include "rotw_stash.h"
+#include "rotw_warn.h"
 #include "rune_letters.h"
 #include "stash_tip.h"
 #include "tab_flash.h"
@@ -147,7 +150,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.22";
+constexpr const char* PluginVersion = "0.1.23";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -213,7 +216,7 @@ char g_otherImage[256] = "";  // the message for a player on another game image,
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -497,6 +500,7 @@ char g_voChatReport[160] = "";
 char g_reassignReport[192] = "";
 char g_rotwStashReport[384] = "";
 char g_medTabReport[256] = "";
+char g_rotwWarnReport[512] = "";
 char g_stashTipReport[192] = "";
 char g_tabFlashReport[192] = "";
 char g_voidFloorReport[160] = "";
@@ -548,7 +552,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
 	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"charmdup", g_charmDupReport}, {"vochat", g_voChatReport},
-	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport}, {"modelcache", g_modelCacheReport},
+	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"rotwwarn", g_rotwWarnReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport}, {"modelcache", g_modelCacheReport},
 	             {"arealvl", g_areaLevelReport}, {"clearfonts", g_clearFontsReport}, {"cltdostub", g_stubReport}};
 	for (const auto& p : parts) {
 		words[count] = p.word;
@@ -803,6 +807,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	std::snprintf(line, sizeof(line), "%s; stash inits %ld (classic: pages wired %ld, left as D2R %ld), item pictures skipped %ld, empty slot draws dimmed %ld, small item draws %ld; game type %d, %s",
 	              g_rotwStashReport, rs.inits, rs.classicWired, rs.classicLeft, rs.skipped, rs.dimmed, rs.shrunk, rs.gameType, rs.hd ? "HD" : "legacy");
 	SayPart(command, "rotwstash", line);
+	{
+		char status[448];
+		RotwWarnStatus(status, sizeof(status));
+		std::snprintf(line, sizeof(line), "%s | %s", g_rotwWarnReport, status);
+		SayPart(command, "rotwwarn", line);
+	}
 	{
 		char status[256];
 		MedianTabsStatus(status, sizeof(status));
@@ -1082,6 +1092,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("rotwstash")) {
 		InstallRotwStash(context, g_rotwStashReport, sizeof(g_rotwStashReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_rotwStashReport);
+		context->LogInfo(line);
+	}
+	if (!Off("rotwwarn")) {  // before medtab: its tab update asks this part
+		InstallRotwWarn(context, g_rotwWarnReport, sizeof(g_rotwWarnReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_rotwWarnReport);
 		context->LogInfo(line);
 	}
 	// medtab off keeps the hooks (the 7-tab layout asserts without them) and hides the Median tabs

@@ -14,14 +14,17 @@
 // The run takes no other click while it goes. At the end one line goes to the message log (server chat packet 0x26 to the local client, from the
 // next server frame).
 //
-// A timer thread asks the UI thread every 250 ms (50 ms during a run) which of the three buttons shows: the button; greyed in a
-// game without the RotW stash unit (classic / expansion games); greyed for a joiner of another player's game (send_stash_logic.h
-// JoinersOn). The two others are hidden and disabled (D2R hit-tests a hidden widget), and the greyed ones send the same message:
-// a click on one puts the reason into the message log (bug #554). A joiner is a client whose local player no server game of this process has (the server frame callback records the
+// A timer thread asks the UI thread every 250 ms (50 ms during a run) which of the four buttons shows: the button; greyed on an
+// account without Reign of the Warlock (part rotwwarn's answer, its dev switch included; bug #591: the pages it keeps closed would
+// hold the items out of reach); greyed in a game without the RotW stash unit (classic / expansion games); greyed for a joiner of
+// another player's game (send_stash_logic.h JoinersOn). The others are hidden and disabled (D2R hit-tests a hidden widget), and the
+// greyed ones send the same message: a click on one puts the reason into the message log (bug #554), and for the RotW reason
+// rotwwarn's centred banner shows too. A joiner is a client whose local player no server game of this process has (the server frame callback records the
 // local player when it finds it).
 #include "send_stash.h"
 
 #include "mxl_send_stash.h"
+#include "rotw_warn.h"
 #include "send_stash_logic.h"
 #include "server_frame.h"
 
@@ -247,11 +250,14 @@ void StartRun() noexcept {
 	void* player = LocalPlayer();
 	void* stash = player != nullptr ? StashUnit(player) : nullptr;
 	const bool joined = player != nullptr && g_hostPlayer.load() != g_clientPlayer.load();
-	const Show show = Decide(player != nullptr, joined, stash != nullptr);
+	const Show show = Decide(player != nullptr, joined, stash != nullptr, !RotwWarnStoreBlocked());
 	if (show != Show::Button) {
 		if (const char* why = RefusalLine(show)) {  // a click on the greyed button: one line saying why
 			g_refused.fetch_add(1);
 			QueueLine(why);
+		}
+		if (show == Show::NoRotw) {
+			RotwWarnSendRefused();
 		}
 		return;
 	}
@@ -301,7 +307,8 @@ void SetShown(D2RL::Widgets::WidgetHandle panel, Show show) noexcept {
 	const struct {
 		const char* name;
 		Show when;
-	} buttons[] = {{mxl_send_stash::Button, Show::Button}, {mxl_send_stash::NoSlots, Show::NoSlots}, {mxl_send_stash::Joined, Show::Joined}};
+	} buttons[] = {{mxl_send_stash::Button, Show::Button}, {mxl_send_stash::NoSlots, Show::NoSlots}, {mxl_send_stash::Joined, Show::Joined},
+	               {mxl_send_stash::NoRotw, Show::NoRotw}};
 	for (const auto& b : buttons) {
 		D2RL::Widgets::WidgetHandle w = 0;
 		if (g_widgets->findWidget(g_context, panel, b.name, &w) == D2RL::Widgets::Result::Success) {
@@ -321,7 +328,7 @@ void Refresh() noexcept {
 	}
 	void* player = LocalPlayer();
 	const bool joined = player != nullptr && g_hostPlayer.load() != g_clientPlayer.load();
-	const Show show = Decide(player != nullptr, joined, player != nullptr && StashUnit(player) != nullptr);
+	const Show show = Decide(player != nullptr, joined, player != nullptr && StashUnit(player) != nullptr, !RotwWarnStoreBlocked());
 	const uint64_t now = GetTickCount64();
 	if (show == Show::None || (panel == g_lastPanel && static_cast<int>(show) == g_show.load() && now - g_lastSetAt < 2000)) {
 		return;
@@ -508,10 +515,10 @@ auto InstallSendStash(const D2RL::PluginContext* context, char* report, size_t r
 }
 
 void SendStashStatus(char* out, size_t size) noexcept {
-	static const char* const shows[] = {"none", "button", "noslots", "joined"};
+	static const char* const shows[] = {"none", "button", "noslots", "joined", "norotw"};
 	const int show = g_show.load();
 	std::snprintf(out, size, "show=%s host=%u local=%u frames=%ld running=%d clicks=%ld runs=%ld sent=%ld full=%ld nottaken=%ld busy=%ld refused=%ld lines=%ld linefails=%ld faults=%ld",
-	              show >= 0 && show < 4 ? shows[show] : "-", g_hostPlayer.load(), g_ready ? g_localId() : 0u, g_frames.load(), g_running.load() ? 1 : 0, g_clicks.load(), g_runs.load(),
+	              show >= 0 && show < 5 ? shows[show] : "-", g_hostPlayer.load(), g_ready ? g_localId() : 0u, g_frames.load(), g_running.load() ? 1 : 0, g_clicks.load(), g_runs.load(),
 	              g_sent.load(), g_full.load(), g_notTaken.load(), g_busy.load(), g_refused.load(), g_lines.load(), g_lineFails.load(), g_faults.load());
 }
 

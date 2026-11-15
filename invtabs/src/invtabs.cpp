@@ -1171,9 +1171,12 @@ std::string CellsSprite(int slot, int cols, int rows, int cell) {
 	return std::string("d2rloader\\") + PluginId + "\\" + name;
 }
 
-// The inventory button: 4 frames (normal, pressed, disabled, hovered), D2R's stash tab picture cut down is not ours to
-// cut at run time, so a small framed square with a charm shape.
-constexpr int ButtonSize = 56;
+// The inventory button: 4 frames (normal, pressed, disabled, hovered). The mod's own art when it has it (ButtonArt, made at
+// build time in D2R HD's button style by tools/invtabs_hdart.py, bug #592); else this drawn stand-in: a small framed square
+// with a charm shape (D2R's pictures are not ours to cut at run time).
+constexpr int  ButtonSize      = 56;
+constexpr char ButtonArtFile[] = "data/hd/global/ui/panel/invtabs/button.sprite";
+constexpr char ButtonArt[]     = "PANEL\\invtabs\\button";
 std::vector<Lay::Picture> ButtonFrames() {
 	std::vector<Lay::Picture> frames;
 	for (int frame = 0; frame < 4; ++frame) {
@@ -1400,12 +1403,18 @@ Panels::RegistrationHandle AddPanel(int slot) {
 }
 
 void AddButton() {
-	if (!RegisterSprite("button", ButtonFrames())) return;
+	const bool  modArt   = ModFileExists(ButtonArtFile);
+	std::string filename = ButtonArt;
+	if (!modArt) {
+		if (!RegisterSprite("button", ButtonFrames())) return;
+		filename = std::string("d2rloader/") + PluginId + "/button";
+	}
+	Log(!modArt, "inventory button: %s", modArt ? "the mod's art (button.sprite)" : "drawn stand-in (the mod has no data/hd/global/ui/panel/invtabs/button.sprite)");
 	char button[1024] {};
 	std::snprintf(button, sizeof(button),
-	              R"({"type": "ButtonWidget", "name": "invtabs/InventoryButton", "fields": {"rect": {"x": 214, "y": 1375}, "filename": "d2rloader/invtabs/button", "normalFrame": 0, "pressedFrame": 1, "disabledFrame": 2, "hoveredFrame": 3, )"
+	              R"({"type": "ButtonWidget", "name": "invtabs/InventoryButton", "fields": {"rect": {"x": 214, "y": 1375}, "filename": %s, "normalFrame": 0, "pressedFrame": 1, "disabledFrame": 2, "hoveredFrame": 3, )"
 	              R"("tooltipString": %s, "sound": "cursor_menu_select_hd", "onClickMessage": %s}})",
-	              Lay::Json(Tabs[0].cfg.label).c_str(), Lay::Json("PanelManager:TogglePanel:" + PanelName(Tabs[0].id)).c_str());
+	              Lay::Json(filename).c_str(), Lay::Json(Tabs[0].cfg.label).c_str(), Lay::Json("PanelManager:TogglePanel:" + PanelName(Tabs[0].id)).c_str());
 	if (!RegisterResource("data/global/ui/layouts/invtabs/InventoryButtonhd.json", button)) return;
 	const Panels::ChildLayoutRegistration child {
 		.structSize = Panels::ChildLayoutRegistrationSize,

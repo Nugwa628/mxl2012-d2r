@@ -197,6 +197,12 @@ def mxl_text():
     return g.console_text("mxl2012", settle=1.0)
 
 
+def statbook_text():
+    """The Stat Book plugin's `statbook` command output (statbook/src/statbook.cpp): its parts sheetres and advstats, the
+    book, Chance to Block and the gamepad tabs, one line each, in the same "<part> <report>" form as mxl_text()."""
+    return g.console_text("statbook", settle=1.0)
+
+
 def mxl_mark():
     return g._size(g.MXL_LOG)
 
@@ -16538,7 +16544,14 @@ def check_sendstashclassic():
     sendstash_checks.run_classic(sys.modules[__name__])
 
 
-CHECKS += [("sendstash", check_sendstash), ("sendstashclassic", check_sendstashclassic)]
+def check_sendstashrotw():
+    """Bug #591: Send to stash and Ctrl-click keep items out of the RotW pages on an account without Reign of the Warlock
+    (MXL_ROTW_OWNED_TEST=no; without it: owned, as before). MXL_CHAR=<a RotW character>; tools/sendstash_checks.py."""
+    import sendstash_checks
+    sendstash_checks.run_rotw(sys.modules[__name__])
+
+
+CHECKS += [("sendstash", check_sendstash), ("sendstashclassic", check_sendstashclassic), ("sendstashrotw", check_sendstashrotw)]
 
 
 def check_medtab():
@@ -16640,6 +16653,63 @@ def check_advstats():
 
 
 CHECKS += [("advstats", check_advstats)]
+
+
+def check_advgroups():
+    """The Advanced Stats panel in groups (bugs #581 / #582): an Amazon's Ecstatic Frenzy cast with the panel open, an Assassin's
+    Perfect Being Avoid line, the legacy sheet (tools/advstats_checks.py run_groups)."""
+    import advstats_checks
+    advstats_checks.run_groups(sys.modules[__name__])
+
+
+CHECKS += [("advgroups", check_advgroups)]
+
+
+def check_statbook():
+    """The Stat Book plugin's own status and pages (statbook/, docs/statbook.md): its parts, Chance to Block against D2R's
+    GetBlockRate, rows against the client's stats (tools/statbook_checks.py)."""
+    import statbook_checks
+    statbook_checks.run(sys.modules[__name__])
+
+
+def check_statbook_pad():
+    """The Stat Book's gamepad hook on the character sheet: the controller action ids of LB / RB / LT / RT as the sheet's
+    handler gets them (pad_log = true in the installed statbook.toml; tools/statbook_checks.py run_pad)."""
+    import statbook_checks
+    statbook_checks.run_pad(sys.modules[__name__])
+
+
+CHECKS += [("statbook", check_statbook), ("statbook_pad", check_statbook_pad)]
+
+
+def check_statbook_host():
+    """The Stat Book on the HD character sheet: every tab, All Stats with a typed search, the Advanced Stats arrow, 1080p / 1440p
+    and the legacy sheet (tools/statbook_checks.py run_host)."""
+    import statbook_checks
+    statbook_checks.run_host(sys.modules[__name__])
+
+
+CHECKS += [("statbook_host", check_statbook_host)]
+
+
+def check_statbook_host_pad():
+    """The Stat Book's tabs on the gamepad sheet with the sheet host bound (SB_PAD_SETUP=cqol: with Controller QOL Updates;
+    tools/statbook_checks.py run_host_pad)."""
+    import statbook_checks
+    statbook_checks.run_host_pad(sys.modules[__name__])
+
+
+CHECKS += [("statbook_host_pad", check_statbook_host_pad)]
+
+
+def check_statbook_side():
+    """The Stat Book's top / side tabs: the toggle on both hosts, every side page, search, the arrows, reopen, statbook.toml
+    written back (tools/statbook_checks.py run_side)."""
+    import statbook_checks
+    statbook_checks.run_side(sys.modules[__name__])
+
+
+CHECKS += [("statbook_side", check_statbook_side)]
 
 # lane hdcombat: player report "damage, hits and chance-to-cast procs work less well in HD than in legacy graphics". The same
 # Barbarian, sword and zombie in each graphics mode: HC_ATTACKS left clicks without procs (hits = clicks after which the zombie
@@ -17063,6 +17133,109 @@ def check_wikilab():
 
 
 CHECKS += [("wikilab", check_wikilab)]
+
+
+def diffnames_automap(tag, shots, log):
+    """The automap (Tab) in HD and in legacy graphics: its "Difficulty: %s" line names the difficulty (screenshots)."""
+    for mode in ("hd", "legacy"):
+        log.append("%s graphics %s: %s" % (tag, mode, set_graphics(mode)))
+        close_right_panel()
+        time.sleep(5)  # a Tab sent right after entering or right after G was not taken (run checks-20261113-233107-s3)
+        g.press("tab")
+        time.sleep(2.5)
+        shots.append(sh("diffnames_%s_automap_%s" % (tag, mode)))
+        g.press("tab")
+        time.sleep(1)
+
+
+def check_diffnames():
+    """Median's difficulty names (median-rules-audit DF13). In Hatred: the automap's difficulty line in HD and legacy. SET-UP by save:
+    progression 10 (all three difficulties open; MXL_CHAR should be a throwaway character). Then the difficulty dialog (character
+    card, Play; D2R draws the front end in HD only), its Destruction button, and the automap line in Destruction in HD and legacy.
+    Judged by eye on the screenshots: Hatred / Terror / Destruction instead of Normal / Nightmare / Hell (D2R's automap shows no
+    difficulty line in the first difficulty)."""
+    name = "diffnames"
+    log, shots = [], []
+    mark = engine_mark()
+    goto(1)
+    diffnames_automap("hatred", shots, log)
+    if not rc2_save_exit():
+        return add(name, "BLOCKED", "Save and Exit did not leave the game", shots, log)
+    g.stop()
+    time.sleep(2)
+    rc_setup.edit(SAVES, g.CHAR_NAME, lambda s: rc_setup.set_progression(s, "hell"))
+    if not to_menu():
+        return add(name, "BLOCKED", "the game did not come back to the menu after the save edit", shots, log)
+    y = card_y(card_of(g.CHAR_NAME) or 0)
+    if y is None:
+        return add(name, "BLOCKED", "%s is not on the visible character list" % g.CHAR_NAME, shots, log)
+    g.click(0.87, y)
+    time.sleep(0.8)
+    g.click(*g.UI["menu_play"])
+    time.sleep(3)
+    shots.append(sh("diffnames_dialog_hd"))
+    g.click(0.5, DIFF_Y["hell"])
+    ok = wait_in_game(45)
+    STATE["in_game"] = ok
+    if not ok:
+        return add(name, "BLOCKED", "Destruction was not entered from the dialog", shots, log)
+    p = hstate()["player"]
+    log.append("in game: difficulty %s, area %s" % (p.get("difficulty"), p.get("area")))
+    time.sleep(6)  # the "Entering ..." title
+    diffnames_automap("destruction", shots, log)
+    finish(name, p.get("difficulty") == 2, "entered difficulty %s from the dialog's third button; read the names on the shots"
+           % p.get("difficulty"), mark, shots, log, partial="the names, by eye on the screenshots")
+
+
+CHECKS += [("diffnames", check_diffnames)]
+
+# lane zonenames, bug #612: the red "Entering ..." banner names the area as Median does (Duncraig, not "The Cave Level 2").
+# Act 1 areas Median renamed (and the Rogue Encampment, D2R's own text) unless MXL_ZONES lists others ("13,18,1").
+ZONE_AREAS = [int(a) for a in os.environ.get("MXL_ZONES", "13,14,16,18,1").split(",") if a.strip()]
+
+
+def zone_arrival(area, tag, shots, log, timeout=40):
+    """Harness travel to `area`, then screenshots while the banner shows (it fades after a few seconds): the first right when
+    `h state` reports the area, the next ones 1 s apart. Returns True when the character arrived."""
+    revive_if_dead()
+    H("level %d" % area)
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        time.sleep(0.4)
+        if hstate()["player"].get("area") == area:
+            for n in range(3):
+                shots.append(sh("zonenames_%s_%d_%d" % (tag, area, n)))
+                time.sleep(1.0)
+            log.append("%s: arrived in %d after %.1f s" % (tag, area, time.time() - t0))
+            return True
+    log.append("%s: not in %d after %d s (area %s)" % (tag, area, timeout, hstate()["player"].get("area")))
+    return False
+
+
+def check_zonenames():
+    """Bug #612. In HD and legacy graphics, arrival in each of ZONE_AREAS by harness travel (god mode against the monsters);
+    the banner is judged by eye on the screenshots (tools/level_entries.py check proves the strings for every level)."""
+    name = "zonenames"
+    log, shots = [], []
+    mark = engine_mark()
+    enable_debug()
+    cheat("god 1")
+    arrived = 0
+    for mode in ("hd", "legacy"):
+        goto(1)
+        log.append("graphics %s: %s" % (mode, set_graphics(mode)))
+        close_right_panel()
+        for area in ZONE_AREAS:
+            if area == 1:
+                goto(2)  # the town banner shows on arriving in the town
+            arrived += zone_arrival(area, mode, shots, log)
+    goto(1)
+    set_graphics("hd")
+    finish(name, arrived == 2 * len(ZONE_AREAS), "arrived %d of %d; read the banners on the shots" % (arrived, 2 * len(ZONE_AREAS)),
+           mark, shots, log, partial="the banner text, by eye on the screenshots")
+
+
+CHECKS += [("zonenames", check_zonenames)]
 
 if __name__ == "__main__":
     main()

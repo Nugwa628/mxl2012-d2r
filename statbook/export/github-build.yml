@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (fetches the D2RLoader PluginSDK at the pinned commit)
+        run: cmake -S . -B build -A x64
+
+      - name: Build the plugin and its unit tests
+        run: cmake --build build --config Release --target statbook statbook_all_tests
+
+      - name: Unit tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Tool checks (the checks that need D2R's own files are skipped)
+        run: |
+          python -m pip install pillow numpy
+          python -m unittest discover -s tools/tests -v
+
+      - name: Release zip
+        run: python tools/package.py --dll build/Release/statbook.dll --out dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d2r-advanced-stats
+          path: dist/*.zip

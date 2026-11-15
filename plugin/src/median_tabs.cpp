@@ -20,6 +20,8 @@
 
 #include "median_tabs_logic.h"
 #include "medtab_names.h"
+#include "rotw_warn.h"
+#include "rotw_warn_logic.h"
 
 #include <D2RLPlugin/mutations.h>
 #include <D2RLPlugin/shared_events.h>
@@ -75,7 +77,7 @@ std::atomic<bool> g_median{false};  // the Materials page shows the Median group
 std::atomic<void*> g_panel{nullptr};  // the stash panel of the last tab update
 std::atomic<uint64_t> g_handle{0};    // WidgetService's handle of the stock stash at the last toggle
 std::atomic<uint32_t> g_updates{0}, g_bounces{0}, g_cubeHidden{0}, g_toggles{0}, g_applies{0}, g_missing{0}, g_noPanel{0};
-std::atomic<uint32_t> g_codesRestored{0}, g_noMark{0};
+std::atomic<uint32_t> g_codesRestored{0}, g_noMark{0}, g_warned{0};
 std::atomic<bool> g_live{false};    // the last update's panel had the 7-tab layout in a game that shows tabs 5 and 6
 
 // D2R's own show / hide of a page widget (0x23e630: vfuncs +0x50 then +0x48)
@@ -146,6 +148,10 @@ uint64_t UpdateHook(void* panel, uint64_t arg) noexcept {
 	g_updates.fetch_add(1);
 	auto* p = static_cast<uint8_t*>(panel);
 	int* tab = panel != nullptr ? RealTab(panel) : nullptr;
+	if (tab != nullptr && RotwWarnBlocks(*tab)) {  // part rotwwarn: a RotW tab on an account without RotW stays closed
+		*tab = rotw_warn::FallbackTab(g_tab.load());
+		g_warned.fetch_add(1);
+	}
 	if (tab == nullptr || g_child(panel, medtab_names::LayoutMark) == nullptr) {
 		g_noMark.fetch_add(1);  // D2R's or an older layout: 5 tabs, left as D2R
 		return g_update(panel, arg);
@@ -288,10 +294,10 @@ auto InstallMedianTabs(const D2RL::PluginContext* context, bool tabsOn, char* re
 
 void MedianTabsStatus(char* out, size_t outSize) noexcept {
 	std::snprintf(out, outSize, "tab %d (%s), materials %s; updates %u (no layout mark %u), bounces %u, cube hidden %u, toggles %u, applies %u "
-	              "(names missing %u, no panel %u), '@' codes restored %u; panel %p, WidgetService handle %llx", g_tab.load(),
+	              "(names missing %u, no panel %u), '@' codes restored %u, RotW tabs kept closed %u; panel %p, WidgetService handle %llx", g_tab.load(),
 	              g_live.load() ? "live" : "tabs 5 / 6 hidden", g_median.load() ? "Median" : "Vanilla", g_updates.load(), g_noMark.load(),
 	              g_bounces.load(), g_cubeHidden.load(), g_toggles.load(), g_applies.load(), g_missing.load(), g_noPanel.load(),
-	              g_codesRestored.load(), g_panel.load(), static_cast<unsigned long long>(g_handle.load()));
+	              g_codesRestored.load(), g_warned.load(), g_panel.load(), static_cast<unsigned long long>(g_handle.load()));
 }
 
 auto MedianTabsLive() noexcept -> bool {

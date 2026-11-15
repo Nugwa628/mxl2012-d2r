@@ -7,7 +7,7 @@ Only one of them can own D2RLoader's custom player page, so the mod data is buil
 
   charminv  data/global/excel/d2rloader/charm-inv/*.txt (tools/charm_inv.py); nothing of invtabs, and no Charms button in
             the classic inventory layouts (CharmInv has no classic panel: the button would open nothing)
-  invtabs   INVTABS_DATA (tab type tables, HD cells, classic panel art) and the classic inventory's Charms button; no
+  invtabs   INVTABS_DATA (tab type tables, HD cells and Charms button, classic panel art) and the classic inventory's Charms button; no
             CharmInv tables
 
 CHARM_INVENTORY is the default: invtabs since the release after 0.1.19 (owner decision, 2026-11-11). One run takes another with `--charm-inventory NAME` (tools/build.py, package_release.py)
@@ -25,6 +25,7 @@ ENV = "MXL2012_CHARM_INVENTORY"
 # invtabs' files in the mod's data folder (mxl2012.mpq/data), made by the build's invtabs steps
 INVTABS_DATA = ("global/excel/d2rloader/invtabs/tabs.txt", "global/excel/d2rloader/invtabs/types_charms.txt",
                 "hd/global/ui/panel/invtabs/stockgrid.sprite", "hd/global/ui/panel/invtabs/stockgrid.lowend.sprite",
+                "hd/global/ui/panel/invtabs/button.sprite", "hd/global/ui/panel/invtabs/button.lowend.sprite",
                 "global/ui/panel/invtabs_charms.dc6", "global/ui/panel/invtabs_tab_charms.dc6", "global/ui/panel/invtabs_button.dc6")
 CHARMINV_DATA = ("global/excel/d2rloader/charm-inv/charminv.txt", "global/excel/d2rloader/charm-inv/charminvtypes.txt")
 CLASSIC_INVENTORY = ("global/ui/layouts/playerinventoryoriginallayout.json", "global/ui/layouts/playerinventoryexpansionlayout.json")

@@ -136,6 +136,71 @@ class MissileLoadTests(unittest.TestCase):
 
 
 
+VCOLS = ["Missile", "*ID", "pCltDoFunc", "pCltHitFunc", "CltParam1", "CltParam2", "cHitPar1", "Vel", "Range", "CelFile",
+         "CltSubMissile1", "CltHitSubMissile1", "ExplosionMissile"]
+
+
+def void_rows():
+    """Median 2012's Singularity client rows, the columns void_clouds reads or writes."""
+    v = [["voidfield", "1327", "1", "30", "", "", "4", "", "1", "null", "", "voidsparkles", ""],
+         ["voidsparkles", "1328", "20", "", "32", "4", "", "24", "31", "Boiling", "", "", "blackexplosion"],
+         ["laughingexp", "2722", "1", "", "", "", "", "", "125", "", "", "", ""]]
+    return v
+
+
+class VoidCloudTests(unittest.TestCase):
+    """Bug #573: Singularity's HD cloud rides on two new client rows (txt_migrate.void_clouds), the sparkles stay."""
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        tm.OUT = Path(self.temp.name) / "out"
+        self.mig = tm.Migrator.__new__(tm.Migrator)
+        self.mig.report = []
+
+    def write(self, rows):
+        for bank in ("base", ""):
+            d = tm.OUT / "data" / "global" / "excel" / bank
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "missiles.txt").write_bytes(tsv(VCOLS, *rows).encode("utf-8"))
+
+    def read(self, bank):
+        h, rows = tm.read_tsv(tm.OUT / "data" / "global" / "excel" / bank / "missiles.txt")
+        return [r[0] for r in rows], {r[0]: dict(zip(h, r)) for r in rows}
+
+    def test_rows_added_in_both_banks(self):
+        self.write(void_rows())
+        self.mig.void_clouds()
+        for bank in ("base", ""):
+            order, got = self.read(bank)
+            self.assertEqual(order, ["voidfield", "voidsparkles", "laughingexp", "voidcloudfield", "voidcloud"])
+            vf, field, cloud, vs = got["voidfield"], got["voidcloudfield"], got["voidcloud"], got["voidsparkles"]
+            self.assertEqual((vf["pCltDoFunc"], vf["CltParam1"], vf["CltSubMissile1"], vf["CltHitSubMissile1"], vf["cHitPar1"]),
+                             ("19", "1", "voidcloudfield", "voidsparkles", "4"))
+            self.assertEqual((field["*ID"], field["pCltDoFunc"], field["pCltHitFunc"], field["cHitPar1"], field["CltHitSubMissile1"],
+                              field["CltSubMissile1"]), ("2723", "1", "30", tm.VOID_CLOUD_STEP, "voidcloud", ""))
+            self.assertEqual((cloud["*ID"], cloud["pCltDoFunc"], cloud["Vel"], cloud["Range"], cloud["CelFile"], cloud["ExplosionMissile"]),
+                             ("2724", "20", "24", "31", "null", ""))
+            self.assertEqual(vs, dict(zip(VCOLS, void_rows()[1])))
+        self.assertIn("voidcloudfield (2723)", self.mig.report[-1])
+        self.assertEqual(len(range(0, 64, int(tm.VOID_CLOUD_STEP))), 8)  # clouds per burst (hit 30 walks 64 spread entries)
+
+    def test_changed_source_value_is_left_and_reported(self):
+        rows = void_rows()
+        rows[0][VCOLS.index("CltSubMissile1")] = "other"
+        self.write(rows)
+        self.mig.void_clouds()
+        order, got = self.read("base")
+        self.assertNotIn("voidcloud", order)
+        self.assertEqual(got["voidfield"]["pCltDoFunc"], "1")
+        self.assertIn("NOT applied", self.mig.report[-1])
+
+    def test_second_run_adds_nothing(self):
+        self.write(void_rows())
+        self.mig.void_clouds()
+        self.mig.void_clouds()
+        self.assertEqual(self.read("")[0].count("voidcloud"), 1)
+
+
 class DroppedMonsterTests(unittest.TestCase):
     """Owner 2026-10-29: `cougar` dropped (txt_migrate.dropped_monsters): the row stays in place, switched off and unlinked."""
     COLS = ["Id", "*hcIdx", "enabled", "isSpawn", "MonProp", "minion1", "SetBoss", "BossXfer", "Code"]

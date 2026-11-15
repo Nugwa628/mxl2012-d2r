@@ -1,6 +1,7 @@
 """The character sheet's Advanced Stats panel lists the itemstatcost rows with `advdisplay` 1 (always) or 2 (while not 0).
 txt_migrate.advanced_stats sets the column from data/advanced_stats.tsv: Laz's PlugY stat pages plus the vanilla rows that mean
-the same in Median."""
+the same in Median. The plugin part advstats lists the same file in groups with headings (tools/advanced_stats.py ->
+statbook/src/advstats_table.h) and adds its own rows (Avoid, elemental adds, skill speeds)."""
 import importlib.util
 import os
 import sys
@@ -14,6 +15,7 @@ import localconfig  # noqa: E402
 spec = importlib.util.spec_from_file_location("txt_migrate", TOOLS / "txt_migrate.py")
 tm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tm)
+import advanced_stats as advs  # noqa: E402
 
 BUILT = TOOLS.parent / "work" / "mod" / "data" / "global" / "excel"
 NAMED = TOOLS.parent / "work" / "named" / "itemstatcost.txt"
@@ -108,6 +110,99 @@ class Built(unittest.TestCase):
         for i, name in ((39, "fireresist"), (79, "item_goldbonus"), (80, "item_magicbonus"), (85, "item_addexperience"),
                         (105, "item_fastercastrate")):
             self.assertEqual(table[i][0], name)
+
+
+class Groups(unittest.TestCase):
+    """bugs #581 / #582: the grouped panel's table."""
+
+    def setUp(self):
+        self.rows = advs.read_rows()
+
+    def test_every_group_has_rows_in_display_order(self):
+        order = list(advs.GROUPS)
+        groups = [r["group"] for r in self.rows]
+        self.assertEqual(sorted(set(groups), key=order.index), order)
+        self.assertEqual(groups, sorted(groups, key=order.index), "rows sorted by group")
+        self.assertEqual(groups[0], "offense")
+        self.assertEqual(groups[-1], "other")
+
+    def test_plain_rows_are_the_advdisplay_rows(self):
+        plain = {r["stats"][0] for r in self.rows if not r["kind"]}
+        self.assertEqual(plain, set(tm.read_advanced_stats()))
+        always = {r["stats"][0] for r in self.rows if r["always"]}
+        self.assertEqual(always, {k for k, v in tm.read_advanced_stats().items() if v == "1"})
+
+    def where(self, stat):
+        return next(r for r in self.rows if stat in r["stats"])
+
+    def test_avoid_and_own_rows(self):
+        avoid = self.where("passive_dodge")
+        self.assertEqual((avoid["kind"], avoid["stats"], avoid["group"]), ("avoid", advs.AVOID_STATS, "defense"))
+        for stat, key in (("firemindam", "AdvStatsAddsFire"), ("lightmindam", "AdvStatsAddsLightning"),
+                          ("coldmindam", "AdvStatsAddsCold"), ("magicmindam", "AdvStatsAddsMagic")):
+            r = self.where(stat)
+            self.assertEqual((r["kind"], r["key"], r["group"], len(r["stats"])), ("range", key, "offense", 2), stat)
+        for stat in ("attackrate", "velocitypercent"):
+            r = self.where(stat)
+            self.assertEqual((r["kind"], r["group"]), ("value", "speed"), stat)
+
+    def test_new_stats(self):
+        for stat, group in (("armorclass_vs_hth", "defense"), ("armorclass_vs_missile", "defense"), ("armor_override_percent", "defense"),
+                            ("item_tohit_percent", "offense"), ("item_maxhp_percent", "lifemana"), ("item_maxmana_percent", "lifemana"),
+                            ("item_manawhenstruck", "lifemana"), ("item_allskills", "skills"), ("enr_factor_percent", "spell"),
+                            ("str_factor", "spell"), ("maxfireresist", "resist"), ("item_absorbcold", "resist")):
+            self.assertEqual(self.where(stat)["group"], group, stat)
+
+    def test_left_out(self):
+        listed = {s for r in self.rows for s in r["stats"]}
+        # poison adds (per-item merge rules), defense / block / attack rating (the character sheet shows the real values)
+        for stat in ("poisonmindam", "poisonmaxdam", "toblock", "armorclass", "tohit", "item_singleskill", "item_addclassskills"):
+            self.assertNotIn(stat, listed)
+
+    def test_header_lists_the_file(self):
+        """statbook/src/advstats_table.h is generated from the file: same rows, same order, same kinds."""
+        text = advs.HEADER.read_text("utf-8")
+        names = [line.rsplit('"', 2)[-2] for line in text.splitlines() if line.strip().startswith("{") and "Kind::" in line]
+        self.assertEqual(names, [",".join(r["stats"]) for r in self.rows])
+        kinds = [line.split("Kind::")[1].split(",")[0] for line in text.splitlines() if "Kind::" in line and line.strip().startswith("{")]
+        self.assertEqual(kinds, [advs.KINDS[r["kind"]][0] for r in self.rows])
+
+    @unittest.skipUnless(NAMED.exists(), "needs work/named/itemstatcost.txt (stat ids)")
+    def test_header_is_up_to_date(self):
+        self.assertEqual(advs.header_text(self.rows, advs.stat_ids(NAMED)), advs.HEADER.read_text("utf-8"))
+
+    def test_strings_cover_every_key_in_every_language(self):
+        strings = advs.strings()
+        keys = {s["Key"] for s in strings}
+        self.assertTrue({k for k, _ in advs.GROUPS.values()} | set(advs.TEXTS) | set(advs.AVOID_TEXTS) <= keys)
+        for s in strings:
+            self.assertEqual(set(s) - {"Key"}, set(advs.LANGS), s["Key"])
+            self.assertEqual(len(set(s[lang] for lang in advs.LANGS)), 1, "English in every language")
+        logic = (advs.ROOT / "statbook" / "src" / "advstats_logic.h").read_text("utf-8")
+        for key, text in advs.AVOID_TEXTS.items():
+            self.assertIn('{"%s", "%s"}' % (key, text), logic, "AvoidTexts match the strings")
+
+    def test_bad_rows_are_refused(self):
+        import tempfile
+        head = "stat\tshow\tgroup\trow\tsource\n"
+        bad = (head + "fireresist\tnonzero\tnosuch\t\tx\n",  # no such group
+               head + "firemindam\tnonzero\toffense\trange:AdvStatsAddsFire\tx\n",  # a range needs two stats
+               head + "fireresist\tnonzero\tresist\t\tx\n" * 2)  # listed twice
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "a.tsv"
+            for text in bad:
+                p.write_text(text, encoding="utf-8")
+                with self.assertRaises(ValueError, msg=text):
+                    advs.read_rows(p)
+
+    def test_write_strings(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            paths = advs.write_strings(Path(d))
+            self.assertEqual([p.relative_to(d).as_posix() for p in paths],
+                             ["local/lng/strings/mxl2012/advanced_stats.json", "local/lng/strings-legacy/mxl2012/advanced_stats.json"])
+            self.assertEqual(json.loads(paths[0].read_text("utf-8"))[0]["enUS"], "Offense")
 
 
 if __name__ == "__main__":

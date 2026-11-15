@@ -36,7 +36,7 @@ class SendStashTest(unittest.TestCase):
         for hd in (True, False):
             ws = ss.widgets(hd)
             json.loads(json.dumps(ws))
-            self.assertEqual([w["name"] for w in ws], [ss.NO_SLOTS, ss.JOINED, ss.BUTTON])  # the live one on top
+            self.assertEqual([w["name"] for w in ws], [ss.NO_SLOTS, ss.JOINED, ss.NO_ROTW, ss.BUTTON])  # the live one on top
             self.assertNotIn('"@', json.dumps(ws))  # literal text in a served layout (bug #30)
             *greyed, live = ws
             self.assertEqual(live["fields"]["onClickMessage"], "PanelManager:OpenPanel:mxl2012-core/SendStash")
@@ -49,6 +49,7 @@ class SendStashTest(unittest.TestCase):
                 self.assertEqual(w["fields"]["rect"], live["fields"]["rect"])
             self.assertIn("Reign of the Warlock", ws[0]["fields"]["tooltipString"])
             self.assertIn("joined", ws[1]["fields"]["tooltipString"])
+            self.assertIn("Needs Reign of the Warlock", ws[2]["fields"]["tooltipString"])  # #591
 
     def test_places(self):
         # HD: inside the bottom-left square of the inventory picture (classic 17..50 x 386..417 scaled)
@@ -65,7 +66,8 @@ class SendStashTest(unittest.TestCase):
         self.assertLessEqual(y + h, 432)
 
     def test_art(self):
-        frames = ss.hd_frames()
+        import hd_buttons
+        frames = ss.hd_frames(src=hd_buttons.Sources.drawn())
         self.assertEqual(len(frames), 4)
         self.assertEqual({f.size for f in frames}, {ss.HD_RECT[2:]})
         self.assertEqual(len(set(f.tobytes() for f in frames)), 4)
@@ -169,6 +171,13 @@ class ParseTest(unittest.TestCase):
         """The check's expected reason line is the plugin's (send_stash_logic.h RefusalLine)."""
         src = (Path(__file__).resolve().parents[2] / "plugin" / "src" / "send_stash_logic.h").read_text(encoding="utf-8")
         self.assertIn('"%s' % sc.NOSLOTS_LINE, src)
+        self.assertIn('"%s' % sc.NOROTW_LINE, src)  # #591
+
+    def test_header_names_every_button(self):
+        """The committed header carries every button name the layouts write (#591: MxlSendStashNoRotw)."""
+        text = ss.HEADER.read_text("utf-8")
+        for name in (ss.BUTTON, ss.NO_SLOTS, ss.JOINED, ss.NO_ROTW):
+            self.assertIn('"%s"' % name, text)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,64 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.23 (2026-11-15)
+
+- **New: the Stat Book.** The HD character sheet gets tabs: Character (the sheet you know), Offense, Spells, Defense,
+  Resistances, Skills & Procs, Utility and All Stats. Each page lists the stats the sheet never showed, with your current
+  values (grey at zero, red below zero, gold at the cap), including Chance to Block as the game computes it. All Stats has
+  every stat you have in groups, with a search box: type and the matching lines light up; the arrow on a line opens the
+  page that has it. The arrow on the sheet that opened the Advanced Stats panel now opens All Stats. On a gamepad switch
+  pages with LT / RT (LB / RB with Controller QOL). Legacy graphics keep the classic sheet.
+  The Stat Book is also released on its own for plain D2R as D2R Advanced Stats
+  (<https://github.com/Nugwa628/d2r-advanced-stats>).
+- The Stat Book can show its tabs down the side: the book then opens as its own panel next to the character sheet (where
+  the Advanced Stats panel was), and the sheet keeps its normal page. Switch with the small button in the top-right corner
+  of the book's page, or with the "Stat Book: Top/Side Tabs" key in Options > Controls (no key by default). The choice is
+  saved in `statbook.toml` (`tabs = "top"` or `"side"`). Top tabs stay the default; the controller sheet always uses them.
+  The standalone Stat Book plugin on plain D2R has the side panel and the button too.
+- The character sheet shows Magic Resistance and Physical Resistance next to the fire, cold, lightning and poison
+  resistances, in HD, legacy graphics and the controller sheet. The numbers are what the game applies: physical at most
+  50%, magic at most 75% plus maximum magic resistance (never above 95%); gold at the maximum, red below 0.
+- The difficulties carry Median XL's names again: Hatred, Terror and Destruction instead of Normal, Nightmare and Hell,
+  on the difficulty buttons, in the create and join game panels, on the automap and in the "must kill Baal" join
+  messages. Items, monsters and skills with "Hell" or "Nightmare" in their names keep them.
+- The big red text on entering an area now names the area as Median XL does, as the automap already did: "Entering
+  Duncraig" instead of "Entering The Cave Level 2", also Ureh, Fauztinville, Vizjun, the Secret Cow Level and the other
+  renamed areas (17 in all), and "Welcome to Toraja" (Old Bremmtown, Khalimgrad) in the three Hell areas. HD and legacy
+  graphics.
+- Without Reign of the Warlock the stash's Gems, Materials, Runes, MEDIAN and ORBS tabs no longer open: the tab stays closed and a large red banner in the middle of the screen (over the stash) says for a few seconds that the tab needs Reign of the Warlock; the message log says it too.
+- Without Reign of the Warlock items can no longer go into those tabs while they are closed: the Send to stash button is greyed (its tooltip and a click say that it needs Reign of the Warlock, with the same banner), and Ctrl+click or the gamepad's deposits put nothing there. With Reign of the Warlock nothing changes.
+- The Send to stash and Charms buttons in the HD inventory have new HD art in the style of D2R's own buttons (stone rim,
+  dark inside, a gold arrow going into a chest and a blue charm) instead of the flat low-resolution pictures.
+- The Advanced Stats panel (HD graphics, the arrow on the character sheet) is sorted into groups with headings: Offense,
+  Spell Damage, Defense, Resistances, Speed, Life & Mana, Attributes, Skills, Summons and Other.
+- The Advanced Stats panel now shows your chance to avoid damage (Perfect Being and other avoid sources), elemental damage you
+  add, attack and movement speed from skills, defense against melee and missiles, "Total Character Defense = 0", bonus attack
+  rating, increased maximum life and mana, all skills, mana when struck, and the energy and strength spell damage factors.
+- The Advanced Stats panel updates while it is open: casting a buff such as Ecstatic Frenzy adds or removes its lines at once.
+- The Advanced Stats panel reads Median's own stats (crafting points, spell damage factors, minion bonuses and others, 33 lines)
+  from the right place: before, those lines could stay hidden or show the number of an unrelated stat.
+- The resistance rows on the character sheet and the grouped Advanced Stats panel now come from a plugin of their own, the
+  Stat Book (`d2rloader/plugins/statbook.dll`, settings in `d2rloader/config/statbook.toml`): each can be switched off there.
+- The third row of resistance boxes on the HD character sheet no longer repeats the Cold / Poison row's stone, and the
+  ledge under it is no longer squashed.
+- HD skill effects closer to legacy:
+  - Carpet of Spiders: small spiders now spread from the target instead of a fan of blades flying out of the character.
+  - Rapture: the aura ring is blue instead of rainbow.
+  - Hammerstrike: a thin ring of sparks instead of a blinding white disc.
+  - Hive: the buff now shows a pale wind around the character.
+  - Faerie Fire: the buff now shows a rainbow ring under the druid.
+  - Quill Storm and Egg Trap: the quills are big enough to see, so their red hit glows no longer appear from nowhere.
+  - Laughing Ghost: the ghost is visible.
+  - Egg Trap: the egg bursts as a small dark splat instead of a fiery explosion.
+- HD looks of more skills:
+  - Singularity: a large dark purple cloud over its area instead of lightning strikes and an orange blast.
+  - Wychwind: thrown knives instead of pale shurikens, with a darker glow where they hit.
+  - Beacon: its blast flies outward like Exploding Arrow's instead of red lightning rays.
+  - Storm Crows' knives, Widowmaker's bolts, Barrage's and Phalanx's arrows, Fireball Sentry's explosion and Broadside's
+    daggers appear where they are made instead of flying out of your character first.
+- The Sacrifices' corpses say "Help us" again instead of "Over here".
+
 ### 0.1.22 (2026-11-13)
 
 - **Downloader 0.1.5.** Your downloader offers this update when it starts: say Yes. This release needs it; an older

@@ -99,6 +99,7 @@ def check_picks(by_key: dict[tuple[str, str], dict], picks: dict, work: Path | N
         mj = json.loads((work / "data" / "hd" / "missiles" / "missiles.json").read_text("utf-8"))
 
     def base_of(effect: str) -> str:
+        effect = effect.removesuffix("_free")  # tools/missile_release.py: the same model without the glide from the hand
         m = re.fullmatch(r"mxl_(.+)_s\d+", effect)
         return m.group(1) if m else effect
 

@@ -1,0 +1,124 @@
+# Stat Book pages (docs/statbook.md; tools/statbook.py turns this into the plugin's book file). kind page: id + tab title;
+# section: a heading line; row: label, stats (itemstatcost names; a,b for two values; name:class = the player's class as param),
+# format (%d %+d %% only, or yesno / block), colour (w r b y p m gold blue green), cap (N or N+stat<=M: gold at or over it),
+# base (added per value, e.g. 0,75 for a max resistance). Rows whose stats a game's itemstatcost lacks are left out of that book.
+kind	page	text	stat	format	colour	cap	base
+page	offense	Offense
+section	offense	Damage
+row	offense	Enhanced Damage	item_maxdamage_percent	%+d%%	w
+row	offense	Attack Rating	item_tohit_percent	%+d%%	w
+row	offense	Adds Fire Damage	firemindam,firemaxdam	%d-%d	r
+row	offense	Adds Lightning Damage	lightmindam,lightmaxdam	%d-%d	y
+row	offense	Adds Cold Damage	coldmindam,coldmaxdam	%d-%d	b
+row	offense	Adds Poison Damage	poisonmindam,poisonmaxdam	%d-%d	p
+row	offense	Damage to Demons	item_demondamage_percent	%+d%%	w
+row	offense	Damage to Undead	item_undeaddamage_percent	%+d%%	w
+section	offense	Strikes
+row	offense	Crushing Blow	item_crushingblow	%d%%	w
+row	offense	Deadly Strike	item_deadlystrike	%d%%	w
+row	offense	Open Wounds	item_openwounds	%d%%	w
+row	offense	Piercing Attack	item_pierce	%d%%	w
+row	offense	Ignore Target's Defense	item_ignoretargetac	yesno	w
+row	offense	Target Defense	item_fractionaltargetac	%d%%	w
+row	offense	Target Takes Additional Damage	item_targettakesdamage	%d	w
+section	offense	On Hit
+row	offense	Slows Target by	item_slow	%d%%	w
+row	offense	Hit Causes Monster to Flee	item_howl	%d%%	w
+row	offense	Prevent Monster Heal	item_preventheal	yesno	w
+row	offense	Hit Blinds Target	item_stupidity	%+d	w
+row	offense	Freezes Target	item_freeze	%+d	b
+section	offense	Speed
+row	offense	Increased Attack Speed	item_fasterattackrate	%d%%	w
+row	offense	Attack Speed from Skills	attackrate	%+d%%	gold		-100
+page	spells	Spells
+section	spells	Spell Damage
+row	spells	Energy Factor	enr_factor	%d	w
+row	spells	Strength Factor	str_factor	%d	w
+row	spells	Fire Spell Damage	passive_fire_mastery	%+d%%	r
+row	spells	Lightning Spell Damage	passive_ltng_mastery	%+d%%	y
+row	spells	Cold Spell Damage	passive_cold_mastery	%+d%%	b
+row	spells	Poison Spell Damage	passive_pois_mastery	%+d%%	p
+row	spells	Physical/Magic Spell Damage	passive_mag_mastery	%+d%%	m
+section	spells	Enemy Resistance
+row	spells	Enemy Fire Resistance	passive_fire_pierce	-%d%%	r
+row	spells	Enemy Lightning Resistance	passive_ltng_pierce	-%d%%	y
+row	spells	Enemy Cold Resistance	passive_cold_pierce	-%d%%	b
+row	spells	Enemy Poison Resistance	passive_pois_pierce	-%d%%	p
+row	spells	Enemy Physical/Magic Resistance	passive_mag_pierce	-%d%%	m
+section	spells	Casting
+row	spells	Faster Cast Rate	item_fastercastrate	%d%%	w
+row	spells	Skill Duration	profession_duration_mod	%+d%%	w
+page	defense	Defense
+section	defense	Avoidance
+row	defense	Chance to Avoid Damage	passive_avoid	%d%%	w
+row	defense	Chance to Dodge Melee	passive_dodge	%d%%	w
+row	defense	Chance to Evade Missiles	passive_evade	%d%%	w
+row	defense	Chance to Block	toblock	block	w
+row	defense	Faster Block Rate	item_fasterblockrate	%d%%	w
+row	defense	Faster Hit Recovery	item_fastergethitrate	%d%%	w
+section	defense	Armor
+row	defense	Enhanced Defense	item_armor_percent	%+d%%	w
+row	defense	Defense vs. Missile	armorclass_vs_missile	%+d	w
+row	defense	Defense vs. Melee	armorclass_vs_hth	%+d	w
+row	defense	Defense from Skills	skill_armor_percent	%+d%%	w
+section	defense	Damage Taken
+row	defense	Physical Damage Reduced by	normal_damage_reduction	%d	w
+row	defense	Magic Damage Reduced by	magic_damage_reduction	%d	w
+row	defense	Cannot Be Frozen	item_cannotbefrozen	yesno	b
+row	defense	Half Freeze Duration	item_halffreezeduration	yesno	b
+section	defense	Thorns
+row	defense	Attacker Takes Damage	item_attackertakesdamage	%d	w
+row	defense	Attacker Takes Fire Damage	item_attackertakesfiredamage	%d	r
+row	defense	Attacker Takes Cold Damage	item_attackertakescolddamage	%d	b
+row	defense	Attacker Takes Lightning Damage	item_attackertakeslightdamage	%d	y
+row	defense	Slows Ranged Attackers by	skill_slowrangedthorns	%d%%	w
+page	resist	Resistances
+section	resist	Resistances (before the difficulty penalty)
+row	resist	Fire Resistance	fireresist,maxfireresist	%d%% (max %d%%)	r	75+maxfireresist<=95	0,75
+row	resist	Cold Resistance	coldresist,maxcoldresist	%d%% (max %d%%)	b	75+maxcoldresist<=95	0,75
+row	resist	Lightning Resistance	lightresist,maxlightresist	%d%% (max %d%%)	y	75+maxlightresist<=95	0,75
+row	resist	Poison Resistance	poisonresist,maxpoisonresist	%d%% (max %d%%)	p	75+maxpoisonresist<=95	0,75
+row	resist	Magic Resistance	magicresist,maxmagicresist	%d%% (max %d%%)	m	75+maxmagicresist<=95	0,75
+row	resist	Physical Resistance	damageresist	%d%% (max 50%%)	w	50
+section	resist	Absorb
+row	resist	Fire Absorb	item_absorbfire_percent,item_absorbfire	%d%% / %d	r
+row	resist	Cold Absorb	item_absorbcold_percent,item_absorbcold	%d%% / %d	b
+row	resist	Lightning Absorb	item_absorblight_percent,item_absorblight	%d%% / %d	y
+row	resist	Magic Absorb	item_absorbmagic_percent,item_absorbmagic	%d%% / %d	m
+section	resist	Other
+row	resist	Curse Resistance	curse_resistance	%d%%	w
+row	resist	Poison Length Reduced by	item_poisonlengthresist	%d%%	p
+row	resist	Minion Resistances	minion_resist_all	%+d%%	w
+page	skills	Skills & Procs
+section	skills	Skill Levels
+row	skills	All Skills	item_allskills	%+d	blue
+row	skills	Class Skill Levels	item_addclassskills:class	%+d	blue
+section	skills	Minions
+row	skills	Minion Damage	skill_minion_dmg_percent	%+d%%	w
+row	skills	Minion Life	skill_minion_hp_percent	%+d%%	w
+row	skills	Minion Attack Rating	item_minion_attack	%+d%%	w
+page	utility	Utility
+section	utility	Life & Mana
+row	utility	Life Stolen per Hit	lifedrainmindam	%d%%	r
+row	utility	Mana Stolen per Hit	manadrainmindam	%d%%	b
+row	utility	Life after each Kill	item_healafterkill	%+d	w
+row	utility	Mana after each Kill	item_manaafterkill	%+d	w
+row	utility	Life when Struck	item_healwhenstruck	%+d	w
+row	utility	Mana when Struck	item_manawhenstruck	%+d	w
+row	utility	Replenish Life	hpregen	%+d	w
+row	utility	Regenerate Mana	manarecoverybonus	%d%%	w
+row	utility	Damage Taken Goes to Mana	item_damagetomana	%d%%	w
+row	utility	Maximum Life	item_maxhp_percent	%+d%%	w
+section	utility	Movement
+row	utility	Faster Run/Walk	item_fastermovevelocity	%d%%	w
+row	utility	Movement Speed from Skills	velocitypercent	%+d%%	gold		-100
+section	utility	Finding
+row	utility	Magic Find	item_magicbonus	%d%%	w
+row	utility	Gold Find	item_goldbonus	%d%%	w
+row	utility	Experience Gained	item_addexperience	%+d%%	w
+row	utility	Light Radius	item_lightradius	%+d	w
+row	utility	Reduced Vendor Prices	item_reducedprices	%d%%	w
+section	utility	Progress
+row	utility	Crafting Points	game_craftpoints	%d	gold
+row	utility	Ennead Skill	learn_ennead	yesno	green
+row	utility	Black Road Skill	learn_blackroad	yesno	green

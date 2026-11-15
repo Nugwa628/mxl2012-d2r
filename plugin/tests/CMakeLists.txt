@@ -5,8 +5,8 @@ cmake_minimum_required(VERSION 3.20)
 project(mxl2012_core_tests LANGUAGES CXX)
 
 set(names imageguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests dodgelist_tests statelists_tests melttrail_tests whirlwind_tests charmlength_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests spiritwarp_tests appleuse_tests vochat_tests reassign_tests savemode_tests rotwstash_tests voidfloor_tests stashpages_tests sendstash_tests medtab_tests mapreveal_tests arealvl_tests stashtip_tests tabflash_tests clearfonts_tests padinput_tests modelcache_tests devmenu_tests charmdup_tests
-          panel_tests
-          wikilogic_tests)
+          panel_tests rotwwarn_tests
+          wikilogic_tests blockrate_tests)
 add_executable(devmenu_tests EXCLUDE_FROM_ALL devmenu_test.cpp)
 add_executable(imageguard_tests EXCLUDE_FROM_ALL image_guard_test.cpp)
 add_executable(panel_tests EXCLUDE_FROM_ALL panel_logic_test.cpp)
@@ -41,6 +41,7 @@ add_executable(vochat_tests EXCLUDE_FROM_ALL vo_chat_test.cpp)
 add_executable(reassign_tests EXCLUDE_FROM_ALL reassign_guard_test.cpp)
 add_executable(savemode_tests EXCLUDE_FROM_ALL save_mode_test.cpp)
 add_executable(rotwstash_tests EXCLUDE_FROM_ALL rotw_stash_test.cpp)
+add_executable(rotwwarn_tests EXCLUDE_FROM_ALL rotw_warn_test.cpp)
 add_executable(voidfloor_tests EXCLUDE_FROM_ALL void_floor_test.cpp)
 add_executable(stashpages_tests EXCLUDE_FROM_ALL stash_pages_test.cpp)
 add_executable(sendstash_tests EXCLUDE_FROM_ALL send_stash_test.cpp)
@@ -52,6 +53,7 @@ add_executable(tabflash_tests EXCLUDE_FROM_ALL tab_flash_test.cpp)
 add_executable(clearfonts_tests EXCLUDE_FROM_ALL clear_fonts_test.cpp)
 add_executable(padinput_tests EXCLUDE_FROM_ALL pad_input_test.cpp)
 add_executable(modelcache_tests EXCLUDE_FROM_ALL model_cache_test.cpp)
+add_executable(blockrate_tests EXCLUDE_FROM_ALL block_rate_test.cpp)
 add_custom_target(tests DEPENDS ${names})
 
 foreach(t ${names})
