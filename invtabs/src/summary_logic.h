@@ -132,9 +132,10 @@ inline std::string StripColour(std::string_view text) {
 	return out;
 }
 
-// The most lines the summary keeps. A full tab of charms with every stat distinct stays far below it; past it the
-// last kept line says how many were left out (MoreLine), so a runaway list cannot grow the layout without bound.
-inline constexpr std::size_t MaxLines = 160;
+// The most lines the summary keeps. A full tab of charms listed by charm (60 small charms with a name line and a few
+// stat lines each) stays below it; past it the last kept line says how many were left out (MoreLine), so a runaway list
+// cannot grow the layout without bound.
+inline constexpr std::size_t MaxLines = 400;
 
 inline std::string MoreLine(std::size_t hidden) { return "... +" + std::to_string(hidden); }
 
@@ -145,6 +146,55 @@ inline std::vector<std::string> CapLines(std::vector<std::string> lines, std::si
 	lines.resize(max - 1);
 	lines.push_back(MoreLine(hidden));
 	return lines;
+}
+
+// --- the list by charm ------------------------------------------------------------------------------------------------
+// The player can list the charms one by one instead of the sum (the charm tab's mode button, invtabs.toml
+// `summary_list`): each charm's name, then its own stat lines as its tooltip words them. The core passes the charms in
+// grid order (the tab's charms row by row, left to right, then the backpack's when they count there too).
+
+enum class ListMode { Totals, ByCharm };
+
+inline constexpr char ColourGold[]  = "\xC3\xBF" "c4"; // D2R's unique item name colour
+inline constexpr char ColourGrey[]  = "\xC3\xBF" "c5";
+inline constexpr char ColourWhite[] = "\xC3\xBF" "c0";
+
+struct CharmBlock {
+	std::string              name;        // the charm's name as the game shows it ("" -> "Charm")
+	bool                     unique = true;  // the name in gold (Median's charms are uniques); else white
+	bool                     counts = true;  // its stats are merged into the player; else greyed with "(inactive)"
+	bool                     inTab  = true;  // in the charm tab; false: in the backpack
+	std::vector<std::string> lines;       // its stat lines (SplitLines of its tooltip block, tooltip order)
+};
+
+inline std::string BackpackHeading() { return std::string(ColourGrey) + "In the inventory"; }
+
+inline std::vector<std::string> ByCharmLines(const std::vector<CharmBlock>& blocks) {
+	std::vector<std::string> out;
+	bool                     backpack = false;
+	for (const CharmBlock& b : blocks) {
+		if (!b.inTab && !backpack) {
+			backpack = true;
+			out.push_back(BackpackHeading());
+		}
+		std::string head = std::string(!b.counts ? ColourGrey : b.unique ? ColourGold : ColourWhite) + (b.name.empty() ? std::string("Charm") : b.name);
+		if (!b.counts) head += " (inactive)";
+		out.push_back(std::move(head));
+		for (const std::string& l : b.lines) out.push_back(b.counts ? l : std::string(ColourGrey) + StripColour(l));
+	}
+	return out;
+}
+
+// Grid order of the charms: the tab's first (row by row, then column), then the backpack's the same way.
+struct GridPlace {
+	bool inTab = true;
+	int  x = 0, y = 0;
+};
+
+inline bool GridBefore(const GridPlace& a, const GridPlace& b) {
+	if (a.inTab != b.inTab) return a.inTab;
+	if (a.y != b.y) return a.y < b.y;
+	return a.x < b.x;
 }
 
 // The classic layout shows `rows` lines at a time, starting at `first`. ClampFirst keeps the window inside the list;
@@ -187,7 +237,23 @@ inline constexpr int ClassicRowPitch = 13, ClassicRowHeight = 12;
 inline constexpr char ScrollViewName[] = "SummaryView";
 inline constexpr char ScrollBarName[]  = "SummaryScroll";
 
-inline std::string RowName(std::size_t i) { return "SummaryLine" + std::to_string(i); }
+// A text box draws in the one colour of its style (colour codes given to its setter print as text, docs/d2r-addresses.md
+// "Text boxes"). So the list by charm has four boxes per row, one per colour, and fills the one its line needs.
+enum class RowColour { Base, Gold, Grey, White };
+inline constexpr RowColour RowColours[] = { RowColour::Base, RowColour::Gold, RowColour::Grey, RowColour::White };
+
+inline std::string RowName(std::size_t i, RowColour c = RowColour::Base) {
+	static constexpr const char* suffix[] = { "", "Gold", "Grey", "White" };
+	return "SummaryLine" + std::to_string(i) + suffix[static_cast<int>(c)];
+}
+
+// A line's colour (its leading colour code: c4 gold, c5 grey, c0 white, else the list's blue) and its text without codes.
+inline std::pair<RowColour, std::string> SplitColour(std::string_view line) {
+	RowColour c = RowColour::Base;
+	if (line.size() >= 4 && static_cast<unsigned char>(line[0]) == 0xC3 && static_cast<unsigned char>(line[1]) == 0xBF && line[2] == 'c')
+		c = line[3] == '4' ? RowColour::Gold : line[3] == '5' ? RowColour::Grey : line[3] == '0' ? RowColour::White : RowColour::Base;
+	return { c, StripColour(line) };
+}
 
 inline std::size_t VisibleRows(LayoutMode mode, int height) {
 	const int pitch = mode == LayoutMode::Hd ? HdRowPitch : ClassicRowPitch;
@@ -210,36 +276,52 @@ inline std::string JsonRect(int x, int y, int w, int h) {
 	return "{ \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"width\": " + std::to_string(w) + ", \"height\": " + std::to_string(h) + " }";
 }
 
-inline std::string RowWidget(LayoutMode mode, std::size_t i, int x, int y, int width) {
-	const bool hd = mode == LayoutMode::Hd;
-	std::string style = hd ? "{ \"fontColor\": \"$FontColorBlue\", \"pointSize\": \"$SmallFontSize\", \"alignment\": { \"h\": \"center\", \"v\": \"center\" } }"
-	                       : "{ \"fontColor\": { \"r\": 110, \"g\": 110, \"b\": 255, \"a\": 255 }, \"alignment\": { \"h\": \"center\", \"v\": \"center\" } }";
-	return "{ \"type\": \"TextBoxWidget\", \"name\": \"" + RowName(i) + "\", \"fields\": { \"rect\": " +
+inline std::string RowWidget(LayoutMode mode, std::size_t i, int x, int y, int width, RowColour c = RowColour::Base) {
+	const bool  hd = mode == LayoutMode::Hd;
+	static constexpr const char* hdColour[] = { "\"$FontColorBlue\"", "\"$FontColorGold\"", "\"$FontColorGray\"", "\"$FontColorWhite\"" };
+	static constexpr const char* sdColour[] = { "{ \"r\": 110, \"g\": 110, \"b\": 255, \"a\": 255 }", "{ \"r\": 199, \"g\": 179, \"b\": 119, \"a\": 255 }",
+		                                        "{ \"r\": 105, \"g\": 105, \"b\": 105, \"a\": 255 }", "{ \"r\": 255, \"g\": 255, \"b\": 255, \"a\": 255 }" };
+	const int   k     = static_cast<int>(c);
+	std::string style = hd ? std::string("{ \"fontColor\": ") + hdColour[k] + ", \"pointSize\": \"$SmallFontSize\", \"alignment\": { \"h\": \"center\", \"v\": \"center\" } }"
+	                       : std::string("{ \"fontColor\": ") + sdColour[k] + ", \"alignment\": { \"h\": \"center\", \"v\": \"center\" } }";
+	return "{ \"type\": \"TextBoxWidget\", \"name\": \"" + RowName(i, c) + "\", \"fields\": { \"rect\": " +
 	       JsonRect(x, y, width, hd ? HdRowHeight : ClassicRowHeight) + ", \"text\": \"\", \"style\": " + style + (hd ? "" : ", \"fontType\": \"8pt\"") + " } }";
 }
 
 // The widgets as a comma-separated list of JSON objects, to splice into the panel's "children" array. `area` is in the
 // panel's coordinates (the band the core reserves above the charm grid).
-inline std::string LayoutFragment(LayoutMode mode, Rect area, std::size_t rows) {
+// HD: `barInset` keeps the top of the scroll bar free and `cornerWidth` the list's right edge clear of what sits there
+// (the list's mode button, a square in the top-right corner of the area).
+// `colours`: each row gets its gold, grey and white boxes too (the list by charm).
+inline std::string LayoutFragment(LayoutMode mode, Rect area, std::size_t rows, int barInset = 0, int cornerWidth = 0, bool colours = false) {
 	std::string out;
+	const auto  row = [&](std::size_t i, int x, int y, int width) {
+        std::string r;
+        for (RowColour c : RowColours) {
+            if (c != RowColour::Base && !colours) break;
+            if (!r.empty()) r += ",\n";
+            r += RowWidget(mode, i, x, y, width, c);
+        }
+        return r;
+	};
 	if (mode == LayoutMode::Classic) {
 		for (std::size_t i = 0; i < rows; ++i) {
 			if (i) out += ",\n";
-			out += RowWidget(mode, i, area.x, area.y + static_cast<int>(i) * ClassicRowPitch, area.width);
+			out += row(i, area.x, area.y + static_cast<int>(i) * ClassicRowPitch, area.width);
 		}
 		return out;
 	}
-	const int viewWidth = area.width - HdBarWidth - HdBarGap;
+	const int viewWidth = area.width - std::max(HdBarWidth, cornerWidth) - HdBarGap;
 	out += "{ \"type\": \"ScrollViewWidget\", \"name\": \"" + std::string(ScrollViewName) + "\", \"fields\": { \"rect\": " +
 	       JsonRect(area.x, area.y, viewWidth, area.height) + ", \"scrollControllerName\": \"" + ScrollBarName +
 	       "\", \"clipChildrenDraw\": true }, \"children\": [\n";
 	for (std::size_t i = 0; i < rows; ++i) {
 		if (i) out += ",\n";
-		out += RowWidget(mode, i, 0, static_cast<int>(i) * HdRowPitch, viewWidth);
+		out += row(i, 0, static_cast<int>(i) * HdRowPitch, viewWidth);
 	}
 	out += "\n] },\n";
 	out += "{ \"type\": \"ScrollControllerWidget\", \"name\": \"" + std::string(ScrollBarName) + "\", \"fields\": { \"rect\": " +
-	       JsonRect(area.x + area.width - HdBarWidth, area.y, HdBarWidth, area.height) +
+	       JsonRect(area.x + area.width - HdBarWidth, area.y + barInset, HdBarWidth, area.height - barInset) +
 	       ", \"upArrowFilepath\": \"FrontEnd/HD/Final/FrontEnd_ScrollUpBtn\", \"downArrowFilepath\": \"FrontEnd/HD/Final/FrontEnd_ScrollDownBtn\""
 	       ", \"barFilepath\": \"PauseMenu/VerticalIndicator\", \"viewName\": \"" + ScrollViewName +
 	       "\", \"wheelScrollSound\": \"cursor_scroll_hd\", \"buttonScrollSound\": \"cursor_scroll_hd\" } }";

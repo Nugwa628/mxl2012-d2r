@@ -711,6 +711,19 @@ def hand_pick(picks: dict, kind: str, m: "Prof", cands: list["Prof"], no_scale: 
     return c, scale, hp["conf"], f"hand pick (data/hd-effects-picks.tsv): {hp['why']}; D2R {c.name} ({c.art_name})"
 
 
+def check_authored_picks(picks: dict, authored: dict) -> None:
+    """A pick of an authored effect: of the effect's kind, and without a tint (an authored layer carries its own colours)."""
+    for key, hp in picks.items():
+        e = authored.get(hp["effect"])
+        if e is None:
+            continue
+        if e["kind"] != key[0]:
+            raise SystemExit(f"data/hd-effects-picks.tsv line {hp['line']}: {key[0]} pick of the {e['kind']} effect {hp['effect']}")
+        if hp["tint"]:
+            raise SystemExit(f"data/hd-effects-picks.tsv line {hp['line']}: authored effect {hp['effect']} with a tint "
+                             "(give its layer an edit with ramps instead)")
+
+
 def empty_definition(d: dict) -> bool:
     """A D2R HD definition whose entities have no components: D2R ships 86 such overlay stubs (e.g. monster/fetishdeath_2,
     necro/cast_familiar) for effects it draws some other way; a stand-in copied from one draws nothing."""
@@ -817,6 +830,8 @@ def main() -> int:
     ap.add_argument("--no-tint", action="store_true", help="no gradient tint of recoloured vanilla effects (hd_recolour.py)")
     ap.add_argument("--map", default=str(fxpaths.MAP_TSV), help="art -> effect table (default data/hd-effects-map.tsv)")
     ap.add_argument("--picks", default=str(fxpaths.PICKS_TSV), help="hand-picked effects (default data/hd-effects-picks.tsv; '' for none)")
+    ap.add_argument("--authored", default=str(fxpaths.ROOT / "data" / "hd-effects-authored.json"),
+                    help="authored effects a pick can name (default data/hd-effects-authored.json; '' for none)")
     args = ap.parse_args()
     work = Path(args.work)
     out = work / "data"
@@ -832,7 +847,21 @@ def main() -> int:
     d2r_excel, mod_excel = fxpaths.D2R_EXCEL, fxpaths.TABLES
 
     import hd_recolour as hr
+    import hd_authored as ha
     hr.clean(work / "hd_recolour.json", out)
+    ha.clean(out)
+    authored = ha.load(Path(args.authored) if args.authored else None)
+    check_authored_picks(picks, authored)
+    made: dict[str, dict] = {}  # authored effect -> its definition (written once)
+
+    def base_of(effect: str) -> str:
+        """The D2R effect a pick stands on: an authored effect's base, else the effect itself."""
+        return authored[effect]["base"] if effect in authored else effect
+
+    def authored_def(effect: str) -> dict:
+        if effect not in made:
+            made[effect] = ha.build(authored[effect], HDM, HDO, out, hr.WRITTEN)
+        return made[effect]
     tint_m = no_tint if args.no_tint else hr.plan_missile(HDM)
     tint_o = no_tint if args.no_tint else hr.plan_overlay(HDO, norm_key)
     tint_pm = no_tint if args.no_tint else hr.plan_pick_missile(HDM)  # a hand pick's `tint` column
@@ -918,10 +947,15 @@ def main() -> int:
                 conf = confidence("exact", sc, margin, len({s.model for s in src}), m, c)
                 nm = len({s.model for s in src})
                 why = f"D2R {c.name} uses the art" + (f" ({nm} models)" if nm > 1 else "")
-            elif (hp := hand_pick(picks, "missile", m, [p for p in dm.values() if p.model == (hpl or {}).get("effect")],
+            elif (hp := hand_pick(picks, "missile", m, [p for p in dm.values() if p.model == base_of((hpl or {}).get("effect", ""))],
                                   args.no_scale)):
                 c, scale, conf, why = hp
                 cls, model = "hand", c.model
+                if hpl["effect"] in authored:
+                    model = hpl["effect"]
+                    if model not in made:
+                        write_json(out / "hd" / "missiles" / f"{model}.json", authored_def(model))
+                    why += f"; authored effect {model} (data/hd-effects-authored.json)"
                 if hpl["tint"]:
                     spec = tint_pm(model, hpl["tint"])
                     if spec:
@@ -963,7 +997,7 @@ def main() -> int:
         raw[name.lower()] = model
     for vname, (base, k) in new_models.items():
         src = HDM / f"{base}.json"
-        if base in tinted.values():
+        if base in tinted.values() or base in made:
             src = out / "hd" / "missiles" / f"{base}.json"
         write_json(out / "hd" / "missiles" / f"{vname}.json", scaled_definition(load_json(src), vname, k))
     final = dict(hd_m)
@@ -1023,7 +1057,7 @@ def main() -> int:
             cls, scale, conf = "exact", 1.0, confidence("exact", sc, margin, len(src), m, c)
             why = f"D2R {c.name} uses the art"
         elif (hp := hand_pick(picks, "overlay", m, [p for p in do.values() if f"{p.folder}/{norm_key(p.name)}".lower()
-                                                     == (hpl or {}).get("effect", "").lower()],
+                                                     == base_of((hpl or {}).get("effect", "")).lower()],
                               args.no_scale)):
             c, scale, conf, why = hp
             cls = "hand"
@@ -1052,8 +1086,12 @@ def main() -> int:
             has_d2r_art = m.art_name in d2r_oarts
             why = (f"{'base-game art without a D2R HD effect' if has_d2r_art else 'Median-only art'}; like D2R {c.name} "
                    f"({c.art_name}); score {sc:.1f}, margin {margin:.1f}; " + ", ".join(parts))
+        own = cls == "hand" and (hpl or {}).get("effect") in authored
+        if own:
+            why += f"; authored effect {hpl['effect']} (data/hd-effects-authored.json)"
         res("overlay", m, cls, f"{c.folder}/{norm_key(c.name)}", scale, conf, why, c, art_in=art_in)
-        d = scaled_definition(load_json(HDO / c.folder / f"{norm_key(c.name)}.json"), norm_key(name), scale,
+        d = scaled_definition(authored_def(hpl["effect"]) if own else load_json(HDO / c.folder / f"{norm_key(c.name)}.json"),
+                              norm_key(name), scale,
                               add_missing=cls == "hand" and (hpl or {}).get("scale") is not None)
         if cls == "hand" and empty_definition(d):
             raise SystemExit(f"data/hd-effects-picks.tsv line {hpl['line']}: overlay {m.art_name}: D2R's {c.folder}/{norm_key(c.name)} "

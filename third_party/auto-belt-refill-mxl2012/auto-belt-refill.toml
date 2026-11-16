@@ -7,8 +7,9 @@
 # match_first_slot = true: each belt column refills from the inventory with exactly the potion in its first (bottom) slot,
 # hp3 with hp3, mp5 with mp5. To change a column, put another potion at its bottom. A completely empty column gets nothing
 # until you put a potion there yourself.
-# belt_counts = true: a small number on each column shows how many of its potion you have (inventory and belt together); it
-# turns red at 0.
+# belt_counts = true: a number on the bottom cell of each column shows how many potions that column holds, also with the
+# belt open; it turns red at 1 and 0. "+N" shows how many more of the column's potion the inventory holds (HD: above the
+# belt; legacy: top right of the bottom cell). It needs D2R-XL 2012's HUD layouts (the boxes the numbers go in).
 # never_refill: the elixirs and the Goodberry are buffs, not refills: the plugin never moves them, also from a column's bottom.
 # Keep each value on one line (the plugin reads the file line by line).
 #

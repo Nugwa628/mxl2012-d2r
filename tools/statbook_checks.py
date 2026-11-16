@@ -464,12 +464,12 @@ def run_host(gc):
         gc.g.press("c")
         time.sleep(1.0)
 
-        # legacy: D2R's page 1, the host not bound
+        # legacy: the mod's classic sheet with the book (check statbook_legacy has the rest)
         gc.set_graphics("legacy")
         gc.g.press("c")
         time.sleep(1.5)
         st = host(gc, log)
-        row("legacy sheet: not bound (page 1 only)", st.get("bound") == 0, "%s" % st)
+        row("legacy sheet: bound (the classic layout)", st.get("bound") == 1 and st.get("layout") == "legacy", "%s" % st)
         shot("legacy_page1")
         gc.g.press("c")
         time.sleep(0.8)
@@ -682,4 +682,227 @@ def run_side(gc):
     judged = [r for r in rows if r[1] is not None]
     ok = bool(judged) and all(r[1] for r in judged)
     gc.finish("statbook_side", ok, "; ".join("%s %s" % (r[0], "ok" if r[1] else ("info" if r[1] is None else "FAIL")) for r in rows), mark, shots, log,
+              partial="the pages are judged from the shots")
+
+
+# ---- legacy graphics (check `statbook_legacy`; docs/statbook.md "Legacy graphics") ------------------------------------------
+
+# D2R's classic screen: 800 x 600 on the dev install, 1066 x 600 with Legacy 16:9 (a release install ships it):
+# MXL_LEGACY_SCREEN_W=1066 for a run with Legacy 16:9.
+LEGACY_SCREEN = (int(os.environ.get("MXL_LEGACY_SCREEN_W", "800")), 600)
+LEGACY_ADV = (142 + 9, 340 + 13)  # the classic Advanced Stats arrow's middle (statbook_legacy.ADVANCED)
+
+
+def legacy_xy(gc, ux, uy, origin):
+    """A point of a legacy layout (classic pixels from its top left; `origin` from statbook-layout.json: its corner from D2R's
+    classic left panel at (80, 60)) as client fractions: the classic screen is scaled to fit the client, centred."""
+    w, h = gc.g.CLIENT_W, gc.g.CLIENT_H
+    sw, sh = LEGACY_SCREEN
+    s = min(w / sw, h / sh)
+    sx, sy = 80 + origin[0] + ux, 60 + origin[1] + uy
+    return ((w - sw * s) / 2 + sx * s) / w, ((h - sh * s) / 2 + sy * s) / h
+
+
+def run_legacy(gc):
+    """Check `statbook_legacy`: the Stat Book on the mod's legacy sheet. Every tab clicked (shots statbook_legacy_<page>), the
+    Advanced Stats arrow, All Stats with a typed search and a row's arrow, close and reopen on a page, the graphics switched to
+    HD and back with the sheet open (the book follows, no stale widgets), the top / side toggle both ways with the side pages
+    and G with the side panel open, 1080p and 1440p, then the HD sheet's tabs again (no regression)."""
+    import json
+    import devmenu_checks
+    mark = gc.engine_mark()
+    log, shots, rows = [], [], []
+
+    def row(name, ok, note):
+        rows.append((name, ok, note))
+        log.append("ROW %s %s: %s" % (name, "PASS" if ok else ("INFO" if ok is None else "FAIL"), note))
+
+    def shot(name, wait=0.8):
+        time.sleep(wait)
+        shots.append(gc.sh("statbook_legacy_" + name))
+
+    def away():
+        gc.g.click(0.99, 0.5, move_only=True)
+
+    def mid(r):
+        x, y, w, h = r
+        return x + w / 2, y + h / 2
+
+    def click(geo, ux, uy, wait=0.8):
+        gc.g.click(*legacy_xy(gc, ux, uy, geo["origin"]))
+        time.sleep(wait)
+        away()
+        return tabs_state(gc, log)
+
+    def sheet_to(want, wait=1.5):
+        st = {}
+        for _ in range(3):
+            st = tabs_state(gc, log)
+            if st.get("open") == (1 if want else 0):
+                return st
+            gc.g.press("c")
+            time.sleep(wait)
+        return tabs_state(gc, log)
+
+    def typed(geo, word):
+        gc.g.click(*legacy_xy(gc, *mid(geo["search"]), geo["origin"]))
+        time.sleep(0.5)
+        devmenu_checks.type_keys(gc, word)
+        time.sleep(1.0)
+        return tabs_state(gc, log)
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "work", "mod", "data", "hd", "global", "ui", "panel", "statbook", "statbook-layout.json"), encoding="utf-8") as f:
+        geo = json.load(f)
+    lg, ls, pc = geo["legacy"], geo["legacyside"], geo["pc"]
+    names = ["character", "offense", "spells", "defense", "resistances", "skills", "utility", "allstats"]
+    gc.enable_debug()
+    lines = text(gc)
+    log.extend("statbook: " + ln for ln in lines)
+    joined = " ".join(lines)
+    row("host read the legacy geometry and side layout", "legacy ok" in joined and "(+ legacy)" in joined, part(lines, "book")[:300])
+    if not gc.be_class(0):
+        row("Amazon", False, "could not play an Amazon")
+    else:
+        gc.goto(1, timeout=60)
+        gc.set_graphics("hd")
+        gc.close_right_panel()
+        gc.H("unequip rring")
+        ok, _ = gc.Hl("equip rin %d=25 %d=37 rring" % (FCR, FIRE_RES), log)
+        row("ring worn", ok, "Faster Cast Rate 25, Fire Resistance 37")
+        log.append(gc.g.console_text("statbook tabs top", settle=1.0))
+        row("legacy graphics", gc.set_graphics("legacy"), "G")
+        st = sheet_to(True)
+        time.sleep(1.0)
+        st = tabs_state(gc, log)
+        tabs = st.get("tabs", 8)
+        row("bound on the legacy sheet", st.get("bound") == 1 and st.get("layout") == "legacy" and st.get("tab") == 0, "%s" % st)
+        shot("character")
+        seen = []
+        for i in list(range(1, tabs)) + [0]:
+            st = click(lg, *mid(lg["tabs"][i]))
+            seen.append((i, st.get("tab")))
+            if i:
+                shot(names[i] if i < len(names) else "tab%d" % i)
+        row("each legacy tab click selects its tab", all(a == b for a, b in seen), "clicked -> tab %s" % seen)
+
+        # the classic Advanced Stats arrow (right of the stat points plate): All Stats
+        st = click(lg, *LEGACY_ADV)
+        row("the legacy Advanced Stats arrow opens All Stats", st.get("tab") == tabs - 1 and st.get("arrows", 0) >= 1, "%s" % st)
+        shot("arrow_allstats")
+        if st.get("tab") != tabs - 1:                       # the search and the row arrow still checked
+            click(lg, *mid(lg["tabs"][tabs - 1]))
+        st = typed(lg, "fire")
+        row("typing in the legacy search box", st.get("query") == "fire", "%s" % st)
+        if st.get("query") != "fire":
+            gc.g.console_text("statbook find fire", settle=0.5)
+        shot("allstats_search")
+        x, y, w, h = lg["allRowRects"][1]
+        st = click(lg, x + w - 8, y + h / 2)
+        row("a legacy All Stats row's arrow opens its page", 1 <= st.get("tab", -1) < tabs - 1, "%s" % st)
+        shot("allstats_row_go")
+
+        # closed and opened again on a page
+        click(lg, *mid(lg["tabs"][3]))
+        before = tabs_state(gc, log).get("opens", 0)
+        sheet_to(False)
+        st = sheet_to(True)
+        time.sleep(1.0)
+        st = tabs_state(gc, log)
+        row("legacy: opened again on its page", st.get("opens", 0) > before and st.get("tab") == 3, "opens %s -> %s, %s" % (before, st.get("opens"), st))
+        shot("reopened_defense")
+
+        # the graphics switched with the sheet open: the HD sheet bound on the same page, then legacy again
+        click(lg, *mid(lg["tabs"][2]))
+        hd_ok = gc.set_graphics("hd")
+        time.sleep(1.5)
+        st = tabs_state(gc, log)
+        row("G with the sheet open: HD bound, same page", hd_ok and st.get("bound") == 1 and st.get("layout") == "PC" and st.get("tab") == 2, "%s" % st)
+        shot("switched_to_hd")
+        lg_ok = gc.set_graphics("legacy")
+        time.sleep(1.5)
+        st = tabs_state(gc, log)
+        row("G with the sheet open: legacy bound, same page", lg_ok and st.get("bound") == 1 and st.get("layout") == "legacy" and st.get("tab") == 2,
+            "%s" % st)
+        shot("switched_back_legacy")
+        st = click(lg, *mid(lg["tabs"][0]))
+        row("after the switches: the Character tab", st.get("tab") == 0, "%s" % st)
+        shot("character_after_switch")
+
+        # top / side: the toggle on a page, the side panel's pages, G with it open, back
+        click(lg, *mid(lg["tabs"][1]))
+        st = click(lg, *mid(lg["toggle"]), 1.5)
+        row("legacy toggle: side", st.get("mode") == "side" and st.get("showing") == "showing" and st.get("panel") == "open", "%s" % st)
+        shot("side_offense")
+        seen = []
+        for i in range(2, tabs):
+            st = click(ls, *mid(ls["tabs"][i]))
+            seen.append((i, st.get("tab")))
+            shot("side_" + (names[i] if i < len(names) else "tab%d" % i))
+        row("each legacy side tab selects its tab", all(a == b for a, b in seen), "%s" % seen)
+        st = typed(ls, "cold")
+        row("typing in the legacy side search box", st.get("query") == "cold", "%s" % st)
+        shot("side_allstats_search")
+        click(ls, *mid(ls["tabs"][tabs - 1]))  # the box lets go of the keyboard (else G is typed into it)
+        gc.set_graphics("hd")
+        time.sleep(1.5)
+        st = tabs_state(gc, log)
+        row("G with the side panel open: the HD side panel", st.get("mode") == "side" and st.get("layout") == "PC" and st.get("panel") == "open", "%s" % st)
+        shot("side_switched_hd")
+        gc.set_graphics("legacy")
+        time.sleep(1.5)
+        st = tabs_state(gc, log)
+        row("G back: the legacy side panel", st.get("mode") == "side" and st.get("layout") == "legacy" and st.get("panel") == "open", "%s" % st)
+        shot("side_switched_legacy")
+        st = click(ls, *mid(ls["toggle"]), 1.5)
+        row("legacy side toggle: top again", st.get("mode") == "top" and st.get("panel") != "open", "%s" % st)
+        shot("top_again")
+
+        # the client at 1080p and 1440p (the dev client is 1600 x 900)
+        old = (gc.g.CLIENT_W, gc.g.CLIENT_H)
+        try:
+            for w, h in ((1920, 1080), (2560, 1440)):
+                gc.g.CLIENT_W, gc.g.CLIENT_H = w, h
+                got = gc.g.fit_window(gc.g.need_window())
+                time.sleep(2.0)
+                size = (got[2] - got[0], got[3] - got[1])
+                log.append("client %dx%d asked, %s got" % (w, h, size))
+                gc.g.CLIENT_W, gc.g.CLIENT_H = size
+                click(lg, *mid(lg["tabs"][2]))
+                shot("spells_%dp" % h, 1.0)
+                st = click(lg, *mid(lg["tabs"][tabs - 1]))
+                shot("allstats_%dp" % h, 1.0)
+                row("legacy tabs at %dp" % h, st.get("tab") == tabs - 1, "client %s, %s" % (size, st))
+        finally:
+            gc.g.CLIENT_W, gc.g.CLIENT_H = old
+            gc.g.fit_window(gc.g.need_window())
+            time.sleep(2.0)
+        click(lg, *mid(lg["tabs"][0]))
+        st = sheet_to(False)
+        row("legacy: closed", st.get("open") == 0, "%s" % st)
+        shot("closed")
+
+        # the HD sheet after all this (no regression): every tab
+        gc.set_graphics("hd")
+        st = sheet_to(True)
+        time.sleep(1.0)
+        st = tabs_state(gc, log)
+        row("HD sheet bound after legacy", st.get("bound") == 1 and st.get("layout") == "PC", "%s" % st)
+        seen = []
+        for i in list(range(1, tabs)) + [0]:
+            gc.g.click(*sheet_xy(*mid(pc["tabs"][i])))
+            time.sleep(0.6)
+            away()
+            st = tabs_state(gc, log)
+            seen.append((i, st.get("tab")))
+            shots.append(gc.sh("statbook_legacy_hd_" + (names[i] if i < len(names) else "tab%d" % i)))
+        row("HD tabs after legacy", all(a == b for a, b in seen), "%s" % seen)
+        sheet_to(False)
+        gc.H("unequip rring")
+
+    lines = text(gc)
+    log.extend("statbook after: " + ln for ln in lines)
+    judged = [r for r in rows if r[1] is not None]
+    ok = bool(judged) and all(r[1] for r in judged)
+    gc.finish("statbook_legacy", ok, "; ".join("%s %s" % (r[0], "ok" if r[1] else ("info" if r[1] is None else "FAIL")) for r in rows), mark, shots, log,
               partial="the pages are judged from the shots")

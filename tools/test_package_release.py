@@ -228,7 +228,7 @@ class PackageReleaseTests(unittest.TestCase):
         (src / "external" / "PluginSDK" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
         (src / "PINNED_COMMIT").write_text((commit or pr.buffhud_commit()) + "\n", encoding="ascii")
         dll = self.tmp / "d2rl-buff-panel.dll"
-        dll.write_bytes(b"MZ...buff-panel\0...1.1.0\0...[buff_panel]\nenabled = true\n")
+        dll.write_bytes(b"MZ...buff-panel\0..." + pr.BUFFHUD["version"].encode() + b"\0...[buff_panel]\nenabled = true\n")
         dll.with_suffix(".mpq").write_bytes(b"MPQ\x1a...")
         return src, dll
 
@@ -267,11 +267,12 @@ class PackageReleaseTests(unittest.TestCase):
     def test_buffhud_builds_that_are_not_ours_are_refused(self):
         _src, dll = self.buffhud_src()
         self.assertEqual(pr.check_buffhud(dll), [])
-        for body, words in ((b"MZ buff-panel\0 1.1.0\0", "not our fork"), (b"MZ buff-panel\0 1.0.11\0 [buff_panel]", "version")):
+        version = pr.BUFFHUD["version"].encode()
+        for body, words in ((b"MZ buff-panel\0 " + version + b"\0", "not our fork"), (b"MZ buff-panel\0 1.0.11\0 [buff_panel]", "version")):
             dll.write_bytes(body)
             problems = pr.check_buffhud(dll)
             self.assertTrue(problems and any(words in p for p in problems), (body, problems))
-        dll.write_bytes(b"MZ buff-panel\0 1.1.0\0 [buff_panel]")
+        dll.write_bytes(b"MZ buff-panel\0 " + version + b"\0 [buff_panel]")
         dll.with_suffix(".mpq").write_bytes(b"PK")
         self.assertTrue(any("not a packed MPQ" in p for p in pr.check_buffhud(dll)))
         dll.with_suffix(".mpq").unlink()
@@ -295,7 +296,8 @@ class PackageReleaseTests(unittest.TestCase):
         names = [ln.split("  ")[1] for ln in pr.beltrefill_patches()]
         self.assertEqual(names, ["0001-pluginsdk-1.3.1.patch", "0002-mxl2012-belt-rows.patch",
                                  "0003-mxl2012-match-first-slot.patch", "0004-mxl2012-count-signatures.patch",
-                                 "0005-refill-natives-by-signature.patch"])
+                                 "0005-refill-natives-by-signature.patch", "0006-mxl2012-counts-as-hud-text.patch",
+                                 "0007-mxl2012-column-counts-and-reserve.patch"])
 
     def test_beltrefill_config_matches_the_first_slot(self):
         import tomllib

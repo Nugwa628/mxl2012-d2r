@@ -302,6 +302,7 @@ column makes the overlays appear.
 | `tools/fxpaths.py`, `tools/build_effects.py`, `tools/test_effects_hd.py`, `tools/requirements-fx.txt` | new | |
 | `data/hd-effects-map.tsv` | new | the committed mapping table (558 art files) |
 | `data/hd-effects-picks.tsv` | new (lane hdfx2) | hand-picked stand-ins, an input of `effects_hd.py` (section 9) |
+| `tools/hd_particles.py`, `tools/hd_authored.py`, `data/hd-effects-authored.json` | new (lane hd587 round 3) | edits of D2R's particle files and layered effects of our own, docs/hd-effects-authoring.md. Tests `tools/tests/test_hd_particles.py` |
 
 Not ported: `missile_hd.py`, `missile_art.py`, `hd_skill_anims.py`, `palshift.py`, `art_fix.py`
 (reasons in section 3).

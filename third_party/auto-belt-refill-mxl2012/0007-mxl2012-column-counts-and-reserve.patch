@@ -1,0 +1,203 @@
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+index d47b0ac..d6fa369 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
++++ b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+@@ -62,7 +62,7 @@
+ //   match_first_slot = true: each column refills with exactly the item code in its first (bottom) slot; a completely empty
+ //     column refills nothing until the player puts a potion there. No families, no prefer_large, no follow-the-game extension.
+ //   never_refill = [...]: codes that are never learned or refilled (Median's elixirs and the Goodberry).
+-//   belt_counts = true: a small count on each column of how many of its potion the inventory and the belt hold (D2R's own HUD text, 0006).
++//   belt_counts = true: on each column the potions in it, and above the belt the inventory reserve of its potion (D2R's own HUD text, 0006 / 0007).
+ 
+ #define WIN32_LEAN_AND_MEAN
+ #define NOMINMAX
+@@ -2126,13 +2126,15 @@ auto StartFillSession(const D2RL::PluginContext* context) noexcept -> D2RL::Thre
+ 
+ // ---------------------------------------------------------------- belt counts
+ //
+-// D2R-XL 2012: the watcher's snapshot gives each column's code (its first slot, else its memory) and how many items of that
+-// code the inventory and the belt hold; a UI-thread pass puts them in the HUD's count boxes. Atomics only: the two threads share
+-// nothing else. g_countsStampMs = 0 or older than CountsStaleMs (out of a game: the watcher stops) = empty boxes.
++// D2R-XL 2012: the watcher's snapshot gives each column's code (its first slot, else its memory), how many items that column
++// of the belt holds and how many of that code the inventory holds (the reserve the refill takes from); a UI-thread pass puts
++// them in the HUD's count boxes. Atomics only: the two threads share nothing else. g_countsStampMs = 0 or older than
++// CountsStaleMs (out of a game: the watcher stops) = empty boxes.
+ 
+ constexpr uint64_t CountsStaleMs = 2000;
+ std::atomic<uint32_t> g_countCode[BeltColumns] {};
+-std::atomic<uint32_t> g_countValue[BeltColumns] {};
++std::atomic<uint32_t> g_countValue[BeltColumns] {};   // items in the column
++std::atomic<uint32_t> g_reserveValue[BeltColumns] {}; // items of the column's code in the inventory
+ std::atomic<uint64_t> g_countsStampMs {0};
+ std::atomic<uint64_t> g_textsSet {0};      // belt-counts: texts given to D2R's setter
+ std::atomic<uint32_t> g_boxesFound {0};    // belt-counts: count boxes found in the HUD panel at its last (re)fill
+@@ -2140,13 +2142,13 @@ std::atomic<bool>     g_hudFound {false};  // belt-counts: the HUD panel was the
+ std::atomic<bool>     g_textsQueued {false};
+ 
+ void UpdateBeltCounts(const Snapshot& snapshot) noexcept {
+-	uint32_t codes[MaxBeltSlots + MaxCarried] {};
+-	uint32_t count = 0;
++	int32_t slots[MaxBeltSlots] {};
+ 	for (uint32_t index = 0; index < snapshot.beltCount; ++index) {
+-		codes[count++] = snapshot.belt[index].code;
++		slots[index] = snapshot.belt[index].x;
+ 	}
++	uint32_t carried[MaxCarried] {};
+ 	for (uint32_t index = 0; index < snapshot.inventoryCount; ++index) {
+-		codes[count++] = snapshot.inventory[index].code;
++		carried[index] = snapshot.inventory[index].code;
+ 	}
+ 	for (uint32_t column = 0; column < BeltColumns; ++column) {
+ 		const Cell* cell = FindSlot(snapshot, column);
+@@ -2158,7 +2160,8 @@ void UpdateBeltCounts(const Snapshot& snapshot) noexcept {
+ 			code = 0; // an elixir in the first slot is not a refilled potion: no count
+ 		}
+ 		g_countCode[column].store(code, std::memory_order_relaxed);
+-		g_countValue[column].store(BeltMatch::CountOf(code, codes, count), std::memory_order_relaxed);
++		g_countValue[column].store(BeltMatch::InColumn(column, slots, snapshot.beltCount), std::memory_order_relaxed);
++		g_reserveValue[column].store(BeltMatch::CountOf(code, carried, snapshot.inventoryCount), std::memory_order_relaxed);
+ 	}
+ 	g_countsStampMs.store(GetTickCount64(), std::memory_order_release);
+ }
+@@ -2262,7 +2265,7 @@ const char*   g_textMissing = "belt_counts off in the config";
+ // UI thread only
+ void*    g_textPanel  = nullptr;
+ uint64_t g_textFullMs = 0; // last full refill: a HUD rebuilt at the same address would otherwise keep empty boxes
+-char  g_shownText[BeltColumns][2][4] {};
++char  g_shownText[BeltColumns][BeltMatch::BoxKinds][sizeof(BeltMatch::CountBoxTexts::reserve)] {};
+ 
+ void ApplyCountTextsInner() noexcept {
+ 	void* root = *g_uiRoot;
+@@ -2289,22 +2292,26 @@ void ApplyCountTextsInner() noexcept {
+ 	uint32_t found = 0;
+ 	for (uint32_t column = 0; column < BeltColumns; ++column) {
+ 		const uint32_t code  = live ? g_countCode[column].load(std::memory_order_relaxed) : 0;
+-		const auto     texts = BeltMatch::BoxTexts(code, g_countValue[column].load(std::memory_order_relaxed));
+-		for (int zero = 0; zero < 2; ++zero) {
+-			const char* want  = zero != 0 ? texts.red : texts.white;
+-			char*       shown = g_shownText[column][zero];
++		const auto     texts = BeltMatch::BoxTexts(code, g_countValue[column].load(std::memory_order_relaxed),
++		                                           g_reserveValue[column].load(std::memory_order_relaxed));
++		for (uint32_t kind = 0; kind < BeltMatch::BoxKinds; ++kind) {
++			const auto  boxKind = static_cast<BeltMatch::BoxKind>(kind);
++			const char* want    = boxKind == BeltMatch::BoxKind::Low       ? texts.red
++			                      : boxKind == BeltMatch::BoxKind::Reserve ? texts.reserve
++			                                                               : texts.white;
++			char*       shown   = g_shownText[column][kind];
+ 			if (!fresh && std::strcmp(shown, want) == 0) {
+ 				continue;
+ 			}
+ 			char boxName[24] {};
+-			void* box = g_uiFindChild(panel, BeltMatch::BoxName(zero != 0, column, boxName));
++			void* box = g_uiFindChild(panel, BeltMatch::BoxName(boxKind, column, boxName));
+ 			if (box == nullptr) {
+ 				continue;
+ 			}
+ 			++found;
+ 			const NativeStringView view {want, std::strlen(want)};
+ 			g_uiSetText(box, &view);
+-			std::memcpy(shown, want, 4); // BoxTexts: at most 3 digits and the terminator
++			std::memcpy(shown, want, view.size + 1); // BoxTexts: at most 4 characters and the terminator
+ 			g_textsSet.fetch_add(1, std::memory_order_relaxed);
+ 		}
+ 	}
+@@ -2385,12 +2392,13 @@ void RunCounts(const D2RL::PluginContext* context, void*) noexcept {
+ 	Log(context, "AutoBeltRefill: counts: %s graphics, classic screen %s %.0f x %.0f.",
+ 		g_countNatives ? (hd ? "HD" : "legacy") : "unknown", classic ? "ok" : "unknown", sdWidth, sdHeight);
+ 	Log(context, "AutoBeltRefill: counts: HUD panel %s, %u of %u count box(es) found, %llu text(s) set.",
+-		g_hudFound.load() ? "found" : "not found", g_boxesFound.load(), BeltColumns * 2,
++		g_hudFound.load() ? "found" : "not found", g_boxesFound.load(), BeltColumns * BeltMatch::BoxKinds,
+ 		static_cast<unsigned long long>(g_textsSet.load()));
+ 	for (uint32_t column = 0; column < BeltColumns; ++column) {
+ 		char text[5] {};
+ 		CodeText(g_countCode[column].load(), text);
+-		Log(context, "AutoBeltRefill: counts: column %u code=%s count=%u.", column, text, g_countValue[column].load());
++		Log(context, "AutoBeltRefill: counts: column %u code=%s in column=%u reserve=%u.", column, text,
++			g_countValue[column].load(), g_reserveValue[column].load());
+ 	}
+ }
+ 
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h b/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
+index 6ecddda..552e193 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
++++ b/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
+@@ -41,7 +41,7 @@ constexpr auto IsNever(uint32_t code, const uint32_t* never, uint32_t neverCount
+ 	return false;
+ }
+ 
+-// How many items of `code` are in `codes` (the inventory and the belt together).
++// How many items of `code` are in `codes` (the inventory: a column's reserve).
+ constexpr auto CountOf(uint32_t code, const uint32_t* codes, uint32_t count) noexcept -> uint32_t {
+ 	if (code == 0) {
+ 		return 0;
+@@ -177,33 +177,59 @@ inline auto ResolveCountNatives(const std::uint8_t* image, std::size_t imageSize
+ // ---- the counts as D2R's own HUD text (0006) ----
+ // D2RLoader's overlay text never reached the screen on this game (drawText Success, nothing drawn: docs/bugs.md #567, and the
+ // owner saw no count in 0.1.15 - 0.1.23). The counts are now text boxes of D2R's own HUD: D2R-XL 2012's hudpanelhd.json /
+-// hudpanel.json (tools/ui_layouts.py `hud_*`) add, after the belt, two boxes per column on the bottom-row cell, right-aligned
+-// on the hotkey letter's line: `MxlBeltCount<c>` (white) and `MxlBeltCountZero<c>` (red). The plugin fills one of them through
+-// D2R's own text setter on the UI thread and empties the other. Without those boxes (another mod) nothing shows.
++// hudpanel.json (tools/ui_layouts.py `hud_*`) add three boxes per column. On the bottom-row cell, right-aligned on the hotkey
++// letter's line: `MxlBeltCount<c>` (white) and `MxlBeltCountLow<c>` (red), the potions in that column; the plugin fills one
++// and empties the other. Above the belt, centred on the column and drawn before the belt (an opened belt covers it):
++// `MxlBeltReserve<c>`, "+N" = the column's potions in the inventory, which the refill still has. The plugin sets them through
++// D2R's own text setter on the UI thread. Without those boxes (another mod) nothing shows.
+ inline constexpr const char* HudPanelName = "HUDPanel";
+ 
++// The column count is red at this many potions or fewer (the last one, or none). With the refill on, a column only drops below
++// full when the inventory has none of its potion left, so red means "this column is running out".
++inline constexpr uint32_t LowCount = 1;
++
++// How many items the belt holds in `column`: `slots` are the occupied belt slots (row * Columns + column), `slotCount` of them.
++constexpr auto InColumn(uint32_t column, const int32_t* slots, uint32_t slotCount) noexcept -> uint32_t {
++	uint32_t found = 0;
++	for (uint32_t index = 0; index < slotCount; ++index) {
++		found += slots[index] >= 0 && static_cast<uint32_t>(slots[index]) % Columns == column ? 1U : 0U;
++	}
++	return found;
++}
++
+ struct CountBoxTexts {
+ 	char white[4];
+ 	char red[4];
++	char reserve[5]; // "+" and up to three digits
+ };
+ 
+-// The two boxes of a column: no code (empty column, elixir) = both empty; 0 left = "0" in red; else the count in white.
+-constexpr auto BoxTexts(uint32_t code, uint32_t count) noexcept -> CountBoxTexts {
++// The three boxes of a column: no code (empty column, elixir) = all empty; else the column's potions, in red at LowCount or
++// fewer, else in white; and the reserve "+N" (also "+0": nothing left to refill with).
++constexpr auto BoxTexts(uint32_t code, uint32_t inColumn, uint32_t reserve) noexcept -> CountBoxTexts {
+ 	CountBoxTexts out {};
+ 	if (code == 0) {
+ 		return out;
+ 	}
+-	if (count == 0) {
+-		CountText(0, out.red);
++	if (inColumn <= LowCount) {
++		CountText(inColumn, out.red);
+ 	} else {
+-		CountText(count, out.white);
++		CountText(inColumn, out.white);
++	}
++	char digits[4] {};
++	const uint32_t length = CountText(reserve, digits);
++	out.reserve[0] = '+';
++	for (uint32_t index = 0; index <= length; ++index) {
++		out.reserve[1 + index] = digits[index];
+ 	}
+ 	return out;
+ }
+ 
+-// `MxlBeltCount<column>` / `MxlBeltCountZero<column>` (column 0..3).
+-inline auto BoxName(bool zero, uint32_t column, char (&out)[24]) noexcept -> const char* {
+-	const char* stem = zero ? "MxlBeltCountZero" : "MxlBeltCount";
++enum class BoxKind : uint32_t { Count = 0, Low = 1, Reserve = 2 };
++inline constexpr uint32_t BoxKinds = 3;
++
++// `MxlBeltCount<column>` / `MxlBeltCountLow<column>` / `MxlBeltReserve<column>` (column 0..3).
++inline auto BoxName(BoxKind kind, uint32_t column, char (&out)[24]) noexcept -> const char* {
++	const char* stem = kind == BoxKind::Low ? "MxlBeltCountLow" : kind == BoxKind::Reserve ? "MxlBeltReserve" : "MxlBeltCount";
+ 	std::size_t at = 0;
+ 	for (; stem[at] != '\0' && at + 2 < sizeof(out); ++at) {
+ 		out[at] = stem[at];

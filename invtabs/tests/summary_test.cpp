@@ -175,6 +175,47 @@ void Layout() {
 	CHECK(LayoutFragment(LayoutMode::Classic, { 0, 0, 10, 10 }, 0).empty());
 }
 
+void ByCharm() {
+	// grid order: the tab's charms row by row, then the backpack's
+	CHECK(GridBefore({ true, 5, 0 }, { true, 0, 1 }));
+	CHECK(GridBefore({ true, 0, 1 }, { true, 1, 1 }));
+	CHECK(GridBefore({ true, 9, 5 }, { false, 0, 0 }));
+	CHECK(!GridBefore({ false, 0, 0 }, { true, 9, 5 }));
+	CHECK(!GridBefore({ true, 2, 2 }, { true, 2, 2 }));
+	const std::string gold = ColourGold, grey = ColourGrey, white = ColourWhite;
+	std::vector<CharmBlock> blocks;
+	blocks.push_back({ "Sunstone of Fire", true, true, true, { "+10% to Fire Skill Damage", "Fire Resist +20%" } });
+	blocks.push_back({ "", false, true, true, { "+5 to Strength" } });
+	blocks.push_back({ "Butcher's Tooth", true, false, true, { gold + "+1 to All Skills" } });
+	blocks.push_back({ "Ancient Coin", true, true, false, { "+50% Gold Find" } });
+	const auto lines = ByCharmLines(blocks);
+	CHECK(lines == (std::vector<std::string> { gold + "Sunstone of Fire", "+10% to Fire Skill Damage", "Fire Resist +20%", white + "Charm", "+5 to Strength",
+	                                          grey + "Butcher's Tooth (inactive)", grey + "+1 to All Skills", BackpackHeading(), gold + "Ancient Coin",
+	                                          "+50% Gold Find" }));
+	CHECK(ByCharmLines({}).empty());
+	// a charm with no stat lines still has its name line
+	CHECK(ByCharmLines({ { "Plain", true, true, true, {} } }) == (std::vector<std::string> { gold + "Plain" }));
+	// 60 small charms of 5 lines each fit under MaxLines
+	CHECK(60 * 6 <= static_cast<int>(MaxLines));
+	// the list's mode button: the bar starts under it, the rows keep clear of it
+	const std::string hd = LayoutFragment(LayoutMode::Hd, { 40, 120, 600, 320 }, 12, 64, 56);
+	CHECK(hd.find(JsonRect(40 + 600 - HdBarWidth, 120 + 64, HdBarWidth, 320 - 64)) != std::string::npos);
+	CHECK(hd.find(JsonRect(40, 120, 600 - 56 - HdBarGap, 320)) != std::string::npos);
+	// colours: a box per colour on each row in the list by charm, the line's text without its code
+	CHECK(SplitColour(gold + "Sunstone of Fire") == (std::pair<RowColour, std::string> { RowColour::Gold, "Sunstone of Fire" }));
+	CHECK(SplitColour(grey + "x (inactive)").first == RowColour::Grey);
+	CHECK(SplitColour(white + "Charm").first == RowColour::White);
+	CHECK(SplitColour("+5 to Strength") == (std::pair<RowColour, std::string> { RowColour::Base, "+5 to Strength" }));
+	CHECK(RowName(3) == "SummaryLine3" && RowName(3, RowColour::Gold) == "SummaryLine3Gold");
+	const std::string plain = LayoutFragment(LayoutMode::Hd, { 40, 120, 600, 320 }, 12, 64, 56);
+	const std::string tinted = LayoutFragment(LayoutMode::Hd, { 40, 120, 600, 320 }, 12, 64, 56, true);
+	CHECK(plain.find("SummaryLine11Gold") == std::string::npos);
+	CHECK(tinted.find("\"SummaryLine11Gold\"") != std::string::npos && tinted.find("\"SummaryLine11Grey\"") != std::string::npos
+	      && tinted.find("\"SummaryLine11White\"") != std::string::npos && tinted.find("$FontColorGold") != std::string::npos);
+	const std::string sdTinted = LayoutFragment(LayoutMode::Classic, { 10, 50, 300, 130 }, 10, 0, 0, true);
+	CHECK(sdTinted.find("\"SummaryLine9Grey\"") != std::string::npos && sdTinted.find("\"r\": 199") != std::string::npos);
+}
+
 void Patterns() {
 	CHECK(ParsePattern("E8 ?? ?? ?? ?? 48") == (std::vector<int> { 0xE8, -1, -1, -1, -1, 0x48 }));
 	CHECK(ParsePattern("e8 0f") == (std::vector<int> { 0xE8, 0x0F }));
@@ -219,6 +260,7 @@ int main() {
 	Lines();
 	LongLists();
 	Layout();
+	ByCharm();
 	Patterns();
 	if (failures) {
 		std::printf("%d check(s) failed\n", failures);

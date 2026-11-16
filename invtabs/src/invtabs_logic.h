@@ -217,6 +217,7 @@ struct Config {
 	bool                     inventoryCharms = true;
 	bool                     openButton      = true;
 	int                      openKey         = 73; // Windows virtual key of the Controls action (0: none)
+	bool                     listByCharm     = false; // summary_list = "by_charm": the charm tab lists each charm, not the sum
 	std::vector<Tab>         tabs;     // toml order; Tab is tab_config.h's (x, y -1 unless the toml sets them)
 	std::vector<std::string> problems; // one log line each
 };
@@ -312,6 +313,12 @@ inline Config ParseConfig(std::string_view text) {
 			else if (key == "inventory_charms") flag(c.inventoryCharms);
 			else if (key == "open_button") flag(c.openButton);
 			else if (key == "open_key") number(c.openKey);
+			else if (key == "summary_list") {
+				const auto s = Quoted(value);
+				if (s && *s == "all") c.listByCharm = false;
+				else if (s && *s == "by_charm") c.listByCharm = true;
+				else bad();
+			}
 		} else if (tab) {
 			Tab& t = c.tabs[tab - 1];
 			if (key == "columns") number(t.columns);
@@ -335,6 +342,51 @@ inline Config ParseConfig(std::string_view text) {
 		if (t.typesFile.empty() && t.types.empty()) t.typesFile = "types_" + t.name + ".txt";
 	}
 	return c;
+}
+
+// The toml with `key = value` set in [section]: the old value replaced in place (the line's comment and the rest of the file
+// kept), else the key added as the section's first line, else the section added at the end. `value` is written as given
+// (quote strings yourself). Used to remember the charm list's mode (summary_list) when the player switches it.
+inline std::string SetConfigKey(std::string_view text, std::string_view section, std::string_view key, std::string_view value) {
+	std::string out;
+	std::string current;
+	std::size_t afterHeader = std::string_view::npos; // where the section's first key line starts in `text`
+	std::size_t pos         = 0;
+	while (pos < text.size()) {
+		const auto             nl   = text.find('\n', pos);
+		const std::size_t      end  = nl == std::string_view::npos ? text.size() : nl;
+		const std::string_view line = text.substr(pos, end - pos);
+		const std::string_view bare = Trim(StripComment(line));
+		const std::size_t      next = nl == std::string_view::npos ? text.size() : nl + 1;
+		if (!bare.empty() && bare.front() == '[') {
+			const auto close = bare.find(']');
+			current          = std::string(Trim(bare.substr(1, close == std::string_view::npos ? std::string_view::npos : close - 1)));
+			if (current == section && afterHeader == std::string_view::npos) afterHeader = next;
+		} else if (current == section) {
+			const auto eq = bare.find('=');
+			if (eq != std::string_view::npos && Trim(bare.substr(0, eq)) == key) {
+				// the value sits between '=' and the comment (StripComment kept the part before it)
+				const std::size_t lineEq = line.find('=');
+				std::size_t       vBeg   = lineEq + 1;
+				while (vBeg < line.size() && (line[vBeg] == ' ' || line[vBeg] == '\t')) ++vBeg;
+				const std::size_t vEnd = (bare.data() + bare.size()) - line.data();
+				std::string r(text.substr(0, pos + vBeg));
+				r += value;
+				r += text.substr(pos + std::max(vEnd, vBeg));
+				return r;
+			}
+		}
+		pos = next;
+	}
+	const std::string add = std::string(key) + " = " + std::string(value) + "\n";
+	if (afterHeader != std::string_view::npos) {
+		std::string r(text.substr(0, afterHeader));
+		if (!r.empty() && r.back() != '\n') r += '\n';
+		return r + add + std::string(text.substr(std::min(afterHeader, text.size())));
+	}
+	std::string r(text);
+	if (!r.empty() && r.back() != '\n') r += '\n';
+	return r + "[" + std::string(section) + "]\n" + add;
 }
 
 // tab_config.h's table rules for one tab given in the toml. Empty when fine.

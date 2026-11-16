@@ -1,0 +1,69 @@
+{
+  "_comment": "Authored HD effects (tools/hd_authored.py, docs/hd-effects-authoring.md): D2R definitions made of layers of D2R effects, with edited particle files. A hand pick (data/hd-effects-picks.tsv) names one in its effect column. Candidates the owner did not pick stay here so a pick can switch to them.",
+  "effects": [
+    {"name": "mxl_thunderstone_a", "kind": "missile", "base": "rock_large",
+     "why": "Thunderstone (#600): the grey-brown stone with the Assassin's charge-up lightning arcs crackling round it",
+     "layers": [
+       {"from": "missile:rock_large", "scale": 1.5},
+       {"from": "overlay:common/progressive_lightning_1", "scale": 0.5}]},
+    {"name": "mxl_thunderstone_b", "kind": "missile", "base": "rock_large",
+     "why": "Thunderstone (#600): the stone inside a Charged Bolt spark ball",
+     "layers": [
+       {"from": "missile:rock_large", "scale": 1.5},
+       {"from": "missile:charged_bolt", "scale": 0.8}]},
+    {"name": "mxl_thunderstone_c", "kind": "missile", "base": "rock_large",
+     "why": "Thunderstone (#600): the stone with the small lightning-hit crackle",
+     "layers": [
+       {"from": "missile:rock_large", "scale": 1.5},
+       {"from": "overlay:common/lightning", "scale": 0.6}]},
+
+    {"name": "mxl_faerie_a", "kind": "missile", "base": "gleam",
+     "why": "Faerie Fire (#597): classic draws Salvation's front art at each monster; D2R's Salvation front (rainbow rings and rainbow sparkles) at half size",
+     "layers": [
+       {"particles": "data/hd/vfx/particles/overlays/paladin/aura_resistall_front/FX_ResistAll_Overlay.particles", "scale": 0.5}]},
+    {"name": "mxl_faerie_b", "kind": "missile", "base": "gleam",
+     "why": "Faerie Fire (#597): Salvation's rainbow sparkles alone, its ring layers switched off (EnableRendering) in an edited copy",
+     "layers": [
+       {"particles": "data/hd/vfx/particles/overlays/paladin/aura_resistall_front/FX_ResistAll_Overlay.particles", "scale": 1.0,
+        "edit": {"hide": "mesh"}}]},
+    {"name": "mxl_faerie_c", "kind": "missile", "base": "gleam",
+     "why": "Faerie Fire (#597): the Paladin Charge flash with its red ramp turned into a rainbow, so each flash runs through the colours as it fades",
+     "layers": [
+       {"particles": "data/hd/vfx/particles/overlays/paladin/charge/vfx_charge_overlay.particles", "scale": 0.8,
+        "edit": {"ramps": {"data/hd/vfx/textures/gradient/T_FX_feral_rage_gradient.texture": "rainbow"}}}]},
+
+    {"name": "rapture_trail_a", "kind": "overlay", "base": "paladin/aura_resistcold",
+     "why": "Rapture (#594): Resist Cold's blue ring, plus the Fire Bolt trail (head and light off, flame ramp blue) on the ground: its particles stay where they were made, so walking leaves a trail",
+     "layers": [
+       {"from": "overlay:paladin/aura_resistcold"},
+       {"particles": "data/hd/vfx/particles/missiles/firebolt/vfx_firebolt_trail.particles", "scale": 1.5, "offset": [0, 0.3, 0],
+        "edit": {"hide": "mesh,light", "ramps": {"data/hd/vfx/textures/gradient/T_FX_flame_gradient_02.texture": "blue"}}}]},
+    {"name": "rapture_trail_b", "kind": "overlay", "base": "paladin/aura_resistcold",
+     "why": "Rapture (#594): the blue ring plus the Fire Ball trail (smoke and flame, head and light off, flame ramp blue) on the ground",
+     "layers": [
+       {"from": "overlay:paladin/aura_resistcold"},
+       {"particles": "data/hd/vfx/particles/missiles/fireball/vfx_fireball_trail.particles", "scale": 2.0, "offset": [0, 0.3, 0],
+        "edit": {"hide": "mesh,light", "ramps": {"data/hd/vfx/textures/gradient/T_FX_flame_gradient_02.texture": "blue"}}}]},
+    {"name": "rapture_trail_c", "kind": "overlay", "base": "paladin/aura_resistcold",
+     "why": "Rapture (#594): Resist Cold's blue ring plus the tower mist trail, whose mist stays on the ground where the paladin walked (the Fire Bolt and Fire Ball trails of _a and _b move with an overlay and leave nothing behind)",
+     "layers": [
+       {"from": "overlay:paladin/aura_resistcold"},
+       {"particles": "data/hd/vfx/particles/missiles/mist/vfx_mist_towerMistTrail.particles", "scale": 2.0}]},
+    {"name": "rapture_trail_d", "kind": "overlay", "base": "paladin/aura_resistcold",
+     "why": "Rapture (#594): the blue ring plus the tower mist trail of _c turned blue in its own code (the mist's grey colour is computed by its compiled script, tools/hd_cbvm.py tint), so the mist left on the ground is blue",
+     "layers": [
+       {"from": "overlay:paladin/aura_resistcold"},
+       {"particles": "data/hd/vfx/particles/missiles/mist/vfx_mist_towerMistTrail.particles", "scale": 2.0,
+        "edit": {"tint": [0.35, 0.6, 1.6, 1.0]}}]},
+    {"name": "rapture_melt_a", "kind": "missile", "base": "mist",
+     "why": "Rapture (#594): the melt trail pieces (missile spidergoolay, classic's light blue ground smear) drawn as D2R's tower mist, which stays on the ground where it was made, turned deep blue in its code",
+     "layers": [
+       {"particles": "data/hd/vfx/particles/missiles/mist/vfx_mist_towerMistTrail.particles", "scale": 1.0,
+        "edit": {"tint": [0.35, 0.6, 1.6, 1.0]}}]},
+    {"name": "rapture_melt_b", "kind": "missile", "base": "mist",
+     "why": "Rapture (#594): the melt trail pieces as a larger, paler ice-blue tower mist (colour set in its code)",
+     "layers": [
+       {"particles": "data/hd/vfx/particles/missiles/mist/vfx_mist_towerMistTrail.particles", "scale": 1.6,
+        "edit": {"tint": [0.6, 0.9, 1.5, 0.8]}}]}
+  ]
+}

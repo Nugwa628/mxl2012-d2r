@@ -48,6 +48,7 @@ rows D2R's stop function 1).
 | srvdofunc | 153-171 (D2Sigma's added functions) | +19 = 172-190 | mxl2012-core plugin (docs/plugin-spec.md "Skill server functions"); 175 = D2Sigma 156 since bug #58; free: 181, 182, 183, 186-189 |
 | srvdofunc | 155 (town_portal), 160, 161, 167 | 109 (D2R's itemless Town Portal, on purpose), 124, 121, 58 | D2R native; `town_portal` -> 109 stays, it is the one Median row that may use 109 |
 | srvstfunc | 30, 66 | 71, 72 | plugin `skill_starts.cpp` |
+| srvstfunc | - (the mod's own Move Only row, tools/move_only.py) | 71 (the build stops if another row takes 71: tools/idmap.py FREE_SLOTS still lists it first) | plugin `move_only.cpp`: refuses every cast (docs/left-skills.md) |
 | cltdofunc | 97, 98, 99; 15, 11, 95, 22 | 110, 111, 112; 19, 15, 111, 113 | plugin client slots / D2R's equivalents |
 | srvdofunc | 27 (with aurarangecalc), 18 / 124 (layered) | 179, 174 / 180 | plugin |
 

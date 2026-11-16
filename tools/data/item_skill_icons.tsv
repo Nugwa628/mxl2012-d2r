@@ -190,3 +190,4 @@ atmgsentry	d2r:lightning sentry	ATMG Sentry	sentry or tower
 patriotsentry	d2r:lightning sentry	Patriot Sentry	sentry or tower
 guardtower	d2r:lightning sentry	TLGT, Guard Tower	sentry or tower
 other_typhoonsentry	d2r:lightning sentry	Other Typhoon Sentry	sentry or tower
+move_only	d2r:quickness	Move Only	walking or running, the mod's own Move Only (tools/move_only.py)

@@ -28,6 +28,9 @@ the HD titles (#30), a `@key` in a widget's `text` / `tooltipString` of a layout
 "Skill Choices Remaining" box, seen in game), so those are written out as D2R's English text; the same for the close / drop gold /
 transmute tooltips of the inventory and cube (`LITERALS`, `literalize` runs over every file written).
 
+The HUD (`hudpanelhd.json`, the gamepad `controller/hudpanelhd.json`, the legacy `hudpanel.json`) stays D2R's but for eight
+empty text boxes on the belt's bottom-row cells that Auto Belt Refill fills with the potion counts (bug #613, its patch 0006).
+
 Slot/grid positions are the Amazon row of inventory.txt (the seven classic classes share every number) minus invLeft; the
 cube's the "Transmogrify Box Page 1" row; the picture items (tabs, gold, transmute square) were measured on the DC6.
 
@@ -370,7 +373,9 @@ CLASSIC_TAB_KEY = re.compile(r'"@SkillCategory(?:Am|So|Ne|Pa|Ba|Dr|As|Wa)[123]"'
 # any `@key` left in a layout file.
 LITERALS = {"@StrSklTree1 @StrSklTree2 @StrSklTree3": "Skill Choices Remaining", "@StrSklTreea": "Skill Tab 1",
             "@StrSklTreeb": "Skill Tab 2", "@StrSklTreec": "Skill Tab 3", "@strClose": "Close", "@strGoldDrop": "Drop Gold",
-            "@strUiMenu2": "Transmute", "@SkillCategoryWa1": "Demon", "@SkillCategoryWa2": "Eldritch", "@SkillCategoryWa3": "Chaos"}
+            "@strUiMenu2": "Transmute", "@SkillCategoryWa1": "Demon", "@SkillCategoryWa2": "Eldritch", "@SkillCategoryWa3": "Chaos",
+            "@CfgQuestLog": "Quest Log", "@strlvlup": "New Stats", "@strnewskl": "New Skill", "@panelmini": "Open Mini Panel",
+            "@panelcmini": "Close Mini Panel", "@SkillAndStatLevelUp": "New Stats and Skills"}
 AT_KEY = re.compile(r'"(@[^"\n]*)"')
 
 
@@ -417,6 +422,109 @@ def skilltree_classic(warlock_code: int | None = None) -> str:
     return literalize(warlock_cancel_position(out, warlock_code), "skillstreepanel.json")
 
 
+# Auto Belt Refill's potion counts (patches 0006 / 0007, docs/bugs.md #613): empty text boxes in D2R's HUD by the belt, which the
+# plugin finds by name in the "HUDPanel" panel and fills; without the plugin they stay empty.
+# - On each bottom-row cell, at the right of the hotkey letter's line, one white and one red box: the potions in that column
+#   (red at 1 or 0). The bottom row stays in place when the belt opens (the other rows pop up above it), so nothing covers them.
+# - `MxlBeltReserve<c>`, "+N": that column's potions in the inventory. HD: one row just above the belt's rim, centred on each
+#   column, drawn before the belt so an opened belt covers it. Legacy: at the top right of the bottom-row cell, since the
+#   classic mini panel sits above the belt's first columns (and to the right of the belt is the right skill button).
+BELT_COUNT_NAMES = ("MxlBeltCount", "MxlBeltCountLow")
+BELT_RESERVE_NAME = "MxlBeltReserve"
+BELT_COUNT_HD = {"belt": (1704, 278), "first_cell": (12, 6), "pitch": 98 + 27, "cell": 98, "point_size": 34,
+                 "reserve_y": 160, "reserve_point_size": 30}
+BELT_COUNT_PAD = {"belt": (1591, 263), "first_cell": (12, 6), "pitch": 98 + 32, "cell": 98, "point_size": 34,
+                  "reserve_y": 145, "reserve_point_size": 30}  # gamepad HUD
+BELT_COUNT_SD = {"belt": (176, 63), "first_cell": (1, 2), "pitch": 29 + 2, "cell": 29}
+BELT_COUNT_COLORS = ('{ "r": 255, "g": 255, "b": 255, "a": 255 }', '{ "r": 252, "g": 70, "b": 70, "a": 255 }')
+BELT_RESERVE_COLOR = '{ "r": 232, "g": 214, "b": 160, "a": 255 }'  # pale gold: apart from the white counts
+
+
+def _text_box(indent: str, name: str, box: str, style: str) -> list[str]:
+    return [f'{indent}{{',
+            f'{indent}    "type": "TextBoxWidget", "name": "{name}",',
+            f'{indent}    "fields": {{',
+            f'{indent}        "text": "",',
+            f'{indent}        "rect": {box},',
+            f'{indent}        "style": {{ {style}, "options": {{ "hideOverflow": true }} }}',
+            f'{indent}    }}',
+            f'{indent}}},']
+
+
+def _shadow(hd: bool) -> str:
+    return '{ "shadowColor": { "r": 0, "g": 0, "b": 0, "a": 230 }, "offset": { "x": %d, "y": %d } }' % ((3, 3) if hd else (1, 1))
+
+
+def belt_count_boxes(geo: dict, indent: str, hd: bool) -> str:
+    """The count boxes (TextBoxWidget, empty text) over the belt's bottom-row cells, as layout JSON children: white and red per
+    column, and in legacy the reserve too (top right of the cell)."""
+    bx, by = geo["belt"]
+    ox, oy = geo["first_cell"]
+    size = f'"pointSize": {geo["point_size"]}, ' if hd else ""
+    w, h = geo["cell"] - (6 if hd else 2), geo["cell"] - (4 if hd else 1)
+    lines = []
+    for stem, color in zip(BELT_COUNT_NAMES, BELT_COUNT_COLORS):
+        for column in range(4):
+            box = rect(bx + ox + column * geo["pitch"], by + oy, w, h)
+            lines += _text_box(indent, f"{stem}{column}", box, f'{size}"fontColor": {color}, "dropShadow": {_shadow(hd)}, '
+                               '"alignment": { "h": "right", "v": "bottom" }')
+    if not hd:
+        for column in range(4):
+            box = rect(bx + ox + column * geo["pitch"], by + oy - 1, w, h)
+            lines += _text_box(indent, f"{BELT_RESERVE_NAME}{column}", box, f'"fontColor": {BELT_RESERVE_COLOR}, '
+                               f'"dropShadow": {_shadow(hd)}, "alignment": {{ "h": "right", "v": "top" }}')
+    return "\n".join(lines) + "\n"
+
+
+def belt_reserve_boxes(geo: dict, indent: str) -> str:
+    """HD: the reserve boxes in one row above the belt's rim, each as wide as its column's pitch and centred on the cell."""
+    bx, _ = geo["belt"]
+    ox, _ = geo["first_cell"]
+    pad = geo["pitch"] - geo["cell"]
+    top, h = geo["reserve_y"], 52  # the text's bottom about 10 above the belt's rim (HD: rim at y 222 for the belt at 278)
+    lines = []
+    for column in range(4):
+        box = rect(bx + ox + column * geo["pitch"] - pad / 2, top, geo["pitch"], h)
+        lines += _text_box(indent, f"{BELT_RESERVE_NAME}{column}", box,
+                           f'"pointSize": {geo["reserve_point_size"]}, "fontColor": {BELT_RESERVE_COLOR}, '
+                           f'"dropShadow": {_shadow(True)}, "alignment": {{ "h": "center", "v": "bottom" }}')
+    return "\n".join(lines) + "\n"
+
+
+def add_after_belt(text: str, boxes: str) -> str:
+    """`boxes` inserted on the line after the "Belt" widget's closing brace (a comma added when the belt was last)."""
+    s, e = block_span(text, '"name": "Belt"')
+    if not text[s:e].endswith(","):
+        boxes = "," + boxes
+    nl = text.find("\n", e)
+    at = nl + 1 if nl >= 0 and text[e:nl].strip() == "" else e
+    return text[:at] + boxes + text[at:]
+
+
+def add_before_belt(text: str, boxes: str) -> str:
+    """`boxes` (each ending in a comma) inserted on the line before the "Belt" widget: drawn under the belt."""
+    s, _ = block_span(text, '"name": "Belt"')
+    at = text.rindex("\n", 0, s) + 1
+    return text[:at] + boxes + text[at:]
+
+
+def hud_hd() -> str:
+    """D2R's HD HUD with the belt reserve boxes before the belt and the count boxes after it (siblings in the HUDPanel)."""
+    text = add_after_belt(baseline("hudpanelhd.json"), belt_count_boxes(BELT_COUNT_HD, " " * 8, True))
+    return add_before_belt(text, belt_reserve_boxes(BELT_COUNT_HD, " " * 8))
+
+
+def hud_controller() -> str:
+    """D2R's gamepad HUD (basedOn the HD one, its belt moved and spaced wider): the boxes again, at the gamepad belt's cells."""
+    text = add_after_belt(baseline("controller/hudpanelhd.json"), belt_count_boxes(BELT_COUNT_PAD, " " * 8, True))
+    return add_before_belt(text, belt_reserve_boxes(BELT_COUNT_PAD, " " * 8))
+
+
+def hud_classic() -> str:
+    """D2R's legacy HUD with the belt count boxes after the belt (siblings in its "Middle" widget)."""
+    return add_after_belt(baseline("hudpanel.json"), belt_count_boxes(BELT_COUNT_SD, " " * 16, False))
+
+
 def build(out: Path = LAYOUT_OUT, table: Path = EXCEL / "inventory.txt") -> list[str]:
     rows = table_rows(table)
     player, box = rows["Amazon"], rows["Transmogrify Box Page 1"]
@@ -429,7 +537,10 @@ def build(out: Path = LAYOUT_OUT, table: Path = EXCEL / "inventory.txt") -> list
              "playerinventoryoriginallayout.json": inventory_original(player),
              "playerinventoryexpansionlayout.json": inventory_expansion(),
              "horadriccubelayout.json": cube(box),
-             "skillstreepanel.json": skilltree_classic()}
+             "skillstreepanel.json": skilltree_classic(),
+             "hudpanelhd.json": hud_hd(),
+             "controller/hudpanelhd.json": hud_controller(),
+             "hudpanel.json": hud_classic()}
     for name, text in files.items():
         (out / name).parent.mkdir(parents=True, exist_ok=True)
         (out / name).write_text(literalize(text, name), "utf-8", newline="")

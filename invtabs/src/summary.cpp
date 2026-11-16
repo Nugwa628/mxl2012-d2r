@@ -281,7 +281,7 @@ std::vector<std::string> Summary::Format(const std::vector<StatValue>& totals, v
 	return lines;
 }
 
-void Summary::Refresh(void* const* items, std::size_t count) {
+void Summary::Refresh(void* const* items, std::size_t count, const CharmMeta* meta) {
 	totals_.clear();
 	lines_.clear();
 	counted_ = skipped_ = 0;
@@ -302,18 +302,37 @@ void Summary::Refresh(void* const* items, std::size_t count) {
 		stats.push_back(std::move(s));
 	}
 	totals_ = Sum(stats);
-	lines_  = Format(totals_, context);
+	if (list_ == ListMode::ByCharm) {
+		std::vector<CharmBlock> blocks;
+		for (std::size_t i = 0, k = 0; i < count; ++i) {
+			if (items[i] == nullptr) continue;
+			CharmBlock b;
+			b.counts = stats[k++].counts;
+			if (meta != nullptr) {
+				b.name   = meta[i].name;
+				b.unique = meta[i].unique;
+				b.inTab  = meta[i].inTab;
+			}
+			const std::vector<StatValue> own = b.counts ? stats[k - 1].stats : ReadItem(items[i]);
+			b.lines = Format(Sum({ ItemStats { true, own } }), items[i]);
+			blocks.push_back(std::move(b));
+		}
+		lines_ = ByCharmLines(blocks);
+	} else {
+		lines_ = Format(totals_, context);
+	}
 	lines_.insert(lines_.begin(), notice_.begin(), notice_.end()); // the core's notice first (a read-only tab in a joined game)
 	lines_  = CapLines(std::move(lines_));
 	first_  = ClampFirst(static_cast<long long>(first_), lines_.size(), rows_);
 }
 
-std::string Summary::Fragment(LayoutMode mode, Rect area) {
+std::string Summary::Fragment(LayoutMode mode, Rect area, int barInset, int cornerWidth) {
 	mode_  = mode;
 	rows_  = LayoutRows(mode, area.height, lines_.size());
 	first_ = 0;
 	shown_.assign(rows_, std::string("\x01")); // never equal to a real text: the first ApplyTexts sets every row
-	return LayoutFragment(mode, area, rows_);
+	colours_ = list_ == ListMode::ByCharm;
+	return LayoutFragment(mode, area, rows_, barInset, cornerWidth, colours_);
 }
 
 void Summary::ApplyTexts(const char* panelName, bool force) {
@@ -326,15 +345,22 @@ void Summary::ApplyTexts(const char* panelName, bool force) {
 	for (std::size_t i = 0; i < rows_; ++i) {
 		const std::string want = RowText(lines_, first, i);
 		if (!force && i < shown_.size() && shown_[i] == want) continue;
-		bool found = false;
-		if (!SafeSetRow(reinterpret_cast<FindPanelFn>(fn_[UiFindPanel]), reinterpret_cast<FindChildFn>(fn_[UiFindChild]),
-		                reinterpret_cast<SetTextFn>(fn_[TextBoxSetText]), root, name, RowName(i).c_str(), want.c_str(), want.size(), &found)) {
-			Logf(log_, "summary: setting row %zu faulted", i);
-			return;
-		}
-		if (!found) {
-			Logf(log_, "summary: %s has no row %s (panel not open?)", panelName, RowName(i).c_str());
-			return;
+		// the colour boxes of the list by charm: the line's text in the box of its colour, the others emptied
+		const auto [colour, plain] = colours_ ? SplitColour(want) : std::pair<RowColour, std::string> { RowColour::Base, want };
+		for (RowColour c : RowColours) {
+			if (c != RowColour::Base && !colours_) break;
+			const std::string text = c == colour ? plain : std::string();
+			const std::string row  = RowName(i, c);
+			bool              found = false;
+			if (!SafeSetRow(reinterpret_cast<FindPanelFn>(fn_[UiFindPanel]), reinterpret_cast<FindChildFn>(fn_[UiFindChild]),
+			                reinterpret_cast<SetTextFn>(fn_[TextBoxSetText]), root, name, row.c_str(), text.c_str(), text.size(), &found)) {
+				Logf(log_, "summary: setting row %zu faulted", i);
+				return;
+			}
+			if (!found) {
+				Logf(log_, "summary: %s has no row %s (panel not open?)", panelName, row.c_str());
+				return;
+			}
 		}
 		if (i < shown_.size()) shown_[i] = want;
 	}

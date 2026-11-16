@@ -33,7 +33,18 @@ public:
 	bool Init(const void* gameModule, LogFn log);
 	bool Ready() const { return ready_; }
 
-	void Refresh(void* const* items, std::size_t count);
+	// What the core knows of each charm for the list by charm (parallel to Refresh's items; the core passes the items in
+	// grid order, summary_logic.h GridBefore).
+	struct CharmMeta {
+		std::string name;
+		bool        unique = true;
+		bool        inTab  = true;
+	};
+	void Refresh(void* const* items, std::size_t count, const CharmMeta* meta = nullptr);
+	// Totals (the sum, the default) or each charm under its name (summary_logic.h ByCharmLines). Takes effect at the next
+	// Refresh.
+	void SetListMode(ListMode mode) { list_ = mode; }
+	ListMode GetListMode() const { return list_; }
 	// Lines the core puts above the totals at the next Refresh (empty: none). Used for the notice of a read-only tab in a
 	// joined TCP/IP game. Like the totals it needs the summary's natives: without them the notice is in the log only.
 	void SetNotice(std::vector<std::string> lines) { notice_ = std::move(lines); }
@@ -44,7 +55,7 @@ public:
 	std::size_t Skipped() const { return skipped_; }
 	bool UsedFallback() const { return fallback_; }
 
-	std::string Fragment(LayoutMode mode, Rect area);
+	std::string Fragment(LayoutMode mode, Rect area, int barInset = 0, int cornerWidth = 0);
 	std::size_t Rows() const { return rows_; }
 	bool NeedsRelayout() const { return !Fits(mode_, rows_, lines_.size()); }
 
@@ -71,6 +82,8 @@ private:
 	std::size_t              counted_ = 0, skipped_ = 0;
 	bool                     fallback_ = false;
 	LayoutMode               mode_     = LayoutMode::Hd;
+	ListMode                 list_     = ListMode::Totals;
+	bool                     colours_  = false; // the layout has a box per colour on each row (built in ByCharm mode)
 	std::size_t              rows_     = 0;
 	std::size_t              first_    = 0;
 };

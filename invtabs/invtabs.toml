@@ -8,6 +8,9 @@ inventory_charms = true
 open_key = 73
 # Show an inventory button for mouse users.
 open_button = true
+# The charm tab's stat list: "all" (the sum of the charms that count) or "by_charm" (each charm under its name).
+# The button at the top right of the list switches it and writes the choice here.
+summary_list = "all"
 # Expose the tab through the controller inventory navigation.
 controller_button = true
 # RGBA bytes used to tint inactive charms (requirements or duplicate rule).

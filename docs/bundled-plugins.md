@@ -118,7 +118,9 @@ Median XL 2012 goes upstream) the buff list for Median's states (`buff-hud.txt`,
 companion MPQ), the elixir pictures, a `buff-panel.toml` on / off switch, and hover names that work under D2RLoader 1.3.1
 (it returns the authored, unresolved rects of the panel, so the fork takes the UI screen from the game: 2160 units high in
 HD, `ScreenSizeX` x `ScreenSizeY` in legacy), also while the game window is in the background, without D2's colour codes.
-`buff-panel status` names the label under the cursor. Lane buffship, docs/testing.md "Lane buffship".
+`buff-panel status` names the label under the cursor. Lane buffship, docs/testing.md "Lane buffship". From fork 1.2.0 the
+name is the panel's own `HoverName` text widget, drawn by the game: 1.1.0 drew it in D2RLoader's overlay layer, which
+players did not see over the game (and which a screenshot of the window does not hold either).
 
 - **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-buff-panel.dll` (mod-scoped) with its companion
   `d2rl-buff-panel.mpq` (layouts and the Median buff list), the fork's MIT licence with Lukaszpg's copyright
@@ -157,6 +159,21 @@ HD, `ScreenSizeX` x `ScreenSizeY` in legacy), also while the game window is in t
   rows that no Median skill or item grants, so only the other three were seen in game. Rows that still use global frame 0: Lightning
   Enchant (222), Cold Enchant (223), Shadowform (232), Lifeblood (240), Elixir of Power (241, shows its item picture),
   Stamina Potion (271, item picture) and Cow Disguise (301). docs/testing.md "Lane bufficons".
+- **Harmful effects, moving the icons, legacy size (fork 1.2.0, lane buffhud):** `display_type = debuff` rows of
+  `buff-hud.txt` (22 rows: curses such as Amplify Damage, Decrepify, Lower Resist, Blood Mana, Terror, Nightmare, Dazzle,
+  Doom; poison, burning, freeze, chill, stun, slow and others, each pointed at a fitting existing icon in
+  `buff-hud-display.txt`) read the state's own stat list on the player and show in a second group of 14 slots by the
+  mana globe, with a red frame (`debuffframe`), a timer when the list carries an end frame, and the name on hover. Buffs
+  keep 21 slots by the life globe. Left Ctrl + left drag on an icon moves its group (the game window is subclassed; the
+  grabbing click and the moves while dragging never reach the game, a click without Ctrl still walks). Each group's
+  top-left corner is saved in `buff-panel.toml` as a share of the UI screen (`hd_buffs_x` / `_y`, `hd_debuffs_x` / `_y`,
+  `legacy_buffs_x` ... ; `-1` = the default spot), clamped to the screen, so it survives a restart and a resolution
+  change. `reset_buffs` / `reset_debuffs = true` put a group back at the next start (the plugin writes them back as
+  `false`); the console command `buff-panel reset [buffs | debuffs]` does it at once. Legacy icons are 24 px (half size,
+  `small/` sheets in the companion MPQ, made from this mod's built pictures by the fork's `scripts/make_companion_art.py`,
+  which `tools/build_buffhud.ps1` runs before packing; they are not in the fork's git) with a smaller timer and name
+  font; HD is unchanged. The panel moves through D2R's own widget setters (fingerprinted; on a mismatch the debuff
+  group, the hover name and moving stay off and the log says so). docs/testing.md "Lane buffhud".
 - **Test runs:** a dev install (`tools/install_mod.py`) does not install it; a release install does.
 
 ## Auto Belt Refill by jaycachou-svg (shipped from 0.1.15)
@@ -183,7 +200,10 @@ customise it. Credit: README, CHANGELOG / release notes, NOTICE.md and this file
 - **Patches:** `0001-pluginsdk-1.3.1.patch`, API renames for D2RLoader 1.3.1 / ABI 4 (`abiVersion`, `InventoryService`,
   `ThreadService`, `InputService`, `LifecycleService`, the one-argument `QueryService`), no behaviour change.
   `0002-mxl2012-belt-rows.patch`, the Median belt sizes (next point). `0004-mxl2012-count-signatures.patch`, the counts' game
-  data found by signature (`belt_counts` below). `0005-refill-natives-by-signature.patch` (written so it can go to the author):
+  data found by signature (`belt_counts` below). `0006-mxl2012-counts-as-hud-text.patch`, the counts as D2R's own HUD
+  text in boxes of the mod's HUD layouts instead of the loader's overlay (`belt_counts` below, bug #613).
+  `0007-mxl2012-column-counts-and-reserve.patch`, the count of each belt column itself and the inventory reserve beside it
+  (`belt_counts` below). `0005-refill-natives-by-signature.patch` (written so it can go to the author):
   the twelve game routines the refill drives (`GetLocalPlayer`, `GetLocalDataContext`, `GetUnitInventory`, `GetUnitType`,
   `GetItemData`, `GetFirstItem`, `GetNextItem`, `GetItemCode`, `GetFreeBeltSlot`, `CanPutInBelt`, `BeltTransfer`, and
   `Pickup`, which only `belt-verify` reports) are found at load by byte signatures in `.text` (new `belt_natives.h`, the
@@ -203,18 +223,31 @@ customise it. Credit: README, CHANGELOG / release notes, NOTICE.md and this file
     2026-11-06; no remembered type). An empty first slot under items still in the column keeps the code.
   - `never_refill`: codes never learned or refilled, also from a column's bottom: Median's elixirs (`ey1`-`ey9`, `eo7`-`eo9`,
     `et1`, `0g0`-`0g8`) and the Goodberry `b@b` (#541).
-  - `belt_counts`: a count on the top right of each column's first cell, how many items of that column's code the inventory and
-    the belt hold together (white, red at 0; none on an empty or elixir column), drawn with D2RLoader's `OverlayService`.
-    The cells come from D2R's own layouts (`hudpanelhd.json`: HUD anchored bottom centre in a 2160-high UI space, belt cell 98,
-    pitch 125; `hudpanel.json`: the classic screen letterboxed, belt at the centred middle part, cell 29, pitch 31). HD or legacy
-    and the classic screen size are found at load by byte signatures (`0004-mxl2012-count-signatures.patch`, the repo's scan in
-    `invtabs/src/invtabs_logic.h`): D2R's HD test (`0x846210` in 93847) and the screen-size function (`0x7f4d0`, whose classic
-    branch reads `0x22a0d68` / `0x22a0d6c`), each unique in `.text` and cross-checked (the function calls the HD test, the height
-    follows the width, the data lies outside `.text`). A signature that does not match exactly once logs `belt_counts: OFF -
-    pattern ...` and the counts stay off; refilling is not affected. The load log names what was found (`patterns resolved`).
-    `BeltMatchTests` with env `D2R_DUMP` resolves both in the 93847 dump. The watcher refreshes
-    the counts every `auto_poll_frames`; out of a game they are hidden. Console `belt-counts` logs them, the cells and the
-    overlay's frame / draw counters.
+  - `belt_counts`: two numbers per column, as D2R's own HUD text (nothing on an empty or elixir column). How many items that
+    belt column holds (`0007-mxl2012-column-counts-and-reserve.patch`; 0006 showed the code's inventory and belt total), on
+    the column's bottom-row cell, right-aligned on the hotkey letter's line: white, red at 1 or 0 (`BeltMatch::LowCount`;
+    with the refill on a column only drops below full once the inventory has none of its potion left). The bottom row is the
+    one that stays in place when the belt opens (the others pop up above it), so the counts show with the belt closed and
+    open. And the reserve, "+N" = the column's code in the inventory (what the refill takes from; two columns of one code
+    show the same reserve): in HD a row just above the belt's rim, centred on each column, pale gold, before the belt in the
+    panel so an opened belt covers it; in legacy at the top right of the bottom-row cell, since the classic mini panel sits
+    above the belt's first two columns and the right skill button right of the belt (there is no room for one line beside
+    the fourth slot in either HUD). Since `0006-mxl2012-counts-as-hud-text.patch` (bug #613): the mod's HUD layouts carry
+    twelve empty text boxes, `MxlBeltCount0`-`3` (white), `MxlBeltCountLow0`-`3` (red) and `MxlBeltReserve0`-`3`, by the
+    belt (`tools/ui_layouts.py` `hud_hd` / `hud_controller` / `hud_classic`: `hudpanelhd.json` 34 pt on the 98-pixel cell
+    and 30 pt above it, the gamepad `controller/hudpanelhd.json` at its own belt, the legacy `hudpanel.json` in its "Middle"
+    part with the classic font). The plugin finds D2R's UI root, panel lookup, child lookup and text setter by the repo's signatures
+    (`invtabs/src/summary_natives.h`, the same functions as the dev menu and the charm summary: 93847 `0x3440170`,
+    `0x89f760`, `0x855c90`, `0x86dd50`), and the watcher queues a UI-thread pass after each refresh that sets only the texts
+    that changed (all of them once a second and for a new HUD: G between HD and legacy rebuilds it). A fault in that pass
+    turns the counts off (`counts: off (a fault in the UI pass)`), the refill goes on. Before 0006 the counts were drawn with
+    D2RLoader's `OverlayService`: the plugin's draw calls all succeeded but nothing reached the screen (as for the dev menu's
+    overlay text, bug #567), so players saw no count (#613). HD or legacy and the classic screen size are still found by
+    signature (`0004-mxl2012-count-signatures.patch`, D2R's HD test `0x846210`, the screen-size function `0x7f4d0`), now
+    only for `belt-counts`' report. A signature that does not match exactly once logs `belt_counts: OFF - pattern ...` and
+    the counts stay off; refilling is not affected. `BeltMatchTests` with env `D2R_DUMP` resolves all of them in the 93847
+    dump. The watcher refreshes the counts every `auto_poll_frames`; out of a game the boxes are emptied. Console
+    `belt-counts` logs the counts, whether the HUD panel and its boxes were found and how many texts were set.
   - **Known limit (D2R):** the game routes a potion by item type, not by code. Two columns of one kind (say `hp3` and `hp5`)
     both short: the game offers the first of them to either code; the plugin never puts the wrong potion there, so while that
     column has room and no potion of its own is left, the other column waits (in game: `hp5` in the inventory, `hp3` column

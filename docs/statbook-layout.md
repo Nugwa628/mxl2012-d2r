@@ -10,7 +10,21 @@ Layouts that get the widgets:
 - `global/ui/layouts/characterstatspanelhd.json` (PC, HD graphics), inserted before D2R's `CloseButton`.
 - `global/ui/layouts/controller/characterstatspanelhd.json` (gamepad UI), appended at the end. This file is `basedOn` the
   PC file, so every name is repeated with gamepad rects.
-- The legacy layout gets nothing. Legacy graphics keep D2R's sheet without tabs.
+- `global/ui/layouts/characterstatspanel.json` (legacy graphics), built by `tools/statbook_legacy.py` after this tool:
+  the same names in the same groups (WidgetService handles are paths, so the plugin keeps them across a G switch), classic
+  rects, classic fonts (6pt labels, 8pt values and headings) and explicit RGB colours. It keeps D2R's 320 x 432 rect: D2R
+  draws a classic left panel only inside the classic panel area, whatever the layout's rect says (a sheet widened by 80 x 24
+  was cut there in game, 2026-11-15). The tab strip (18 high) lies over the sheet's frame top; D2R's name and class texts
+  move to the row below it, on the SbHead picture. Extra names: SbLegacyMarker (the plugin binds the legacy sheet only when
+  it is there), SbAdvanced (a classic Advanced Stats arrow: All Stats; a Stat Book click found by its rect) and SbHead. 21 All Stats
+  rows. A half row's label too long for its cell is drawn in a clean short form by the plugin (sheet_host_logic.h ShortLabels,
+  whole labels: Minion Resistances to Minion Res. and the like). Values: classic 6pt, right-aligned inside their bars, bright
+  tones (HD's grey for a zero value is near white).
+- `hd/global/ui/panel/statbook/sidepanel.json`: the classic side panel, registered beside the HD one on the same panel, at
+  D2R's right panel anchor (the classic right panel area), its tabs along its top. Its stone is part of SbSideBody (group
+  SbSideStone); its SbPageBody is bare, as in HD (the side host hides it).
+- `statbook-layout.json` keys `legacy` and `legacyside`: the click rects in classic pixels and `origin`, the panel's corner
+  from D2R's classic left panel corner (80, 60 of 800 x 600); the plugin maps a click with D2R's classic screen size.
 - `hd/global/ui/panel/statbook/sidepanelhd.json`: the side panel (tabs = "side", docs/statbook.md "Side host"), the plugin's
   own panel `statbook/SbSidePanel` (rect x 1398, y -651, 1342 x 1507 at D2R's left panel anchor: right of the sheet, where
   D2R puts its Advanced Stats panel). The plugin registers it as its layout. It has the same names as the PC sheet

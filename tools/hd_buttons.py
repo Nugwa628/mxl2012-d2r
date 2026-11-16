@@ -1,5 +1,6 @@
 """HD art of the mod's own square buttons in D2R HD's button style: Send to stash (tools/send_stash.py, also the gamepad
-inventory's copy in tools/pad_ui.py) and invtabs' Charms button (tools/invtabs_hdart.py; bug #592).
+inventory's copy in tools/pad_ui.py), invtabs' Charms button (tools/invtabs_hdart.py; bug #592) and the charm list's mode
+button (all stats / by charm, also tools/invtabs_hdart.py).
 
 A button is three layers:
   rim     D2R's HD close button (PANEL\\closebtn_4x, frame 0; greyed: its disabled frame 2): the grey stone bevel with its
@@ -293,7 +294,53 @@ def charm_icon(size: tuple[int, int]) -> np.ndarray:
     return img
 
 
-ICONS = {"sendstash": chest_icon, "charms": charm_icon}
+def _blue_stone(mask: np.ndarray) -> np.ndarray:
+    """A small blue charm stone over mask (deep blue, a lighter centre)."""
+    gem = shaded(mask, (120, 184, 255), (20, 44, 120), bevel=1.0, gloss=0.25)
+    return gem
+
+
+def list_sum_icon(size: tuple[int, int]) -> np.ndarray:
+    """The charm list's "all stats" glyph: a gold sum sign (sigma) over a single stone, the bonuses added up."""
+    def sigma(d, P, L):
+        d.polygon([P(0.16, 0.06), P(0.84, 0.06), P(0.84, 0.24), P(0.72, 0.24), P(0.70, 0.18), P(0.40, 0.18),
+                   P(0.60, 0.50), P(0.40, 0.82), P(0.70, 0.82), P(0.72, 0.76), P(0.84, 0.76), P(0.84, 0.94),
+                   P(0.16, 0.94), P(0.16, 0.88), P(0.44, 0.50), P(0.16, 0.12)], fill=255)
+
+    m = _mask(size, sigma)
+    img = np.zeros(m.shape + (4,), np.float32)
+    img = over(img, flat(outline(m, max(1, round(min(size) / 30))), INK))
+    img = over(img, shaded(m, *GOLD, bevel=1.4, gloss=0.35))
+    return img
+
+
+def list_charms_icon(size: tuple[int, int]) -> np.ndarray:
+    """The charm list's "by charm" glyph: three rows, each a blue stone in a gold setting and a gold line of text."""
+    rows = (0.10, 0.40, 0.70)
+
+    def settings(d, P, L):
+        for y in rows:
+            d.ellipse([P(0.06, y), P(0.30, y + 0.22)], fill=255)
+
+    def stones(d, P, L):
+        for y in rows:
+            d.ellipse([P(0.10, y + 0.04), P(0.26, y + 0.18)], fill=255)
+
+    def lines(d, P, L):
+        for k, y in enumerate(rows):
+            d.rounded_rectangle([P(0.38, y + 0.06), P(0.94 if k != 1 else 0.80, y + 0.16)], radius=L(0.04), fill=255)
+
+    ms, mt, ml = _mask(size, settings), _mask(size, stones), _mask(size, lines)
+    img = np.zeros(ms.shape + (4,), np.float32)
+    ow = max(1, round(min(size) / 30))
+    img = over(img, flat(outline(np.maximum(ms, ml), ow), INK))
+    img = over(img, shaded(ms, *GOLD, bevel=1.0, gloss=0.3))
+    img = over(img, _blue_stone(mt))
+    img = over(img, shaded(ml, *GOLD_DARK, bevel=1.0, gloss=0.2))
+    return img
+
+
+ICONS = {"sendstash": chest_icon, "charms": charm_icon, "listsum": list_sum_icon, "listcharms": list_charms_icon}
 
 
 # ---- the button ------------------------------------------------------------------------------------------------------

@@ -3,7 +3,8 @@
 The Stat Book turns D2R's character sheet into a book with folder tabs (owner decision, option C): tab 1 is D2R's own
 sheet (with the Magic / Physical Resistance rows), then the themed pages Offense, Spells, Defense, Resistances,
 Skills & Procs and Utility, and last All Stats (the grouped Advanced Stats list with a search box). The old Advanced Stats
-arrow opens All Stats. HD graphics only for the themed pages and All Stats; legacy graphics keep page 1 without tabs.
+arrow opens All Stats. D2R-XL 2012 has the book in HD and in legacy graphics (see Legacy graphics); the standalone plugin (0.1.2) has the same
+classic layouts and DC6 art for plain D2R in legacy (built and unit-tested; not yet seen in game, see Plain D2R panel).
 
 It is one standalone D2RLoader plugin (`statbook`, its own DLL, layouts and config) that also works on plain D2R; D2R-XL 2012
 ships the same plugin with Median's book (stat list, caps, page contents).
@@ -13,7 +14,7 @@ ships the same plugin with Median's book (stat list, caps, page contents).
 | Part | State |
 |-|-|
 | Page data `data/statbook_pages.tsv`, generator `tools/statbook.py` | done, tested (`tools/tests/test_statbook.py`) |
-| Book file in the mod (`data/statbook/statbook.txt`, a `tools/build.py` step) | done |
+| Book file in the mod (`mxl2012.mpq/data/statbook/statbook.txt`, a `tools/build.py` step) | done |
 | Plain D2R book compiled in (`statbook/src/default_book.inc`, `statbook.py default` / `check`) | done |
 | Pure core `statbook/src/book_logic.h`: parse, row values and tones, page lines, search, tabs | done, tested (`statbook/tests`) |
 | Plugin DLL `statbook/` (`build/statbook/Release/statbook.dll`, `statbook.toml`), the parts sheetres and advstats moved in from mxl2012-core | done, seen in game (check `statbook`, `advgroups`) |
@@ -26,6 +27,8 @@ ships the same plugin with Median's book (stat list, caps, page contents).
 | Packaging: `install_mod.py`, `package_release.py`, `verify_package.py` (DLL, config, the book file in the data) | done, tested |
 | Sheet host `statbook/src/sheet_host.cpp` (tabs, pages, All Stats with search and row arrows, the Advanced Stats arrow, visibility on every opening), pure part `sheet_host_logic.h` | done, tested (`statbook_sheethost_tests`, `tools/tests/test_statbook_checks.py`), seen in game on the HD PC sheet at 900p / 1080p / 1440p (check `statbook_host`, also with mxl2012-core's developer menu opened first) and on the gamepad sheet with both pad setups (check `statbook_host_pad`) |
 | Plain D2R panel over the sheet (`statbook/SbPlainPanel`, `statbook/src/statbook_plain_layout.h`, `statbook_layout.py plain`) | done, seen in game on the HD PC sheet (slot 1, `mods\statbook-plain`): opens and closes with the sheet, all 8 tabs, All Stats search, the Stat Book's own tab strip (D2R's stash tab when its art is not installed), D2R's title hidden; shots `statbook_plain_*`. The side panel and its toggle too (`statbook/SbSidePanel`, own side art and HD toggle). The gamepad sheet and legacy graphics keep D2R's own sheet (see Plain D2R panel) |
+| Legacy graphics (D2R-XL 2012): classic sheet and side panel with the whole book, classic DC6 art, `tools/statbook_legacy.py` (a `tools/build.py` step) | done, tested (`tools/tests/test_statbook_legacy.py`, `statbook_sheethost_tests`), seen in game at 900p / 1080p / 1440p (check `statbook_legacy`, see Legacy graphics) |
+| Legacy graphics on plain D2R | built (standalone 0.1.2: classic layouts compiled in, 12 DC6 shipped, registered only when all are installed); in-game proof pending: plain D2R does not reach the menu on slot 3 (see Plain D2R panel) |
 | Layouts and art (tab strip, page stone, cells, All Stats, gamepad), `tools/statbook_layout.py` (a `tools/build.py` step), widget names in [statbook-layout.md](statbook-layout.md) | done, tested (`tools/tests/test_statbook_layout.py`); looked at in game with static previews (slot 4, 2026-11-15) |
 
 ## Data
@@ -48,7 +51,7 @@ format: `FillRow` asks the host for the pseudo stat `BlockRateStat`, and the plu
 ## Plugin
 
 `statbook.dll` loads per mod (D2R-XL 2012 ships it next to mxl2012-core) or in any other mod folder. It reads the book from
-the mod's `data/statbook/statbook.txt` (the mod's MPQ folder); without it, the plain D2R book compiled in. The grouped
+the mod's `<mod>.mpq/data/statbook/statbook.txt`; without it, the plain D2R book compiled in. The grouped
 Advanced Stats list (part advstats) holds D2R-XL 2012's stat ids, so it only runs with the mod's book; plain D2R keeps its
 own panel. The parts have their switches in `statbook.toml`:
 
@@ -84,7 +87,8 @@ of the page content, filling or search differs.
 ### Sheet host
 
 `statbook/src/sheet_host.cpp` binds the contract of [statbook-layout.md](statbook-layout.md) on the HD sheet
-(`CharacterStatsPanel` with `StatBookMarker`; legacy and D2R's own layout have no marker and are left alone). A 50 ms
+(`CharacterStatsPanel` with `StatBookMarker`; D2R's own layout has no marker and is left alone) and on the mod's legacy sheet
+(with `SbLegacyMarker` too, see Legacy graphics). A 50 ms
 UI-thread tick does all the work:
 
 - Visibility: D2R shows every widget of the sheet when it opens. On each opening and each tab change the host sets every Stat
@@ -100,9 +104,11 @@ UI-thread tick does all the work:
   position in the sheet's layout units (16:9: panel at 236, 208.4 of a 2160-unit-high screen) picks the tab or the All
   Stats row in `statbook-layout.json`. A row's arrow opens the page that has the row's stat.
 - The Advanced Stats arrow (`CharacterStatsPanelMessage:ToggleAdvancedStats`) is taken on the HD PC sheet and opens All
-  Stats; D2R's own Advanced Stats panel does not open there any more (legacy keeps it).
+  Stats; D2R's own Advanced Stats panel does not open there any more. The legacy sheet's own arrow does the same.
 - Search: `SbSearchInput` types through panel_shared's typing fix (as the developer menu's box); the host reads the text with
-  WidgetService `getInputText` while the box is clicked. The count shows "shown/total" rows. The mouse wheel over the list
+  WidgetService `getInputText` while the box is clicked, and again whenever the bound box changes (G rebinds the sheet, the
+  side panel opens, top / side switches), since WidgetService cannot write a box's text: the list always matches the box
+  shown. The count shows "shown/total" rows. The mouse wheel over the list
   scrolls it. Rows are D2R's own item lines (0x14eb250 with a stand-in panel) or the book's own patterns, colour codes removed.
 - Two copies of panel_shared (mxl2012-core's and statbook's) each subclass the game window once. They chain: the outer one
   turns a key typed into its focused box into F24 and the inner one passes F24 on, and each copy only acts for its own
@@ -138,7 +144,8 @@ D2R's string), with the top tabs, pages and toggle hidden.
 - Widgets: WidgetService gives a plugin about 256 handles and the sheet's book uses ~165, so the side panel's widgets are
   shown and hidden with D2R's own vfuncs (+0x50, +0x48), only while it is open (it is filled only then); only its search box
   has a handle (the typed text). The fill code is the sheet's, run over the side panel's caches (`SideView`).
-- Not on the gamepad sheet (it keeps its top tabs and pad host whatever the setting) and not in legacy graphics.
+- Not on the gamepad sheet (it keeps its top tabs and pad host whatever the setting). In legacy graphics the mod has a
+  classic side panel (see Legacy graphics).
 - Plain D2R has it too: the plugin registers the same side panel from `statbook_plain_layout.h` (`SideLayoutHd`, written by
   `statbook_layout.py plain` from the mod's side layout with its art, see "Plain D2R panel"); the toggle, the
   Controls action, `statbook tabs` and the write-back to statbook.toml work the same. On plain D2R the Advanced Stats arrow
@@ -160,6 +167,40 @@ Switching (live, with the sheet open or closed; the next tick hides one host's w
 - Console: `statbook tabs [top|side|toggle]`.
 - D2R's own Options menu has no plugin API (docs/legacy-hd-text-research.md section 3), so the setting has no entry
   there; the gameplay options layout is not patched for it.
+
+### Legacy graphics
+
+D2R-XL 2012 only. `tools/statbook_legacy.py` (a `tools/build.py` step after `statbook_layout.py`) builds the classic sheet
+`global/ui/layouts/characterstatspanel.json` with the contract widgets, the classic side panel
+`hd/global/ui/panel/statbook/sidepanel.json`, their DC6 art in `global/ui/panel/statbook/`, and the `legacy` / `legacyside`
+geometry in `statbook-layout.json` (statbook-layout.md). The plugin is the same: the sheet host binds the classic sheet when
+it has `SbLegacyMarker`, fills it with the same code and book (book_logic.h), and maps a click through D2R's classic screen
+size (RVA 0x22a0d68 / 0x22a0d6c, 800 x 600 when unreadable) scaled to fit the client.
+
+- Look: the classic sheet's own art (its frame, the Fire Resistance box nine-sliced into the row cells), D2R's HD stash tab
+  and the Stat Book's HD page stone and toggles down-rendered, D2R's classic buy/sell arrow for the row arrows; classic
+  fonts (6pt labels, 8pt values and headings) in explicit RGB tones. All built by our tools from stock art.
+- Room: D2R draws a classic left panel only inside the classic panel area (80, 60, 320 x 432 of 800 x 600): a sheet widened
+  to 400 x 456 was cut there in game (2026-11-15, shots of run `checks-20261115-233054-s3`). So the book fits the sheet: an 18
+  pixel tab strip over the frame top (short labels CHAR, OFF, SPELL ... ALL when the full ones do not fit), the name and
+  class texts moved just below it, the level / experience boxes kept, the page below. Half rows' labels are shortened by the
+  plugin in legacy only, whole labels to clean short forms (sheet_host_logic.h ShortLabels: "Minion Res.", "Life Leech",
+  "Avoid Damage" and the like); every other label and full rows keep the full text. Values are right-aligned inside their
+  bars in bright tones (white, and HD's colours where HD colours a value).
+- D2R draws a classic image's frame bottom-aligned to frame 0 of its DC6 (a 33-high frame of a DC6 whose frame 0 was 256
+  high came out 223 lower), so every DC6 here has frames of one height.
+- Advanced Stats arrow: a classic arrow right of the stat points plate on the Character tab; it is a Stat Book click (the
+  classic sheet does not pass D2R's ToggleAdvancedStats message on) found by its rect `advanced`. It comes after the book's
+  groups in the layout: D2R hit-tests the hidden page body's ClickCatcher too, and with the arrow before it the arrow got no
+  click (runs `checks-20261116-005509-s3`, `-011439-s3`; after the move `-013808-s3`).
+- Side tabs: the book as its own panel in the classic right panel area (D2R's right panel anchor), its tabs along its top;
+  the toggle sits right of the class box on the sheet and of the title on the side panel. It covers the inventory when both
+  are open (a 4:3 screen has no other room).
+- G (graphics switch) with the sheet or the side panel open: the host rebinds the other layout on the same tab.
+- Plain D2R in legacy: the standalone plugin compiles in the classic sheet and side layouts (`statbook/src/statbook_plain_legacy.h`,
+  `statbook_legacy.py plain`) and ships 12 DC6 (`statbook_legacy.py plain-art`, made from D2R's stock classic art); see Plain D2R
+  panel. Not done: Legacy 16:9 (the click mapping reads the classic screen size, so it should follow, but the dev
+  install has no Legacy 16:9 to try).
 
 ### Plain D2R panel
 
@@ -188,12 +229,21 @@ stash arrow.
 - D2R's title text (`StatsPanelTitle`, "Character") sits under the tab strip: the host hides it while the panel is bound
   (D2R shows it again on each opening; the mod's layout empties it instead).
 - The Advanced Stats arrow keeps opening D2R's own panel there.
-- Gamepad sheet and legacy graphics: plain D2R keeps D2R's own sheet. A gamepad variant would need a second panel at the
+- Legacy graphics (0.1.2): the panel also gets a classic layout (`statbook/SbPlainPanel` as `<localId>.json`, the vanilla
+  classic sheet's name and class boxes as `SbPlainName` / `SbPlainClass`, filled by the host from the player's name and
+  `partychar*` class string, its own close button `SbClose` on the pages, no ClickCatcher) and a classic side layout, both
+  registered only when all 12 DC6 in `data/global/ui/panel/statbook/` are installed (else legacy keeps D2R's own sheet);
+  the status line says `legacy ok (+ side) (12 of 12 DC6)`. The DC6 are made by `statbook_legacy.py plain-art` from D2R's
+  stock classic art (the sheet `invchar6`, the classic panel sets) and the Stat Book's HD art. Not seen in game yet: on slot
+  3 the plain test mod never reaches the menu, with or without the plugin (the loader stops at `Preparing frontend launch
+  task`, the game process ends within 5 s, no crash report; the mxl2012 mod starts on the same slot), 2026-11-16, runs
+  `plain1` to `plain9` in the lane's notes. The plugin itself loads there and reports `legacy ok (+ side) (12 of 12 DC6)`.
+- Gamepad sheet: plain D2R keeps D2R's own sheet. A gamepad variant would need a second panel at the
   gamepad menu's rect, the pad geometry and its own art, registered and focused inside D2R's gamepad menu: not cheap, left
   out. The host opens its panel only over a sheet with a `CloseButton` (D2R's PC sheet has one, the gamepad sheet none,
-  `test_close_button_tells_the_pc_sheet`) and only in HD; on the gamepad sheet it stays unbound, so LT / RT / LB / RB stay
-  D2R's there. Not run in game: plain D2R with the gamepad UI (the scripted pad needs mxl2012-core's harness, which the
-  plain test mod does not hold) and legacy on slot 1 (G would change the owner's graphics setting).
+  `test_close_button_tells_the_pc_sheet`) and only in HD or with the legacy art installed; on the gamepad sheet it stays
+  unbound, so LT / RT / LB / RB stay D2R's there. Not run in game: plain D2R with the gamepad UI (the scripted pad needs
+  mxl2012-core's harness, which the plain test mod does not hold).
 - Run `work/plain_panel.py` (lane scratch, slot 1, 2026-11-15): sheet open binds, each tab click selects its tab, a typed
   All Stats search, closed with the sheet and opened again, no failed open in the loader log; with the tab art installed
   (shots `statbook_plain_*`, `statbook_plain_tabs_vs_mod`: the mod's strip above, the plain one below) and without it
@@ -245,7 +295,9 @@ step the tabs 0, 1, 2, 1, LT / RT page the menu away and back, LB / RB glyphs; `
 | Plain D2R: built-in book, own panel over the HD PC sheet, tabs, search, reopen, own tab art and the stash-tab fallback, title hidden | slot 1, `mods\statbook-plain` | `work/plain_panel.py`, cp6 `statbook_plain_*`, `statbook_stocktabs_plain_*` |
 | Plain D2R side host (`statbook/SbSidePanel`): the book toggle both ways with its tooltip, live and with the sheet closed, statbook.toml written back, every side page, the Advanced Stats arrow to All Stats, search and a row arrow, reopen keeps the tab, top tabs right after switching back, own tab, cell, side and toggle art (0 stock swaps; rows in their boxes as on the mod), Controls action registered | slot 1, `mods\statbook-plain` | `work/plain_side.py` (19 rows), `statbook_plain_*` in `shots/plain`, `shots/plain2` (69 px toggle, row cells) |
 | Side host (`tabs = "side"`), HD PC sheet at 900p: the book toggle both ways with its tooltip, live with the sheet open, statbook.toml written back, every side page, the Advanced Stats arrow, All Stats search and a row arrow, reopen keeps the tab, `statbook tabs` with the sheet closed, top tabs right after switching back, Controls action registered | slot 1, D2R-XL 2012 | `checks-20261115-100552-s1`, `-114857-s1` (check `statbook_side`; v2: grey-gold side labels, HD toggle), `-134014-s1` and `-134905-s1` (`statbook_side`, `statbook_host`: the 69 px toggle), `statbook_side_*` |
-| Not run in game | | the Controls action pressed on a key (registered only, unbound by default), the side host at other resolutions, plain D2R with the gamepad UI or in legacy (D2R's own sheet by design), a real controller (only the scripted pad), Controller QOL on plain D2R |
+| Legacy graphics (mod): every tab, the classic Advanced Stats arrow, All Stats search and a row arrow, reopen on a page, G with the sheet open and with the side panel open (same tab both ways), the top / side toggle both ways, side tabs and search, 1080p / 1440p, then the HD tabs | slot 3, D2R-XL 2012 | `checks-20261116-020612-s3` (checks `statbook_legacy`, `statbook_host`, `statbook_side`: every row ok; the legacy verdict FAIL is only D2R's known legacy-mode engine assert `last_used_frame != PrismGetFrameCount()` (D2PrismSpriteCache.cpp:339, docs/testing.md 2026-11-09), seen in 4 of 7 legacy runs), shots `statbook_legacy_*`; shot sheet `mxl2012-runs/sblegacy/shots/overview.png` |
+| Legacy readability (values white / blue / red / gold inside their bars, right-aligned, clean short labels) on every legacy page and side page, with the checks of the row above again, and the HD tabs after | slot 3, D2R-XL 2012 | `checks-20261116-114111-s3` (`statbook_legacy`, `statbook_side` PARTIAL: every row ok, the pages judged from the shots; `statbook_host` FAIL only from the known exit pool assert and the legacy-mode engine assert), full-size crops `mxl2012-runs/sblegacy/shots/pages2/`, sheet `shots/overview2.png` |
+| Not run in game | | Legacy 16:9, the Controls action pressed on a key (registered only, unbound by default), the side host at other resolutions, plain D2R with the gamepad UI (D2R's own sheet by design), plain D2R in legacy (built, pending: the plain test mod does not start on slot 3), a real controller (only the scripted pad), Controller QOL on plain D2R |
 
 Shots: `mxl2012-runs/statbook/shots/cp5/` and `cp6/`; side host `mxl2012-runs/sbside/shots/`.
 

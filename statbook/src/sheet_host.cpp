@@ -24,8 +24,10 @@
 // from statbook_plain_layout.h (tools/statbook_layout.py `plain`, written from the mod's layouts): statbook/SbPlainPanel (the
 // same widget names at the sheet's rect) and the side panel statbook/SbSidePanel. The Stat Book's own sprites are used when the
 // install has them, else D2R's stock ones (the header's Fallback rows); D2R's stock sprites for the rest. The host opens the
-// sheet's panel while the sheet is open (HD only), closes it with the sheet; D2R's title text under the tab strip is hidden
-// (shown in side mode). The Stat Book widgets are that panel's; D2R's widgets hidden on the pages are the sheet's (by name);
+// sheet's panel while the sheet is open, closes it with the sheet; D2R's title text under the tab strip is hidden (shown in
+// side mode). Legacy graphics: classic layouts of both panels from statbook_plain_legacy.h (tools/statbook_legacy.py
+// `plain`, the mod's classic book over D2R's classic sheet), registered when the install has their DC6 art; the panel's
+// head covers D2R's name and class, so the host fills its own name and class texts (SbPlainName / SbPlainClass). The Stat Book widgets are that panel's; D2R's widgets hidden on the pages are the sheet's (by name);
 // the sheet's visible flag (+0x51 bit 0x01, as calibrated on the mod's sheet) says when it is open. D2R's Advanced Stats arrow
 // keeps opening D2R's own panel there with top tabs; in side mode (D2R's panel would sit under the side panel) it opens All Stats.
 #include "sheet_host.h"
@@ -35,6 +37,7 @@
 #include "advstats.h"
 #include "sheet_host_logic.h"
 #include "statbook_plain_layout.h"
+#include "statbook_plain_legacy.h"
 
 #include <D2RLPlugin/panels.h>
 #include <D2RLPlugin/shared_events.h>
@@ -79,6 +82,24 @@ constexpr const char* HideByName[] = {
     "Divider08", "Divider09", "Row08", "Divider10", "Divider11", "FireResistanceBG", "ColdResistanceBG", "LightningResistanceBG",
     "PoisonResistanceBG", "MxlMagicResistanceBG", "MxlPhysicalResistanceBG", "StrengthPointButton", "DexPointButton", "VitalityPointButton",
     "EnergyPointButton"};
+// Legacy graphics (the mod's classic sheet, statbook_legacy.py): D2R's classic header texts and close stay on the pages (the page
+// body draws the header boxes); the stat point buttons (LevelUpInfo) go with the rest. Without the child list: by name.
+constexpr const char* KeepLegacy[] = {"ClickCatcher", "click_catcher", "background", "CharacterName", "ClassInfo", "LevelTitle", "Level", "CurrentXPTitle",
+                                      "CurrentXP", "NextLevelXPText", "NextLevelXP", "CloseButton", "SbLegacyMarker"};
+constexpr const char* HideByNameLegacy[] = {
+    "StrengthTitle", "StrengthStat", "DexTitle", "DexStat", "VitalityTitle", "VitalityStat", "EnergyTitle", "EnergyStat",
+    "LeftSkillStats", "RightSkillStats", "ArmorClassTitle", "ArmorClass", "StaminaTitle", "MaxStamina", "CurrentStamina", "HPTitle", "MaxHP",
+    "CurrentHP", "ManaTitle", "MaxMana", "CurrentMana", "FireResistanceTitle", "FireText", "ColdResistanceTitle", "ColdText",
+    "LightningResistanceTitle", "LightningText", "PoisonResistanceTitle", "PoisonText", "MxlMagicResistanceTitle", "MxlMagicText",
+    "MxlMagicTextCapped", "MxlMagicTextNegative", "MxlPhysicalResistanceTitle", "MxlPhysicalText", "MxlPhysicalTextCapped",
+    "MxlPhysicalTextNegative", "LevelUpInfo", "SbAdvanced"};
+constexpr const char* LegacyMarker = "SbLegacyMarker";
+// D2R's classic screen size (int, int): 800 x 600, 1066 x 600 with Legacy 16:9 (build 93847, as the Legacy 16:9 plugin's table)
+constexpr uintptr_t RvaScreenSizeX = 0x22a0d68;
+constexpr uintptr_t RvaScreenSizeY = 0x22a0d6c;
+// a player unit's player data (its name, char[64], at +0; docs/d2r-addresses.md); a unit's class at +4 (0 Amazon .. 7 Warlock)
+constexpr uintptr_t RvaPlayerData = 0x34b240;
+constexpr long UnitClassOffset = 4;
 
 using VisFn = void (*)(void* widget, uint64_t on) noexcept;
 
@@ -93,6 +114,8 @@ bool g_plainOpen = false;
 bool g_plainPadSheet = false;  // D2R's sheet is the gamepad one: the plain panel stays closed
 std::atomic<long> g_plainOpens{0}, g_plainFails{0};
 std::string g_plainHd, g_plainGeometry;
+std::string g_plainLegacy, g_plainLegacyGeometry, g_sideLegacyJson;  // the classic layouts (statbook_plain_legacy.h)
+bool g_plainLegacyReady = false;  // registered: the install has their art
 panel_shared::Client g_sheet;  // only its panelName: D2R's sheet (the Stat Book's own panel is g_client)
 void* g_sheetPanel = nullptr;
 void* g_sheetTitle = nullptr;  // plain D2R: the sheet's title text ("Character"), under the tab strip; hidden while bound
@@ -102,7 +125,10 @@ const statbook::Book* g_book = nullptr;
 SheetHostServices g_sv;
 bool g_padTriggers = false;
 Geometry g_pc, g_pad;
-char g_geometryFrom[300] = "not read";
+Geometry g_legacy, g_legacySide;       // statbook-layout.json "legacy" / "legacyside" (the mod's classic layouts)
+std::atomic<bool> g_legacyNow{false};  // the bound sheet is the classic one (SbLegacyMarker)
+bool g_sideLegacyReady = false;        // the side panel's classic layout is registered too
+char g_geometryFrom[420] = "not read";
 panel_shared::Client g_client;
 std::atomic<bool> g_tickQueued{false};
 
@@ -123,7 +149,7 @@ bool g_sideOpen = false, g_sideTried = false, g_raw = false;
 void* g_sideNative = nullptr;
 int g_sideApplied = -1;
 Geometry g_side;
-std::string g_sideJson;
+std::string g_sideJson, g_sideClassicJson;
 panel_shared::Client g_sideClient;
 std::atomic<long> g_sideOpens{0}, g_sideFails{0}, g_toggles{0};
 
@@ -143,6 +169,10 @@ bool g_isPad = false;
 bool g_wasOpen = false;
 int g_appliedTab = -1;
 std::string g_query, g_appliedQuery;
+// the bound search box changed (G rebinds, a side opening, top / side): the query is read from it again, so the list
+// matches the box shown (WidgetService cannot write a box's text)
+bool g_syncQuery = false;
+int g_lastSideNow = -1;
 long g_scroll = 0, g_appliedScroll = -1;
 struct Cached {
 	void* w = nullptr;                                                    // the native widget (reading its flag, texts)
@@ -277,6 +307,35 @@ void Text(const std::string& name, const std::string& want, bool force) {
 }
 
 // While it lives, Find / Group / Vis / Text work on the side panel (its own name caches, handles and raw visibility).
+// Plain D2R in legacy graphics: the plugin's head picture covers D2R's name and class texts, so it draws its own
+auto PlayerName(void* player, char* out, size_t size) noexcept -> bool {
+	out[0] = '\0';
+	__try {
+		using Fn = const char* (*)(void*);
+		const char* data = reinterpret_cast<Fn>(g_context->exeBase + RvaPlayerData)(player);
+		if (data == nullptr) {
+			return false;
+		}
+		size_t n = 0;
+		for (; n + 1 < size && n < 64 && data[n] != '\0'; ++n) {
+			out[n] = data[n];
+		}
+		out[n] = '\0';
+		return n != 0;
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		out[0] = '\0';
+		return false;
+	}
+}
+
+auto PlayerClass(void* player) noexcept -> int {
+	__try {
+		return *reinterpret_cast<const int*>(static_cast<const uint8_t*>(player) + UnitClassOffset);
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		return -1;
+	}
+}
+
 void* g_viewSheet = nullptr;  // the sheet's panel while a SideView lives (a fault inside one is undone on the next tick)
 
 struct SideView {
@@ -420,6 +479,8 @@ void NewPanel(void* panel, void* sheet) {
 	g_appliedTab = -1;
 	g_sheetTitle = g_plain ? panel_shared::NativeChild(sheet, "StatsPanelTitle") : nullptr;
 	g_isPad = panel_shared::NativeChild(panel, "SbPadPrevLB") != nullptr;
+	const bool legacy = panel_shared::NativeChild(panel, LegacyMarker) != nullptr;
+	g_legacyNow.store(legacy);
 	for (const char* n : {"StatBookMarker", "StatBookTabs", "SbPageBody", "StatBookPage", "StatBookAll", "SbPadAllHint", "SbPreviewQuery"}) {
 		if (void* w = panel_shared::NativeChild(panel, n)) {
 			g_ownTop.insert(w);
@@ -433,12 +494,18 @@ void NewPanel(void* panel, void* sheet) {
 		g_visOff = SheetVisibleOffset;
 		g_visMask = SheetVisibleMask;
 	}
-	void* known[] = {Find("StatBookMarker").w, Find("StatBookTabs").w, panel_shared::NativeChild(panel, "Background"), panel_shared::NativeChild(panel, "CharacterName")};
+	void* known[] = {Find("StatBookMarker").w, Find("StatBookTabs").w, panel_shared::NativeChild(panel, legacy ? "background" : "Background"),
+	                 panel_shared::NativeChild(panel, "CharacterName")};
 	g_kidsOff = !g_plain && known[0] && known[1] && known[2] && known[3] ? FindKids(panel, known, 4) : 0;
 	// D2R's widgets to hide on the pages: the panel's children that are neither the Stat Book's, kept, nor the click catcher
 	std::unordered_set<void*> keep(g_ownTop);
 	for (const char* n : Keep) {
-		if (void* w = panel_shared::NativeChild(sheet, n)) {
+		if (void* w = panel_shared::NativeChild(sheet, n); w != nullptr && !legacy) {
+			keep.insert(w);
+		}
+	}
+	for (const char* n : KeepLegacy) {
+		if (void* w = panel_shared::NativeChild(sheet, n); w != nullptr && legacy) {
 			keep.insert(w);
 		}
 	}
@@ -457,14 +524,24 @@ void NewPanel(void* panel, void* sheet) {
 		}
 	} else {
 		for (const char* n : HideByName) {
-			if (void* w = panel_shared::NativeChild(sheet, n)) {
+			if (void* w = panel_shared::NativeChild(sheet, n); w != nullptr && !legacy) {
+				g_d2r.emplace_back(w, true);
+			}
+		}
+		for (const char* n : HideByNameLegacy) {
+			if (void* w = panel_shared::NativeChild(sheet, n); w != nullptr && legacy) {
 				g_d2r.emplace_back(w, true);
 			}
 		}
 	}
+	if (g_plain && legacy) {  // plain D2R: the classic arrow is the plugin panel's own (on the mod's sheet one of the sheet's)
+		if (void* w = panel_shared::NativeChild(panel, "SbAdvanced")) {
+			g_d2r.emplace_back(w, true);
+		}
+	}
 	char line[320];
 	std::snprintf(line, sizeof(line), "statbook host: %s %p (%s layout): %s; child list %s; %zu D2R widgets hidden on the pages", g_plain ? "plain panel" : "sheet", panel,
-	              g_isPad ? "gamepad" : "PC", g_calib, g_kidsOff != 0 ? "found" : "not found (by name)", g_d2r.size());
+	              g_isPad ? "gamepad" : legacy ? "legacy" : "PC", g_calib, g_kidsOff != 0 ? "found" : "not found (by name)", g_d2r.size());
 	g_context->LogInfo(line);
 }
 
@@ -479,6 +556,19 @@ auto Str(const std::string& key, const std::string& english) -> std::string {
 	std::string s = LookupString(key.c_str(), b, sizeof(b)) ? std::string(b) : english;
 	g_strings.emplace(key, s);
 	return s;
+}
+
+void FillPlainName(void* player, bool force) {
+	char name[65];
+	if (player == nullptr || !PlayerName(player, name, sizeof(name))) {
+		name[0] = '\0';
+	}
+	static constexpr const char* Keys[][2] = {{"partycharama", "Amazon"}, {"partycharsor", "Sorceress"}, {"partycharnec", "Necromancer"},
+	                                          {"partycharpal", "Paladin"},  {"partycharbar", "Barbarian"}, {"partychardru", "Druid"},
+	                                          {"partycharass", "Assassin"}, {"partycharwar", "Warlock"}};
+	const int c = player != nullptr ? PlayerClass(player) : -1;
+	Text(statbook_plain::NameText, name, force);
+	Text(statbook_plain::ClassText, c >= 0 && c < 8 ? Str(Keys[c][0], Keys[c][1]) : std::string(), force);
 }
 
 void BuildAll(void* player) {
@@ -548,7 +638,7 @@ void FillLines(void* player, bool show, bool force) {
 			Vis(base, on[p], force);
 			const statbook::Cell& c = l.cell[p == 2 ? 1 : 0];
 			if (on[p]) {
-				Text(base + "Label", c.label, force);
+				Text(base + "Label", p > 0 && g_legacyNow.load() ? ShortLabel(c.label) : c.label, force);
 			}
 			for (int t = 0; t < ToneCount; ++t) {
 				const bool mine = on[p] && static_cast<int>(c.tone) == t;
@@ -560,8 +650,16 @@ void FillLines(void* player, bool show, bool force) {
 	}
 }
 
+// The geometry of the host shown: the sheet's (`side` false) or the side panel's, in the bound graphics mode.
+auto Geo(bool side) -> const Geometry& {
+	if (g_legacyNow.load()) {
+		return side ? g_legacySide : g_legacy;
+	}
+	return side ? g_side : g_isPad ? g_pad : g_pc;
+}
+
 void FillAll(void* player, bool show, bool force) {
-	const Geometry& geo = g_raw ? g_side : g_isPad ? g_pad : g_pc;
+	const Geometry& geo = Geo(g_raw);
 	const int rows = geo.ok ? (geo.allRows < MaxAllRows ? geo.allRows : MaxAllRows) : (g_isPad ? 20 : MaxAllRows);
 	g_slots.assign(static_cast<size_t>(rows), AllSlot{});
 	size_t kept = 0, keptRows = 0;
@@ -630,19 +728,49 @@ auto ToUnits(int x, int y, int clientH, double* ux, double* uy, double left = Pa
 	return true;
 }
 
+// D2R's classic screen size now (800 x 600 when it cannot be read or looks wrong).
+void ClassicScreen(int* w, int* h) noexcept {
+	*w = 800;
+	*h = 600;
+	__try {
+		const int x = *reinterpret_cast<const int*>(g_context->exeBase + RvaScreenSizeX);
+		const int y = *reinterpret_cast<const int*>(g_context->exeBase + RvaScreenSizeY);
+		if (x >= 640 && x <= 2048 && y >= 480 && y <= 1200) {
+			*w = x;
+			*h = y;
+		}
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+	}
+}
+
+// A client pixel in the units of the host shown (HD: the sheet's or the side panel's layout units; legacy: classic pixels).
+auto PanelUnits(int x, int y, int clientW, int clientH, bool side, double* ux, double* uy) -> bool {
+	if (g_legacyNow.load()) {
+		int sw = 0, sh = 0;
+		ClassicScreen(&sw, &sh);
+		return ClassicUnits(clientW, clientH, sw, sh, Geo(side).origin, x, y, ux, uy);
+	}
+	return ToUnits(x, y, clientH, ux, uy, side ? SideLeftUnits : PanelLeftUnits);
+}
+
 void TakeClick() {
 	int x = 0, y = 0, w = 0, h = 0;
 	const bool side = g_sideOn.load();
-	const Geometry& geo = side ? g_side : g_pc;
+	const Geometry& geo = Geo(side);
 	if (!panel_shared::LastClick(&x, &y, &w, &h) || g_isPad || !geo.ok) {
 		g_clickMisses.fetch_add(1);
 		return;
 	}
 	double ux = 0, uy = 0;
-	ToUnits(x, y, h, &ux, &uy, side ? SideLeftUnits : PanelLeftUnits);
+	PanelUnits(x, y, w, h, side, &ux, &uy);
 	const ClickHit hit = ClickOn(geo, g_tabs, ux, uy);
 	if (hit.kind == ClickHit::Kind::Toggle) {
 		g_flip.store(true);
+		g_clicks.fetch_add(1);
+		return;
+	}
+	if (hit.kind == ClickHit::Kind::Advanced) {
+		g_arrow.store(true);
 		g_clicks.fetch_add(1);
 		return;
 	}
@@ -689,11 +817,12 @@ auto SheetFlag(void* sheet) noexcept -> int {
 	}
 }
 
-// Plain D2R: the plugin's panel follows the sheet (open while the sheet is open, HD only). The sheet's open state, -1 unknown.
+// Plain D2R: the plugin's panel follows the sheet (open while the sheet is open; in legacy graphics only with the classic layout
+// registered). The sheet's open state, -1 unknown.
 auto PlainFollow() -> int {
 	void* sheet = panel_shared::NativePanel(g_sheet);
-	// only over the PC sheet (it has a CloseButton; D2R's gamepad sheet in the gamepad menu has none): the gamepad sheet and
-	// legacy graphics keep D2R's own sheet
+	// only over the PC sheet (it has a CloseButton; D2R's gamepad sheet in the gamepad menu has none): the gamepad sheet keeps
+	// D2R's own sheet
 	static void* lastSheet = nullptr;
 	if (sheet != lastSheet) {
 		lastSheet = sheet;
@@ -703,7 +832,7 @@ auto PlainFollow() -> int {
 		sheet = nullptr;
 	}
 	g_sheetPanel = sheet;
-	const int open = sheet != nullptr && panel_shared::IsHd() ? SheetFlag(sheet) : 0;
+	const int open = sheet != nullptr && (panel_shared::IsHd() || g_plainLegacyReady) ? SheetFlag(sheet) : 0;
 	static bool tried = false;  // one open per sheet opening: a refused open is not retried until the sheet opens again
 	if (open != 1) {
 		tried = false;
@@ -738,8 +867,13 @@ void TakeFlip() {
 	}
 }
 
+// The side panel has a layout for the graphics mode shown (HD: sidepanelhd.json; legacy: sidepanel.json beside the mod's classic sheet).
+auto SideReadyNow() -> bool {
+	return g_sideReady && (panel_shared::IsHd() ? !g_legacyNow.load() : g_sideLegacyReady && g_legacyNow.load() && g_legacySide.ok);
+}
+
 auto SideActive() -> bool {
-	return g_sideWanted.load() && g_sideReady && !g_isPad && panel_shared::IsHd();
+	return g_sideWanted.load() && SideReadyNow() && !g_isPad;
 }
 
 void SideClose() {
@@ -774,6 +908,7 @@ void TickSide(void* player, const PageShow& ps, bool force) {
 	}
 	if (side != g_sideNative || g_sideApplied < 0) {  // a new opening: D2R shows every widget, and may have made new ones
 		g_sideNative = side;
+		g_syncQuery = true;
 		g_sideW.clear();
 		g_sideTexts.clear();
 		force = true;
@@ -784,6 +919,9 @@ void TickSide(void* player, const PageShow& ps, bool force) {
 		g_panelHandle = D2RL::Widgets::InvalidHandle;
 	}
 	g_sideClient.boxFocus.store(panel_shared::BoxFocused(g_sideClient));
+	if (g_syncQuery && ReadTyped()) {
+		g_syncQuery = false;
+	}
 	if (ps.all && g_sideClient.boxClicked.load()) {
 		ReadTyped();
 	}
@@ -816,7 +954,8 @@ void TickInner() {
 	}
 	const int sheetOpen = g_plain ? PlainFollow() : 1;
 	void* panel = panel_shared::NativePanel(g_client);
-	if (panel == nullptr || panel_shared::NativeChild(panel, Marker) == nullptr || !panel_shared::IsHd() && panel_shared::NativeChild(panel, "SbPadPrevLB") == nullptr) {
+	if (panel == nullptr || panel_shared::NativeChild(panel, Marker) == nullptr ||
+	    !panel_shared::IsHd() && panel_shared::NativeChild(panel, "SbPadPrevLB") == nullptr && (panel_shared::NativeChild(panel, LegacyMarker) == nullptr || !g_legacy.ok)) {
 		SideClose();
 		g_sideOn.store(false);
 		g_bound.store(false);
@@ -840,6 +979,7 @@ void TickInner() {
 		boundSheet = g_plain ? g_sheetPanel : nullptr;
 		NewPanel(panel, g_plain ? g_sheetPanel : panel);
 		force = true;
+		g_syncQuery = true;
 	}
 	g_bound.store(true);
 	const int vis = IsVisible(panel);
@@ -879,6 +1019,7 @@ void TickInner() {
 		g_holdQueue.clear();
 		if (g_findSet.exchange(false)) {
 			g_query = Query(g_findText);
+			g_syncQuery = false;  // a find wins over the box
 		}
 	}
 	if (g_clicked.exchange(false)) {  // on the host shown until now
@@ -915,6 +1056,13 @@ void TickInner() {
 		g_scroll += w;
 	}
 	g_client.boxFocus.store(!sideNow && panel_shared::BoxFocused(g_client));
+	if (g_lastSideNow != (sideNow ? 1 : 0)) {
+		g_lastSideNow = sideNow ? 1 : 0;
+		g_syncQuery = true;
+	}
+	if (g_syncQuery && !sideNow && ReadTyped()) {
+		g_syncQuery = false;
+	}
 	const bool all = g_tabs.current == g_tabs.AllStats();
 	if (all && !sideNow && g_client.boxClicked.load()) {
 		ReadTyped();
@@ -926,6 +1074,9 @@ void TickInner() {
 	g_tabNow.store(g_tabs.current);
 	void* player = g_sv.player != nullptr ? g_sv.player() : nullptr;
 	const PageShow ps = ShowForTab(g_tabs);
+	if (g_plain && g_legacyNow.load()) {
+		FillPlainName(player, force);
+	}
 	if (sideNow) {
 		// the sheet shows D2R's own page 1 under its own title; the book is the side panel
 		Vis("StatBookTabs", false, force);
@@ -943,7 +1094,7 @@ void TickInner() {
 		g_appliedTab = g_tabs.current;
 		return;
 	}
-	if (force && !g_plain && !g_isPad && g_sideReady) {
+	if (force && !g_plain && !g_isPad && SideReadyNow()) {
 		Text("StatsPanelTitle", std::string(), true);  // the tabs are the title (the mod's PC layout has none; side mode set one)
 	}
 	Vis("StatBookTabs", true, force);
@@ -952,7 +1103,7 @@ void TickInner() {
 	Vis("StatBookPage", ps.page, force);
 	Vis("StatBookAll", ps.all, force);
 	if (!g_isPad) {
-		Vis("SbTabsToggle", ps.body && g_sideReady, force);
+		Vis("SbTabsToggle", ps.body && SideReadyNow(), force);
 	}
 	FillTabs(force);
 	FillLines(player, ps.page, force);
@@ -994,9 +1145,20 @@ void OnPress(int) noexcept {
 // The search box of the host shown: the sheet's (`side` false) or the side panel's.
 auto SearchBox(panel_shared::BoxRect* box, bool side) noexcept -> bool {
 	int x = 0, y = 0, w = 0, h = 0;
-	const Geometry& geo = side ? g_side : g_pc;
+	const Geometry& geo = Geo(side);
 	if (!g_bound.load() || g_isPad || g_sideOn.load() != side || !geo.ok || g_tabNow.load() != g_tabs.AllStats() || !panel_shared::LastClick(&x, &y, &w, &h)) {
 		return false;
+	}
+	if (g_legacyNow.load()) {
+		int sw = 0, sh = 0;
+		ClassicScreen(&sw, &sh);
+		box->hd = false;
+		ClassicPlace(sw, sh, geo.origin, &box->panelX, &box->panelY);
+		box->x = geo.search.x;
+		box->y = geo.search.y;
+		box->w = geo.search.w;
+		box->h = geo.search.h;
+		return true;
 	}
 	const double s = h / 2160.0;
 	box->hd = true;
@@ -1018,13 +1180,13 @@ auto SideInputBox(panel_shared::BoxRect* box) noexcept -> bool {
 }
 
 // The wheel over the All Stats list of the host shown (both clients get it; only the shown host's takes it).
-auto Wheel(int notches, int x, int y, int clientH, bool side) noexcept -> bool {
-	const Geometry& geo = side ? g_side : g_pc;
+auto Wheel(int notches, int x, int y, int clientW, int clientH, bool side) noexcept -> bool {
+	const Geometry& geo = Geo(side);
 	if (!g_bound.load() || g_isPad || g_sideOn.load() != side || g_tabNow.load() != g_tabs.AllStats() || geo.allRowRects.empty()) {
 		return false;
 	}
 	double ux = 0, uy = 0;
-	ToUnits(x, y, clientH, &ux, &uy, side ? SideLeftUnits : PanelLeftUnits);
+	PanelUnits(x, y, clientW, clientH, side, &ux, &uy);
 	const Rect& first = geo.allRowRects.front();
 	const Rect& last = geo.allRowRects.back();
 	if (ux < first.x || ux > first.x + first.w || uy < first.y || uy > last.y + last.h) {
@@ -1034,12 +1196,12 @@ auto Wheel(int notches, int x, int y, int clientH, bool side) noexcept -> bool {
 	return true;
 }
 
-auto OnWheel(int notches, int x, int y, int, int clientH) noexcept -> bool {
-	return Wheel(notches, x, y, clientH, false);
+auto OnWheel(int notches, int x, int y, int clientW, int clientH) noexcept -> bool {
+	return Wheel(notches, x, y, clientW, clientH, false);
 }
 
-auto SideWheel(int notches, int x, int y, int, int clientH) noexcept -> bool {
-	return Wheel(notches, x, y, clientH, true);
+auto SideWheel(int notches, int x, int y, int clientW, int clientH) noexcept -> bool {
+	return Wheel(notches, x, y, clientW, clientH, true);
 }
 
 auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::UiMessageEvent* event, void*) noexcept -> D2RL::SharedEvents::UiMessageAction {
@@ -1075,6 +1237,8 @@ auto InstallSheetHost(const D2RL::PluginContext* context, const statbook::Book* 
 		g_pc = ParseGeometry(json, "pc");
 		g_pad = ParseGeometry(json, "pad");
 		g_side = ParseGeometry(json, "side");
+		g_legacy = ParseGeometry(json, "legacy");
+		g_legacySide = ParseGeometry(json, "legacyside");
 		// the side panel (tabs = "side"): its layout is the mod's (statbook_layout.py writes it beside statbook-layout.json)
 		const char* side = "no sidepanelhd.json";
 		if (g_side.ok && panel_shared::ReadModFile(context, selfPath, L"data\\hd\\global\\ui\\panel\\statbook\\sidepanelhd.json", 4 * 1024 * 1024, &g_sideJson) ==
@@ -1083,12 +1247,17 @@ auto InstallSheetHost(const D2RL::PluginContext* context, const statbook::Book* 
 			reg.structSize = D2RL::Panels::PanelRegistrationSize;
 			reg.flags = D2RL::Panels::PanelFlags::None;
 			reg.localId = SideLocalId;
+			// its classic layout (statbook_legacy.py), for the mod's legacy sheet: registered first, the panel then has both
+			if (g_legacySide.ok && panel_shared::ReadModFile(context, selfPath, L"data\\hd\\global\\ui\\panel\\statbook\\sidepanel.json", 4 * 1024 * 1024,
+			                                                 &g_sideClassicJson) == panel_shared::FileResult::Ok) {
+				g_sideLegacyReady = panel_shared::RegisterLayout(context, SideLocalId, g_sideClassicJson.c_str(), g_sideClassicJson.size());
+			}
 			g_sideReady = panel_shared::RegisterLayout(context, (std::string(SideLocalId) + "hd").c_str(), g_sideJson.c_str(), g_sideJson.size()) &&
 			              g_panels->registerPanel(context, &reg, &g_sidePanel) == D2RL::Panels::Result::Success;
 			side = g_sideReady ? "side panel ok" : "side panel NOT registered";
 		}
-		std::snprintf(g_geometryFrom, sizeof(g_geometryFrom), "statbook-layout.json: pc %s (%zu tabs), pad %s; %s", g_pc.ok ? "ok" : "BAD", g_pc.tabs.size(),
-		              g_pad.ok ? "ok" : "BAD", side);
+		std::snprintf(g_geometryFrom, sizeof(g_geometryFrom), "statbook-layout.json: pc %s (%zu tabs), pad %s, legacy %s; %s%s", g_pc.ok ? "ok" : "BAD",
+		              g_pc.tabs.size(), g_pad.ok ? "ok" : "BAD", g_legacy.ok ? "ok" : "none", side, g_sideLegacyReady ? " (+ legacy)" : "");
 	} else {
 		// no mod sheet layout: plain D2R, the plugin's own panels: over the sheet, and the side panel
 		g_plain = true;
@@ -1100,6 +1269,15 @@ auto InstallSheetHost(const D2RL::PluginContext* context, const statbook::Book* 
 		}
 		for (const char* part : statbook_plain::Geometry) {
 			g_plainGeometry += part;
+		}
+		for (const char* part : statbook_plain::LayoutLegacy) {
+			g_plainLegacy += part;
+		}
+		for (const char* part : statbook_plain::SideLayoutLegacy) {
+			g_sideLegacyJson += part;
+		}
+		for (const char* part : statbook_plain::GeometryLegacy) {
+			g_plainLegacyGeometry += part;
 		}
 		// the Stat Book's own sprites when the install has them (as the mod's art: the MPQ folder's data), else D2R's stock ones
 		std::unordered_map<std::string, bool> have;
@@ -1131,7 +1309,26 @@ auto InstallSheetHost(const D2RL::PluginContext* context, const statbook::Book* 
 		}
 		g_pc = ParseGeometry(g_plainGeometry, "pc");
 		g_side = ParseGeometry(g_plainGeometry, "side");
-		// HD only (as the wiki). Its name must not start with the click panel's name (statbook/StatBook): with statbook/StatBookPlain
+		// legacy graphics: the classic layouts, registered first (the panel then has both) when the install has all their art
+		// (data/global/ui/panel/statbook/*.dc6); else legacy keeps D2R's own sheet
+		int legacyArt = 0;
+		for (const char* file : statbook_plain::LegacyArt) {
+			std::wstring rel = L"data\\global\\ui\\panel\\statbook\\";
+			for (const char* c = file; *c != '\0'; ++c) {
+				rel += static_cast<wchar_t>(*c);
+			}
+			std::string unused;
+			const panel_shared::FileResult r = panel_shared::ReadModFile(context, selfPath, rel.c_str(), 1, &unused);
+			legacyArt += r == panel_shared::FileResult::Ok || r == panel_shared::FileResult::BadSize ? 1 : 0;
+		}
+		const int legacyArtWanted = static_cast<int>(sizeof(statbook_plain::LegacyArt) / sizeof(statbook_plain::LegacyArt[0]));
+		if (legacyArt == legacyArtWanted) {
+			g_legacy = ParseGeometry(g_plainLegacyGeometry, "legacy");
+			g_legacySide = ParseGeometry(g_plainLegacyGeometry, "legacyside");
+			g_plainLegacyReady = g_legacy.ok && panel_shared::RegisterLayout(context, statbook_plain::PanelLocalId, g_plainLegacy.c_str(), g_plainLegacy.size());
+			g_legacy.ok = g_plainLegacyReady;
+		}
+		// The HD layout (<localId>hd.json; the classic one is <localId>.json). Its name must not start with the click panel's name (statbook/StatBook): with statbook/StatBookPlain
 		// the loader never opened it (each open "failed" with the resource found)
 		const bool layouts = panel_shared::RegisterLayout(context, (std::string(statbook_plain::PanelLocalId) + "hd").c_str(), g_plainHd.c_str(), g_plainHd.size());
 		D2RL::Panels::PanelRegistration panel{};
@@ -1147,12 +1344,16 @@ auto InstallSheetHost(const D2RL::PluginContext* context, const statbook::Book* 
 		reg.structSize = D2RL::Panels::PanelRegistrationSize;
 		reg.flags = D2RL::Panels::PanelFlags::None;
 		reg.localId = statbook_plain::SideLocalId;
+		if (g_plainLegacyReady && g_legacySide.ok) {
+			g_sideLegacyReady = panel_shared::RegisterLayout(context, statbook_plain::SideLocalId, g_sideLegacyJson.c_str(), g_sideLegacyJson.size());
+		}
 		g_sideReady = g_side.ok && panel_shared::RegisterLayout(context, (std::string(statbook_plain::SideLocalId) + "hd").c_str(), g_sideJson.c_str(), g_sideJson.size()) &&
 		              g_panels->registerPanel(context, &reg, &g_sidePanel) == D2RL::Panels::Result::Success;
-		std::snprintf(g_geometryFrom, sizeof(g_geometryFrom), "plain D2R: own panel %s (pc %s, %zu tabs, tab art %s, cell art %s); side panel %s (side art %s, toggle art %s); %d stock swaps%s",
+		std::snprintf(g_geometryFrom, sizeof(g_geometryFrom), "plain D2R: own panel %s (pc %s, %zu tabs, tab art %s, cell art %s); side panel %s (side art %s, toggle art %s); %d stock swaps%s; legacy %s%s (%d of %d DC6)",
 		              statbook_plain::PanelName, g_pc.ok ? "ok" : "BAD", g_pc.tabs.size(), installed("tab.sprite") ? "own" : "D2R's stash tab", installed("halfcell.sprite") && installed("sidehalfcell.sprite") ? "own" : "none",
 		              g_sideReady ? "ok" : "NOT registered", installed("sidebody.sprite") && installed("sidetab.sprite") ? "own" : "D2R's stock",
-		              installed("tabstoggleside.sprite") ? "own" : "D2R's level-up button", swapped, unmatched != 0 ? ", SOME NOT FOUND" : "");
+		              installed("tabstoggleside.sprite") ? "own" : "D2R's level-up button", swapped, unmatched != 0 ? ", SOME NOT FOUND" : "",
+		              g_plainLegacyReady ? "ok" : "off", g_sideLegacyReady ? " (+ side)" : "", legacyArt, legacyArtWanted);
 		g_client.panelName = statbook_plain::PanelName;
 		g_sheet.panelName = PanelName;
 	}
@@ -1192,7 +1393,7 @@ void SheetHostStatus(char* out, size_t outSize) noexcept {
 	              "bound %d (%s), tab %d of %d, query \"%s\"; %s, sheet open %d; ticks %ld, opens %ld, tab changes %ld, clicks %ld (missed %ld), arrows %ld, typed reads %ld, "
 	              "box clicked %d focus %d; names missing %ld, handles %zu (fails %ld), visibility sets %ld (fails %ld), D2R re-shown %ld, texts %ld (fails %ld), stat lines %ld (D2R's fails %ld), "
 	              "faults %ld; all rows %zu; plain panel %s (opens %ld, fails %ld); tabs %s (side %s, panel %s, opens %ld, fails %ld, toggles %ld)",
-	              g_bound.load() ? 1 : 0, g_isPad ? "gamepad" : "PC", g_tabNow.load(), g_tabs.Count(), g_query.c_str(), g_calib, g_wasOpen ? 1 : 0, g_ticks.load(), g_opens.load(),
+	              g_bound.load() ? 1 : 0, g_isPad ? "gamepad" : g_legacyNow.load() ? "legacy" : "PC", g_tabNow.load(), g_tabs.Count(), g_query.c_str(), g_calib, g_wasOpen ? 1 : 0, g_ticks.load(), g_opens.load(),
 	              g_tabChanges.load(), g_clicks.load(), g_clickMisses.load(), g_arrows.load(), g_typedReads.load(), g_client.boxClicked.load() ? 1 : 0,
 	              g_client.boxFocus.load() ? 1 : 0, g_missing.load(), g_handles.size(), g_handleFails.load(), g_visSets.load(), g_visFails.load(), g_reshown.load(), g_client.textsSet.load(), g_client.textFails.load(),
 	              g_statLines.load(), g_statLineFails.load(), g_faults.load(), RowCount(g_all), g_plain ? (g_plainOpen ? "open" : g_plainPadSheet ? "closed (gamepad sheet: D2R's own)" : "closed") : "no", g_plainOpens.load(),

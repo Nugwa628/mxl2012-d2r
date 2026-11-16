@@ -283,6 +283,7 @@ def d2r_rows(d2r: Path) -> dict:
 def median_inputs() -> tuple[dict, int, dict, dict]:
     """Median's skilldesc rows (-> charclasses of Median's skills on them), the frames of its shared sheet, tiers by skill
     name (tools/skill_icons.py), IconCel by skilldesc row."""
+    import move_only
     import skill_icons
     from icon_paths import EXCEL, read_tsv
     dh, rows = read_tsv(EXCEL / "skilldesc.txt")
@@ -294,6 +295,7 @@ def median_inputs() -> tuple[dict, int, dict, dict]:
             out[r[sd]].add(r[cc])
     shared = len(dc6.read_dc6(skill_icons.SPELLS / "skillicon.dc6"))
     tiers = {s["name"]: s["tier"] for s in skill_icons.load_skills()}
+    tiers[move_only.SKILL] = skill_icons.START  # the mod's own starting skill (not in Median's tables)
     ic = _col(dh, "IconCel")
     return out, shared, tiers, {r[0]: _cel(r[ic]) for r in rows}
 

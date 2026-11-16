@@ -81,5 +81,36 @@ class InvtabsButton(unittest.TestCase):
         self.assertEqual(ih.BUTTON_FRAMES, ("normal", "pressed", "greyed", "hovered"))
 
 
+
+class InvtabsListMode(unittest.TestCase):
+    def test_glyphs_differ_and_states_differ(self):
+        frames = ih.listmode_frames(SRC)
+        self.assertEqual(len(frames), 8)
+        self.assertEqual({f.size for f in frames}, {(ih.BUTTON, ih.BUTTON)})
+        self.assertEqual(len({f.tobytes() for f in frames}), 8)
+        # the "by charm" glyph has its blue stones, the sum sign is gold only
+        by_charm, total = (np.asarray(frames[k], dtype=int) for k in (0, 4))
+        blue = lambda a: int(((a[..., 2] > a[..., 0] + 60) & (a[..., 3] == 255)).sum())  # noqa: E731
+        self.assertGreater(blue(by_charm), 10)
+        self.assertLess(blue(total), blue(by_charm))
+
+    def test_written_sprites(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            ih.build_listmode(out, SRC)
+            for rel, size in ((ih.LISTMODE_REL, ih.BUTTON), (ih.LISTMODE_REL.with_name("listmode.lowend.sprite"), ih.BUTTON // 2)):
+                info = dc6.sprite_info(out / rel)
+                self.assertEqual((info["version"], info["frame_width"], info["height"], info["frames"]), (31, size, size, 8))
+
+    def test_plugin_agrees(self):
+        """invtabs.cpp looks for this file and uses frames 0 / 4 per mode; layouts.h orders a glyph's frames like the art."""
+        src = (ROOT / "invtabs" / "src" / "invtabs.cpp").read_text(encoding="utf-8")
+        lay = (ROOT / "invtabs" / "src" / "layouts.h").read_text(encoding="utf-8")
+        self.assertRegex(src, r'ListArtFile\[\]\s*=\s*"data/%s";' % re.escape(ih.LISTMODE_REL.as_posix()))
+        self.assertRegex(src, r'ListArt\[\]\s*=\s*"PANEL\\\\invtabs\\\\listmode";')
+        self.assertEqual(ih.LISTMODE_FRAMES, ("normal", "hovered", "pressed", "greyed"))
+        self.assertRegex(lay, r'"normalFrame": \)"\s*\+ N\(t\.frame0\) \+ R"\(, "hoveredFrame": \)" \+ N\(t\.frame0 \+ 1\)')
+
+
 if __name__ == "__main__":
     unittest.main()

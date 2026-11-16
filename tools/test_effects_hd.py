@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import effects_hd as e  # noqa: E402
 import fxpaths  # noqa: E402
+import hd_authored as ha  # noqa: E402
 
 
 class Keys(unittest.TestCase):
@@ -253,11 +254,17 @@ class Picks(unittest.TestCase):
             e.hand_pick(picks, "missile", m, [], False)
 
     def test_committed_picks_resolve(self):
-        """Every committed pick names an effect D2R has and an art file of the mod or the base game."""
+        """Every committed pick names an effect D2R has (or an authored one, data/hd-effects-authored.json, built on one D2R
+        has) and an art file of the mod or the base game."""
         picks = e.load_picks(fxpaths.PICKS_TSV)
+        authored = ha.load()
         self.assertGreater(len(picks), 30)
         for (kind, art, *_row), hp in picks.items():
-            self.assertTrue(((e.HDM if kind == "missile" else e.HDO) / f"{hp['effect']}.json").exists(), hp)
+            own = authored.get(hp["effect"])
+            if own:
+                self.assertEqual(own["kind"], kind, hp)
+            eff = own["base"] if own else hp["effect"]
+            self.assertTrue(((e.HDM if kind == "missile" else e.HDO) / f"{eff}.json").exists(), hp)
             rel = Path(kind + "s") / (art.replace(e.BS, "/") + ".dcc")
             self.assertTrue(any((root / rel).exists() for root in (fxpaths.MXL, fxpaths.D2R_DATA / "global")),
                             f"{kind} {art}: no art file")
@@ -265,11 +272,14 @@ class Picks(unittest.TestCase):
     def test_overlay_picks_not_empty(self):
         """No overlay pick names one of D2R's empty HD stubs (bug #507: it draws nothing in HD)."""
         picks = e.load_picks(fxpaths.PICKS_TSV)
+        authored = ha.load()
         n = 0
         for (kind, art, *_row), hp in picks.items():
             if kind == "overlay":
                 n += 1
-                self.assertFalse(e.empty_definition(e.load_json(e.HDO / f"{hp['effect']}.json")), f"{art}: {hp['effect']}")
+                own = authored.get(hp["effect"])
+                d = ha.build(own, e.HDM, e.HDO, None) if own else e.load_json(e.HDO / f"{hp['effect']}.json")
+                self.assertFalse(e.empty_definition(d), f"{art}: {hp['effect']}")
         self.assertGreaterEqual(n, 23)  # 7 before lane fxpick + its 16 (bug #507)
 
 

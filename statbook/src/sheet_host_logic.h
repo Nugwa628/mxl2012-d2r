@@ -25,6 +25,28 @@ inline auto Slot(const char* prefix, int i, const char* suffix) -> std::string {
 	return b;
 }
 
+// A half row's label on the legacy sheet (classic font6 in a 104 pixel cell): the labels too long for it, whole, with a clean
+// short form (every other label is drawn as it is). tools/statbook_legacy.py reads this table for its fit check.
+inline constexpr const char* ShortLabels[][2] = {
+	{"Prevent Monster Heal", "Prevent Heal"}, {"Increased Attack Speed", "Attack Speed"},
+	{"Fire Spell Damage", "Fire Spells"}, {"Cold Spell Damage", "Cold Spells"}, {"Lightning Spell Damage", "Lightning Spells"},
+	{"Poison Spell Damage", "Poison Spells"}, {"Enemy Fire Resistance", "Enemy Fire Res."}, {"Enemy Cold Resistance", "Enemy Cold Res."},
+	{"Chance to Avoid Damage", "Avoid Damage"}, {"Chance to Dodge Melee", "Dodge Melee"}, {"Faster Hit Recovery", "Hit Recovery"},
+	{"Defense vs. Missile", "Missile Defense"}, {"Defense vs. Melee", "Melee Defense"}, {"Defense from Skills", "Skill Defense"},
+	{"Half Freeze Duration", "Half Freeze"}, {"Attacker Takes Damage", "Reflect Damage"}, {"Minion Resistances", "Minion Res."},
+	{"Minion Attack Rating", "Minion Att. Rating"}, {"Life Stolen per Hit", "Life Leech"}, {"Mana Stolen per Hit", "Mana Leech"},
+	{"Life after each Kill", "Life per Kill"}, {"Mana after each Kill", "Mana per Kill"}, {"Reduced Vendor Prices", "Vendor Discount"},
+};
+
+inline auto ShortLabel(const std::string& s) -> std::string {
+	for (const auto& w : ShortLabels) {
+		if (s == w[0]) {
+			return w[1];
+		}
+	}
+	return s;
+}
+
 inline auto TabName(int i, const char* suffix) -> std::string {
 	char b[48];
 	std::snprintf(b, sizeof(b), "SbTab%d%s", i, suffix);
@@ -204,6 +226,8 @@ struct Geometry {
 	std::vector<Rect> tabs, lineRects, allRowRects;
 	Rect search;
 	Rect toggle;  // the top / side toggle (w 0: none, the gamepad layout)
+	Rect advanced;  // legacy layouts: the classic Advanced Stats arrow (w 0: none; HD takes D2R's ToggleAdvancedStats message)
+	Rect origin;  // legacy layouts: the panel's top left from the top left of D2R's classic left panel (x, y)
 	int lines = 0, allRows = 0, allColumns = 0;
 };
 
@@ -319,11 +343,52 @@ inline auto ParseGeometry(std::string_view json, std::string_view layout) -> Geo
 			g.toggle = Rect{v[0], v[1], v[2], v[3]};
 		}
 	}
+	const size_t ad = detail::ValueAt(json, "advanced", at, end);
+	if (ad != std::string_view::npos && json[ad] == '[') {
+		const std::vector<int> v = detail::Ints(json, ad, detail::Close(json, ad));
+		if (v.size() >= 4) {
+			g.advanced = Rect{v[0], v[1], v[2], v[3]};
+		}
+	}
+	const size_t og = detail::ValueAt(json, "origin", at, end);
+	if (og != std::string_view::npos && json[og] == '[') {
+		const std::vector<int> v = detail::Ints(json, og, detail::Close(json, og));
+		if (v.size() >= 2) {
+			g.origin = Rect{v[0], v[1], 0, 0};
+		}
+	}
 	g.lines = detail::Int(json, "lines", at, end);
 	g.allRows = detail::Int(json, "allRows", at, end);
 	g.allColumns = detail::Int(json, "allColumns", at, end);
 	g.ok = !g.tabs.empty() && g.lines > 0 && g.allRows > 0;
 	return g;
+}
+
+// Legacy graphics: D2R draws the classic screen (screenW x screenH: 800 x 600, 1066 x 600 with Legacy 16:9) scaled into the
+// client by the smaller of both ratios, centred. Its left panel ($LeftPanelAnchor, rect -320, -240, 320 x 432) has its top left
+// at x 80 of a 600-high screen (stock and Legacy 16:9 alike) and 0 of a 480-high one, y screenH / 2 - 240.
+inline auto ClassicPanelLeft(int screenH) -> int {
+	return screenH >= 600 ? 80 : 0;
+}
+
+// A legacy layout's place from the screen centre in classic pixels (panel_shared::BoxRect panelX / panelY, hd false).
+inline void ClassicPlace(int screenW, int screenH, const Rect& origin, int* panelX, int* panelY) {
+	*panelX = ClassicPanelLeft(screenH) + origin.x - screenW / 2;
+	*panelY = origin.y - 240;
+}
+
+// Client pixel (x, y) in a legacy layout's own units (classic pixels from its top left). False for an empty client or screen.
+inline auto ClassicUnits(int clientW, int clientH, int screenW, int screenH, const Rect& origin, int x, int y, double* ux, double* uy) -> bool {
+	if (clientW <= 0 || clientH <= 0 || screenW <= 0 || screenH <= 0) {
+		return false;
+	}
+	const double sx = static_cast<double>(clientW) / screenW, sy = static_cast<double>(clientH) / screenH;
+	const double s = sx < sy ? sx : sy;
+	int px = 0, py = 0;
+	ClassicPlace(screenW, screenH, origin, &px, &py);
+	*ux = (x - clientW / 2.0) / s - px;
+	*uy = (y - clientH / 2.0) / s - py;
+	return true;
 }
 
 // The rectangle holding (x, y), or -1.
@@ -341,7 +406,7 @@ inline auto HitRect(const std::vector<Rect>& rects, double x, double y) -> int {
 // toggle comes first (on the sheet it sits over the end of the first heading's rule); a tab of zero size (the side panel's
 // Character tab) is never hit.
 struct ClickHit {
-	enum class Kind : uint8_t { None, Toggle, Tab, Row } kind = Kind::None;
+	enum class Kind : uint8_t { None, Toggle, Tab, Row, Advanced } kind = Kind::None;
 	int index = -1;
 };
 
@@ -352,6 +417,9 @@ inline auto ClickOn(const Geometry& g, const statbook::Tabs& t, double x, double
 	const int tab = HitRect(g.tabs, x, y);
 	if (tab >= 0 && tab < t.Count()) {
 		return {ClickHit::Kind::Tab, tab};
+	}
+	if (g.advanced.w > 0 && t.current == 0 && HitRect({g.advanced}, x, y) == 0) {
+		return {ClickHit::Kind::Advanced, 0};
 	}
 	if (t.current == t.AllStats()) {
 		const int row = HitRect(g.allRowRects, x, y);

@@ -16,10 +16,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ui_paths import BASE, BASE_UI, PAL  # noqa: E402
 
-LAYOUTS = ("playerinventoryoriginallayout", "playerinventoryexpansionlayout", "horadriccubelayout")
+LAYOUTS = ("playerinventoryoriginallayout", "playerinventoryexpansionlayout", "horadriccubelayout",
+           "hudpanel")  # hudpanel: the belt count boxes (ui_layouts.hud_hd / hud_classic, bug #613)
 CHECK_LAYOUTS = ("bankexpansionlayouthd", "tradelayouthd", "vendorpanellayouthd")  # only read by the check (grid sizes)
 CONTROLLER_LAYOUTS = ("horadriccubelayouthd", "bankexpansionlayouthd",  # layouts/controller: ui_layouts (gamepad UI)
-                      "skillstreepanelhd")                             # pad_skill_trees reads its geometry
+                      "skillstreepanelhd",                              # pad_skill_trees reads its geometry
+                      "hudpanelhd")                                     # the belt count boxes (bug #613)
 CLASSIC_LAYOUTS = ("skillstreepanel",)  # classic only (ui_layouts.skilltree_classic, bug #33)
 CLASS_PREFIXES = ("am", "so", "ne", "pa", "ba", "dr", "as")
 STASH_ART_DIR = Path("panel") / "stash" / "additionalstash"

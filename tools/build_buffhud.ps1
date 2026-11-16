@@ -5,8 +5,10 @@
 # submodule third_party\d2rl-buff-hud. Whatever that checkout has checked out, the pinned commit is exported (git archive) into
 # build\buffhud-src and built from there. Its PluginSDK (a submodule of the fork, not in the archive) is exported the same way
 # at the commit the fork pins, from -Sdk / MXL2012_PLUGINSDK_DIR / third_party\PluginSDK. Nothing is downloaded here.
+# The half-size legacy icon sheets of the companion are made from this mod's built pictures (work\mod, work\d2r-baseline, so
+# run tools/build.py first) by the fork's scripts\make_companion_art.py; -Work DIR takes another checkout's built work\ folder.
 # Needs Visual Studio 2022 with the C++ workload (the fork's scripts\build.ps1 finds it with vswhere; CMake and Ninja come with it).
-param([string]$Src, [string]$Sdk)
+param([string]$Src, [string]$Sdk, [string]$Work)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
@@ -52,6 +54,12 @@ Set-Content -Path (Join-Path $out 'PINNED_COMMIT') -Value $pin -Encoding ascii
 # The fork's own build: vcvars, the release preset (Ninja), its unit tests; then the companion MPQ.
 & (Join-Path $out 'scripts\build.ps1') -Preset release
 if ($LASTEXITCODE) { Write-Host 'FAILED: d2rl-buff-hud build or tests'; exit $LASTEXITCODE }
+if (-not $Work) { $Work = $root }
+if (-not (Test-Path (Join-Path $Work 'work\mod\data\global'))) {
+    throw "Buff HUD legacy icon sheets: no built mod in $Work\work. Run py -3 tools/build.py first, or pass -Work a checkout that has one."
+}
+py -3 (Join-Path $out 'scripts\make_companion_art.py') $Work
+if ($LASTEXITCODE) { Write-Host 'FAILED: d2rl-buff-hud companion art'; exit $LASTEXITCODE }
 Push-Location $out
 try {
     cmake --build --preset release --target buff_panel_companion

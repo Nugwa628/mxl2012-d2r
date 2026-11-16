@@ -37,7 +37,9 @@ With D2R-XL 2012: Magic and Physical Resistance on the sheet, the Defense page, 
 
 - Diablo II: Resurrected with **D2RLoader 1.3.1**. The plugin checks the game code it runs on: under another D2RLoader
   version it loads, says so in its log and changes nothing.
-- HD graphics. Legacy (classic) graphics keep D2R's own sheet.
+- HD or legacy (classic) graphics. In legacy graphics the book is drawn in the classic style: the tabs along the top of
+  the classic sheet (the side tabs as a classic panel to the right of it) and a classic Advanced Stats arrow that opens
+  All Stats.
 - Offline / single player (D2RLoader).
 
 ## Install on plain D2R
@@ -52,6 +54,7 @@ only from a mod, so the release is a small, otherwise empty mod called `Advanced
    mods\AdvancedStats\modinfo.json
    mods\AdvancedStats\AdvancedStats.mpq\modinfo.json
    mods\AdvancedStats\AdvancedStats.mpq\data\hd\global\ui\panel\statbook\*.sprite
+   mods\AdvancedStats\AdvancedStats.mpq\data\global\ui\panel\statbook\*.dc6
    mods\AdvancedStats\d2rloader\plugins\statbook.dll
    mods\AdvancedStats\d2rloader\config\statbook.toml
    ```
@@ -63,7 +66,8 @@ The mod keeps its own save folder (`Saved Games\Diablo II Resurrected\mods\Advan
 with a `savepath`. To play an existing character there, copy its files into that folder (keep a backup).
 
 If the sprites are missing from the mod, the book still works and uses D2R's stock sprites instead (the stash tab for the
-tabs, plain rows); the `statbook` console command says which art is in use.
+tabs, plain rows); the `statbook` console command says which art is in use. Without the legacy art (the `.dc6` files),
+legacy graphics keep D2R's own sheet.
 
 To remove it, delete `mods\AdvancedStats\`.
 
@@ -128,9 +132,18 @@ Layout:
 | `src/` | the plugin: `statbook.cpp` (entry, settings, console, gamepad), `sheet_host.cpp` (tabs, pages, All Stats), `sheet_resist.cpp`, `advstats.cpp`; the pure logic in `*_logic.h` |
 | `src/shared/` | native panel helpers shared with D2R-XL 2012's core plugin (typing into a text box, layout registration, D2R's block rate) |
 | `tests/` | unit tests of the pure parts |
-| `data/` | the page and All Stats tables, and the plain install's sprites (`data/hd/...`) |
+| `data/` | the page and All Stats tables, and the plain install's sprites (`data/hd/...`) and legacy art (`data/global/...`) |
 | `tools/` | the book, layout and art generators, the release packer |
 | `docs/` | [how it works](docs/statbook.md), [the widget names](docs/statbook-layout.md) |
+
+## Changes
+
+- **0.1.2**: legacy (classic) graphics get the Stat Book too: the classic sheet with the tab strip, the pages and All
+  Stats in classic fonts and art, the classic side panel, a classic Advanced Stats arrow, and the character's name and
+  class above the pages. The release adds the legacy art (`data\global\ui\panel\statbook\*.dc6` in the mod). Values are
+  drawn bright, in the HD page's colours (white, red below zero,
+  gold at a cap, light grey at zero), right-aligned inside their boxes; long names in the half-width rows use clean short
+  forms.
 
 ## Credits and thanks
 
@@ -144,5 +157,6 @@ Layout:
 
 MIT ([LICENSE](LICENSE)) for the code, tools and docs. The sprites in `data/hd/` are built from Diablo II: Resurrected's
 own HD interface art (the character sheet, the stash tab, the Advanced Stats frame, the level-up button) and are included
-for use with the game; that art belongs to Blizzard Entertainment. Diablo II and Diablo II: Resurrected belong to Blizzard
+for use with the game, and so are the legacy graphics files in `data/global/` (built from D2R's classic character
+sheet, stash tab and buttons); that art belongs to Blizzard Entertainment. Diablo II and Diablo II: Resurrected belong to Blizzard
 Entertainment; this project is not affiliated with or endorsed by Blizzard Entertainment or the D2RLoader project.

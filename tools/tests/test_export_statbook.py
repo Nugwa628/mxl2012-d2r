@@ -14,7 +14,7 @@ import statbook_layout as L  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 MUST = {"CMakeLists.txt", "README.md", "LICENSE", ".gitignore", ".github/workflows/build.yml", "statbook.toml",
-        "src/statbook.cpp", "src/sheet_host.cpp", "src/statbook_plain_layout.h", "src/default_book.inc",
+        "src/statbook.cpp", "src/sheet_host.cpp", "src/statbook_plain_layout.h", "src/statbook_plain_legacy.h", "src/default_book.inc",
         "src/shared/panel_shared.cpp", "src/shared/panel_shared.h", "src/shared/panel_logic.h",
         "src/shared/block_rate_logic.h", "src/shared/hd_mode.h", "tests/CMakeLists.txt", "tests/book_test.cpp",
         "tools/statbook.py", "tools/statbook_layout.py", "tools/d2r_ui.py", "tools/d2r_paths.py", "tools/advanced_stats.py",
@@ -34,6 +34,8 @@ class ExportTree(unittest.TestCase):
         for a in L.PLAIN_OWN_ART:
             for ext in (".sprite", ".lowend.sprite"):
                 (art / f"{a.lower()}{ext}").write_bytes(b"SpA1")
+        for n in E.legacy_art_names():
+            (art / n).write_bytes(b"\x06\x00\x00\x00")
         (images / "shot.png").write_bytes(b"\x89PNG")
         cls.out = base / "repo"
         cls.result = E.export(cls.out, art=art, build_art=False, images=images)
@@ -52,6 +54,8 @@ class ExportTree(unittest.TestCase):
         self.assertIn("docs/images/shot.png", self.files)
         art = {f for f in self.files if f.startswith(E.ART_DIR.as_posix() + "/")}
         self.assertEqual(len(art), 2 * len(L.PLAIN_OWN_ART))
+        dc6 = {f for f in self.files if f.startswith(E.LEGACY_ART_DIR.as_posix() + "/")}
+        self.assertEqual(dc6, {f"{E.LEGACY_ART_DIR.as_posix()}/{n}" for n in E.legacy_art_names()})
         # every source and test of statbook/ but the harness, nothing else under src/ and tests/
         want = {f"src/{p.name}" for p in (ROOT / "statbook" / "src").iterdir() if p.name not in E.SKIP_SRC}
         want |= {f"tests/{p.name}" for p in (ROOT / "statbook" / "tests").iterdir() if p.is_file()}
@@ -72,7 +76,7 @@ class ExportTree(unittest.TestCase):
 
     def test_no_monorepo_paths(self):
         for rel in self.files:
-            if rel.startswith((E.ART_DIR.as_posix(), "docs/images/")):
+            if rel.startswith((E.ART_DIR.as_posix(), E.LEGACY_ART_DIR.as_posix(), "docs/images/")):
                 continue
             text = (self.out / rel).read_text("utf-8")
             if rel not in E.VERBATIM:

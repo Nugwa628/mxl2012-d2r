@@ -115,7 +115,13 @@ TINT_OVERRIDES: dict[tuple[str, str], dict] = {
 GOLD_RAMP = ((0.0, 120, 60, 0), (0.35, 200, 110, 8), (0.7, 240, 160, 24), (1.0, 255, 190, 40))
 GREEN_RAMP = ((0.0, 18, 70, 8), (0.35, 48, 138, 26), (0.7, 104, 208, 56), (1.0, 196, 255, 148))
 RED_RAMP = ((0.0, 110, 0, 0), (0.35, 196, 18, 8), (0.7, 255, 64, 36), (1.0, 255, 186, 166))
-RAMPS = {"fire": FIRE_RAMP, "violet": VIOLET_RAMP, "gold": GOLD_RAMP, "green": GREEN_RAMP, "red": RED_RAMP}
+# lane hd587 round 3 (data/hd-effects-authored.json): Rapture's blue ground trail, Faerie Fire's rainbow sparkles (a hue
+# per brightness step, so a particle whose gradient cursor runs with its life cycles through the colours)
+BLUE_RAMP = ((0.0, 10, 30, 140), (0.35, 30, 80, 220), (0.7, 90, 150, 255), (1.0, 190, 220, 255))
+RAINBOW_RAMP = ((0.0, 255, 40, 40), (0.17, 255, 150, 20), (0.33, 255, 240, 40), (0.5, 60, 230, 60), (0.67, 40, 200, 255),
+                (0.83, 70, 80, 255), (1.0, 210, 80, 255))
+RAMPS = {"fire": FIRE_RAMP, "violet": VIOLET_RAMP, "gold": GOLD_RAMP, "green": GREEN_RAMP, "red": RED_RAMP,
+         "blue": BLUE_RAMP, "rainbow": RAINBOW_RAMP}
 
 
 def gradient_pixels(path: str) -> np.ndarray | None:
@@ -429,7 +435,10 @@ def main() -> int:
     ap.add_argument("--report", default=str(fxpaths.MOD / "hd_recolour.json"))
     a = ap.parse_args()
     rep = json.loads(Path(a.report).read_text("utf-8"))
-    files = sorted(set(rep["asked"]) - set(rep["missing"]))
+    import hd_authored as ha  # every authored candidate's edited files, picked or not
+    hd = D2R / "data" / "hd"
+    extra = {f for e in ha.load().values() for f in ha.edited_files(e, hd / "missiles", hd / "overlays")}
+    files = sorted((set(rep["asked"]) | extra) - set(rep["missing"]))
     if rep["missing"]:
         print(f"{len(rep['missing'])} files were missing in that run (set MXL_SLOT=2|3|4 and run effects_hd.py again)")
     VFX_LIST.write_text("# D2R files tools/hd_recolour.py reads (cached by tools/lane_setup.py); "

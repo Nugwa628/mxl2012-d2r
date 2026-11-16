@@ -42,6 +42,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -1123,20 +1124,25 @@ bool RegisterResource(const std::string& path, const std::string& bytes, Res::Re
 		.byteCount  = bytes.size(),
 	};
 	Res::RegistrationHandle handle = Res::InvalidHandle;
-	if (ResourceApi->registerResource(Context, &resource, &handle) == Res::Result::Success) {
+	const Res::Result       result = ResourceApi->registerResource(Context, &resource, &handle);
+	if (result == Res::Result::Success) {
 		if (out) *out = handle;
 		return true;
 	}
-	Log(true, "could not register %s", path.c_str());
+	Log(true, "could not register %s (result %u)", path.c_str(), static_cast<unsigned>(result));
 	return false;
 }
 
 // d2rloader\invtabs\<name> (HD and its lowend half).
-bool RegisterSprite(const std::string& name, const std::vector<Lay::Picture>& frames) {
+bool RegisterSprite(const std::string& name, const std::vector<Lay::Picture>& frames, Res::RegistrationHandle* handles = nullptr) {
 	std::vector<Lay::Picture> low;
 	for (const auto& frame : frames) low.push_back(Lay::Half(frame));
 	const std::string path = std::string("data/hd/global/ui/d2rloader/") + PluginId + "/" + name;
-	return RegisterResource(path + ".sprite", Lay::SpriteFile(frames)) && RegisterResource(path + ".lowend.sprite", Lay::SpriteFile(low));
+	Res::RegistrationHandle hd = Res::InvalidHandle, lowend = Res::InvalidHandle;
+	const bool ok = RegisterResource(path + ".sprite", Lay::SpriteFile(frames), &hd) && RegisterResource(path + ".lowend.sprite", Lay::SpriteFile(low), &lowend);
+	if (!ok && hd != Res::InvalidHandle) (void)ResourceApi->unregisterResource(Context, hd), hd = Res::InvalidHandle;
+	if (handles) handles[0] = hd, handles[1] = lowend;
+	return ok;
 }
 
 // A file of the mod's own data (data/...) as installed: <mods>\<mod>\<mod>.mpq\data\... . D2RLoader 1.3.1's
@@ -1165,10 +1171,27 @@ bool ModFileExists(const std::string& rel) { return !ReadModFile(rel).empty(); }
 
 std::optional<Lay::Picture> StockGrid;
 
+// The grid picture of a slot, registered once per size (bug #615). Every layout build asks for it, and the charm tab's
+// layout is built again whenever the summary outgrows its rows; registering the same path a second time is refused by
+// D2RLoader, which left that layout with no picture and the grid empty.
+struct CellsEntry {
+	int                     cols = 0, rows = 0, cell = 0;
+	std::string             file;
+	Res::RegistrationHandle handles[2] { Res::InvalidHandle, Res::InvalidHandle };
+};
+std::map<int, CellsEntry> Cells;
+
 std::string CellsSprite(int slot, int cols, int rows, int cell) {
+	CellsEntry& e = Cells[slot];
+	if (!e.file.empty() && e.cols == cols && e.rows == rows && e.cell == cell) return e.file;
+	for (auto& h : e.handles)
+		if (h != Res::InvalidHandle) (void)ResourceApi->unregisterResource(Context, h), h = Res::InvalidHandle;
+	e = {};
 	const std::string name = "cells" + std::to_string(slot);
-	if (!RegisterSprite(name, { Lay::GridPicture(StockGrid ? &*StockGrid : nullptr, cols, rows, cell) })) return {};
-	return std::string("d2rloader\\") + PluginId + "\\" + name;
+	if (!RegisterSprite(name, { Lay::GridPicture(StockGrid ? &*StockGrid : nullptr, cols, rows, cell) }, e.handles)) return {};
+	e.cols = cols, e.rows = rows, e.cell = cell;
+	e.file = std::string("d2rloader\\") + PluginId + "\\" + name;
+	return e.file;
 }
 
 // The inventory button: 4 frames (normal, pressed, disabled, hovered). The mod's own art when it has it (ButtonArt, made at
@@ -1237,9 +1260,214 @@ std::size_t CharmUnits(void* owner, int pageByte, const Area& area, void** out, 
 	return n;
 }
 
-std::string SummaryFragment(invtabs::summary::Summary& summary, invtabs::summary::LayoutMode mode, const Lay::Box& box) {
+// ---- the list by charm: each charm's place and name ----
+
+constexpr std::size_t ItemDataQuality = 0x00, ItemDataIndex = 0x34, UnitClass = 0x04; // charm_dup.cpp's item data offsets
+constexpr int         QualityUnique   = 7;
+
+struct CharmRaw {
+	bool          inTab = false;
+	int           x = 0, y = 0;
+	int           quality = 0, index = -1;
+	std::uint32_t classId = 0;
+};
+
+// Place, quality, unique row and class of each charm unit (UI thread). No C++ objects: __try.
+bool ReadCharmRaw(void* const* units, std::size_t n, int pageByte, CharmRaw* out) noexcept {
+	__try {
+		for (std::size_t i = 0; i < n; ++i) {
+			auto* const item = static_cast<std::uint8_t*>(units[i]);
+			auto* const data = *reinterpret_cast<std::uint8_t**>(item + UnitData);
+			auto* const path = *reinterpret_cast<std::uint8_t**>(item + UnitPath);
+			CharmRaw&   r    = out[i];
+			r.inTab          = data && data[DataPage] == pageByte;
+			r.x              = path ? *reinterpret_cast<std::int32_t*>(path + PathX) : 0;
+			r.y              = path ? *reinterpret_cast<std::int32_t*>(path + PathY) : 0;
+			r.quality        = data ? *reinterpret_cast<std::int32_t*>(data + ItemDataQuality) : 0;
+			r.index          = data ? *reinterpret_cast<std::int32_t*>(data + ItemDataIndex) : -1;
+			r.classId        = *reinterpret_cast<std::uint32_t*>(item + UnitClass);
+		}
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
+	return true;
+}
+
+// The cells of one column of a tab-separated table, by its header, one per data row ("Expansion" rows kept or dropped).
+std::vector<std::string> TxtColumn(const std::string& text, const char* column, bool dropExpansion) {
+	std::vector<std::string> out;
+	std::istringstream       lines(text);
+	std::string              line;
+	int                      col  = -1;
+	bool                     head = true;
+	while (std::getline(lines, line)) {
+		if (!line.empty() && line.back() == '\r') line.pop_back();
+		std::vector<std::string> cells;
+		std::size_t              at = 0;
+		for (;;) {
+			const auto tab = line.find('\t', at);
+			cells.push_back(line.substr(at, tab == std::string::npos ? std::string::npos : tab - at));
+			if (tab == std::string::npos) break;
+			at = tab + 1;
+		}
+		if (head) {
+			head = false;
+			for (std::size_t i = 0; i < cells.size(); ++i)
+				if (cells[i] == column) col = static_cast<int>(i);
+			if (col < 0) return {};
+			continue;
+		}
+		if (dropExpansion && !cells.empty() && cells[0] == "Expansion") continue;
+		out.push_back(col < static_cast<int>(cells.size()) ? cells[static_cast<std::size_t>(col)] : std::string());
+	}
+	return out;
+}
+
+struct NameTables {
+	bool                               loaded = false;
+	std::vector<std::string>           uniqueKey; // uniqueitems.txt index, by row
+	std::vector<std::string>           itemKey;   // namestr of weapons, armor, misc in class order
+	std::map<std::string, std::string> shown;     // key -> the name as shown (cache)
+} Names;
+
+void LoadNames() {
+	if (Names.loaded) return;
+	Names.loaded    = true;
+	Names.uniqueKey = TxtColumn(ReadModFile("data/global/excel/uniqueitems.txt"), "index", false);
+	for (const char* f : { "weapons", "armor", "misc" }) {
+		auto keys = TxtColumn(ReadModFile(std::string("data/global/excel/") + f + ".txt"), "namestr", true);
+		Names.itemKey.insert(Names.itemKey.end(), keys.begin(), keys.end());
+	}
+	Log(Names.uniqueKey.empty(), "charm names: %zu unique row(s), %zu item class(es)", Names.uniqueKey.size(), Names.itemKey.size());
+}
+
+// "SunstoneOfFire" -> "Sunstone Of Fire" (a key the strings do not have still reads as words).
+std::string KeyWords(std::string_view key) {
+	std::string out;
+	for (std::size_t i = 0; i < key.size(); ++i) {
+		const char c = key[i];
+		if (i > 0 && c >= 'A' && c <= 'Z' && key[i - 1] >= 'a' && key[i - 1] <= 'z') out += ' ';
+		out += c;
+	}
+	return out;
+}
+
+const D2RL::LocalizationService* Strings = nullptr;
+
+// The game's text of a string key (the mod's index cells are "mxl2012:Key"; the strings file has "Key"): the last line
+// (Median's challenge items carry a note line above the name), colour codes removed. Empty key: empty.
+std::string ShownName(const std::string& key) {
+	if (key.empty()) return {};
+	if (const auto it = Names.shown.find(key); it != Names.shown.end()) return it->second;
+	const auto        colon = key.find(':');
+	const std::string bare  = colon == std::string::npos ? key : key.substr(colon + 1);
+	std::string       text;
+	if (Strings && Strings->getStringByKey) {
+		for (const std::string& k : { key, bare, std::string("d2r:") + bare }) {
+			char          buf[512] {};
+			std::uint32_t need = 0;
+			if (Strings->getStringByKey(Context, k.c_str(), buf, sizeof(buf), &need) == D2RL::Localization::Result::Success && buf[0]) {
+				text = buf;
+				break;
+			}
+		}
+	}
+	if (text.empty()) text = KeyWords(bare);
+	while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) text.pop_back();
+	if (const auto nl = text.find_last_of('\n'); nl != std::string::npos) text = text.substr(nl + 1);
+	text             = invtabs::summary::StripColour(text);
+	Names.shown[key] = text;
+	return text;
+}
+
+// Sorts the charm units into grid order and fills each one's name (summary.h CharmMeta, parallel to the units).
+void CharmOrder(void** units, std::size_t n, int pageByte, std::vector<invtabs::summary::Summary::CharmMeta>& meta) {
+	meta.assign(n, {});
+	std::vector<CharmRaw> raw(n);
+	if (n == 0 || !ReadCharmRaw(units, n, pageByte, raw.data())) return;
+	std::vector<std::size_t> order(n);
+	for (std::size_t i = 0; i < n; ++i) order[i] = i;
+	std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+		return invtabs::summary::GridBefore({ raw[a].inTab, raw[a].x, raw[a].y }, { raw[b].inTab, raw[b].x, raw[b].y });
+	});
+	LoadNames();
+	std::vector<void*> sorted(n);
+	for (std::size_t k = 0; k < n; ++k) {
+		const CharmRaw& r = raw[order[k]];
+		sorted[k]         = units[order[k]];
+		auto& m           = meta[k];
+		m.inTab           = r.inTab;
+		m.unique          = r.quality == QualityUnique;
+		if (m.unique && r.index >= 0 && static_cast<std::size_t>(r.index) < Names.uniqueKey.size()) m.name = ShownName(Names.uniqueKey[static_cast<std::size_t>(r.index)]);
+		else if (r.classId < Names.itemKey.size()) m.name = ShownName(Names.itemKey[r.classId]);
+	}
+	std::copy(sorted.begin(), sorted.end(), units);
+}
+
+std::string SummaryFragment(invtabs::summary::Summary& summary, invtabs::summary::LayoutMode mode, const Lay::Box& box, int barInset = 0, int cornerWidth = 0) {
 	if (!SummaryOn || box.h <= 0) return {};
-	return summary.Fragment(mode, { box.x, box.y, box.w, box.h });
+	return summary.Fragment(mode, { box.x, box.y, box.w, box.h }, barInset, cornerWidth);
+}
+
+// ---- the list's mode button (all stats / by charm) ----
+
+constexpr char    ListArtFile[]        = "data/hd/global/ui/panel/invtabs/listmode.sprite";
+constexpr char    ListArt[]            = "PANEL\\invtabs\\listmode";
+constexpr char    ListArtClassicFile[] = "data/global/ui/panel/invtabs_listmode.dc6";
+constexpr char    ListArtClassic[]     = "PANEL\\invtabs_listmode";
+constexpr char    ListPanel[]          = "ListMode"; // the click's target: an empty panel name of ours (panel_shared.cpp's way)
+std::string       ListHdFile, ListClassicFile;       // empty: no button in that look
+std::atomic<bool> ListByCharm {};
+
+// The drawn stand-in of the HD button when the mod has no listmode.sprite: 8 frames, 0-3 a list (shown while summing),
+// 4-7 a sum sign; normal, hovered, pressed, disabled. The mod's art (tools/invtabs_hdart.py) is in D2R's button style.
+std::vector<Lay::Picture> ListFrames() {
+	std::vector<Lay::Picture> frames;
+	constexpr int             S = Lay::HdToggleSize;
+	for (int glyph = 0; glyph < 2; ++glyph)
+		for (int state = 0; state < 4; ++state) {
+			Lay::Picture p     = Lay::Blank(S, S);
+			const int    light = state == 1 ? 40 : state == 2 ? -10 : 0;
+			const int    dy    = state == 2 ? 2 : 0;
+			for (int y = 0; y < S; ++y)
+				for (int x = 0; x < S; ++x) {
+					unsigned char* px   = p.at(x, y);
+					const int      edge = std::min({ x, y, S - 1 - x, S - 1 - y });
+					int            r = 30, g = 26, b = 22;
+					if (edge < 3) r = 160, g = 128, b = 72;
+					else if (edge < 5) r = 50, g = 42, b = 32;
+					const int yy = y - dy;
+					if (glyph == 0) {
+						for (int row = 0; row < 3; ++row) {
+							const int cy = 16 + row * 12;
+							if (std::abs(x - 15) <= 3 && std::abs(yy - cy) <= 3) r = 110, g = 150, b = 230;
+							if (x >= 23 && x <= (row == 1 ? 36 : 42) && std::abs(yy - cy) <= 1) r = 200, g = 170, b = 90;
+						}
+					} else {
+						const bool bars  = x >= 16 && x <= 40 && (std::abs(yy - 14) <= 1 || std::abs(yy - 42) <= 1);
+						const int  d     = std::abs(yy - 28);
+						const bool angle = yy >= 15 && yy <= 41 && std::abs(x - (30 - d)) <= 1;
+						if (bars || angle) r = 200, g = 170, b = 90;
+					}
+					px[0] = static_cast<unsigned char>(std::clamp(r + light, 0, 255));
+					px[1] = static_cast<unsigned char>(std::clamp(g + light, 0, 255));
+					px[2] = static_cast<unsigned char>(std::clamp(b + light, 0, 255));
+					px[3] = static_cast<unsigned char>(state == 3 ? 120 : 255);
+				}
+			frames.push_back(std::move(p));
+		}
+	return frames;
+}
+
+// The button as the layouts show it now: its glyph is the mode a click switches to.
+Lay::ListToggle ListToggleOf(bool hd) {
+	Lay::ListToggle t;
+	t.filename    = hd ? ListHdFile : ListClassicFile;
+	const bool by = ListByCharm.load();
+	t.frame0      = hd ? (by ? 4 : 0) : (by ? 2 : 0);
+	t.tooltip     = by ? "Show all stats (the sum of your charms)" : "Show the stats of each charm";
+	t.message     = PanelName(ListPanel);
+	return t;
 }
 
 // ---- layouts ----
@@ -1259,8 +1487,9 @@ std::string HdText(int slot) {
 	}
 	const auto g     = Lay::HdLayoutOf(tab->area.w, tab->area.h, static_cast<int>(Tabs.size()), slot == 0);
 	const auto cells = CellsSprite(slot, tab->area.w, tab->area.h, g.cell);
-	const auto frag  = slot == 0 ? SummaryFragment(SummaryHd, invtabs::summary::LayoutMode::Hd, g.band) : std::string();
-	return Lay::HdPanel(TabRefs(), slot, slot, tab->area.w, tab->area.h, g, cells, frag, tab->cfg.label);
+	const bool toggle = slot == 0 && SummaryOn && !ListHdFile.empty() && g.band.h > Lay::HdToggleSize;
+	const auto frag   = slot == 0 ? SummaryFragment(SummaryHd, invtabs::summary::LayoutMode::Hd, g.band, toggle ? Lay::HdToggleSize + Lay::HdToggleGap : 0, toggle ? Lay::HdToggleSize : 0) : std::string();
+	return Lay::HdPanel(TabRefs(), slot, slot, tab->area.w, tab->area.h, g, cells, frag, tab->cfg.label, toggle ? ListToggleOf(true) : Lay::ListToggle {});
 }
 
 std::string ClassicText(int slot) {
@@ -1274,7 +1503,8 @@ std::string ClassicText(int slot) {
 			refs.push_back({ PanelName(Tabs[i].id), Tabs[i].cfg.label, Tabs[i].cfg.name });
 		}
 	const auto frag = slot == 0 ? SummaryFragment(SummaryClassic, invtabs::summary::LayoutMode::Classic, Lay::ClassicSummaryText(tab->area.h)) : std::string();
-	return Lay::ClassicPanel(refs, self, slot, tab->area.w, tab->area.h, frag);
+	const bool toggle = slot == 0 && SummaryOn && !ListClassicFile.empty();
+	return Lay::ClassicPanel(refs, self, slot, tab->area.w, tab->area.h, frag, toggle ? ListToggleOf(false) : Lay::ListToggle {});
 }
 
 // Registers the slot's layouts again when they changed (the panel is unloaded first when it was loaded).
@@ -1348,9 +1578,11 @@ void __cdecl SummaryTask(const D2RL::PluginContext*, void*) noexcept {
 		ApplyNotice();
 		void* units[512];
 		const std::size_t n = CharmUnits(ClientOwner.load(), CustomPageByte.load(), Tabs[0].area, units, 512);
-		SummaryHd.Refresh(units, n);
-		SummaryClassic.Refresh(units, n);
-		SummaryPad.Refresh(units, n);
+		std::vector<invtabs::summary::Summary::CharmMeta> meta;
+		if (ListByCharm.load()) CharmOrder(units, n, CustomPageByte.load(), meta);
+		SummaryHd.Refresh(units, n, meta.empty() ? nullptr : meta.data());
+		SummaryClassic.Refresh(units, n, meta.empty() ? nullptr : meta.data());
+		SummaryPad.Refresh(units, n); // the controller panel keeps the sum (fixed rows, no scrolling)
 		static std::atomic<int> told {};
 		if (told.fetch_add(1) < 40)
 			Log(false, "summary: %zu charm(s) looked at, %zu counted, %zu left out, %zu line(s)", n, SummaryHd.Counted(), SummaryHd.Skipped(), SummaryHd.Lines().size());
@@ -1428,6 +1660,8 @@ void AddButton() {
 
 // ---- open / close ----
 
+void SetListMode(bool byCharm, bool save); // the list's mode (below): the console verb `invtabs list` sets it too
+
 void Show(TabState* tab, int mode) { // mode 1 open, 0 close, -1 toggle
 	if (!tab || tab->panel == Panels::InvalidHandle) {
 		Context->WriteConsoleMessage("invtabs: no such tab (see the D2RLoader log)");
@@ -1489,6 +1723,10 @@ auto Command(D2R::Game::Client*, const D2RL::ConsoleCommandContext* command, voi
 		else if (verb == "scroll") {
 			SummaryClassic.ScrollBy(std::atoll(name.c_str()));
 			SummaryClassic.ApplyTexts(PanelName(Tabs[0].id).c_str());
+		} else if (verb == "list") { // the charm list's mode: all | charm | toggle (as the button; saved to invtabs.toml)
+			const bool by = name == "charm" || name == "by_charm" ? true : name == "all" ? false : !ListByCharm.load();
+			SetListMode(by, true);
+			Context->WriteConsoleMessage(by ? "invtabs: charm list by charm" : "invtabs: charm list all stats");
 		} else if (verb == "summary") { // the charm tab's summary lines into invtabs.log (tests compare them with tooltips)
 			SummaryTask(Context, nullptr); // fresh totals (a level-up changes what counts without a page change)
 			const auto& lines = SummaryHd.Lines();
@@ -1521,6 +1759,94 @@ auto OnScrollAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent* 
 	} catch (...) {
 	}
 	return D2RL::Input::ActionResult::Handled;
+}
+
+// ---- the list's mode: all stats / by charm ----
+
+// invtabs.toml [invtabs] summary_list, kept as the player chose it (the rest of the file as it was).
+void WriteListMode(bool byCharm) {
+	std::uint32_t required = 0;
+	std::string   config(16384, '\0');
+	if (!Context->ReadConfig(config.data(), static_cast<std::uint32_t>(config.size()), &required)) config.clear();
+	else config.resize(std::strlen(config.c_str()));
+	const std::string next = invtabs::SetConfigKey(config, "invtabs", "summary_list", byCharm ? "\"by_charm\"" : "\"all\"");
+	const bool        ok   = Context->WriteConfig(next.c_str());
+	Log(!ok, "charm list: %s%s", byCharm ? "by charm" : "all stats", ok ? " (saved to invtabs.toml)" : " (invtabs.toml could not be written)");
+}
+
+// UI thread: the mode set, the lists made again, the charm tab's layout registered again with the button's new glyph
+// (closed and opened again when it was open, as the summary's own relayout does).
+void SetListMode(bool byCharm, bool save) {
+	if (Tabs.empty() || !SummaryOn) return;
+	ListByCharm = byCharm;
+	const auto mode = byCharm ? invtabs::summary::ListMode::ByCharm : invtabs::summary::ListMode::Totals;
+	SummaryHd.SetListMode(mode);
+	SummaryClassic.SetListMode(mode);
+	if (save) WriteListMode(byCharm);
+	SummaryTask(Context, nullptr); // the new lines (a relayout when they outgrow the rows)
+	const bool open = PanelOpen(Tabs[0]);
+	if (open) (void)PanelApi->closePanel(Context, Tabs[0].panel);
+	(void)SyncLayout(0);
+	if (open) (void)PanelApi->openPanel(Context, Tabs[0].panel);
+	// its first draw sets every row again: the draw hook queues the summary only when the grid changed, and it has not
+	SummaryFresh     = true;
+	LastSignature[0] = ~std::uint64_t {};
+}
+
+void __cdecl ToggleListTask(const D2RL::PluginContext*, void*) noexcept {
+	try {
+		SetListMode(!ListByCharm.load(), true);
+	} catch (...) {
+	}
+}
+
+void QueueListToggle() {
+	if (ThreadApi) (void)ThreadApi->runOnUiThread(Context, ToggleListTask, nullptr);
+}
+
+// The button's click: D2R sends "PanelManager:OpenPanel:invtabs/ListMode" (an empty panel name of ours, so nothing opens).
+auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::UiMessageEvent* event, void*) noexcept -> D2RL::SharedEvents::UiMessageAction {
+	if (event == nullptr || event->target == nullptr || event->command == nullptr || event->text == nullptr || std::strcmp(event->target, "PanelManager") != 0
+	    || std::strcmp(event->command, "OpenPanel") != 0)
+		return D2RL::SharedEvents::UiMessageAction::Continue;
+	if (std::strcmp(event->text, "invtabs/ListMode") != 0) return D2RL::SharedEvents::UiMessageAction::Continue;
+	QueueListToggle(); // after this message: the panel is closed and opened again there
+	return D2RL::SharedEvents::UiMessageAction::Consume;
+}
+
+auto OnListAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent* event, void*) noexcept -> D2RL::Input::ActionResult {
+	if (!D2RL::Input::HasActionEventField(event, D2RL::Input::ActionEventRequiredSize) || event->kind != D2RL::Input::ActionEventKind::Pressed) return D2RL::Input::ActionResult::Ignored;
+	if (Tabs.empty() || ShownSlot() != 0) return D2RL::Input::ActionResult::Ignored;
+	QueueListToggle();
+	return D2RL::Input::ActionResult::Handled;
+}
+
+// The mode button's art and its click (Load, before the panels' layouts are built).
+void PrepareListToggle() {
+	ListByCharm = Settings.listByCharm;
+	const auto mode = Settings.listByCharm ? invtabs::summary::ListMode::ByCharm : invtabs::summary::ListMode::Totals;
+	SummaryHd.SetListMode(mode);
+	SummaryClassic.SetListMode(mode);
+	if (!SummaryOn) return;
+	const D2RL::SharedEventService* events = Query<D2RL::SharedEventService>("shared event");
+	if (!events || !D2RL::HasSharedEventServiceField(events, D2RL::SharedEventServiceRequiredSize)) {
+		Log(true, "charm list: no shared event service: no mode button (the list stays as invtabs.toml says)");
+		return;
+	}
+	const Panels::PanelRegistration name { .structSize = Panels::PanelRegistrationSize, .flags = Panels::PanelFlags::None, .localId = ListPanel };
+	Panels::RegistrationHandle      handle = Panels::InvalidHandle;
+	const D2RL::SharedEvents::UiMessageListener listener { .structSize = D2RL::SharedEvents::UiMessageListenerSize, .callback = &OnUiMessage };
+	D2RL::SharedEvents::ListenerHandle          heard = 0;
+	if (PanelApi->registerPanel(Context, &name, &handle) != Panels::Result::Success || events->registerUiMessageListener(Context, &listener, &heard) != D2RL::SharedEvents::Result::Success) {
+		Log(true, "charm list: the mode button's click could not be registered: no mode button");
+		return;
+	}
+	if (ModFileExists(ListArtFile)) ListHdFile = ListArt;
+	else if (RegisterSprite("listmode", ListFrames())) ListHdFile = std::string("d2rloader\\") + PluginId + "\\listmode";
+	if (ModFileExists(ListArtClassicFile)) ListClassicFile = ListArtClassic;
+	Log(false, "charm list: %s; mode button HD %s, classic %s", Settings.listByCharm ? "by charm" : "all stats",
+	    ListHdFile.empty() ? "off" : ListHdFile == ListArt ? "the mod's art (listmode.sprite)" : "drawn stand-in",
+	    ListClassicFile.empty() ? "off (the mod has no invtabs_listmode.dc6)" : "the mod's art");
 }
 
 // ---- character load and leave ----
@@ -1766,6 +2092,8 @@ bool Load() {
 				Log(false, "tab %s (%dx%d): no classic layout (%s): HD graphics only", tab.cfg.name.c_str(), tab.area.w, tab.area.h,
 				    Lay::ClassicFits(tab.area.w, tab.area.h) ? "the mod has no classic art for it" : "more than 10 columns or too many rows for the classic panel");
 		}
+		Strings = Query<D2RL::LocalizationService>("localization");
+		PrepareListToggle();
 		for (std::size_t i = 0; i < Tabs.size(); ++i) Tabs[i].panel = AddPanel(static_cast<int>(i));
 		AllTab.id    = "All";
 		AllTab.area  = { 0, 0, invtabs::PageSize, invtabs::PageSize };
@@ -1813,7 +2141,8 @@ bool Load() {
 		const auto openKey = bindKey ? static_cast<D2RL::Input::Key>(Settings.openKey) : D2RL::Input::Key::None;
 		for (const Action& a : { Action { "toggle-charms", "Open/close charms", openKey, OnToggleAction, nullptr },
 		                         Action { "summary-up", "Charm summary up (classic graphics)", D2RL::Input::Key::PageUp, OnScrollAction, nullptr },
-		                         Action { "summary-down", "Charm summary down (classic graphics)", D2RL::Input::Key::PageDown, OnScrollAction, reinterpret_cast<void*>(1) } }) {
+		                         Action { "summary-down", "Charm summary down (classic graphics)", D2RL::Input::Key::PageDown, OnScrollAction, reinterpret_cast<void*>(1) },
+		                         Action { "summary-list", "Charm list: all stats / by charm", D2RL::Input::Key::None, OnListAction, nullptr } }) {
 			const D2RL::Input::ActionRegistration action {
 				.structSize       = D2RL::Input::ActionRegistrationSize,
 				.logicalId        = a.id,
@@ -1830,7 +2159,7 @@ bool Load() {
 		}
 	}
 	(void)Context->RegisterConsoleCommand("invtabs", Command,
-	                                      "Inventory tabs: 'invtabs' status, 'invtabs open|close|toggle [tab]' a tab (the charm tab without a name), 'invtabs all' the whole page, 'invtabs scroll n' the classic summary.");
+	                                      "Inventory tabs: 'invtabs' status, 'invtabs open|close|toggle [tab]' a tab (the charm tab without a name), 'invtabs all' the whole page, 'invtabs scroll n' the classic summary, 'invtabs list all|charm|toggle' the charm list.");
 	const Area a = Tabs[0].area;
 	Log(false, "%s: page 16x16 owned, %zu tab(s), charm tab %dx%d at %d,%d, charms count %s, areas %s", PluginVersion, Tabs.size(), a.w, a.h, a.x, a.y,
 	    Settings.inventoryCharms ? "in the inventory and the tab" : "in the tab only", NativesOk ? "found (wrapped once tables load)" : "OFF");

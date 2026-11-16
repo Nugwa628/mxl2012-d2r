@@ -45,6 +45,8 @@ inline constexpr uint64_t SrvHitBound = 0x2391404;
 // Skill server "do" (srvdofunc), 191 slots.
 inline constexpr uint64_t SrvDoTable = 0x238ea00;
 inline constexpr int SrvDoSlots = 191;
+// Skill server start (srvstfunc), 91 slots: (game, unit, skill id, level) -> 0 stops the cast. D2R fills 0-70.
+inline constexpr uint64_t SrvStTable = 0x238e710;
 
 // --- Functions (RVAs) ----------------------------------------------------------------------------------------------
 inline constexpr uint64_t RvaGetSkillRecord = 0x97790;    // (dataFlag, skillId) -> skills record

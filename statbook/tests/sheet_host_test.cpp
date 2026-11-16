@@ -154,6 +154,52 @@ void TestGeometry() {
 	Check(t.current == 3, "side step back wraps to All Stats");
 }
 
+// Legacy graphics: the classic layouts' place on the screen and a client pixel in their units.
+void TestAdvancedClick() {
+	const Geometry g = ParseGeometry("{\"legacy\": {\"tabs\": [[0, 0, 40, 18]], \"lines\": 22, \"allRows\": 21, \"advanced\": [142, 340, 19, 26]}}", "legacy");
+	statbook::Tabs t;
+	t.pages = 6;
+	Check(g.advanced.w == 19 && ClickOn(g, t, 150, 350).kind == ClickHit::Kind::Advanced, "legacy Advanced Stats arrow hit on the Character tab");
+	t.current = 2;
+	Check(ClickOn(g, t, 150, 350).kind == ClickHit::Kind::None, "no Advanced Stats arrow on a page");
+	Check(ClickOn(g, t, 10, 5).kind == ClickHit::Kind::Tab, "tab still hit");
+}
+
+void TestShortLabel() {
+	Check(ShortLabel("Life Stolen per Hit") == "Life Leech", "short label: leech");
+	Check(ShortLabel("Minion Resistances") == "Minion Res.", "short label: whole label, no cut word");
+	Check(ShortLabel("Chance to Avoid Damage") == "Avoid Damage", "short label: clean form");
+	Check(ShortLabel("Damage to Demons") == "Damage to Demons", "short label: a label that fits is kept");
+	Check(ShortLabel("Fire Spell Damage Bonus") == "Fire Spell Damage Bonus", "short label: only whole labels");
+}
+
+void TestClassic() {
+	const char* json = "{\"legacy\": {\"tabs\": [[0, 0, 40, 24], [40, 0, 60, 24]], \"allRowRects\": [[6, 117, 388, 13]], "
+	                   "\"search\": [6, 101, 388, 13], \"lines\": 22, \"allRows\": 21, \"allColumns\": 1, \"toggle\": [34, 54, 22, 22], "
+	                   "\"advanced\": [142, 340, 19, 26], \"origin\": [-80, -24]},\n \"legacyside\": {\"tabs\": [[0, 0, 0, 0], [0, 0, 50, 24]], \"lines\": 22, \"allRows\": 21, "
+	                   "\"origin\": [320, -24]}}";
+	const Geometry lg = ParseGeometry(json, "legacy"), ls = ParseGeometry(json, "legacyside");
+	Check(lg.ok && lg.origin.x == -80 && lg.origin.y == -24 && lg.tabs.size() == 2 && lg.toggle.w == 22, "legacy geometry and origin");
+	Check(ls.ok && ls.origin.x == 320 && ls.tabs.size() == 2, "legacy side geometry: \"legacy\" does not match \"legacyside\"");
+	Check(!ParseGeometry(json, "side").ok, "\"side\" does not match \"legacyside\"");
+	Check(ClassicPanelLeft(600) == 80 && ClassicPanelLeft(480) == 0, "the classic left panel's left edge");
+	int px = 0, py = 0;
+	ClassicPlace(800, 600, lg.origin, &px, &py);
+	Check(px == -400 && py == -264, "800 x 600: the wide sheet from x 0, y 36 (the layout's rect)");
+	ClassicPlace(1066, 600, lg.origin, &px, &py);
+	Check(px == -533 && py == -264, "1066 x 600 (Legacy 16:9): the left panel stays at x 80");
+	double ux = 0, uy = 0;
+	// 1600 x 900 client, 800 x 600 screen: scale 1.5, 200 pixels of side bar; screen (0, 36) at client (200, 54)
+	Check(ClassicUnits(1600, 900, 800, 600, lg.origin, 200, 54, &ux, &uy) && ux > -0.01 && ux < 0.01 && uy > -0.01 && uy < 0.01, "the sheet's corner");
+	Check(ClassicUnits(1600, 900, 800, 600, lg.origin, 200 + 45, 54 + 15, &ux, &uy) && HitRect(lg.tabs, ux, uy) == 0, "a tab at 900p");
+	Check(ClassicUnits(1920, 1080, 800, 600, lg.origin, 240 + 60 * 9 / 5, 65 + 10 * 9 / 5, &ux, &uy) && HitRect(lg.tabs, ux, uy) == 1, "a tab at 1080p");
+	// 2560 x 1440: scale 2.4, 320 of side bar; the side panel's tab 1 (x 400 + 10 of the screen)
+	Check(ClassicUnits(2560, 1440, 800, 600, ls.origin, 320 + 410 * 12 / 5, (36 + 10) * 12 / 5, &ux, &uy) && HitRect(ls.tabs, ux, uy) == 1, "a side tab at 1440p");
+	// Legacy 16:9 at 1920 x 1080: scale 1.8 (1066 wide fills it), the sheet from screen x 0
+	Check(ClassicUnits(1920, 1080, 1066, 600, lg.origin, 5, 65, &ux, &uy) && HitRect(lg.tabs, ux, uy) == 0, "Legacy 16:9: tab 0");
+	Check(!ClassicUnits(0, 900, 800, 600, lg.origin, 1, 1, &ux, &uy) && !ClassicUnits(1600, 900, 0, 0, lg.origin, 1, 1, &ux, &uy), "no client or screen");
+}
+
 void TestAll() {
 	const statbook::Book b = statbook::ParseBook(Sample);
 	Check(b.error.empty(), "sample parses");
@@ -186,6 +232,9 @@ int main() {
 	TestWindow();
 	TestText();
 	TestGeometry();
+	TestClassic();
+	TestShortLabel();
+	TestAdvancedClick();
 	TestAll();
 	if (g_failed != 0) {
 		std::printf("%d failed\n", g_failed);

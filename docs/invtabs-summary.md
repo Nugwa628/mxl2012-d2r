@@ -99,6 +99,46 @@ the wheel and the arrows.
 **Classic (legacy).** A fixed window of rows (pitch 13, height 12, `fontType` 8pt, rgba 110,110,255). The window is
 moved with `ScrollBy`, clamped so the last line ends at the bottom row (`ClampFirst`).
 
+## All stats or by charm
+
+The list has two modes, switched by a button at the top right of the list (lane charmpage):
+
+- **All stats** (the default): the sum above.
+- **By charm**: each charm under its own name, in grid order. The charm tab comes first, row by row and left to right.
+  The backpack's charms follow under a grey "In the inventory" heading when `inventory_charms` is on. A charm's name
+  is gold (unique) or white. Its lines are its own stats, worded by the same stat block writer as the sum. A charm that
+  does not count (level too low, or the second copy of a carry1 charm) is grey, with "(inactive)" after its name.
+  Identical charms are not grouped: each copy is listed where it lies, so the second copy shows as inactive.
+  A text box draws in the one colour of its style (colour codes print as text, docs/d2r-addresses.md "Text boxes"), so in
+  this mode each row has four boxes at the same place (`SummaryLine<n>` blue, `...Gold`, `...Grey`, `...White`). The
+  plugin fills the box of the line's colour and empties the other three (`summary_logic.h` SplitColour).
+
+The names come from the mod's tables: a unique's `uniqueitems.txt` `index` cell (row = the item's unique index, item
+data +0x34), any other charm's `namestr` (weapons, armor and misc in class order, "Expansion" rows left out). The
+plugin reads these with D2RLoader's localization service (`mxl2012:Key`, then `Key`, then `d2r:Key`). If no string
+is found, the key is split into words. Only the last line of a name is used, without colour codes.
+
+The button's glyph shows the mode that a click switches to: a list of charms while the list shows the sum, a sum sign
+while it shows each charm. Its tooltip says the same. A click (or the console `invtabs list all|charm|toggle`, or the
+Controls action "Charm list: all stats / by charm", unbound by default) sets the mode. It then writes
+`summary_list = "all"|"by_charm"` into `invtabs.toml`, replacing the value in place and keeping the comment and the
+rest of the file (`invtabs_logic.h` SetConfigKey). Finally it builds the tab's layouts again with the other glyph,
+closing and reopening the tab if it was open, as the summary's own relayout does. The choice is read at the next game
+start.
+
+- **HD:** `invtabs/ListMode`, a `ButtonWidget` of 56 x 56 in the summary band's top-right corner. The scroll bar
+  starts 64 units lower, and the rows end where the button begins. Art: the mod's
+  `data/hd/global/ui/panel/invtabs/listmode.sprite`, 8 frames: 0-3 the "by charm" glyph and 4-7 the "all stats"
+  glyph, each normal, hovered, pressed and disabled. It is built by `tools/invtabs_hdart.py` in the style of
+  `tools/hd_buttons.py`: D2R's stone rim and the stash cell well. Without it, the core draws a plain stand-in.
+- **Classic:** a 24 x 24 button at the right end of the tab row (x 282). It is shown only when there are 10 tabs or
+  fewer and the mod has `data/global/ui/panel/invtabs_listmode.dc6`: 4 frames, normal and pressed for each glyph, in
+  the tab buttons' style (`tools/invtabs_art.py`).
+- **Gamepad:** the controller panel keeps the sum. Its 20 rows are fixed and it has no scrolling, so a long list by
+  charm would be cut off.
+- The click reaches the plugin through an empty panel name of its own (`invtabs/ListMode`, no panel), which a shared
+  event UI message listener consumes. This is the same way as `plugin/src/panel_shared.cpp`.
+
 ## Tests
 
 - `invtabs/tests/summary_test.cpp`: a plain assert program with no framework, for sums, the inactive copy, params,

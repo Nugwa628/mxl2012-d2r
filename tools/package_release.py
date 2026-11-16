@@ -114,7 +114,7 @@ LEGACY169_BUILD = ROOT / "build" / "legacy169"
 # buff list inside its companion MPQ), docs/bundled-plugins.md. Built from the commit the gitlink third_party/d2rl-buff-hud pins
 # (tools/build_buffhud.ps1), unless --buffhud is given. The MPQ sits next to the DLL; the fork's MIT licence (copyright
 # Lukaszpg) and the PluginSDK licence it links go next to them. Its default config is a `preserve` file, as legacy169's.
-BUFFHUD = {"name": "Buff HUD", "version": "1.1.0", "repo": "https://github.com/Nugwa628/d2rl-buff-hud",
+BUFFHUD = {"name": "Buff HUD", "version": "1.2.0", "repo": "https://github.com/Nugwa628/d2rl-buff-hud",
            "upstream": "https://github.com/Lukaszpg/d2rl-buff-hud", "author": "Lukaszpg",
            "dll": "d2rloader/plugins/d2rl-buff-panel.dll", "mpq": "d2rloader/plugins/d2rl-buff-panel.mpq",
            "config": "d2rloader/config/buff-panel.toml",
@@ -125,7 +125,7 @@ BUFFHUD_FILES = ("dll", "mpq", "config", "licence", "sdk_licence")
 # Auto Belt Refill by jaycachou-svg, shipped with the author's permission (2026-11-06; the repository has no licence file),
 # docs/bundled-plugins.md. Built from the author's source at the commit the gitlink third_party/auto-belt-refill pins, with our
 # patches (third_party/auto-belt-refill-mxl2012/*.patch: PluginSDK renames, Median belt rows, first-slot
-# matching and belt counts) applied at build time (tools/build_beltrefill.ps1), unless --beltrefill is given. Its config is ours
+# matching and belt counts, the counts as HUD text) applied at build time (tools/build_beltrefill.ps1), unless --beltrefill is given. Its config is ours
 # (columns follow their first slot, elixirs never refilled, keys unbound) and a
 # `preserve` file, as legacy169's. The author's prebuilt DLL is for an older D2RLoader ABI and is refused.
 BELTREFILL = {"name": "Auto Belt Refill", "version": "0.35.9", "repo": "https://github.com/jaycachou-svg/auto-belt-refill",

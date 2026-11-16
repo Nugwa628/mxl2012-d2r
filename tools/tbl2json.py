@@ -41,6 +41,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import move_only  # noqa: E402
 import string_gaps  # noqa: E402
 import strings_ns  # noqa: E402
 
@@ -197,6 +198,12 @@ def main() -> int:
     if absent:
         raise SystemExit(f"tbl2json: string_gaps `fix` rows name keys Median's tbl does not define (or D2R owns): {absent}")
     texts.update(fixed)
+    # texts of the mod's own skills, one per language (tools/move_only.py), not Median's: every other key has one text
+    own = {r["Key"]: r for r in move_only.string_records(tuple(LANGS))}
+    taken = sorted(k for k in own if k in texts or k in d2r_keys)
+    if taken:
+        raise SystemExit(f"tbl2json: the mod's own string keys are already defined: {taken}")
+    texts.update({k: r["enUS"] for k, r in own.items()})
     tooltip_keys = strings_ns.skill_tooltip_keys(tooltip_excel)
     reordered = sorted(k for k in tooltip_keys if "\n" in texts.get(k, ""))
     for k in reordered:
@@ -218,6 +225,8 @@ def main() -> int:
     group2 = [k for k in texts if k not in d2r_keys]
 
     def lang_rec(k: str) -> dict:
+        if k in own:
+            return {lang: own[k][lang] if (lang == "enUS" or not args.english_only) else "" for lang in LANGS}
         return {lang: texts[k] if (lang == "enUS" or not args.english_only) else "" for lang in LANGS}
 
     # Group 1 = Median's text for keys D2R has: one `d2r:<key>` record per key in OVERRIDE_FILE (loader contract:

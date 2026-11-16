@@ -26,8 +26,12 @@
 //      state list without a skill without their range asserts, as 1.14d does (state_lists.cpp, off word statelist, #50 #52);
 //   +  a state-22 list without a skill (Median's raptured) gets 1.14d's fixed trail, missile 143 with the level of the unit's
 //      skill 173, instead of nothing (melt_trail.cpp, off word melttrail, #52);
+//   +  Laughing Ghost (skills.txt lob 1) explodes where the player clicked, no farther than its missile's range: the target
+//      point of its lob missile is capped in both missile creates (lob_aim.cpp, off word lobaim, #614);
 //   +  Whirlwind's 1.13c hit rate (srvdofunc 76: Whirlwind, Spin To Win, Danse Macabre, Harvest) instead of D2R 2.4's
 //      (whirlwind.cpp, off word whirlwind, #281);
+//   +  Move Only (srvstfunc 71, the mod's own walk-only skill) never starts a cast: a click on a monster walks to it and
+//      stops (move_only.cpp, off word moveonly);
 //   +  skill server do 51 (Mind Blast's conversion, Batstrike's charm) converts for Param3 + rand(Param4) frames as 1.13c,
 //      where D2R reads calc2 (charm_length.cpp, off word charmlen, #527);
 //   +  a second `useitem` cube output (Median's Oil of Duplication) copies output a as 1.13c did, where D2R makes nothing
@@ -106,6 +110,7 @@
 #include "lvlup_ui.h"
 #include "map_reveal.h"
 #include "melt_trail.h"
+#include "lob_aim.h"
 #include "missile_stubs.h"
 #include "orig_asserts.h"
 #include "reassign_guard.h"
@@ -127,6 +132,7 @@
 #include "sound_guard.h"
 #include "state_lists.h"
 #include "testharness.h"
+#include "move_only.h"
 #include "whirlwind.h"
 #include "charm_length.h"
 #include "clear_fonts.h"
@@ -150,7 +156,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.23";
+constexpr const char* PluginVersion = "0.1.24";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -216,7 +222,7 @@ char g_otherImage[256] = "";  // the message for a player on another game image,
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail whirlwind charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail lobaim whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -479,7 +485,9 @@ char g_skillRemoveReport[160] = "";
 char g_dodgeListReport[160] = "";
 char g_stateListReport[160] = "";
 char g_meltTrailReport[160] = "";
+char g_lobAimReport[160] = "";
 char g_whirlwindReport[160] = "";
+char g_moveOnlyReport[96] = "";
 char g_charmLengthReport[160] = "";
 char g_cubeDupeReport[160] = "";
 char g_itemLevelReport[160] = "";
@@ -547,7 +555,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 		const char* report;
 	} parts[] = {{"cltdo22", g_cltDoReport}, {"cltnomis", g_noMissileReport}, {"itemeffect", g_itemEffectReport},
 	             {"skillremove", g_skillRemoveReport}, {"dodgelist", g_dodgeListReport}, {"statelist", g_stateListReport},
-	             {"melttrail", g_meltTrailReport}, {"whirlwind", g_whirlwindReport}, {"charmlen", g_charmLengthReport}, {"cubedupe", g_cubeDupeReport},
+	             {"melttrail", g_meltTrailReport}, {"lobaim", g_lobAimReport}, {"whirlwind", g_whirlwindReport}, {"moveonly", g_moveOnlyReport}, {"charmlen", g_charmLengthReport}, {"cubedupe", g_cubeDupeReport},
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
@@ -710,10 +718,18 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	MeltTrailCounts(&trailsClient, &trailsServer);
 	std::snprintf(line, sizeof(line), "%s; trails made: client %ld, server %ld", g_meltTrailReport, trailsClient, trailsServer);
 	SayPart(command, "melttrail", line);
+	long lobSeen = 0, lobServer = 0, lobClient = 0;
+	LobAimCounts(&lobSeen, &lobServer, &lobClient);
+	std::snprintf(line, sizeof(line), "%s; missiles seen %ld, targets capped: server %ld, client %ld", g_lobAimReport, lobSeen, lobServer, lobClient);
+	SayPart(command, "lobaim", line);
 	long wwCalls = 0, wwD2R = 0, wwDelay = 0;
 	WhirlwindStats(&wwCalls, &wwD2R, &wwDelay);
 	std::snprintf(line, sizeof(line), "%s; hit delays answered %ld (last: D2R %ld frames -> %ld)", g_whirlwindReport, wwCalls, wwD2R, wwDelay);
 	SayPart(command, "whirlwind", line);
+	long moRefused = 0, moSkill = 0;
+	MoveOnlyStats(&moRefused, &moSkill);
+	std::snprintf(line, sizeof(line), "%s; casts refused %ld (last skill %ld)", g_moveOnlyReport, moRefused, moSkill);
+	SayPart(command, "moveonly", line);
 	long clCalls = 0, clSkill = 0, clLength = 0;
 	CharmLengthStats(&clCalls, &clSkill, &clLength);
 	std::snprintf(line, sizeof(line), "%s; lengths answered %ld (last: skill %ld, %ld frames)", g_charmLengthReport, clCalls, clSkill, clLength);
@@ -992,6 +1008,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_meltTrailReport);
 		context->LogInfo(line);
 	}
+	if (!Off("lobaim")) {
+		InstallLobAim(context, g_lobAimReport, sizeof(g_lobAimReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_lobAimReport);
+		context->LogInfo(line);
+	}
 	for (size_t i = 0; i < orig_asserts::BlockCount; ++i) {
 		if (!Off(orig_asserts::Blocks[i].word)) {
 			InstallOrigAssertGuard(context, i, g_origAssertReport[i], sizeof(g_origAssertReport[i]));
@@ -1002,6 +1023,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("whirlwind")) {
 		InstallWhirlwind(context, g_whirlwindReport, sizeof(g_whirlwindReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_whirlwindReport);
+		context->LogInfo(line);
+	}
+	if (!Off("moveonly")) {
+		InstallMoveOnly(context, g_moveOnlyReport, sizeof(g_moveOnlyReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: moveonly %s", g_moveOnlyReport);
 		context->LogInfo(line);
 	}
 	if (!Off("charmlen")) {

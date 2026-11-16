@@ -35,7 +35,7 @@ whenever it changes. Anything marked "assumed" is open for the owning lane to ch
 | grid child of every tab panel | `invtabs/Grid` (an `InventoryGridWidget`, `cellCount` 16 x 16, `cellSize` `$ItemCellSize`) |
 | grid marker | `chronicleFlourishOffset` = {7400 + N, 7400} (N = slot, 12 for `All`); the core's grid wrappers find their grids by it |
 | inventory button child | local id `InventoryButton`, child of `StockPanel::PlayerInventory`, `KeyboardMouseOnly`; click message `PanelManager:TogglePanel:invtabs/Tab0`; rect x 214, y 1375 (HD: right of the stock back-arrow button) |
-| console | `invtabs` (status, also logged as `invtabs: status: ...`; then `drawn <tab> hd|classic|none`: the tab whose grid the game drew in the last 300 ms, the checks' visibility assertion, and `pad open|closed|off`: the controller panel), `invtabs open|close|toggle [<tab>]`, `invtabs all`, `invtabs scroll <n>` (summary lines), `invtabs summary` (refreshes, then writes the summary lines to the log) |
+| console | `invtabs` (status, also logged as `invtabs: status: ...`; then `drawn <tab> hd|classic|none`: the tab whose grid the game drew in the last 300 ms, the checks' visibility assertion, and `pad open|closed|off`: the controller panel), `invtabs open|close|toggle [<tab>]`, `invtabs all`, `invtabs scroll <n>` (summary lines), `invtabs summary` (refreshes, then writes the summary lines to the log), `invtabs list all|charm|toggle` (the charm list's mode, as its button; saved to `invtabs.toml` `summary_list`, docs/invtabs-summary.md "All stats or by charm") |
 | Controls menu action | logical id `toggle-charms`, category `Inventory Tabs`; bound to `open_key` unless that is 0 or 73 (`I`, the stock inventory key, which it would take from the inventory) |
 | HD panel layout | generated in memory by the core per tab (`layouts.h`), root name `invtabs/<name>`. Text references in plugin layouts must be namespaced: `@d2r:strClose`, `@invtabs:...`; a bare `@strClose` makes D2RLoader refuse the layout and `openPanel` returns 5 (NotFound) (unit test) |
 | classic (legacy) panel layout | assumed `data/global/ui/layouts/invtabs/Tab<N>.json`; the SDK documents only `hd.json` and says legacy inventory layouts are not supported yet: the legacy lane verifies |
@@ -271,7 +271,8 @@ rebuilt from this branch). Unit tests: `tools/tests/test_charm_inventory.py`, `t
 | `global/excel/d2rloader/invtabs/tabs.txt`, `types_charms.txt` | `invtabs_tables.py build` |
 | `hd/global/ui/panel/invtabs/stockgrid.sprite`, `.lowend.sprite` | `invtabs_hdart.py build` |
 | `hd/global/ui/panel/invtabs/button.sprite`, `.lowend.sprite` (the HD Charms button, `tools/hd_buttons.py`) | `invtabs_hdart.py build` |
-| `global/ui/panel/invtabs_charms.dc6`, `invtabs_tab_charms.dc6`, `invtabs_button.dc6` | `invtabs_art.py build` |
+| `hd/global/ui/panel/invtabs/listmode.sprite`, `.lowend.sprite` (the charm list's mode button, all stats / by charm) | `invtabs_hdart.py build` |
+| `global/ui/panel/invtabs_charms.dc6`, `invtabs_tab_charms.dc6`, `invtabs_button.dc6`, `invtabs_listmode.dc6` | `invtabs_art.py build` |
 | the classic Charms button in `playerinventory*layout.json` | `invtabs_legacy.py button` |
 | (CharmInv only) `global/excel/d2rloader/charm-inv/*.txt` | `charm_inv.py apply` |
 

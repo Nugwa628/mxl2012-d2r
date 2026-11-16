@@ -77,6 +77,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   statbook.py book    the Stat Book's book file (pages and All Stats with the built itemstatcost's ids; docs/statbook.md)
   statbook_layout.py build  the Stat Book's folder tabs, page lines and All Stats in the HD sheet layouts (PC, gamepad) and
                      their art from D2R's HD sprites (widget names: docs/statbook-layout.md)
+  statbook_legacy.py build  the same book in the legacy sheet layout (wider, a tab strip on top), the classic side panel and
+                     their DC6 art from the sheet's classic art and D2R's sprites (docs/statbook-layout.md "Legacy")
   legacy_fonts.py    the clearer classic Latin fonts in data/local/font/latin/clear/ for the in-game setting (plugin part
                      clearfonts), from the local repack archive (MXL2012_LEGACY_FONT_ARCHIVE, default under
                      <MXL2012_RUNS>/extract-merged; MXL2012_LEGACY_FONTS=0 leaves them out); stock dialogue/chat pairs
@@ -201,6 +203,8 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
               "--out", str(MOD / "data" / "statbook" / "statbook.txt")],
              # after statbook.py book: the Stat Book's tabs, pages and All Stats in the sheet layouts, and their art
              ["statbook_layout.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
+             # after statbook_layout.py: the same book in the legacy sheet layout and the classic side panel (DC6 art)
+             ["statbook_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
              ["legacy_fonts.py", "--mod", str(MOD)]]  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
 # The steps that depend on the charm inventory (tools/charm_inventory.py). DATA_STEPS / ART_STEPS above are the `charminv` build.
 CHARMINV_STEP = ["charm_inv.py", "apply", "--mod", str(MOD)]

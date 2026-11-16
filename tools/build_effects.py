@@ -103,9 +103,12 @@ def check_picks(by_key: dict[tuple[str, str], dict], picks: dict, work: Path | N
         m = re.fullmatch(r"mxl_(.+)_s\d+", effect)
         return m.group(1) if m else effect
 
+    import hd_authored
+    authored = hd_authored.load()
+
     def is_pick(kind: str, effect: str, hp: dict) -> bool:
         b = base_of(effect) if kind == "missile" else effect
-        if b == hp["effect"]:
+        if b == hp["effect"] or (kind == "overlay" and hp["effect"] in authored and b == authored[hp["effect"]]["base"]):
             return not (hp["tint"] and kind == "missile" and rep and not rep.get("missing"))  # asked tint not made
         return kind == "missile" and tints.get(b) == hp["effect"]
 

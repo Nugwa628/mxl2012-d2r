@@ -112,7 +112,7 @@ Switching (live, with the sheet open or closed):
 ### Plain D2R panel
 
 Without a mod's Stat Book layouts there is no Stat Book widget in D2R's sheet, so the plugin registers panels of its own
-from `src/statbook_plain_layout.h` (HD only), which `py -3 -I tools/statbook_layout.py plain` writes from the plain book:
+from `src/statbook_plain_layout.h` (HD; legacy graphics below), which `py -3 -I tools/statbook_layout.py plain` writes from the plain book:
 `statbook/SbPlainPanel` over the sheet (D2R's left panel rect) and the side panel `statbook/SbSidePanel`.
 
 - The Stat Book's own sprites (the tabs, the row cells and heading rules, the side panel's frame and tabs, the toggle) ship
@@ -122,7 +122,15 @@ from `src/statbook_plain_layout.h` (HD only), which `py -3 -I tools/statbook_lay
   in use.
 - The panel follows D2R's sheet: it opens with it and closes with it.
 - D2R's title text ("Character") sits under the tab strip and is hidden while the panel is shown.
-- Gamepad sheet and legacy graphics: plain D2R keeps D2R's own sheet. The panel is opened only over the HD PC sheet.
+- Gamepad sheet: plain D2R keeps D2R's own sheet. The panel is opened only over the PC sheet.
+- Legacy graphics: `src/statbook_plain_legacy.h` holds classic layouts of both panels (registered as `SbPlainPanel.json` and
+  `SbSidePanel.json`, which D2R picks in legacy graphics, beside the HD `...hd.json`): the book over D2R's classic sheet
+  (320 x 432) with a tab strip along its top, the pages and All Stats in D2R's classic fonts, a classic Advanced Stats
+  arrow that opens All Stats, and the classic side panel. Their art is DC6 (`<mod>.mpq/data/global/ui/panel/statbook/`,
+  in `data/global/...` of this repository); without all of it legacy graphics keep D2R's own sheet. The panel's head
+  picture covers D2R's name and class texts, so the plugin draws the character's name and class itself; on the pages the
+  panel draws its own close button (D2R's, the same message). The header and the DC6 files are made by D2R-XL 2012's
+  classic sheet tools (its `tools/statbook_legacy.py plain` and `plain-art`), from D2R's classic sheet and these HD sprites.
 
 ## Gamepad
 

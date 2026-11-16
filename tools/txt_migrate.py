@@ -31,6 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import idmap  # noqa: E402
+import move_only  # noqa: E402
 import localconfig  # noqa: E402  (.mxl-local.json defaults, D2R extraction)
 import strings_ns  # noqa: E402
 
@@ -42,6 +43,10 @@ D2R = localconfig.default_d2r_extract() / "data" / "global" / "excel"
 OUT = ROOT / "work" / "mod"
 CLT_NOVA = "25"  # skills.txt cltdofunc of D2R's client nova ring
 FINISH_CONSUMES = 3  # prgchargesconsumed of a 1.13c finishing row: all charges (D2R's release counts 3 at most)
+# right-button skills kept off the left button: the scroll and book skills (cast from the item, D2R lets the right
+# button only) and D2R's portal skill of its own
+RIGHT_ONLY = frozenset({"Scroll of Identify", "Book of Identify", "Scroll of Townportal", "Book of Townportal",
+                        "Townportal O Skill"})
 
 # 1.13c column -> D2R column, per table. Case-only differences are matched automatically.
 RENAMES = {
@@ -223,6 +228,29 @@ def conversion_calcs(header: list[str], rows: list[list[str]]) -> list[str]:
                 set_.append(f"{col} {value}")
         if set_:
             done.append(f"{r[ii] if ii is not None else '?'} {r[ni]}: " + ", ".join(set_))
+    return done
+
+
+# skills.txt `lob` on skills whose missile should explode where the player clicked (bug #614, owner request 2026-11-16). Median's
+# Laughing Ghost has `lob` empty, so its missile (laughingghostemerge: Range 12, no CollideType, AlwaysExplode) flies its 12
+# frames and explodes there wherever the click was, as in 1.13c. With `lob` 1 D2R makes the missile on its lob path (D2R's Fire
+# Trauma, Median's Thunderstone): it flies to the target point and explodes there. D2R does not cap that at the missile's
+# Range; the plugin part lobaim (plugin/src/lob_aim.cpp) does, so it cannot reach farther than before.
+LOB_SKILLS = ("Laughing Ghost",)
+
+
+def lob_skills(header: list[str], rows: list[list[str]], names=LOB_SKILLS) -> list[str]:
+    """Set `lob` 1 on the rows named in `names` (in place). Returns the names written."""
+    if "lob" not in header or "skill" not in header:
+        return []
+    li, ni = header.index("lob"), header.index("skill")
+    done = []
+    for r in rows:
+        if r[ni] in names:
+            while len(r) <= li:
+                r.append("")
+            r[li] = "1"
+            done.append(r[ni])
     return done
 
 
@@ -787,7 +815,9 @@ class Migrator:
         - anim / seqtrans: a 1.13c Sequence skill may carry GH (the plrmode.txt code of mode 18 in some tools' output);
           D2R spells it SQ and reads GH as get hit (knockback frames, server never starts the skill).
         - stop functions: D2R gives Whirlwind (srvdofunc 76 / cltdofunc 45) srvstopfunc / cltstopfunc 1; mod rows on a do
-          function D2R pairs with a stop function get the same one (1.13c has no stop columns)."""
+          function D2R pairs with a stop function get the same one (1.13c has no stop columns).
+        - left button: every skill with rightskill 1 gets leftskill 1 (docs/left-skills.md) except auras, corpse-targeted
+          skills (SelectProc / TargetCorpse) and RIGHT_ONLY."""
         for bank in ("base", ""):
             p = OUT / "data" / "global" / "excel" / bank / "skills.txt"
             if not p.exists():
@@ -806,6 +836,9 @@ class Migrator:
             plugin, no_nova = [], []
             cma = h.index("cltmissilea")
             rs = h.index("rightskill")
+            ls = h.index("leftskill") if "leftskill" in h else None
+            corpse = [h.index(c) for c in ("SelectProc", "TargetCorpse") if c in h]
+            n_left = 0
             pst, pst1, au = h.index("passivestate"), h.index("passivestat1"), h.index("aura")
             used = [h.index(c) for c in ("srvstfunc", "srvdofunc", "srvmissile", "srvmissilea", "cltstfunc", "cltdofunc", "aura")]
             fin = h.index("finishing") if "finishing" in h else None
@@ -847,12 +880,44 @@ class Migrator:
                     r[rs] = "1" if any(r[i] not in ("", "0") for i in used) else "0"
                     n_right1 += r[rs] == "1"
                     n_right += r[rs] == "0"
+                if (ls is not None and r[rs] == "1" and r[au] != "1" and r[0] not in RIGHT_ONLY and r[ls] != "1"
+                        and all(r[i] in ("", "0") for i in corpse if i < len(r))):
+                    # every skill the right button casts goes on the left button too (D2R's skill pop-up and its select
+                    # packet 0x3c both read leftskill); auras stay right-only (D2R runs an aura from the right button), so
+                    # do corpse-targeted skills: the left click picks no corpse and casts nothing (the totems, in game)
+                    r[ls] = "1"
+                    n_left += 1
             write_tsv(p, h, rows)
             if bank == "base":
                 self.report.append(f"\nskills: {n_stop} given D2R's stop function for their do function (Whirlwind); {n_seq} "
                                    f"anim/seqtrans GH -> SQ; {n_right} passives given rightskill 0, {n_right1} usable skills rightskill 1; rows on the plugin's cltdofunc 113 (was 22): {', '.join(plugin) or 'none'}; "
                                    f"client nova (cltdofunc 25) without cltmissilea, cltdofunc emptied (bug #51): {', '.join(no_nova) or 'none'}; "
-                                   f"{n_fin} finishing rows given prgchargesconsumed {FINISH_CONSUMES} (bug #527)")
+                                   f"{n_fin} finishing rows given prgchargesconsumed {FINISH_CONSUMES} (bug #527); "
+                                   f"{n_left} right-button skills (not auras, not {', '.join(sorted(RIGHT_ONLY))}) given leftskill 1 (corpse-targeted skills left out)")
+
+    def move_only(self) -> None:
+        """Move Only (tools/move_only.py, docs/left-skills.md): its skills.txt and skilldesc.txt rows after every other row,
+        and every class's first empty charstats `Skill N` column (a starting skill: no skill point, no tree slot)."""
+        ids, classes = set(), []
+        for bank in ("base", ""):
+            ex = OUT / "data" / "global" / "excel" / bank
+            if not (ex / "skills.txt").exists():
+                continue
+            h, rows = read_tsv(ex / "skills.txt")
+            ids.add(move_only.add_skill(h, rows))
+            write_tsv(ex / "skills.txt", h, rows)
+            if (ex / "skilldesc.txt").exists():
+                h, rows = read_tsv(ex / "skilldesc.txt")
+                move_only.add_skilldesc(h, rows)
+                write_tsv(ex / "skilldesc.txt", h, rows)
+            if (ex / "charstats.txt").exists():
+                h, rows = read_tsv(ex / "charstats.txt")
+                classes = move_only.add_to_classes(h, rows)
+                write_tsv(ex / "charstats.txt", h, rows)
+        if len(ids) > 1:
+            raise SystemExit(f"txt_migrate: Move Only has a different id per bank: {sorted(ids)}")
+        self.report.append(f"\nMove Only: skill {', '.join(map(str, sorted(ids)))} (srvstfunc {move_only.START_SLOT}), "
+                           f"starting skill of {', '.join(classes) or 'no class'}")
 
     def stat_send_bits(self) -> None:
         """A state's stat list goes to the client with each stat cut to its itemstatcost `Send Bits`. `modifierlist_skill` (350,
@@ -1249,6 +1314,20 @@ class Migrator:
             if bank == "base":
                 done = lines
         self.report.append("\nskills srvdofunc / srvprgfunc 51 conversion chance / length into calc1 / calc2 (bugs #487, #527): " + ("; ".join(done) or "none"))
+
+    def lob_skills(self) -> None:
+        """skills.txt `lob` 1 on LOB_SKILLS: their missile explodes at the click (bug #614)."""
+        done: list[str] = []
+        for bank in ("base", ""):
+            p = OUT / "data" / "global" / "excel" / bank / "skills.txt"
+            if not p.exists():
+                continue
+            h, rows = read_tsv(p)
+            lines = lob_skills(h, list(idmap.records(rows)))
+            write_tsv(p, h, rows)
+            if bank == "base":
+                done = lines
+        self.report.append("\nskills lob 1 (missile explodes at the click, bug #614): " + (", ".join(done) or "none"))
 
     def hireling_level_difference(self) -> None:
         """hireling.HiringMaxLevelDifference is D2R's column for a rule 1.13c keeps in code: how far a mercenary's level may
@@ -2326,6 +2405,7 @@ def main() -> int:
     m.book_cursors()
     m.belt_columns()
     m.conversion_calcs()
+    m.lob_skills()
     m.cube_unresolved_inputs()
     m.fill_skilldesc()
     m.blank_item_skilldesc()
@@ -2340,6 +2420,7 @@ def main() -> int:
     m.hireling_ai_params()
     m.difficulty_code_rules()
     m.skill_rules()
+    m.move_only()
     m.stat_send_bits()
     m.stat_save_add()
     m.missile_slot_report()

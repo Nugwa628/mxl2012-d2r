@@ -35,7 +35,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.1";
+constexpr const char* PluginVersion = "0.1.2";
 constexpr uint32_t SupportedImage = 0x6ab3782cU;
 
 constexpr D2RL::PluginInfo Info{

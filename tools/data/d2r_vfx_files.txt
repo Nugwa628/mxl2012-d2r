@@ -6,6 +6,8 @@ data/hd/vfx/particles/missiles/diabwall/vfx_diabwall.particles
 data/hd/vfx/particles/missiles/diabwallmaker/vfx_diabwallmaker.particles
 data/hd/vfx/particles/missiles/expansion_imp_fireball/fx_imp_fireball.particles
 data/hd/vfx/particles/missiles/expansion_tornado/vfx_druid_tornado.particles
+data/hd/vfx/particles/missiles/fireball/vfx_fireball_trail.particles
+data/hd/vfx/particles/missiles/firebolt/vfx_firebolt_trail.particles
 data/hd/vfx/particles/missiles/frost_nova/fx_ice_frost_nova.particles
 data/hd/vfx/particles/missiles/ground_fire_big/vfx_ground_fire_big.particles
 data/hd/vfx/particles/missiles/ground_fire_big/vfx_ground_fire_firewall.particles
@@ -21,9 +23,12 @@ data/hd/vfx/particles/missiles/lightning_strike/Lightning_BaalTaunt.particles
 data/hd/vfx/particles/missiles/lightning_strike/Lightning_Fury.particles
 data/hd/vfx/particles/missiles/lightning_strike/Lightning_lightningStrike.particles
 data/hd/vfx/particles/missiles/meteor/vfx_meteor_fire.particles
+data/hd/vfx/particles/missiles/mist/vfx_mist_towerMistTrail.particles
 data/hd/vfx/particles/missiles/teethexplode/vfx_teeth_explode.particles
 data/hd/vfx/particles/missiles/yellow_ball_glow_2/vfx_yellowBall_glow_2.particles
 data/hd/vfx/particles/overlays/object/horadric_light/FX_Horadric_Light.particles
+data/hd/vfx/particles/overlays/paladin/aura_resistall_front/FX_ResistAll_Overlay.particles
+data/hd/vfx/particles/overlays/paladin/charge/vfx_charge_overlay.particles
 data/hd/vfx/textures/gradient/T_FX_AlphaRemapCurve.texture
 data/hd/vfx/textures/gradient/T_FX_AlphaRemapCurve_HardtoSoft.texture
 data/hd/vfx/textures/gradient/T_FX_AlphaRemapCurve_blinkfix.texture
@@ -51,6 +56,7 @@ data/hd/vfx/textures/gradient/T_FX_Max_Grad_01.texture
 data/hd/vfx/textures/gradient/T_FX_RedOrange_Gradient4.texture
 data/hd/vfx/textures/gradient/T_FX_bluegreen_white_gradient_02.texture
 data/hd/vfx/textures/gradient/T_FX_bluegreen_white_gradientbox_01.texture
+data/hd/vfx/textures/gradient/T_FX_feral_rage_gradient.texture
 data/hd/vfx/textures/gradient/T_FX_flame_gradient_02.texture
 data/hd/vfx/textures/gradient/T_FX_flame_gradient_07.texture
 data/hd/vfx/textures/gradient/T_FX_flame_gradient_09.texture

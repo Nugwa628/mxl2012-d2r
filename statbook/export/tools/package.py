@@ -3,6 +3,7 @@
   mods/<MOD>/modinfo.json                                   {"name": MOD, "savepath": MOD/}
   mods/<MOD>/<MOD>.mpq/modinfo.json                         (D2R reads this one; the copy at the mod root is for D2RLoader)
   mods/<MOD>/<MOD>.mpq/data/hd/global/ui/panel/statbook/    the Stat Book's sprites (data/hd/... of this repository)
+  mods/<MOD>/<MOD>.mpq/data/global/ui/panel/statbook/       its legacy graphics art (*.dc6, data/global/... of this repository)
   mods/<MOD>/d2rloader/plugins/statbook.dll
   mods/<MOD>/d2rloader/config/statbook.toml
   mods/<MOD>/README.md, LICENSE
@@ -18,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ART = Path("data") / "hd" / "global" / "ui" / "panel" / "statbook"
+LEGACY_ART = Path("data") / "global" / "ui" / "panel" / "statbook"
 MOD = "AdvancedStats"
 
 
@@ -37,6 +39,10 @@ def entries(dll: Path, mod: str = MOD) -> list[tuple[str, bytes]]:
     if not sprites:
         raise SystemExit(f"no sprites in {ROOT / ART}")
     out += [(f"{base}/{mod}.mpq/{ART.as_posix()}/{p.name}", p.read_bytes()) for p in sprites]
+    dc6 = sorted((ROOT / LEGACY_ART).glob("*.dc6"))
+    if not dc6:
+        raise SystemExit(f"no DC6 in {ROOT / LEGACY_ART}")
+    out += [(f"{base}/{mod}.mpq/{LEGACY_ART.as_posix()}/{p.name}", p.read_bytes()) for p in dc6]
     out.append((f"{base}/d2rloader/plugins/statbook.dll", Path(dll).read_bytes()))
     out.append((f"{base}/d2rloader/config/statbook.toml", (ROOT / "statbook.toml").read_bytes()))
     out += [(f"{base}/{n}", (ROOT / n).read_bytes()) for n in ("README.md", "LICENSE")]

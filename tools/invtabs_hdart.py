@@ -7,7 +7,12 @@ personal stash background (PANEL\\Stash\\StashPanel_BG_Personal, grid at 89,219)
 Also data/hd/global/ui/panel/invtabs/button.sprite (and .lowend): the inventory's Charms button, 56 x 56, 4 frames in the
 plugin's order (normal, pressed, disabled, hovered), in D2R HD's button style (tools/hd_buttons.py: D2R's stone rim, a dark
 well, a charm drawn at native size; bug #592). The plugin uses it when the mod has it (invtabs.cpp AddButton), else its drawn
-stand-in. The art is read from the D2R extraction or the shared cache at build time; nothing of Blizzard's is in git.
+stand-in.
+
+Also data/hd/global/ui/panel/invtabs/listmode.sprite (and .lowend): the mode button of the charm tab's stat list, 56 x 56,
+8 frames: 0-3 the "by charm" glyph (shown while the list sums: a click lists each charm), 4-7 the "all stats" glyph (shown
+while it lists each charm), each in the plugin's order normal, hovered, pressed, disabled (invtabs/src/layouts.h
+HdToggleWidget). The art is read from the D2R extraction or the shared cache at build time; nothing of Blizzard's is in git.
 
     py -3 -I tools/invtabs_hdart.py build --out work/mod/data
     py -3 -I tools/invtabs_hdart.py check --out work/mod/data
@@ -29,7 +34,10 @@ GRID_X, GRID_Y, CELL, CELLS, FRAME = 89, 219, 98, 10, 8
 SIZE = CELLS * CELL + 2 * FRAME  # 996 (layouts.h StockSize)
 BUTTON_REL = Path("hd/global/ui/panel/invtabs/button.sprite")
 BUTTON = 56  # invtabs.cpp ButtonSize: the drawn stand-in's size, so the button keeps its place and size in the inventory
-BUTTON_FRAMES = ("normal", "pressed", "greyed", "hovered")  # the plugin's normal, pressed, disabled, hovered frames
+BUTTON_FRAMES = ("normal", "pressed", "greyed", "hovered")
+LISTMODE_REL = Path("hd/global/ui/panel/invtabs/listmode.sprite")
+LISTMODE_FRAMES = ("normal", "hovered", "pressed", "greyed")  # layouts.h HdToggleWidget: frame0 .. frame0 + 3
+LISTMODE_ICONS = ("listcharms", "listsum")                    # frames 0-3 while summing, 4-7 while listing by charm  # the plugin's normal, pressed, disabled, hovered frames
 
 
 def cut(sprite: bytes) -> bytes:
@@ -63,7 +71,7 @@ def build(out_data: Path) -> list[str]:
     dc6.write_item_sprite(path, SIZE, SIZE, rgba)
     low = path.with_name(path.stem + ".lowend.sprite")
     dc6.write_item_sprite(low, SIZE // 2, SIZE // 2, half(rgba, SIZE, SIZE))
-    return [path.as_posix(), low.as_posix()] + build_button(out_data)
+    return [path.as_posix(), low.as_posix()] + build_button(out_data) + build_listmode(out_data)
 
 
 def button_frames(src=None) -> list:
@@ -77,6 +85,23 @@ def build_button(out_data: Path, src=None) -> list[str]:
     import ui_art
     frames = button_frames(src)
     path = Path(out_data) / BUTTON_REL
+    ui_art.write_sprite(path, frames, BUTTON + 2)
+    low = path.with_name(path.stem.split(".")[0] + ".lowend.sprite")
+    ui_art.write_sprite(low, hd_buttons.lowend(frames), BUTTON // 2 + 2)
+    return [path.as_posix(), low.as_posix()]
+
+
+def listmode_frames(src=None) -> list:
+    """The list mode button's 8 frames (LISTMODE_ICONS x LISTMODE_FRAMES)."""
+    import hd_buttons
+    return [f for icon in LISTMODE_ICONS for f in hd_buttons.frames(icon, BUTTON, BUTTON, LISTMODE_FRAMES, src)]
+
+
+def build_listmode(out_data: Path, src=None) -> list[str]:
+    import hd_buttons
+    import ui_art
+    frames = listmode_frames(src)
+    path = Path(out_data) / LISTMODE_REL
     ui_art.write_sprite(path, frames, BUTTON + 2)
     low = path.with_name(path.stem.split(".")[0] + ".lowend.sprite")
     ui_art.write_sprite(low, hd_buttons.lowend(frames), BUTTON // 2 + 2)
@@ -99,6 +124,15 @@ def check(out_data: Path) -> list[str]:
         info = dc6.sprite_info(p)
         if (info["frame_width"], info["height"], info["frames"]) != (size, size, len(BUTTON_FRAMES)):
             problems.append(f"{p.as_posix()}: {info} is not {len(BUTTON_FRAMES)} frames of {size} x {size}")
+    count = len(LISTMODE_ICONS) * len(LISTMODE_FRAMES)
+    for rel, size in ((LISTMODE_REL, BUTTON), (LISTMODE_REL.with_name("listmode.lowend.sprite"), BUTTON // 2)):
+        p = Path(out_data) / rel
+        if not p.exists():
+            problems.append(f"{p.as_posix()}: missing (run build)")
+            continue
+        info = dc6.sprite_info(p)
+        if (info["frame_width"], info["height"], info["frames"]) != (size, size, count):
+            problems.append(f"{p.as_posix()}: {info} is not {count} frames of {size} x {size}")
     return problems
 
 

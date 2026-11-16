@@ -159,9 +159,10 @@ def check_layouts() -> tuple[list[str], list[str]]:
         for ref in re.findall(r'PANEL\\\\mxl\\\\(\w+)"', text):
             if not (HD_OUT / "panel" / "mxl" / f"{ref}.sprite").exists():
                 problems.append(f"{p.name}: PANEL\\mxl\\{ref} has no sprite")
+        limit = 3000 if p.name.startswith("hudpanel") else 2000  # D2R's HD HUD is 2952 wide (belt counts, bug #613)
         for m in re.finditer(r'"rect":\s*\{([^}]*)\}', text):
             for v in re.findall(r'"(?:x|y)":\s*(-?\d+)', m.group(1)):
-                if abs(int(v)) > 2000:
+                if abs(int(v)) > limit:
                     problems.append(f"{p.name}: rect value {v} off the panel")
     notes.append(f"{len(list(LAYOUT_OUT.rglob('*.json')))} layouts checked")
     return problems, notes

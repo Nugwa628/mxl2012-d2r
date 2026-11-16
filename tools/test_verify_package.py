@@ -48,7 +48,7 @@ class VerifyPackageTests(unittest.TestCase):
         for rel in ("buff-panel.toml", "LICENSE", "external/PluginSDK/LICENSE"):
             (buff / rel).write_text("x\n", encoding="utf-8")
         (buff / "PINNED_COMMIT").write_text(pr.buffhud_commit(), encoding="ascii")
-        (self.tmp / "d2rl-buff-panel.dll").write_bytes(b"MZ buff-panel\0 1.1.0\0 [buff_panel]")
+        (self.tmp / "d2rl-buff-panel.dll").write_bytes(b"MZ buff-panel\0 " + pr.BUFFHUD["version"].encode() + b"\0 [buff_panel]")
         (self.tmp / "d2rl-buff-panel.mpq").write_bytes(b"MPQ\x1a")
         pr.stage_buffhud(self.mod, self.tmp / "d2rl-buff-panel.dll", buff)
         belt = self.tmp / "beltrefill-src"  # what tools/build_beltrefill.ps1 exports

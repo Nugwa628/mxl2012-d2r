@@ -1106,6 +1106,7 @@ def check_mxl2012():
             ("cltnomis", r"^cltnomis cltdofunc 30 curse without client missile; cltstfunc 18 start without client missile"),
             ("melttrail", r"^melttrail state 22 without a list skill makes 1\.14d's trail \(missile 143, skill 173\)"),
             ("whirlwind", r"^whirlwind srvdofunc 76 hits as 1\.13c .*0x56ac00 hooked\)"),
+            ("moveonly", r"^moveonly srvstfunc 71 Move Only start \(refuses every cast\)"),
             ("charmlen", r"^charmlen on: srvdofunc 51 converts for Param3 \+ rand\(Param4\) frames as 1\.13c"),
             ("cubedupe", r"^cubedupe on: a second useitem output copies output a"),
             ("ilvl", r"^ilvl item levels 100-127 kept by the item serializer \(clamp 99 -> 127 at 0x37d744\)$"),
@@ -1579,7 +1580,7 @@ def check_skillprog():
                     charges.append(prog())
                     if not any(charges[-1]):
                         break
-            else:  # Blackstorm: right button only (no leftskill), periodic; cast by right clicks next to a zombie
+            else:  # Blackstorm: periodic; cast from the right button, by right clicks next to a zombie
                 selected, _ = Hl("skill right %d" % skill, log)
                 for _ in range(4 if selected else 0):  # an unset right button + a right click raises `ptSkill` (bug #9)
                     z = zombie()
@@ -8556,9 +8557,234 @@ CHECKS += [("rcbook", check_rcbook), ("rcdelay", check_rcdelay), ("rctoken", che
            ("rpequip", check_rpequip)]
 CHECKS += [("runeletters", check_runeletters)]  # lane runeletters: bug #334
 CHECKS += [("invtabs_pad", lambda: __import__("invtabs_pad_checks").run(sys.modules[__name__]))]  # tools/invtabs_pad_checks.py
+# --- the charm tab with many charms: the grid (bug #615) and the list's mode button (all stats / by charm) -----------------
+CHARMPAGE_TOGGLE = (89 + 980 - 28, 160 + 28)  # layouts.h HdToggleWidget: the band's top-right corner, 56 units square
+
+
+def _charmpage_fill(log, notes):
+    """Fills the charm tab of a fresh MXL_CHAR with every carry1 charm (in batches through the backpack, Ctrl+click), a
+    second Butcher's Tooth (its copy does not count) and leaves what does not fit in the backpack. Returns the page-6 count."""
+    page = _invtabs_page6(log)
+    if page:
+        notes.append("charm tab already holds %d item(s): kept" % len(page))
+        return len(page)
+    rows = carry1_rows()
+    tooth = _invtabs_unique("ButchersTooth")
+    want = [(r[0], r[1]) for r in rows] + ([tooth] if tooth else [])
+    codes = {c for _, c in want}
+    g.console_bg("invtabs open")
+    time.sleep(1.5)
+    for k in range(0, len(want), 8):
+        for row, code in want[k:k + 8]:
+            Hl("item %s unique %d inv" % (code, row), log)
+        time.sleep(1.0)
+        for _ in range(12):
+            left = [c for c in (kv(x) for x in Hl("items", log)[1] if x.startswith("item ")) if c.get("page") == "0" and c.get("code") in codes]
+            moved = False
+            for it in left:
+                before = len(_invtabs_page6(log))
+                _invtabs_ctrl(it, log)
+                if len(_invtabs_page6(log)) > before:
+                    moved = True
+                    break  # the backpack's rows shift as items leave: read them again
+            if not moved:
+                break
+    page = _invtabs_page6(log)
+    left = [c for c in (kv(x) for x in Hl("items", log)[1] if x.startswith("item ")) if c.get("page") == "0" and c.get("code") in codes]
+    notes.append("charms: %d asked, %d in the tab, %d left in the backpack" % (len(want), len(page), len(left)))
+    return len(page)
+
+
+def _charmpage_config():
+    path = os.path.join(g.GAME_DIR, r"mods\mxl2012\d2rloader\config\invtabs.toml")
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            m = re.search(r'^\s*summary_list\s*=\s*"([^"]*)"', f.read(), re.M)
+            return m.group(1) if m else "(no key)"
+    except OSError:
+        return "(no file)"
+
+
+def _charmpage_mode(log, since):
+    """The last `charm list:` mode the plugin logged since `since` (bytes of invtabs.log): 'by charm' / 'all stats' / None."""
+    got = [x for x in _invtabs_log_since(since) if "charm list: " in x]
+    log.extend(got)
+    m = re.search(r"charm list: (by charm|all stats)", got[-1]) if got else None
+    return m.group(1) if m else None
+
+
+def _charmpage_by_charm(lines):
+    """The summary lines read as a list by charm: a gold (unique) or grey (inactive) name line before stat lines."""
+    names = [x for x in lines if x.startswith("ÿc4") or x.endswith("(inactive)")]
+    return len(names), names[:6]
+
+
+def check_charmpage_grid():
+    """Bug #615: the charm tab with many charms (every carry1 charm, max level) in HD: its grid cells must show. Run with the
+    old invtabs.dll as the repro (its log says it could not register cells0 when the summary outgrew its rows) and with the
+    fixed one. Screenshot of the tab, then the HD list wheeled to its end."""
+    name = "charmpage_grid"
+    mark = engine_mark()
+    log, shots, notes, results = [], [], [], {}
+    goto(1)
+    release_held_item()
+    set_graphics("hd")
+    Hl("xp 2000000000", log)
+    time.sleep(2)
+    size = _invtabs_size()
+    g.press_bg("i")
+    time.sleep(1.2)
+    n = _charmpage_fill(log, notes)
+    results["filled"] = n >= 30
+    g.console_bg("invtabs close")
+    time.sleep(1.0)
+    g.console_bg("invtabs open")
+    time.sleep(2.0)
+    counted, skipped, lines = _invtabs_summary(log)
+    notes.append("summary: %s counted, %s left out, %d line(s)" % (counted, skipped, len(lines)))
+    _invtabs_visible("charmpage_grid_hd", "charms hd", log, shots, results)
+    g.wheel_bg(*_invtabs_hd(89 + 490, 232 + 120), notches=-40)
+    time.sleep(0.8)
+    shots.append(sh("charmpage_grid_hd_list_end"))
+    refused = [x for x in _invtabs_log_since(size) if "could not register" in x]
+    log.extend(refused)
+    notes.append("'could not register' lines: %d %s" % (len(refused), refused[:2]))
+    results["cells_registered"] = not any("cells" in x for x in refused)
+    finish(name, all(results.values()), "%s; %s" % ("; ".join(notes), results), mark, shots, log, harness=INVTABS_HARNESS,
+           partial="the grid on the screenshot, by eye")
+
+
+def check_charmpage():
+    """The charm list's mode button (lane charmpage) on the filled tab of `charmpage_grid`: HD at 1600 x 900 the button in
+    the summary band's top-right corner; a click switches all stats -> by charm (names in gold, the copy greyed), the
+    choice is written to invtabs.toml; closing and opening the tab keeps it; a second click goes back; the console and
+    legacy graphics (screenshots of both modes); HD at 1920 x 1080 and 2560 x 1440. The pad keeps the sum (not run)."""
+    name = "charmpage"
+    mark = engine_mark()
+    log, shots, notes, results = [], [], [], {}
+    goto(1)
+    release_held_item()
+    set_graphics("hd")
+    size = _invtabs_size()
+    start = None
+    with open(_invtabs_log(), encoding="utf-8", errors="replace") as f:
+        boot = [x for x in f.read().splitlines() if "charm list: " in x and "mode button" in x]
+    if boot:
+        log.append(boot[-1])
+        start = "by charm" if "charm list: by charm" in boot[-1] else "all stats"
+    notes.append("at start (invtabs.toml %s): %s" % (_charmpage_config(), boot[-1].split("charm list: ", 1)[-1] if boot else "no line"))
+    results["button_art"] = bool(boot) and "HD the mod's art" in boot[-1] and "classic the mod's art" in boot[-1]
+    if _invtabs_page6(log) == []:
+        _charmpage_fill(log, notes)
+    g.press_bg("i")
+    time.sleep(1.2)
+    g.console_bg("invtabs open")
+    time.sleep(1.5)
+    if start == "by charm":  # a previous run ended on by charm: the reopened game starts there (the saved choice)
+        _invtabs_visible("charmpage_hd_restart_by_charm", "charms hd", log, shots, results)
+        _, _, lines = _invtabs_summary(log)
+        results["restart_keeps"] = _charmpage_by_charm(lines)[0] > 0
+        g.console_bg("invtabs list all")
+        time.sleep(2.0)
+    _invtabs_visible("charmpage_hd_all", "charms hd", log, shots, results)
+    _, _, lines = _invtabs_summary(log)
+    results["all_is_sum"] = _charmpage_by_charm(lines)[0] == 0 and len(lines) > 0
+    # hover the button: its tooltip
+    hover_px(*(round(v * k) for v, k in zip(_invtabs_hd(*CHARMPAGE_TOGGLE), (1600, 900))))
+    time.sleep(1.0)
+    shots.append(sh("charmpage_hd_button_tooltip"))
+    # the click: by charm
+    size = _invtabs_size()
+    g.click_bg(*_invtabs_hd(*CHARMPAGE_TOGGLE))
+    time.sleep(2.5)
+    results["click_by_charm"] = _charmpage_mode(log, size) == "by charm"
+    results["saved_by_charm"] = _charmpage_config() == "by_charm"
+    _invtabs_visible("charmpage_hd_by_charm", "charms hd", log, shots, results)
+    _, _, lines = _invtabs_summary(log)
+    count, names = _charmpage_by_charm(lines)
+    results["by_charm_lines"] = count >= 10
+    notes.append("by charm: %d name line(s) of %d, first %s" % (count, len(lines), names))
+    g.wheel_bg(*_invtabs_hd(89 + 490, 232 + 120), notches=-8)
+    time.sleep(0.8)
+    shots.append(sh("charmpage_hd_by_charm_wheel8"))
+    g.wheel_bg(*_invtabs_hd(89 + 490, 232 + 120), notches=-200)
+    time.sleep(0.8)
+    shots.append(sh("charmpage_hd_by_charm_end"))
+    # closed and opened again: still by charm
+    g.console_bg("invtabs close")
+    time.sleep(1.0)
+    g.console_bg("invtabs open")
+    time.sleep(2.0)
+    _, _, lines = _invtabs_summary(log)
+    results["reopen_keeps"] = _charmpage_by_charm(lines)[0] >= 10
+    _invtabs_visible("charmpage_hd_by_charm_reopened", "charms hd", log, shots, results)
+    # back to all stats with a second click
+    size = _invtabs_size()
+    g.click_bg(*_invtabs_hd(*CHARMPAGE_TOGGLE))
+    time.sleep(2.5)
+    results["click_back"] = _charmpage_mode(log, size) == "all stats" and _charmpage_config() == "all"
+    shots.append(sh("charmpage_hd_all_again"))
+    # 1080p and 1440p
+    old = (g.CLIENT_W, g.CLIENT_H)
+    try:
+        for w, h in ((1920, 1080), (2560, 1440)):
+            g.CLIENT_W, g.CLIENT_H = w, h
+            got = g.fit_window(g.need_window())
+            time.sleep(2.0)
+            notes.append("client %dx%d asked, %s got" % (w, h, got and (got[2] - got[0], got[3] - got[1])))
+            g.console_bg("invtabs open")
+            time.sleep(1.0)
+            shots.append(sh("charmpage_hd_all_%dp" % h))
+            size = _invtabs_size()
+            g.click_bg(*_invtabs_hd(*CHARMPAGE_TOGGLE))
+            time.sleep(2.5)
+            results["click_%dp" % h] = _charmpage_mode(log, size) == "by charm"
+            shots.append(sh("charmpage_hd_by_charm_%dp" % h))
+            g.console_bg("invtabs list all")
+            time.sleep(2.0)
+    finally:
+        g.CLIENT_W, g.CLIENT_H = old
+        g.fit_window(g.need_window())
+        time.sleep(2.0)
+    # legacy graphics: the button at the right end of the tab row; both modes
+    g.console_bg("invtabs close")
+    time.sleep(0.8)
+    if set_graphics("legacy"):
+        time.sleep(2)
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+        _invtabs_visible("charmpage_sd_all", "charms classic", log, shots, results)
+        size = _invtabs_size()
+        g.console_bg("invtabs list charm")
+        time.sleep(2.0)
+        results["legacy_by_charm"] = _charmpage_mode(log, size) == "by charm"
+        _invtabs_visible("charmpage_sd_by_charm", "charms classic", log, shots, results)
+        g.press_bg("pgdn")
+        time.sleep(0.8)
+        shots.append(sh("charmpage_sd_by_charm_pgdn"))
+        g.console_bg("invtabs close")
+        time.sleep(0.8)
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+        shots.append(sh("charmpage_sd_by_charm_reopened"))
+        set_graphics("hd")
+        time.sleep(2)
+    else:
+        results["legacy_by_charm"] = False
+    # leave on by charm: the next game start must come back in it (the restart check above)
+    g.console_bg("invtabs open")
+    time.sleep(1.0)
+    g.console_bg("invtabs list charm")
+    time.sleep(2.0)
+    notes.append("left on %s (invtabs.toml %s)" % ("by charm", _charmpage_config()))
+    finish(name, all(results.values()), "%s; %s" % ("; ".join(notes), results), mark, shots, log, harness=INVTABS_HARNESS,
+           partial="the button's look and the lists, by eye on the screenshots")
+
+
 CHECKS += [("invtabs_seed", check_invtabs_seed), ("invtabs", check_invtabs), ("invtabs_tabs", check_invtabs_tabs),
            ("invtabs_refused", check_invtabs_refused), ("invtabscore", check_invtabscore),
            ("invtabscore_outside", check_invtabscore_outside)]  # docs/invtabs.md
+CHECKS += [("charmpage_grid", check_charmpage_grid), ("charmpage", check_charmpage)]  # lane charmpage: bug #615, the list's mode
 CHECKS += [("rpsignets", check_rpsignets)]  # lane phase3: engine-triage #24, signets (pSpell 3) and the Apple (pSpell 10)
 CHECKS += [("apple_use", check_apple_use)]  # lane apple: bug #499, the Apple bought, used, Save and Exit
 CHECKS += [("acts", check_acts)]
@@ -16711,6 +16937,16 @@ def check_statbook_side():
 
 CHECKS += [("statbook_side", check_statbook_side)]
 
+
+def check_statbook_legacy():
+    """The Stat Book on the legacy sheet: every tab, the arrows, search, close / reopen, G with the sheet and the side panel
+    open, the top / side toggle, 1080p / 1440p and the HD sheet after (tools/statbook_checks.py run_legacy)."""
+    import statbook_checks
+    statbook_checks.run_legacy(sys.modules[__name__])
+
+
+CHECKS += [("statbook_legacy", check_statbook_legacy)]
+
 # lane hdcombat: player report "damage, hits and chance-to-cast procs work less well in HD than in legacy graphics". The same
 # Barbarian, sword and zombie in each graphics mode: HC_ATTACKS left clicks without procs (hits = clicks after which the zombie
 # lost life, damage = its life lost), then HC_ATTACKS clicks with Addertongue (25 % Venomous Spirit 841 on attack; procs = the
@@ -17236,6 +17472,26 @@ def check_zonenames():
 
 
 CHECKS += [("zonenames", check_zonenames)]
+
+
+def check_leftskills():
+    """Left-click skills and Move Only (docs/left-skills.md; tools/leftskills_checks.py): formerly right-only skills cast from the
+    left button, the aura and the scroll refused there, Move Only walks and never attacks, the pop-ups in HD and legacy, the left
+    skill kept by Save and Exit."""
+    import leftskills_checks
+    leftskills_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("leftskills", check_leftskills)]
+
+
+def check_leftskills_pad():
+    """Left-click skills: the gamepad's skill assignment, a pad script with shots (tools/leftskills_checks.py run_pad)."""
+    import leftskills_checks
+    leftskills_checks.run_pad(sys.modules[__name__])
+
+
+CHECKS += [("leftskills_pad", check_leftskills_pad)]
 
 if __name__ == "__main__":
     main()

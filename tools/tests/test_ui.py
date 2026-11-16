@@ -257,6 +257,93 @@ class LayoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ui_layouts.set_title('{ "name": "title", "fields": { } }', "x")
 
+    HUD_HD = """{ "type": "HUDPanelHD", "name": "HUDPanel", "fields": { "rect": { "x": -1454, "y": -412 } },
+    "children": [
+        {
+            "type": "BeltWidget", "name": "Belt",
+            "fields": { "rect": { "x": 1704, "y": 278 }, "cellOffsetInRow": { "x": 12, "y": 6 } },
+            "children": [ { "type": "TextBoxWidget", "name": "HotkeyLabelTemplate", "fields": { "text": "123" } } ]
+        },
+        { "type": "LevelUpButtonWidget", "name": "StatUp", "fields": { "labels": ["@strlvlup", "@strlvlup"] } }
+    ] }"""
+    HUD_SD = """{ "type": "SDHeadsUpPanel", "name": "HUDPanel", "children": [
+        { "type": "Widget", "name": "Middle", "children": [
+                { "type": "BeltWidget", "name": "Belt", "fields": { "rect": { "x": 176, "y": 63 } } },
+            ]
+        },
+    ] }"""
+
+    def hud(self, fn, text):
+        import pad_ui
+        orig = ui_layouts.baseline
+        ui_layouts.baseline = lambda name: text
+        try:
+            out = ui_layouts.literalize(fn(), "hud")
+        finally:
+            ui_layouts.baseline = orig
+        return out, pad_ui.load(out)
+
+    def test_belt_count_boxes_hd(self):
+        """Bug #613: eight empty boxes after the belt in the HUD panel, on the bottom-row cells (the plugin's names)."""
+        out, d = self.hud(ui_layouts.hud_hd, self.HUD_HD)
+        names = [c["name"] for c in d["children"]]
+        # the reserve row before the belt (an opened belt covers it), the counts after it
+        self.assertEqual(names[:6], [f"MxlBeltReserve{i}" for i in range(4)] + ["Belt", "MxlBeltCount0"])
+        self.assertEqual(names[-1], "StatUp")
+        boxes = {c["name"]: c["fields"] for c in d["children"] if c["name"].startswith("MxlBeltCount")}
+        self.assertEqual(sorted(boxes), sorted(f"{s}{i}" for s in ("MxlBeltCount", "MxlBeltCountLow") for i in range(4)))
+        for i in range(4):
+            for stem in ("MxlBeltCount", "MxlBeltCountLow"):
+                f = boxes[f"{stem}{i}"]
+                self.assertEqual(f["text"], "")
+                self.assertEqual((f["rect"]["x"], f["rect"]["y"]), (1716 + 125 * i, 284))  # the cell's top left
+                self.assertLessEqual(f["rect"]["width"], 98)
+                self.assertEqual(f["style"]["alignment"], {"h": "right", "v": "bottom"})
+                self.assertEqual(f["style"]["pointSize"], 34)  # larger than the hotkey letter ($MediumFontSize 26)
+        self.assertEqual(boxes["MxlBeltCount0"]["style"]["fontColor"]["g"], 255)
+        self.assertEqual(boxes["MxlBeltCountLow0"]["style"]["fontColor"]["g"], 70)  # red: 1 or 0 left in the column
+        reserve = {c["name"]: c["fields"] for c in d["children"] if c["name"].startswith("MxlBeltReserve")}
+        for i in range(4):
+            f = reserve[f"MxlBeltReserve{i}"]
+            self.assertEqual(f["text"], "")
+            # centred on the cell (1716 + 125 i, 98 wide), its bottom above the belt's rim (y 222)
+            self.assertAlmostEqual(f["rect"]["x"] + f["rect"]["width"] / 2, 1716 + 125 * i + 49, delta=1)
+            self.assertLessEqual(f["rect"]["y"] + f["rect"]["height"], 222)
+            self.assertEqual(f["style"]["alignment"], {"h": "center", "v": "bottom"})
+        self.assertIn('"labels": ["New Stats", "New Stats"]', out)  # a layout the mod serves draws keys as "Missing string"
+
+    def test_belt_count_boxes_classic(self):
+        _, d = self.hud(ui_layouts.hud_classic, self.HUD_SD)
+        middle = d["children"][0]
+        names = [c["name"] for c in middle["children"]]
+        self.assertEqual(len(names), 13)
+        self.assertEqual(names[0], "Belt")
+        fields = {c["name"]: c["fields"] for c in middle["children"][1:]}
+        rects = {n: f["rect"] for n, f in fields.items()}
+        for i in range(4):
+            self.assertEqual((rects[f"MxlBeltCount{i}"]["x"], rects[f"MxlBeltCount{i}"]["y"]), (177 + 31 * i, 65))
+            self.assertEqual(rects[f"MxlBeltCountLow{i}"], rects[f"MxlBeltCount{i}"])
+            # the reserve in the same cell, at its top right (the classic mini panel sits above the belt)
+            self.assertEqual(rects[f"MxlBeltReserve{i}"]["x"], 177 + 31 * i)
+            self.assertEqual(fields[f"MxlBeltReserve{i}"]["style"]["alignment"], {"h": "right", "v": "top"})
+        self.assertNotIn("pointSize", middle["children"][1]["fields"]["style"])  # the legacy HUD's own font size
+
+    def test_belt_count_boxes_on_d2r_files(self):
+        """The real D2R 93847 HUD files, when the baseline has them: every key has a literal, the boxes land beside the belt."""
+        import pad_ui
+        for name, fn in (("hudpanelhd.json", ui_layouts.hud_hd), ("hudpanel.json", ui_layouts.hud_classic)):
+            if not (ui_layouts.BASE_UI / "layouts" / name).exists():
+                self.skipTest(f"{name} not in the D2R baseline (hd_ui.py baseline)")
+            d = pad_ui.load(ui_layouts.literalize(fn(), name))
+            flat = []
+            stack = [d]
+            while stack:
+                w = stack.pop()
+                flat += [c["name"] for c in w.get("children", [])]
+                stack += w.get("children", [])
+            self.assertEqual(sum(n.startswith("MxlBeltCount") for n in flat), 8, name)
+            self.assertEqual(sum(n.startswith("MxlBeltReserve") for n in flat), 4, name)
+
     def test_classic_skilltree_tab_titles_emptied_for_all_eight(self):
         classes = ("Am", "So", "Ne", "Pa", "Ba", "Dr", "As", "Wa")
         lists = ",\n".join(f'"textTab{i}": [ ' + ", ".join(f'"@SkillCategory{c}{i + 1}"' for c in classes) + " ]" for i in range(3))

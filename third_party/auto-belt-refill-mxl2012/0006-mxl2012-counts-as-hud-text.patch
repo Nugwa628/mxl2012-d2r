@@ -1,0 +1,427 @@
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+index 45670fb..b35041d 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
++++ b/Auto-belt-refill-v0.35.9-EN/src/auto_belt_refill_plugin.cpp
+@@ -62,7 +62,7 @@
+ //   match_first_slot = true: each column refills with exactly the item code in its first (bottom) slot; a completely empty
+ //     column refills nothing until the player puts a potion there. No families, no prefer_large, no follow-the-game extension.
+ //   never_refill = [...]: codes that are never learned or refilled (Median's elixirs and the Goodberry).
+-//   belt_counts = true: a small count on each column of how many of its potion the inventory and the belt hold (overlay).
++//   belt_counts = true: a small count on each column of how many of its potion the inventory and the belt hold (D2R's own HUD text, 0006).
+ 
+ #define WIN32_LEAN_AND_MEAN
+ #define NOMINMAX
+@@ -2127,18 +2127,17 @@ auto StartFillSession(const D2RL::PluginContext* context) noexcept -> D2RL::Thre
+ // ---------------------------------------------------------------- belt counts
+ //
+ // D2R-XL 2012: the watcher's snapshot gives each column's code (its first slot, else its memory) and how many items of that
+-// code the inventory and the belt hold; the overlay callback (render thread) draws them. Atomics only: the two threads share
+-// nothing else. g_countsStampMs = 0 or older than CountsStaleMs (out of a game: the watcher stops) = draw nothing.
++// code the inventory and the belt hold; a UI-thread pass puts them in the HUD's count boxes. Atomics only: the two threads share
++// nothing else. g_countsStampMs = 0 or older than CountsStaleMs (out of a game: the watcher stops) = empty boxes.
+ 
+ constexpr uint64_t CountsStaleMs = 2000;
+ std::atomic<uint32_t> g_countCode[BeltColumns] {};
+ std::atomic<uint32_t> g_countValue[BeltColumns] {};
+ std::atomic<uint64_t> g_countsStampMs {0};
+-std::atomic<uint64_t> g_overlayFrames {0};  // belt-counts: overlay callbacks seen
+-std::atomic<uint64_t> g_overlayDrawn {0};   // belt-counts: counts drawn (drawText Success)
+-
+-const D2RL::OverlayService* g_overlay = nullptr;
+-D2RL::Overlay::CallbackHandle g_overlayHandle = D2RL::Overlay::InvalidCallbackHandle;
++std::atomic<uint64_t> g_textsSet {0};      // belt-counts: texts given to D2R's setter
++std::atomic<uint32_t> g_boxesFound {0};    // belt-counts: count boxes found in the HUD panel at its last (re)fill
++std::atomic<bool>     g_hudFound {false};  // belt-counts: the HUD panel was there at the last UI pass
++std::atomic<bool>     g_textsQueued {false};
+ 
+ void UpdateBeltCounts(const Snapshot& snapshot) noexcept {
+ 	uint32_t codes[MaxBeltSlots + MaxCarried] {};
+@@ -2241,114 +2240,136 @@ auto ClassicScreen(float& width, float& height) noexcept -> bool {
+ 	return true;
+ }
+ 
+-void DrawCountText(const D2RL::PluginContext* context, const D2RL::Overlay::Frame* frame, float x, float y, float size,
+-                   const char* text, uint32_t length, D2RL::Overlay::Color color) noexcept {
+-	D2RL::Overlay::TextRequest request {
+-		.structSize = D2RL::Overlay::TextRequestSize,
+-		.flags      = 0,
+-		.canvas     = frame->canvas,
+-		.position   = {x, y},
+-		.color      = {0.0F, 0.0F, 0.0F, 0.9F},
+-		.textSize   = size,
+-		.reserved   = 0,
+-		.text       = text,
+-		.textLength = length,
+-		.reserved2  = 0,
+-	};
+-	// a one-pixel black outline keeps the digits readable over any potion
+-	const float offsets[4][2] = {{-1.0F, 0.0F}, {1.0F, 0.0F}, {0.0F, -1.0F}, {0.0F, 1.0F}};
+-	for (const auto& offset : offsets) {
+-		request.position = {x + offset[0], y + offset[1]};
+-		(void)g_overlay->drawText(context, &request);
++// The counts as D2R's own HUD text (0006; BeltMatch::BoxTexts): the watcher queues a UI-thread pass after each refresh, the
++// pass finds the HUD panel and its count boxes and gives D2R's text setter only what changed (all of it for a new panel: a
++// new game, or G between HD and legacy, which swaps the HUD layout). The overlay text of 0003 / 0004 never reached the
++// screen (docs/bugs.md #567), so nothing is drawn through D2RLoader's overlay any more.
++struct NativeStringView {
++	const char* data;
++	size_t      size;
++};
++using UiFindPanelFn = void* (*)(void* root, const char* name128);
++using UiFindChildFn = void* (*)(void* widget, const char* name);
++using UiSetTextFn   = void (*)(void* textBox, const NativeStringView* text);
++
++void* const*  g_uiRoot      = nullptr;
++UiFindPanelFn g_uiFindPanel = nullptr;
++UiFindChildFn g_uiFindChild = nullptr;
++UiSetTextFn   g_uiSetText   = nullptr;
++bool          g_textNatives = false;
++const char*   g_textMissing = "belt_counts off in the config";
++
++// UI thread only
++void*    g_textPanel  = nullptr;
++uint64_t g_textFullMs = 0; // last full refill: a HUD rebuilt at the same address would otherwise keep empty boxes
++char  g_shownText[BeltColumns][2][4] {};
++
++void ApplyCountTextsInner() noexcept {
++	void* root = *g_uiRoot;
++	if (root == nullptr) {
++		g_hudFound.store(false, std::memory_order_relaxed);
++		return;
++	}
++	char name[128] {};
++	std::memcpy(name, BeltMatch::HudPanelName, std::strlen(BeltMatch::HudPanelName)); // D2R reads all 128 bytes
++	void* panel = g_uiFindPanel(root, name);
++	g_hudFound.store(panel != nullptr, std::memory_order_relaxed);
++	if (panel == nullptr) {
++		g_textPanel = nullptr;
++		return;
++	}
++	const uint64_t now   = GetTickCount64();
++	const bool     fresh = panel != g_textPanel || now - g_textFullMs >= 1000;
++	g_textPanel          = panel;
++	if (fresh) {
++		g_textFullMs = now;
++	}
++	const uint64_t stamp = g_countsStampMs.load(std::memory_order_acquire);
++	const bool     live  = stamp != 0 && now - stamp <= CountsStaleMs;
++	uint32_t found = 0;
++	for (uint32_t column = 0; column < BeltColumns; ++column) {
++		const uint32_t code  = live ? g_countCode[column].load(std::memory_order_relaxed) : 0;
++		const auto     texts = BeltMatch::BoxTexts(code, g_countValue[column].load(std::memory_order_relaxed));
++		for (int zero = 0; zero < 2; ++zero) {
++			const char* want  = zero != 0 ? texts.red : texts.white;
++			char*       shown = g_shownText[column][zero];
++			if (!fresh && std::strcmp(shown, want) == 0) {
++				continue;
++			}
++			char boxName[24] {};
++			void* box = g_uiFindChild(panel, BeltMatch::BoxName(zero != 0, column, boxName));
++			if (box == nullptr) {
++				continue;
++			}
++			++found;
++			const NativeStringView view {want, std::strlen(want)};
++			g_uiSetText(box, &view);
++			std::memcpy(shown, want, 4); // BoxTexts: at most 3 digits and the terminator
++			g_textsSet.fetch_add(1, std::memory_order_relaxed);
++		}
+ 	}
+-	request.position = {x, y};
+-	request.color    = color;
+-	if (g_overlay->drawText(context, &request) == D2RL::Overlay::Result::Success) {
+-		g_overlayDrawn.fetch_add(1, std::memory_order_relaxed);
++	if (fresh) {
++		g_boxesFound.store(found, std::memory_order_relaxed);
+ 	}
+ }
+ 
+-void OnOverlayFrame(const D2RL::PluginContext* context, const D2RL::Overlay::Frame* frame, void*) noexcept {
+-	if (frame == nullptr || g_overlay == nullptr || !g_countNatives) {
++void __cdecl ApplyCountTexts(const D2RL::PluginContext*, void*) noexcept {
++	g_textsQueued.store(false, std::memory_order_release);
++	if (!g_textNatives) {
+ 		return;
+ 	}
+-	g_overlayFrames.fetch_add(1, std::memory_order_relaxed);
+-	const uint64_t stamp = g_countsStampMs.load(std::memory_order_acquire);
+-	if (stamp == 0 || GetTickCount64() - stamp > CountsStaleMs) {
+-		return;
++	__try {
++		ApplyCountTextsInner();
++	} __except (EXCEPTION_EXECUTE_HANDLER) {
++		g_textNatives = false; // a fault in D2R's UI code: the counts stop, the game and the refill go on
++		g_textMissing = "a fault in the UI pass";
+ 	}
+-	const bool hd = g_hdMode() != 0;
+-	float sdWidth = 800.0F;
+-	float sdHeight = 600.0F;
+-	if (!hd && !ClassicScreen(sdWidth, sdHeight)) {
++}
++
++void QueueCountTexts(const D2RL::PluginContext* context) noexcept {
++	if (!g_textNatives || g_threads == nullptr || g_textsQueued.exchange(true, std::memory_order_acq_rel)) {
+ 		return;
+ 	}
+-	for (uint32_t column = 0; column < BeltColumns; ++column) {
+-		if (g_countCode[column].load(std::memory_order_relaxed) == 0) {
+-			continue;
+-		}
+-		const uint32_t count = g_countValue[column].load(std::memory_order_relaxed);
+-		char           text[4] {};
+-		const uint32_t length = BeltMatch::CountText(count, text);
+-		const auto cell = BeltMatch::FirstRowCell(hd, frame->screenWidth, frame->screenHeight, sdWidth, sdHeight, column);
+-		const float size = cell.size * (hd ? 0.30F : 0.42F);
+-		D2RL::Overlay::TextMetrics metrics {.structSize = D2RL::Overlay::TextMetricsSize, .flags = 0};
+-		const D2RL::Overlay::MeasureTextRequest measure {
+-			.structSize = D2RL::Overlay::MeasureTextRequestSize,
+-			.flags      = 0,
+-			.canvas     = frame->canvas,
+-			.textSize   = size,
+-			.reserved   = 0,
+-			.text       = text,
+-			.textLength = length,
+-			.reserved2  = 0,
+-		};
+-		float width = size * 0.6F * static_cast<float>(length);
+-		if (g_overlay->measureText(context, &measure, &metrics) == D2RL::Overlay::Result::Success) {
+-			width = metrics.width;
+-		}
+-		// top-right corner of the first-row cell; red when none is left to refill with
+-		const float pad = cell.size * 0.04F;
+-		const D2RL::Overlay::Color color = count == 0 ? D2RL::Overlay::Color {1.0F, 0.35F, 0.3F, 1.0F}
+-		                                              : D2RL::Overlay::Color {1.0F, 1.0F, 1.0F, 1.0F};
+-		DrawCountText(context, frame, cell.left + cell.size - width - pad, cell.top + pad * 0.5F, size, text, length, color);
++	if (g_threads->runOnUiThread(context, ApplyCountTexts, nullptr) != D2RL::Threads::Result::Success) {
++		g_textsQueued.store(false, std::memory_order_release);
+ 	}
+ }
+ 
+-void RegisterCountOverlay(const D2RL::PluginContext* context) noexcept {
++void RegisterCountTexts(const D2RL::PluginContext* context) noexcept {
+ 	if (!g_config.beltCounts) {
+ 		return;
+ 	}
+-	ResolveCountNatives(context);
+-	if (!g_countNatives) {
+-		return; // logged; refilling is not affected
+-	}
+-	if (context->QueryService(&g_overlay) != D2RL::ServiceQueryResult::Success
+-	    || !D2RL::HasOverlayServiceField(g_overlay, D2RL::OverlayServiceRequiredSize)) {
+-		g_overlay = nullptr;
+-		context->LogInfo("AutoBeltRefill: belt_counts: overlay service unavailable - no counts.");
++	ResolveCountNatives(context); // HD / legacy and the classic screen, for belt-counts' report only
++	const auto base      = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
++	size_t     imageSize = 0;
++	size_t     textRva   = 0;
++	size_t     textSize  = 0;
++	if (base == 0 || !ImageText(base, imageSize, textRva, textSize)) {
++		g_textMissing = "the game's .text section";
++		Log(context, "AutoBeltRefill: belt_counts: OFF - the game's .text section was not found.");
+ 		return;
+ 	}
+-	const D2RL::Overlay::CallbackRegistration registration {
+-		.structSize = D2RL::Overlay::CallbackRegistrationSize,
+-		.flags      = 0,
+-		.phase      = D2RL::Overlay::Phase::AfterGameUi,
+-		.priority   = 0,
+-		.callback   = OnOverlayFrame,
+-		.userData   = nullptr,
+-	};
+-	if (g_overlay->registerFrameCallback(context, &registration, &g_overlayHandle) != D2RL::Overlay::Result::Success) {
+-		g_overlay = nullptr;
+-		context->LogInfo("AutoBeltRefill: belt_counts: overlay registration failed - no counts.");
++	const auto natives = BeltMatch::ResolveTextNatives(reinterpret_cast<const uint8_t*>(base), imageSize, textRva, textSize);
++	if (!natives.ok()) {
++		g_textMissing = natives.missing;
++		Log(context, "AutoBeltRefill: belt_counts: OFF - pattern %s not found exactly once in this D2R build.", natives.missing);
+ 		return;
+ 	}
+-	Log(context, "AutoBeltRefill: belt_counts: on.");
++	g_uiRoot      = reinterpret_cast<void* const*>(base + static_cast<uintptr_t>(natives.uiRoot));
++	g_uiFindPanel = reinterpret_cast<UiFindPanelFn>(base + static_cast<uintptr_t>(natives.findPanel));
++	g_uiFindChild = reinterpret_cast<UiFindChildFn>(base + static_cast<uintptr_t>(natives.findChild));
++	g_uiSetText   = reinterpret_cast<UiSetTextFn>(base + static_cast<uintptr_t>(natives.setText));
++	g_textNatives = true;
++	Log(context, "AutoBeltRefill: belt_counts: on, as HUD text: UiRoot D2R+0x%llX, UiFindPanel +0x%llX, UiFindChild +0x%llX, "
++		"TextBoxSetText +0x%llX (93847: 0x3440170, 0x89F760, 0x855C90, 0x86DD50).",
++		static_cast<unsigned long long>(natives.uiRoot), static_cast<unsigned long long>(natives.findPanel),
++		static_cast<unsigned long long>(natives.findChild), static_cast<unsigned long long>(natives.setText));
+ }
+ 
+-// belt-counts: the counts and where the overlay puts them.
++// belt-counts: the counts and whether D2R's HUD has the boxes they go in.
+ void RunCounts(const D2RL::PluginContext* context, void*) noexcept {
+-	if (!g_countNatives) {
+-		Log(context, "AutoBeltRefill: counts: off (%s).", g_countMissing);
++	if (!g_textNatives) {
++		Log(context, "AutoBeltRefill: counts: off (%s).", g_textMissing);
+ 		return;
+ 	}
+ 	Snapshot snapshot {};
+@@ -2356,23 +2377,20 @@ void RunCounts(const D2RL::PluginContext* context, void*) noexcept {
+ 		return;
+ 	}
+ 	UpdateBeltCounts(snapshot);
+-	const bool hd = g_hdMode() != 0;
++	QueueCountTexts(context);
++	const bool hd = g_countNatives && g_hdMode() != 0;
+ 	float sdWidth = 0.0F;
+ 	float sdHeight = 0.0F;
+ 	const bool classic = ClassicScreen(sdWidth, sdHeight);
+-	D2RL::Overlay::Metrics metrics {.structSize = D2RL::Overlay::MetricsSize, .flags = 0};
+-	const bool haveMetrics = g_overlay != nullptr && g_overlay->getMetrics(context, &metrics) == D2RL::Overlay::Result::Success;
+-	Log(context, "AutoBeltRefill: counts: %s graphics, screen %.0f x %.0f, classic screen %s %.0f x %.0f.",
+-		hd ? "HD" : "legacy", metrics.screenWidth, metrics.screenHeight, classic ? "ok" : "unknown", sdWidth, sdHeight);
+-	Log(context, "AutoBeltRefill: counts: overlay %s, %llu frame(s), %llu count(s) drawn.", haveMetrics ? "live" : "no metrics",
+-		static_cast<unsigned long long>(g_overlayFrames.load()), static_cast<unsigned long long>(g_overlayDrawn.load()));
++	Log(context, "AutoBeltRefill: counts: %s graphics, classic screen %s %.0f x %.0f.",
++		g_countNatives ? (hd ? "HD" : "legacy") : "unknown", classic ? "ok" : "unknown", sdWidth, sdHeight);
++	Log(context, "AutoBeltRefill: counts: HUD panel %s, %u of %u count box(es) found, %llu text(s) set.",
++		g_hudFound.load() ? "found" : "not found", g_boxesFound.load(), BeltColumns * 2,
++		static_cast<unsigned long long>(g_textsSet.load()));
+ 	for (uint32_t column = 0; column < BeltColumns; ++column) {
+ 		char text[5] {};
+ 		CodeText(g_countCode[column].load(), text);
+-		const auto cell = BeltMatch::FirstRowCell(hd, metrics.screenWidth, metrics.screenHeight, classic ? sdWidth : 800.0F,
+-		                                          classic ? sdHeight : 600.0F, column);
+-		Log(context, "AutoBeltRefill: counts: column %u code=%s count=%u cell=(%.0f, %.0f, %.0f).", column, text,
+-			g_countValue[column].load(), cell.left, cell.top, cell.size);
++		Log(context, "AutoBeltRefill: counts: column %u code=%s count=%u.", column, text, g_countValue[column].load());
+ 	}
+ }
+ 
+@@ -2439,6 +2457,7 @@ void RunAutoWatch(const D2RL::PluginContext* context, void*) noexcept {
+ 	}
+ 	if (g_config.beltCounts) {
+ 		UpdateBeltCounts(snapshot);
++		QueueCountTexts(context);
+ 	}
+ 	if (!g_config.autoRefill) {
+ 		reschedule();
+@@ -3755,7 +3774,7 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context)
+ 		"Console (Ctrl + `): belt-fill, belt-place, belt-policy, belt-config, belt-snapshot, belt-reset, belt-scan, belt-watch, belt-counts, belt-verify",
+ 		keyHint);
+ 	context->LogInfo(banner);
+-	RegisterCountOverlay(context);
++	RegisterCountTexts(context);
+ 	if (g_config.autoRefill || g_config.beltCounts) {
+ 		// The GameJoined listener restarts the watch chain whenever a game
+ 		// begins; this load-time attempt covers a hot reload mid-game.
+@@ -3784,8 +3803,12 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context)
+ 
+ D2RL_PLUGIN_EXPORT void D2RLoaderUnloadPlugin() noexcept {
+ 	g_countsStampMs.store(0);
+-	g_overlay         = nullptr;
+-	g_overlayHandle   = D2RL::Overlay::InvalidCallbackHandle;
++	g_textNatives     = false;
++	g_textsQueued.store(false);
++	g_uiRoot          = nullptr;
++	g_uiFindPanel     = nullptr;
++	g_uiFindChild     = nullptr;
++	g_uiSetText       = nullptr;
+ 	g_inventory       = nullptr;
+ 	g_threads         = nullptr;
+ 	g_input           = nullptr;
+diff --git a/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h b/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
+index 24419a0..06ed04d 100644
+--- a/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
++++ b/Auto-belt-refill-v0.35.9-EN/src/belt_match_logic.h
+@@ -9,6 +9,7 @@
+ // The repo's signature scan (invtabs/src, the same helper as the tab and summary plugins): ParsePattern / FindPattern /
+ // RipTarget / ResolveNative. Pure, standard headers only.
+ #include "invtabs_logic.h"
++#include "summary_natives.h"
+ 
+ namespace BeltMatch {
+ 
+@@ -173,4 +174,89 @@ inline auto ResolveCountNatives(const std::uint8_t* image, std::size_t imageSize
+ 	return out;
+ }
+ 
++// ---- the counts as D2R's own HUD text (0006) ----
++// D2RLoader's overlay text never reached the screen on this game (drawText Success, nothing drawn: docs/bugs.md #567, and the
++// owner saw no count in 0.1.15 - 0.1.23). The counts are now text boxes of D2R's own HUD: D2R-XL 2012's hudpanelhd.json /
++// hudpanel.json (tools/ui_layouts.py `hud_*`) add, after the belt, two boxes per column on the bottom-row cell, right-aligned
++// on the hotkey letter's line: `MxlBeltCount<c>` (white) and `MxlBeltCountZero<c>` (red). The plugin fills one of them through
++// D2R's own text setter on the UI thread and empties the other. Without those boxes (another mod) nothing shows.
++inline constexpr const char* HudPanelName = "HUDPanel";
++
++struct CountBoxTexts {
++	char white[4];
++	char red[4];
++};
++
++// The two boxes of a column: no code (empty column, elixir) = both empty; 0 left = "0" in red; else the count in white.
++constexpr auto BoxTexts(uint32_t code, uint32_t count) noexcept -> CountBoxTexts {
++	CountBoxTexts out {};
++	if (code == 0) {
++		return out;
++	}
++	if (count == 0) {
++		CountText(0, out.red);
++	} else {
++		CountText(count, out.white);
++	}
++	return out;
++}
++
++// `MxlBeltCount<column>` / `MxlBeltCountZero<column>` (column 0..3).
++inline auto BoxName(bool zero, uint32_t column, char (&out)[24]) noexcept -> const char* {
++	const char* stem = zero ? "MxlBeltCountZero" : "MxlBeltCount";
++	std::size_t at = 0;
++	for (; stem[at] != '\0' && at + 2 < sizeof(out); ++at) {
++		out[at] = stem[at];
++	}
++	out[at++] = static_cast<char>('0' + column % 10);
++	out[at] = '\0';
++	return out;
++}
++
++// D2R's UI root, panel lookup, child lookup and text setter, by the repo's signatures (invtabs/src/summary_natives.h: the
++// same functions plugin/src/devmenu.cpp and the charm summary use; 93847 0x3440170, 0x89f760, 0x855c90, 0x86dd50).
++struct TextNatives {
++	std::int64_t uiRoot    = -1; // data: void* the root widget
++	std::int64_t findPanel = -1; // void* (void* root, const char name[128])
++	std::int64_t findChild = -1; // void* (void* widget, const char* name)
++	std::int64_t setText   = -1; // void (void* textBox, const {const char*, size_t}* text)
++	const char*  missing   = nullptr;
++	auto ok() const noexcept -> bool { return missing == nullptr; }
++};
++
++// Each signature must match exactly once; the root must be data outside .text, the three functions distinct and in .text.
++inline auto ResolveTextNatives(const std::uint8_t* image, std::size_t imageSize, std::size_t textRva, std::size_t textSize) noexcept
++	-> TextNatives {
++	namespace S = invtabs::summary;
++	const auto fail = [](const char* name) {
++		TextNatives none;
++		none.missing = name;
++		return none;
++	};
++	if (image == nullptr || textRva >= imageSize || textSize > imageSize - textRva) {
++		return fail("image");
++	}
++	const auto inText = [&](std::int64_t rva) {
++		return rva >= 0 && static_cast<std::size_t>(rva) >= textRva && static_cast<std::size_t>(rva) < textRva + textSize;
++	};
++	TextNatives out;
++	const std::int64_t root = invtabs::ResolveNative(image, textRva, textSize, S::SummaryPatterns[S::UiRoot]);
++	if (root < 0 || inText(root) || static_cast<std::size_t>(root) > imageSize - 8) {
++		return fail(S::SummaryPatterns[S::UiRoot].name);
++	}
++	std::int64_t* fns[3] = {&out.findPanel, &out.findChild, &out.setText};
++	const int     ids[3] = {S::UiFindPanel, S::UiFindChild, S::TextBoxSetText};
++	for (int k = 0; k < 3; ++k) {
++		*fns[k] = invtabs::ResolveNative(image, textRva, textSize, S::SummaryPatterns[ids[k]]);
++		if (!inText(*fns[k])) {
++			return fail(S::SummaryPatterns[ids[k]].name);
++		}
++	}
++	if (out.findPanel == out.findChild || out.findPanel == out.setText || out.findChild == out.setText) {
++		return fail("UI functions not distinct");
++	}
++	out.uiRoot = root;
++	return out;
++}
++
+ } // namespace BeltMatch

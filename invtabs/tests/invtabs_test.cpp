@@ -137,6 +137,32 @@ void ConfigReader() {
 	CHECK(ParseConfig("[tabs.charms]\ncolumns = 10\nrows = 6\ntypes = \"types_charms.txt\"\nlabel = \"Charms\"\n# [tabs.consumables]\n# columns = 6\n").tabs.size() == 1);
 }
 
+void ListModeConfig() {
+	CHECK(!ParseConfig("").listByCharm);
+	CHECK(ParseConfig("[invtabs]\nsummary_list = \"by_charm\"\n").listByCharm);
+	CHECK(!ParseConfig("[invtabs]\nsummary_list = \"all\"\n").listByCharm);
+	const auto bad = ParseConfig("[invtabs]\nsummary_list = sideways\n");
+	CHECK(!bad.listByCharm && bad.problems.size() == 1);
+	// written back in place: the comment and the rest of the file kept
+	const std::string toml = "# head\n[invtabs]\nenabled = true\nsummary_list = \"all\"   # the list\nopen_key = 73\n[tabs.charms]\nrows = 6\n";
+	const std::string set  = SetConfigKey(toml, "invtabs", "summary_list", "\"by_charm\"");
+	CHECK(set == "# head\n[invtabs]\nenabled = true\nsummary_list = \"by_charm\"   # the list\nopen_key = 73\n[tabs.charms]\nrows = 6\n");
+	CHECK(ParseConfig(set).listByCharm && ParseConfig(set).tabs.size() == 1 && ParseConfig(set).openKey == 73);
+	CHECK(SetConfigKey(set, "invtabs", "summary_list", "\"all\"") == toml);
+	// CRLF files keep their line ends
+	CHECK(SetConfigKey("[invtabs]\r\nsummary_list = \"all\"\r\n", "invtabs", "summary_list", "\"by_charm\"") == "[invtabs]\r\nsummary_list = \"by_charm\"\r\n");
+	// a key of the same name in another section is not touched; the key is added under [invtabs]
+	CHECK(SetConfigKey("[tabs.charms]\nsummary_list = 1\n[invtabs]\nenabled = true\n", "invtabs", "summary_list", "\"all\"")
+	      == "[tabs.charms]\nsummary_list = 1\n[invtabs]\nsummary_list = \"all\"\nenabled = true\n");
+	// no section: added at the end (also to an empty file)
+	CHECK(SetConfigKey("[tabs.charms]\nrows = 6", "invtabs", "summary_list", "\"all\"") == "[tabs.charms]\nrows = 6\n[invtabs]\nsummary_list = \"all\"\n");
+	CHECK(SetConfigKey("", "invtabs", "summary_list", "\"all\"") == "[invtabs]\nsummary_list = \"all\"\n");
+	// the header as the last line without a newline
+	CHECK(SetConfigKey("[invtabs]", "invtabs", "summary_list", "\"all\"") == "[invtabs]\nsummary_list = \"all\"\n");
+	// the shipped invtabs.toml's default reads as all stats
+	CHECK(!ParseConfig("[invtabs]\n# The charm tab's stat list\nsummary_list = \"all\"\n").listByCharm);
+}
+
 std::vector<Tab> Wanted(const char* toml) { return ParseConfig(toml).tabs; }
 
 void TabPlan() {
@@ -329,7 +355,27 @@ void Layouts() {
 	const auto box = L::ClassicSummaryBox(6), text = L::ClassicSummaryText(6);
 	CHECK(box.x == 20 && box.y == 86 && box.x + box.w == 302 && box.y + box.h == 164 && text.h == 5 * 12);
 	CHECK(L::ClassicFits(10, 7) && !L::ClassicFits(10, 8) && !L::ClassicFits(11, 2) && L::ClassicFits(4, 3));
+	// the list's mode button: HD in the summary band's top-right corner, its frames from frame0, the click to our empty panel
+	L::ListToggle t { "PANEL\\invtabs\\listmode", 4, 1.0, "Show all stats", "invtabs/ListMode" };
+	const auto g10 = L::HdLayoutOf(10, 6, 1, true);
+	const auto withToggle = L::HdPanel({ { "invtabs/Charms", "Charms" } }, 0, 0, 10, 6, g10, "d2rloader\\invtabs\\cells0", "", "Charms", t);
+	CHECK(Balanced(withToggle) && withToggle.find("\"name\": \"invtabs/ListMode\"") != std::string::npos);
+	CHECK(withToggle.find("{\"x\": " + std::to_string(g10.band.x + g10.band.w - L::HdToggleSize) + ", \"y\": " + std::to_string(g10.band.y) + "}") != std::string::npos);
+	CHECK(withToggle.find("\"normalFrame\": 4, \"hoveredFrame\": 5, \"pressedFrame\": 6, \"disabledFrame\": 7") != std::string::npos);
+	CHECK(withToggle.find("PanelManager:OpenPanel:invtabs/ListMode") != std::string::npos && withToggle.find("\"Show all stats\"") != std::string::npos);
+	CHECK(L::HdPanel({ { "invtabs/Charms", "Charms" } }, 0, 0, 10, 6, g10, "c", "", "Charms").find("ListMode") == std::string::npos);
+	t.scale = 0.6667;
+	CHECK(L::HdPanel({ { "invtabs/Charms", "Charms" } }, 0, 0, 10, 6, g10, "c", "", "Charms", t).find("\"scale\": 0.6667}") != std::string::npos);
+	// no band (a tab without the summary): no button
+	CHECK(L::HdPanel({ { "invtabs/Charms", "Charms" } }, 0, 0, 4, 3, L::HdLayoutOf(4, 3, 1, false), "c", "", "x", t).find("ListMode") == std::string::npos);
+	// classic: at the right end of the tab row, clear of the tabs
+	CHECK(L::ClassicToggleFits(1) && L::ClassicToggleFits(9) && !L::ClassicToggleFits(12));
+	L::ListToggle ct { "PANEL\\invtabs_listmode", 2, 1.0, "Show all stats", "invtabs/ListMode" };
+	const auto classicToggle = L::ClassicPanel({ { "invtabs/Charms", "Charms", "charms" } }, 0, 0, 10, 6, "", ct);
+	CHECK(Balanced(classicToggle) && classicToggle.find("\"normalFrame\": 2, \"pressedFrame\": 3") != std::string::npos);
+	CHECK(classicToggle.find(L::XYWH(L::ClassicToggleX, L::ClassicTabRowY(6), L::ClassicTabW, L::ClassicTabH)) != std::string::npos);
 	const auto classic = L::ClassicPanel({ { "invtabs/Charms", "Charms", "charms" } }, 0, 0, 10, 6, "");
+	CHECK(classic.find("ListMode") == std::string::npos);
 	CHECK(Balanced(classic) && classic.find("PANEL\\\\invtabs_charms") != std::string::npos && classic.find("\"x\": 7400, \"y\": 7401") != std::string::npos);
 }
 
@@ -339,6 +385,7 @@ int main() {
 	Marker();
 	Types();
 	ConfigReader();
+	ListModeConfig();
 	TabPlan();
 	MemoryFile();
 	Layouts();

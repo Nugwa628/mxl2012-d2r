@@ -1,4 +1,4 @@
-// Unit tests for belt_match_logic.h (patches 0003 / 0004) and belt_natives.h (patch 0005): exact first-slot matching, the counts and where they are drawn, and the
+// Unit tests for belt_match_logic.h (patches 0003 / 0004) and belt_natives.h (patch 0005), the HUD text of 0006: exact first-slot matching, the counts and where they are drawn, and the
 // signatures that find the counts' game data and the refill's routines. With env D2R_DUMP set to a memory-layout dump of D2R 93847 (file offset == RVA,
 // tools/dump_image.py) the signatures are also resolved in the real image.
 #include "belt_match_logic.h"
@@ -176,6 +176,92 @@ void Signatures() {
 	// a bad image description
 	CHECK(Missing(BeltMatch::ResolveCountNatives(nullptr, ImageSize, TextRva, TextSize), "image"));
 	CHECK(Missing(BeltMatch::ResolveCountNatives(image.data(), ImageSize, TextRva, ImageSize), "image"));
+}
+
+// ---- 0006 / 0007: the counts as D2R's own HUD text: the column's potions and the inventory reserve ----
+
+void HudText() {
+	auto t = BeltMatch::BoxTexts(0, 4, 17); // no code (empty column, elixir): all three boxes empty
+	CHECK(t.white[0] == '\0' && t.red[0] == '\0' && t.reserve[0] == '\0');
+	t = BeltMatch::BoxTexts(Code("hp3"), 0, 0); // column empty, none left: a red 0 and "+0"
+	CHECK(t.white[0] == '\0' && std::strcmp(t.red, "0") == 0 && std::strcmp(t.reserve, "+0") == 0);
+	t = BeltMatch::BoxTexts(Code("hp3"), 1, 0); // the last one: red
+	CHECK(t.white[0] == '\0' && std::strcmp(t.red, "1") == 0 && std::strcmp(t.reserve, "+0") == 0);
+	t = BeltMatch::BoxTexts(Code("hp3"), 2, 0);
+	CHECK(std::strcmp(t.white, "2") == 0 && t.red[0] == '\0');
+	t = BeltMatch::BoxTexts(Code("hp3"), 4, 17); // a full 4-row column, 17 more in the inventory
+	CHECK(std::strcmp(t.white, "4") == 0 && t.red[0] == '\0' && std::strcmp(t.reserve, "+17") == 0);
+	t = BeltMatch::BoxTexts(Code("mp5"), 4, 5000);
+	CHECK(std::strcmp(t.reserve, "+999") == 0);
+	CHECK(BeltMatch::LowCount == 1);
+	char name[24] {};
+	CHECK(std::strcmp(BeltMatch::BoxName(BeltMatch::BoxKind::Count, 0, name), "MxlBeltCount0") == 0);
+	CHECK(std::strcmp(BeltMatch::BoxName(BeltMatch::BoxKind::Low, 3, name), "MxlBeltCountLow3") == 0);
+	CHECK(std::strcmp(BeltMatch::BoxName(BeltMatch::BoxKind::Reserve, 2, name), "MxlBeltReserve2") == 0);
+	CHECK(BeltMatch::BoxKinds == 3);
+	CHECK(std::strcmp(BeltMatch::HudPanelName, "HUDPanel") == 0);
+}
+
+// The column's own potions: the belt slots are row * 4 + column.
+void ColumnCounts() {
+	const int32_t full4[] = {0, 4, 8, 12, 1, 5, 2}; // column 0 full (4 rows), column 1 two, column 2 one, column 3 none
+	CHECK(BeltMatch::InColumn(0, full4, 7) == 4);
+	CHECK(BeltMatch::InColumn(1, full4, 7) == 2);
+	CHECK(BeltMatch::InColumn(2, full4, 7) == 1);
+	CHECK(BeltMatch::InColumn(3, full4, 7) == 0);
+	CHECK(BeltMatch::InColumn(0, full4, 0) == 0);
+	const int32_t bad[] = {-1, 3, 7};
+	CHECK(BeltMatch::InColumn(3, bad, 3) == 2);
+	CHECK(BeltMatch::InColumn(0, bad, 3) == 0);
+}
+
+// A small image: the root load at 0x120 (the root at 0x900), the FindPanel call at 0x180 (to 0x300), FindChild at 0x200,
+// SetText at 0x240.
+auto MakeTextImage() -> std::vector<uint8_t> {
+	namespace S = invtabs::summary;
+	std::vector<uint8_t> image(ImageSize, 0xCC);
+	Put(image, 0x120, S::SummaryPatterns[S::UiRoot].pattern);
+	Rel32(image, 0x123, 0x900);
+	Put(image, 0x180, S::SummaryPatterns[S::UiFindPanel].pattern);
+	Rel32(image, 0x181, 0x300);
+	Put(image, 0x200, S::SummaryPatterns[S::UiFindChild].pattern);
+	Put(image, 0x240, S::SummaryPatterns[S::TextBoxSetText].pattern);
+	return image;
+}
+
+auto TextOff(const BeltMatch::TextNatives& n, const char* name) -> bool {
+	return !n.ok() && std::strcmp(n.missing, name) == 0;
+}
+
+auto ResolveText(const std::vector<uint8_t>& image) -> BeltMatch::TextNatives {
+	return BeltMatch::ResolveTextNatives(image.data(), image.size(), TextRva, TextSize);
+}
+
+void TextSignatures() {
+	namespace S = invtabs::summary;
+	auto image = MakeTextImage();
+	auto n = ResolveText(image);
+	CHECK(n.ok() && n.uiRoot == 0x900 && n.findPanel == 0x300 && n.findChild == 0x200 && n.setText == 0x240);
+	// the root inside .text: not data, off
+	Rel32(image, 0x123, 0x350);
+	CHECK(TextOff(ResolveText(image), "UiRoot"));
+	// the FindPanel call leaves .text
+	image = MakeTextImage();
+	Rel32(image, 0x181, 0x900);
+	CHECK(TextOff(ResolveText(image), "UiFindPanel"));
+	// FindChild twice: ambiguous
+	image = MakeTextImage();
+	Put(image, 0x400, S::SummaryPatterns[S::UiFindChild].pattern);
+	CHECK(TextOff(ResolveText(image), "UiFindChild"));
+	// no setter
+	image = MakeTextImage();
+	image[0x241] = 0x54;
+	CHECK(TextOff(ResolveText(image), "TextBoxSetText"));
+	// the FindPanel call lands on FindChild
+	image = MakeTextImage();
+	Rel32(image, 0x181, 0x200);
+	CHECK(TextOff(ResolveText(image), "UI functions not distinct"));
+	CHECK(TextOff(BeltMatch::ResolveTextNatives(nullptr, ImageSize, TextRva, TextSize), "image"));
 }
 
 // ---- belt_natives.h: a small image that holds every signature with consistent calls and entries ----
@@ -384,6 +470,12 @@ void Dump() {
 		            static_cast<unsigned long long>(natives.rva[sig.id]), static_cast<unsigned long long>(sig.rva93847),
 		            same ? "" : "  MISMATCH");
 	}
+	// the HUD text routines (0006) at their 93847 places
+	const auto hud = BeltMatch::ResolveTextNatives(image.data(), imageSize, textRva, textSize);
+	CHECK(hud.ok() && hud.uiRoot == 0x3440170 && hud.findPanel == 0x89F760 && hud.findChild == 0x855C90 && hud.setText == 0x86DD50);
+	std::printf("belt_match_tests: dump: HUD text %s, root 0x%llx, panel 0x%llx, child 0x%llx, set 0x%llx\n", hud.ok() ? "ok" : hud.missing,
+	            static_cast<unsigned long long>(hud.uiRoot), static_cast<unsigned long long>(hud.findPanel),
+	            static_cast<unsigned long long>(hud.findChild), static_cast<unsigned long long>(hud.setText));
 }
 
 } // namespace
@@ -393,6 +485,9 @@ int main() {
 	Counting();
 	Geometry();
 	Signatures();
+	HudText();
+	ColumnCounts();
+	TextSignatures();
 	Natives();
 	Dump();
 	if (failures != 0) {

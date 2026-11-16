@@ -14,6 +14,8 @@ What goes in:
   data/statbook_pages.tsv, data/advanced_stats.tsv (its `source` column left out)
   data/hd/global/ui/panel/statbook/*.sprite   the art a plain install ships (statbook_layout.PLAIN_OWN_ART): built here
                              from D2R's sprites (`statbook_layout.plain_art`), or copied from --art DIR
+  data/global/ui/panel/statbook/*.dc6         the legacy graphics art (statbook_plain_legacy.h LegacyArt): built here by
+                             `statbook_legacy.plain_art`, or copied from the same --art DIR
   docs/statbook-layout.md    from this repository's, internal notes left out (DOC_RULES)
   docs/images/*.png          README screenshots from --images DIR
   statbook/export/*          the files of the public repository only: CMakeLists.txt, README.md, LICENSE, docs/statbook.md,
@@ -21,8 +23,9 @@ What goes in:
 
 Every copied text file goes through SCRUB (each rule must still match: a changed source fails the export instead of leaking
 a note) and the path rewrite (statbook/src/ -> src/, plugin/src/<shared> -> src/shared/, a docs/ or tools/ path the export
-does not hold -> "D2R-XL 2012's <path>"). The generated header and book (statbook_plain_layout.h, default_book.inc) are copied
-byte for byte: the exported tools must reproduce them.
+does not hold -> "D2R-XL 2012's <path>"). The generated headers and book (statbook_plain_layout.h, statbook_plain_legacy.h,
+default_book.inc) are copied byte for byte: the exported tools must reproduce the first and the book; the legacy header and
+its art come from this repository's tools/statbook_legacy.py (the classic sheet tools stay here).
 
   py -3 tools/export_statbook.py [--out DIR] [--art DIR | --no-art] [--images DIR] [--force]
       default --out <runs>/sbexport/repo, --images <runs>/sbexport/images; --force empties an existing --out first
@@ -42,8 +45,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 OVERLAY = ROOT / "statbook" / "export"
 SHARED = ("panel_shared.cpp", "panel_shared.h", "panel_logic.h", "block_rate_logic.h")
 SKIP_SRC = {"testharness.cpp", "testharness.h"}          # the dev-only background-input harness (STATBOOK_TEST_HARNESS)
-VERBATIM = {"src/statbook_plain_layout.h", "src/default_book.inc"}   # generated: the exported tools must match them
+VERBATIM = {"src/statbook_plain_layout.h", "src/statbook_plain_legacy.h", "src/default_book.inc"}   # generated
 ART_DIR = Path("data") / "hd" / "global" / "ui" / "panel" / "statbook"
+LEGACY_ART_DIR = Path("data") / "global" / "ui" / "panel" / "statbook"
 # overlay names that cannot sit under their real name in this repository
 RENAMES = {"gitignore.txt": ".gitignore", "github-build.yml": ".github/workflows/build.yml"}
 TEXT_SUFFIXES = {".cpp", ".h", ".inc", ".rc", ".txt", ".toml", ".py", ".md", ".tsv", ".yml", ".json", ""}
@@ -259,7 +263,7 @@ def export(out: Path, art: Path | None = None, build_art: bool = True, images: P
     used = {p for p, _rx, _n in SCRUB}
     if used - have:
         problems.append(f"SCRUB names files the export does not hold: {sorted(used - have)}")
-    names = write_art(out / ART_DIR, art, build_art)
+    names = write_art(out / ART_DIR, art, build_art) + write_legacy_art(out / LEGACY_ART_DIR, art, build_art)
     if images:
         for p in sorted(Path(images).glob("*.png")):
             dst = out / "docs" / "images" / p.name
@@ -269,6 +273,7 @@ def export(out: Path, art: Path | None = None, build_art: bool = True, images: P
     if build_art or art:
         import statbook_layout as L
         want = {f"{ART_DIR.as_posix()}/{a.lower()}{ext}" for a in L.PLAIN_OWN_ART for ext in (".sprite", ".lowend.sprite")}
+        want = {f"{LEGACY_ART_DIR.as_posix()}/{n}" for n in legacy_art_names()}
         problems += [f"missing art {w}" for w in sorted(want - set(listed))]
     return {"files": listed, "problems": problems, "art": names}
 
@@ -292,10 +297,37 @@ def write_art(dst: Path, art: Path | None, build: bool) -> list[str]:
     return L.plain_art(Path(fxpaths.D2R), data)
 
 
+def legacy_art_names() -> list[str]:
+    """The DC6 files statbook_plain_legacy.h names (LegacyArt)."""
+    text = (ROOT / "statbook" / "src" / "statbook_plain_legacy.h").read_text("utf-8")
+    m = re.search(r"LegacyArt\[\] = \{([^}]*)\}", text)
+    if not m:
+        raise SystemExit("statbook/src/statbook_plain_legacy.h has no LegacyArt list")
+    return re.findall(r'"([^"]+\.dc6)"', m.group(1))
+
+
+def write_legacy_art(dst: Path, art: Path | None, build: bool) -> list[str]:
+    if art:
+        names = []
+        for n in legacy_art_names():
+            p = Path(art) / n
+            if p.is_file():
+                dst.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(p, dst / n)
+                names.append(n)
+        return names
+    if not build:
+        return []
+    import fxpaths
+    import statbook_legacy
+    statbook_legacy.plain_art(Path(fxpaths.D2R), dst.parents[3])   # <out>/data (LEGACY_ART_DIR is data/global/ui/panel/statbook)
+    return [n for n in legacy_art_names() if (dst / n).is_file()]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0], formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path)
-    ap.add_argument("--art", type=Path, help="copy the plain install's sprites from this folder instead of building them")
+    ap.add_argument("--art", type=Path, help="copy the plain install's sprites and DC6s from this folder instead of building them")
     ap.add_argument("--no-art", action="store_true")
     ap.add_argument("--images", type=Path, help="README screenshots (*.png) for docs/images/")
     ap.add_argument("--force", action="store_true", help="empty a non-empty --out first")

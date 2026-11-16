@@ -224,10 +224,45 @@ inline HdGeometry HdLayoutOf(int cols, int rows, int tabCount, bool summary) {
 	return g;
 }
 
+// The charm list's mode button (all stats summed / by charm). A click sends PanelManager:OpenPanel:<message>, a registered
+// empty panel name the core's UI listener takes (D2R hands a button's PanelManager message on only for a known panel).
+// HD: `filename` is the mod's 8-frame sprite (frames 0-3: normal, hovered, pressed, disabled of the glyph "by charm", shown
+// while the list sums; 4-7 the glyph "all stats", shown while it lists by charm), or the core's drawn stand-in in the same
+// frame order when the mod has none. Classic: the mod's DC6 (frames normal / pressed per mode). Empty filename: no button.
+struct ListToggle {
+	std::string filename;
+	int         frame0 = 0;      // first frame of the shown glyph
+	double      scale  = 1.0;    // HD only
+	std::string tooltip;
+	std::string message;         // full panel name of the click
+};
+
+inline constexpr int HdToggleSize = 56;  // the button's size in the band's top-right corner (the bar starts under it)
+inline constexpr int HdToggleGap  = 8;
+
+inline std::string Num(double v) {
+	char text[32] {};
+	std::snprintf(text, sizeof(text), "%.4f", v);
+	std::string s = text;
+	while (s.back() == '0') s.pop_back();
+	if (s.back() == '.') s.pop_back();
+	return s;
+}
+
+inline std::string HdToggleWidget(const ListToggle& t, const Box& band) {
+	std::string rect = R"({"x": )" + N(band.x + band.w - HdToggleSize) + R"(, "y": )" + N(band.y);
+	if (t.scale != 1.0) rect += R"(, "scale": )" + Num(t.scale);
+	rect += "}";
+	return R"({"type": "ButtonWidget", "name": "invtabs/ListMode", "fields": {"rect": )" + rect + R"(, "filename": )" + Json(t.filename) + R"(, "normalFrame": )"
+	     + N(t.frame0) + R"(, "hoveredFrame": )" + N(t.frame0 + 1) + R"(, "pressedFrame": )" + N(t.frame0 + 2) + R"(, "disabledFrame": )" + N(t.frame0 + 3)
+	     + R"(, "tooltipString": )" + Json(t.tooltip) + R"(, "sound": "cursor_menu_select_hd", "onClickMessage": )" + Json("PanelManager:OpenPanel:" + t.message) + "}}";
+}
+
 // The whole HD panel of one tab. `tabs` is every tab (the row), `self` its index; cellsSprite the registered cell
-// picture (d2rloader\invtabs\...); summaryFragment the summary's widgets (empty: none).
+// picture (d2rloader\invtabs\...); summaryFragment the summary's widgets (empty: none); toggle the list's mode button
+// (top-right corner of the summary band; none without a band or a filename).
 inline std::string HdPanel(const std::vector<TabRef>& tabs, int self, int slot, int cols, int rows, const HdGeometry& g, const std::string& cellsSprite,
-                           const std::string& summaryFragment, const std::string& title) {
+                           const std::string& summaryFragment, const std::string& title, const ListToggle& toggle = {}) {
 	const std::string& name = tabs[static_cast<std::size_t>(self)].panel;
 	std::string        j    = R"({"type": "Panel", "name": )" + Json(name) + R"(, "fields": {"priority": 10, "rect": "$LeftPanelRect", "anchor": "$LeftPanelAnchor"}, "children": [)";
 	j += R"({"type": "ClickCatcherWidget", "name": "PanelClickCatcher", "fields": {"rect": "$PanelClickCatcherRect"}})";
@@ -248,6 +283,7 @@ inline std::string HdPanel(const std::vector<TabRef>& tabs, int self, int slot, 
 		}
 	j += R"(, {"type": "ImageWidget", "name": "Cells", "fields": {"rect": )" + XY(g.grid.x - g.frame, g.grid.y - g.frame) + R"(, "filename": )" + Json(cellsSprite) + "}}";
 	if (!summaryFragment.empty()) j += ", " + summaryFragment;
+	if (!toggle.filename.empty() && g.band.h > HdToggleSize) j += ", " + HdToggleWidget(toggle, g.band);
 	// cellSize is a struct field: a bare number makes the game assert (TypeDesc.cpp:197) and the panel does not open
 	j += ", " + GridWidget(slot, g.grid.x, g.grid.y, g.cell == StockCell ? "\"$ItemCellSize\"" : XY(g.cell, g.cell), false);
 	j += R"(, {"type": "ButtonWidget", "name": "CloseButton", "fields": {"rect": {"x": 1075, "y": 9}, "filename": "PANEL\\closebtn_4x", "hoveredFrame": 3, )"
@@ -293,8 +329,15 @@ struct ClassicTab {
 	std::string panel, label, name; // name: the tab's config name (art PANEL\invtabs_tab_<name>)
 };
 
+// The classic list mode button: right end of the tab row (a tab button's size), when the tabs leave room for it.
+inline constexpr int ClassicToggleX = ClassicInnerX1 - ClassicTabW;
+
+inline bool ClassicToggleFits(std::size_t tabCount) { return ClassicInnerX0 + 1 + static_cast<int>(tabCount) * ClassicTabW + ClassicTabGap <= ClassicToggleX; }
+
 // The classic panel of tabs[self] (only tabs that fit classic are in `tabs`). summaryFragment replaces the empty rows.
-inline std::string ClassicPanel(const std::vector<ClassicTab>& tabs, int self, int slot, int cols, int rows, const std::string& summaryFragment) {
+// toggle: the list mode button (classic frames: frame0 normal, frame0 + 1 pressed).
+inline std::string ClassicPanel(const std::vector<ClassicTab>& tabs, int self, int slot, int cols, int rows, const std::string& summaryFragment,
+                                const ListToggle& toggle = {}) {
 	const auto&       me   = tabs[static_cast<std::size_t>(self)];
 	const std::string name = me.panel;
 	std::string       j    = R"({"type": "Panel", "name": )" + Json(name) + R"(, "fields": {"priority": 10, "rect": {"x": -320, "y": -240, "width": 320, "height": 432}, "anchor": "$LeftPanelAnchor"}, "children": [)";
@@ -310,6 +353,11 @@ inline std::string ClassicPanel(const std::vector<ClassicTab>& tabs, int self, i
 		   + R"(, "tooltipString": )" + Json(tabs[i].label) + R"(, "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
 		   + Json("PanelManager:OpenPanel:" + tabs[i].panel) + "}}";
 	}
+	if (!toggle.filename.empty() && ClassicToggleFits(tabs.size()))
+		j += R"(, {"type": "ButtonWidget", "name": "invtabs/ListMode", "fields": {"rect": )" + XYWH(ClassicToggleX, ClassicTabRowY(rows), ClassicTabW, ClassicTabH)
+		   + R"(, "filename": )" + Json(toggle.filename) + R"(, "normalFrame": )" + N(toggle.frame0) + R"(, "pressedFrame": )" + N(toggle.frame0 + 1)
+		   + R"(, "tooltipString": )" + Json(toggle.tooltip) + R"(, "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
+		   + Json("PanelManager:OpenPanel:" + toggle.message) + "}}";
 	const Box g = ClassicGrid(cols, rows);
 	j += ", " + GridWidget(slot, g.x, g.y, "\"$ItemCellSize\"", true);
 	j += R"(, {"type": "ButtonWidget", "name": "invtabs/Close", "fields": {"rect": {"x": 275, "y": 383, "width": 32, "height": 32}, "filename": "PANEL\\buysellbtn", )"

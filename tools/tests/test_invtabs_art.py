@@ -49,6 +49,23 @@ class NineSlice(unittest.TestCase):
             ia.nine_slice(src, 8, 30, corner=4)
 
 
+class ListMode(unittest.TestCase):
+    """The list mode button needs no extraction (drawn here)."""
+
+    def test_four_frames_two_glyphs(self):
+        frames = ia.listmode_frames()
+        self.assertEqual([f.size for f in frames], [(il.TAB_W, il.TAB_H)] * 4)
+        self.assertEqual(len({f.tobytes() for f in frames}), 4)
+        blue = lambda f: sum(1 for px in f.getdata() if px[:3] == ia.CHARM_BLUE)  # noqa: E731
+        self.assertGreater(blue(frames[0]), 0)   # by charm: the charm stones
+        self.assertEqual(blue(frames[2]), 0)     # all stats: the gold sum sign only
+
+    def test_plugin_agrees(self):
+        src = (Path(__file__).resolve().parents[2] / "invtabs" / "src" / "invtabs.cpp").read_text(encoding="utf-8")
+        self.assertRegex(src, r'ListArtClassicFile\[\]\s*=\s*"data/global/ui/panel/%s\.dc6";' % ia.LISTMODE_ART)
+        self.assertRegex(src, r'ListArtClassic\[\]\s*=\s*"PANEL\\\\%s";' % ia.LISTMODE_ART)
+
+
 class Art(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -106,7 +123,8 @@ class Art(unittest.TestCase):
             self.assertEqual(sizes("invtabs_tab_charms"), [(il.TAB_W, il.TAB_H)] * 3)
             self.assertFalse((panel / "invtabs_tab_maps.dc6").exists())  # no classic panel: no classic tab button either
             self.assertEqual(sizes(il.BUTTON_ART), [(ia.BUTTON, ia.BUTTON)] * 2)
-            for name in ("invtabs_charms", "invtabs_tab_charms", il.BUTTON_ART):
+            self.assertEqual(sizes(ia.LISTMODE_ART), [(il.TAB_W, il.TAB_H)] * 4)
+            for name in ("invtabs_charms", "invtabs_tab_charms", il.BUTTON_ART, ia.LISTMODE_ART):
                 for w, h, _ox, _oy, block in dc6.read_dc6(panel / f"{name}.dc6"):
                     idx = np.array(_indices(w, h, block))
                     self.assertLessEqual(int(idx.max()), 224, name)

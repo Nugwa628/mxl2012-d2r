@@ -7,6 +7,66 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.24 (2026-11-16)
+
+- Potion belt: each belt column now really shows a number (earlier versions announced it, but nothing appeared on
+  screen). The number is how many potions are in that column, for example 4 when a 4-row column is full. It sits on the
+  bottom cell of the column, to the right of the hotkey letter, in white, and turns red at 1 and 0. It stays visible
+  when the belt is opened. Works in HD and legacy graphics.
+- Potion belt: how many more of each column's potion you carry in the inventory (what the belt refills from) shows as
+  "+17", "+0" and so on. In HD it is a small gold line just above the belt, one number over each column; in legacy
+  graphics it sits at the top right of the column's bottom cell.
+- **Every skill you can cast now works on left click too.** Pick it in the left skill menu as you would on the right:
+  class skills, item charges and oskills, and the common skills. Still right-click only: the Barbarian's Stances (auras,
+  which the game runs from the right button only), skills cast on a corpse (the Necromancer's totems, Fairy Ring,
+  Spirit of Vengeance, Engorge, Cold Blood, Raise Skeleton: the game's left click picks no corpse) and the Identify /
+  Town Portal scrolls and books. Passives stay off the buttons.
+- **New skill: Move Only**, on both skill menus of every class (old characters too), free: no skill point, no tree slot.
+  A click on the ground walks or runs there; a click on a monster walks up to it and stops, with no attack and no mana
+  spent. Put it on left click to walk through a crowd and keep a skill on the right. Named in all 13 languages, with a
+  running-figure icon. More in docs/left-skills.md.
+- Laughing Ghost now explodes where you click instead of always at the same distance. Clicks farther away than
+  the old distance explode at the old distance, so its reach is unchanged. Damage is the same; a near click simply
+  explodes sooner.
+- Charms tab (HD): the grid's cells show again with many charms. They were missing once the stat list grew longer
+  than its box (bug #615).
+- Charms tab: a new button at the top right of the stat list switches between "all stats" (the sum of your charms, as
+  before) and "by charm" (each charm under its name, in grid order, with its own stats; charms that do not count are
+  grey and marked "(inactive)"). The choice is kept in `invtabs.toml` (`summary_list`) and comes back on the next game.
+  Works in HD and legacy graphics; also in the console (`invtabs list all|charm|toggle`) and as an unbound Controls
+  action. The gamepad view keeps the sum.
+- HD skill effects closer to legacy:
+  - Thunderstone: the thrown orb is a grey stone with lightning crackling around it instead of a glowing ball that
+    looked like magma.
+  - Faerie Fire: the monsters near the druid glitter with rainbow sparkles, as in legacy, instead of small fire-arrow
+    bursts.
+  - Poison Flash: the green flash is about three times bigger and covers the monsters it hits, closer to legacy's small
+    nova.
+  - Retaliate: the shockwave uses a small sparkle, as in legacy, instead of a bright ball of lightning.
+  - Rapture: walking leaves a trail of blue mist on the ground in HD, like legacy's blue trail; HD drew no trail before.
+- Buff HUD 1.2.0 (the buff icons; Buff HUD is by Lukaszpg, <https://github.com/Lukaszpg/d2rl-buff-hud>):
+  - The buff's name shows again when the cursor is on an icon, in HD and legacy graphics, without colour codes.
+  - Harmful effects on you show too: curses (Amplify Damage, Decrepify, Lower Resist, Nightmare, Dazzle, Blood Mana,
+    Terror and others), poison, burning, freezing and chill, stun and slow. They sit by the mana globe in red frames, with
+    their time left and their name on hover; your buffs stay by the life globe.
+  - Hold Left Ctrl and drag an icon to move its group; buffs and harmful effects move on their own and the click does not
+    move your character. The spot is kept in `buff-panel.toml`, once for HD and once for legacy graphics, and stays on the
+    screen after a restart or a resolution change. `reset_buffs = true` / `reset_debuffs = true` there, or the console
+    command `buff-panel reset` (`buff-panel reset buffs`, `buff-panel reset debuffs`), puts them back by the globes.
+  - In legacy graphics the icons are half their old size, with smaller timers and names. HD is unchanged.
+- **The Stat Book in legacy graphics.** The classic character sheet now has the Stat Book too, drawn in the classic look:
+  tabs along the top of the sheet, the themed pages, All Stats with its search box and the arrows that open a line's page,
+  and an arrow next to the stat points that opens All Stats. Your name and class sit just below the tabs. The top/side
+  button is in the top-right corner of the sheet; with side tabs the book opens as its own panel on the right half of the
+  screen. Switching between HD and legacy (G) keeps the page you were on, also with the sheet open. The values are bright
+  and in the HD page's colours (white, red below zero, gold at a cap, light grey at zero, the elements in their colours),
+  right-aligned inside their boxes.
+  In legacy, a few long stat names in the two-column rows take a short form so they fit the classic font (for example
+  "Minion Res." for Minion Resistances, "Life Leech" for Life Stolen per Hit).
+- D2R Advanced Stats (the Stat Book for plain D2R) 0.1.2 has the same legacy Stat Book.
+- Known issue: after Save and Exit, the skill you put on left click may come back as the normal attack; pick it again
+  in the left skill menu (bug #616, being looked at).
+
 ### 0.1.23 (2026-11-15)
 
 - **New: the Stat Book.** The HD character sheet gets tabs: Character (the sheet you know), Offense, Spells, Defense,

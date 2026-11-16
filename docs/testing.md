@@ -7662,6 +7662,48 @@ screenshots there.
   both legacy runs came out in HD (the lab's graphics switch did not hold after the switch to the druid), so the druid's legacy look
   was not compared in this lane.
 
+## Lane hd587 round 2: #594, #597, #600, #603, #606, #610, #611 (2026-11-15, slot 3, HD and legacy, background input)
+
+- **Change:** hand picks only (`data/hd-effects-picks.tsv`): `poisonflashback` scale 1 -> 3 and `poisonflashfront` -> `common/poisonhit`
+  at 2 (#611); row `buzzorb` -> `rock_large` at 1.5 (#600); row `retaliatenova` -> `gleam` (#603). Full build, `build_effects
+  --check-only` 0 problems; `missiles.json`: `buzzorb` = `mxl_rock_large_s150`, `retaliatenova` = `gleam`.
+- **Lab (`mxl2012-runs/hd587/round2/`, `lab2.py` with `plan2.json`, slot 3 through the slot lock and `heavy_lock.py game`):** runs
+  `b-hd`, `b-leg` (before), `c1-hd` (candidates), `a-hd` (final build). Thunderstone is thrown at the ground 14 tiles away (the orb
+  flies about 1 s); Retaliate stands in 4 zombies with god mode off, with `event_hit2` set before each attack (and once without);
+  Rapture and Faerie Fire walk three legs after the cast. Crops per skill in `shots/<skill>/`, sheet `shots/overview.png`.
+  - Thunderstone: before, an orange glowing ball in flight; after, a grey-brown stone. Legacy's 4:3 view did not show the orb.
+  - Poison Flash: before, small puffs on each zombie; after, a green flash over the pack (legacy: a green ring nova).
+  - Retaliate: with the stat set, 64 `retaliatenova` per attack, but no picture in HD or legacy; real hits never set the stat.
+  - Tremor, screen shake (`round2/shake.py`, camera shift by phase correlation against the frame before the cast): HD 4-5 px over
+    about 2 s, legacy 5-6 px; the dust overlay is drawn in neither mode. Not a bug.
+  - Rapture and Faerie Fire while walking: legacy draws Rapture's wide blue ground trail, HD only the ring that follows the paladin;
+    neither mode leaves a Faerie Fire trail (its rainbow sparkles are missiles at nearby monsters). Both stay open.
+- **Rain of Fire tooltip (no game run):** D2R's `hudpanelhd.json`, `skillselecthd.json` and `_profilehd.json` (build 93847, read from
+  slot 3's CASC into `round2/d2r-layouts/`) give the skill-button tooltip `TooltipStyle`: default sans font, black at 0.75, no
+  border. The mod ships none of them; the 2026-10-29 Force Wall capture (`archive/skilltips`) shows the same box. Not a bug.
+- **Tests:** `tools/tests` 1701 OK; `tools -p "test_*.py"` all pass except the two `test_package_release` checks that need
+  `build/statbook/Release/statbook.dll` (not built in this worktree; `tools/build_plugin.ps1`).
+
+## Lane hd587 round 3: #594, #597, #600 with authored HD effects (2026-11-15, slot 3, HD, background input)
+
+- **Change:** new `tools/hd_particles.py` (reads and edits D2R's baked PopcornFX `.particles`) and `tools/hd_authored.py`
+  (layered effects from `data/hd-effects-authored.json`, built by `tools/effects_hd.py`), docs/hd-effects-authoring.md. Picks:
+  `buzzorb` -> `mxl_thunderstone_b`, `turbofront` -> `rapture_trail_c`, new row `druidcirclespawnmissile` -> `mxl_faerie_b`.
+  Effect steps rerun per candidate set with `MXL_SLOT=3` (`round3/fx-*.log`), `build_effects --check-only` 0 problems each time.
+- **Lab (`mxl2012-runs/hd587/round3/`, `lab3.py` with `plan3.json`, slot 3 through the slot lock and `heavy_lock.py game`):** runs
+  `c1-hd`, `c2-hd`, `c3-hd` (candidate sets) and `after-hd` (final build). Thunderstone thrown 14 tiles; Faerie Fire on a pack;
+  Rapture walks three legs (14, 14 and 12 tiles in `after-hd`). Sheet `round3/shots/overview.png` (HD before / A / B / C / legacy),
+  crops in `round3/shots/<skill>/`.
+  - Thunderstone: A (charge-up arcs) a faint streak; B the stone inside Charged Bolt's sparks, clearly seen in flight; C (hit
+    crackle) barely seen. Pick B.
+  - Faerie Fire: B (Salvation front with its mesh rings switched off by `EnableRendering`) shows only rainbow sparkles: the switch
+    works in game. A shows rings and sparkles; C (Charge flash, rainbow ramp) reads yellow-green. Pick B.
+  - Rapture: A and B (Fire Bolt and Fire Ball trails, blue ramp, on the overlay) leave nothing behind; C (tower mist trail) leaves a
+    pale grey mist along the path for a moment. `c1-hd` ran a build from before the scale fix (ring 1.8x, trail 2.7x). Pick C.
+- **Tests:** `tools/tests` 1712 OK (new `test_hd_particles.py`: 11 tests on a synthetic particle file); `tools -p "test_*.py"` 590,
+  all pass except the two `test_package_release` checks that need `build/statbook/Release/statbook.dll` (not built in this
+  worktree). `hd_particles` parses all 608 particle files slot 3 holds and writes each back byte for byte.
+
 ## Lane sendrotw: no deposits into the RotW pages without Reign of the Warlock (2026-11-14, slot 3, HD, foreground input)
 
 docs/bugs.md #591. Check `sendstashrotw` (`tools/sendstash_checks.py` `run_rotw`):
@@ -7794,3 +7836,118 @@ row's arrow, the sheet closed and opened on a page, `statbook vis` on `StatBookP
   only and kept LT / RT. Fixed (QOL found by plugin id): `checks-20261115-055601-s3` PASS; QOL before
   (`checks-20261115-055831-s3`) and no QOL (`checks-20261115-060024-s3`) PASS again. The check now writes the load order
   from the loader log as an INFO row.
+
+## Lane beltcount: belt potion counts as HUD text, #613 (2026-11-16, slot 4, HD and legacy, background input)
+
+Driver `mxl2012-runs/beltcount/scripts/session.py` (slot lock, `release_install.py install --package` with the 0.1.23 7z,
+optionally our `d2rl-auto-belt-refill.dll` and `BELT_LAYOUTS` over the package, then `shots.py`, restore) under
+`heavy_lock.py game`. `shots.py`: the owner's look (girdle `859`, 16 `hp3` picked up into the belt, 5 more in the inventory);
+for HD and legacy at 1920 x 1080 and 2560 x 1440: console `belt-counts`, grab with the belt closed, `` ` `` to open it, grab,
+`belt-counts`; 2x crops of the belt.
+- Before (`checks-20261116-120507-s4`, 0.1.23 as shipped): `belt_counts: patterns resolved ... on`, `belt-counts` 21 on every
+  column and "overlay live, N count(s) drawn", but no count in any of the eight shots.
+- After (`checks-20261116-125535-s4`, the 0.1.23 package with the plugin built with `0006` and the HUD layouts of
+  `tools/ui_layouts.py`): load line `belt_counts: on, as HUD text: UiRoot D2R+0x3440170, UiFindPanel +0x89F760, UiFindChild
+  +0x855C90, TextBoxSetText +0x86DD50`; `belt-counts` "HUD panel found, 8 of 8 count box(es) found"; "21" on the bottom-right
+  of each bottom-row cell in all eight shots, closed and open, HD and legacy, both sizes. Shots and the before / after sheet:
+  `mxl2012-runs/beltcount/shots/` (`overview.png`). Logscan: the usual pool asserts when the game stops (20 before, 10 after),
+  one launch-time last-resort crash report in each run, both before any plugin change mattered.
+- `BeltMatchTests` (new `HudText`, `TextSignatures`; with `D2R_DUMP` the four UI functions at their 93847 places) pass;
+  `tools/tests/test_ui.py` `test_belt_count_boxes_*`.
+
+## Lane beltslot: each belt column's own count and the inventory reserve (2026-11-16, slot 4, HD and legacy, background input)
+
+Build: `tools/build_beltrefill.ps1` (`0001` ... `0007-mxl2012-column-counts-and-reserve.patch`), `BeltMatchTests` pass (new
+`ColumnCounts`, `HudText` with the reserve and red at 1 or 0). Driver `mxl2012-runs/beltslot/scripts/session.py` + `shots.py`
+(lane beltcount's, the 0.1.23 package with our DLL and the built `hudpanel*.json`) under `heavy_lock.py game`. Belt (girdle
+`859`): column 1 hp3 x4, 2 mp3 x2, 3 rvs x1, 4 hp5 x4; inventory 5 hp3, 3 hp5. Run `checks-20261116-175636-s4`:
+- `belt-counts` "12 of 12 count box(es) found"; columns `in column=4 reserve=5`, `2 / 0`, `1 / 0`, `4 / 3`; after key 4 (drink
+  from column 4) the refill put it back: `4 / 2`.
+- Shots, HD and legacy at 1920 x 1080 and 2560 x 1440, closed and open: 4 / 2 / red 1 / 4 on the bottom cells. HD: "+5 +0 +0
+  +3" in a pale gold row above the belt's rim, covered by the opened belt. Legacy: the "+N" at the top right of each bottom
+  cell (the classic mini panel covers the space above columns 1-2). Sheet `mxl2012-runs/beltslot/shots/overview.png`.
+- Logscan: one launch-time last-resort crash report, as in lane beltcount's runs.
+
+## Lane leftskills: left-click skills and Move Only (2026-11-16, slots 3 and 4, HD and legacy, background input)
+
+Checks `leftskills` and `leftskills_pad` (`tools/leftskills_checks.py`), Necromancer `LeftSkills`, lane `session.py`
+(`mxl2012-runs/leftskills/`). Shots sheet `mxl2012-runs/leftskills/shots/overview.png`.
+
+- `checks-20261116-142705-s3` (first build): the casts of Sacrifices, Bend the Shadows and Blink from the left were seen.
+  Deaths Fury Totem, Deathlord and BearSmite showed nothing the check read (no state or skill-mode reading yet; the player
+  still stood in the town mode TN after the waypoint). The learnt BearSmite (a monster skill without skilldesc) gave the
+  `nDesc < skillDescTbl.size()` / `SkillSelectButtonWidget.cpp:556` / `SkillSelectPanel.cpp:411` asserts in the skill
+  pop-up: a harness artifact (crash-audit C11), replaced by Cleave. No such assert in the later runs.
+- `checks-20261116-144713-s3`, `-145602-s4`, `-150441-s4`: with the state and mode readings, a step out of the town mode and
+  a right-click control, every skill cast from the left except the totems. Deaths Fury Totem from the left did nothing on a
+  monster and only walked on the ground; the same click on the right summoned it. The totems are corpse-targeted
+  (`SelectProc`, `TargetCorpse`): the rule now leaves such rows right-only (32 rows, 295 given leftskill).
+- `checks-20261116-152523-s4` (rebuilt): `leftskills` PARTIAL with every judged row ok. From the left: Slayer (summon: a new
+  unit, missiles, damage), Sacrifices (11 missiles, damage), Deathlord (state 124), Bend the Shadows and Blink (warp 9),
+  Cleave (damage). Wolf Stance, Deaths Fury Totem, Scroll of Identify: refused on the left, taken on the right. Move Only on
+  both buttons; a ground click walked 8 sub-tiles, left and right clicks on a zombie walked up to it (2 sub-tiles) with no
+  damage and no mana spent; the harness cast at a zombie only walked (mode 2), so srvstfunc 71's refusal counter stayed 0.
+  After Save and Exit the buttons were Sacrifices / Move Only as set. The pop-ups list Move Only and the new left skills
+  in HD and legacy (judged on the shots). `mxl2012` FAILs only on the `other plugins` line: the slot's mod folder also holds
+  `statbook.dll` from another lane's install, which `smoke_plugins_ok` does not know.
+- `checks-20261116-153026-s4`: `leftskills_pad`. Start, RB twice to the Skill Tree, RT to General Skills, the D-pad onto a
+  skill, X (Bind Skill) opened D2R's rebind dialog and B bound the skill to the pad's B button (HUD shot).
+- Each launch left one `d2r-lastresort-crash-report` (a handled first-chance access violation at start, other lanes' runs
+  on slot 3 too; see bugs.md #17).
+
+## Lane buffhud: Buff HUD 1.2.0, debuffs, moving the icons, hover names (2026-11-16, slot 3, HD and legacy, background input)
+
+Owner requests for the bundled Buff HUD (docs/bundled-plugins.md): hover names that show, harmful effects in their own group,
+Left Ctrl + drag of each group with the spot saved, and half-size legacy icons. Fork commit `86d4774` (branch buffhud-next of
+our d2rl-buff-hud fork), pinned in `third_party/d2rl-buff-hud`. Runner, logs and shots in `mxl2012-runs/buffhud/`
+(`run_buffpanel.py`, `iter_build.sh`, `make_sheet.py`, `run*.out`, `build-*.log`):
+`MXL_SLOT=3 MXL_RUN=buffhud MXL_CHAR=BuffDrag MXL_CHAR_CLASS=paladin py -3 <runs>/buffhud/run_buffpanel.py A|B` under
+`heavy_lock.py game buffhud`. The runner places the plugin's DLL, MPQ and toml in the slot's `mods\mxl2012` after the slot lock
+and removes them before it is released. The character gets god mode and three buffs (Superbeast and others through `setskill`);
+curses come from monsters spawned with 1,000,000 life that cast at the player (`mcast`), retried until one lands, since a
+monster curse lands only now and then.
+
+| Check | Run | Result |
+|-|-|-|
+| HD default, hover, drag, clamp, cube, G | `checks-20261116-153558-s3` (1600 x 900) | PASS: buffs by the life globe, Nightmare with a red frame and timer by the mana globe; hover shows "Superbeast" and "Nightmare"; Left Ctrl + drag moves each group on its own and writes `hd_buffs_x/y` 0.3475 / 0.4116 and `hd_debuffs_x/y` 0.4694 / 0.5574; a drag past the top-left corner stops at (0, 0); Horadric Cube open hides the icons; G rebuilds the panel |
+| Legacy default, hover, drag | same run, and `checks-20261116-152425-s3` (legacy debuff hover) | PASS: 24 px icons with smaller timers; hover shows "Superbeast" and "Nightmare"; both groups drag and save their own legacy spot (`legacy_buffs_*`, `legacy_debuffs_*`) |
+| Restart, resolution change, reset | `checks-20261116-152853-s3` (new game process at 1280 x 720, A's toml with `reset_debuffs = true`) | PASS: buffs kept their saved spot in HD and legacy; the debuffs were back by the mana globe and the toml read `reset_debuffs = false` again; console `buff-panel reset buffs` put the buffs back and wrote -1; hover on Lower Resist |
+| The click does not reach the game | A runs 4 to 6 (no curse on the player) | PASS: the player stays put during each Ctrl + drag; a plain click in the same place walks the character (control). In the curse runs the player drifts 2 to 9 units from monster hits, not from walking |
+
+- Harmful effects seen in game with a red frame, timer and name: Amplify Damage, Nightmare, Dazzle, Lower Resist, Poisoned,
+  Decrepify.
+- Shot sheet `mxl2012-runs/buffhud/shots/overview.png` (17 shots, also as `01_*.png` to `17_*.png`).
+- The game runs used the fork's working tree built by `iter_build.sh` (the same source as the pinned commit). The pinned build
+  `tools/build_buffhud.ps1 -Work <checkout with a built work\>` passes the fork's 16 native tests and `check_buffhud`
+  (`build-pinned2.log`); its companion MPQ holds the 25 half-size legacy sheets made at build time.
+- One crash report file per run: the first-chance access violation report at +0x147A9 also seen in other lanes; the game
+  kept running and the d2rloader log has no ERROR or ASSERT line.
+- **Not covered:** the gamepad, other resolutions than 1600 x 900 and 1280 x 720, Ctrl + drag with Right Ctrl only (the
+  harness's virtual Ctrl reports both keys), a drag with a real mouse and keyboard.
+
+## Lane rel0124: release 0.1.24 package smoke (2026-11-16, slot 2, HD and legacy, background input)
+
+Package `D2R-XL-2012-0.1.24.7z` (6,583 files, 172,954,825 bytes, sha256
+`48093e00b0b423eb393b7bea1d7e5e60cf74720017e707f5cb520619561e8c0f`), `verify_package.py` OK. Bundled: D2R Legacy 16:9
+`c1ec651`, Buff HUD 1.2.0 `86d4774` (built from a clone of the fork at the pinned commit), Auto Belt Refill `a3b6805` with our
+patches, Controller QOL `df44457`, Inventory Tabs. Installed with `release_install.py install --slot 2 --package` (dev DLL of the
+same PluginVersion for the harness), restored after each run. Driver `mxl2012-runs/rel0124/smoke/` (`smoke.sh`, `relchecks.py`
+with the extra checks `rel_belt`, `rel_buffhover`, `rel_ghost`, `rel_rapture`; not in git). Character `RelSmk` (Amazon
+`BugAmazon` for the Stat Book check). Runs `checks-20261116-223536-s2` (all) and `checks-20261116-232227-s2`
+(`statbook_legacy` with `MXL_LEGACY_SCREEN_W=1066`, `leftskills`).
+
+| Item | HD | Legacy | Notes |
+|-|-|-|-|
+| Start, `mxl` line `mxl2012-core 0.1.24` | PASS | | `mxl2012` FAILs only on `other plugins` (the release ships more plugins than the check knows) |
+| Stash tabs (`tabflash`, `sendstash`) | PASS | not judged | the checks' legacy click places are 4:3; the release ships Legacy 16:9 (as in lane rel0117) |
+| Belt counts and "+N" spares (`rel_belt`) | PASS | PASS | 4 / 2 / red 1 / 4 and +5 +0 +0 +3; "12 of 12 count box(es) found" |
+| Left-click skills, Move Only (`leftskills`) | PASS but one row | | Slayer, Sacrifices, Deathlord, Bend the Shadows, Cleave, Blink from the left; Stances, totems, scrolls right-only; Move Only walks with no damage or mana. FAIL: the left skill is not kept by Save and Exit, both runs (bug #616, CHANGELOG known issue) |
+| Laughing Ghost lands at the click (`rel_ghost`) | not judged | not judged | the scripted cast was refused in game ("I can't", "Impossible"): no ghost on the frames |
+| Buff HUD hover (`rel_buffhover`) | PASS | PASS | "Superbeast" on hover |
+| Stat Book in legacy (`statbook_legacy`) | PASS | PASS (top tabs) | first run FAILed on every legacy click: `statbook_checks.LEGACY_SCREEN` was 800 x 600, the Legacy 16:9 classic screen is 1066 x 600 (the tab drawn as OFF got the click meant for RES). With `MXL_LEGACY_SCREEN_W=1066` the tabs, the arrows, the search box, G with the sheet open and 1080p / 1440p pass. The side-tab rows still FAIL: the check places the side panel at the 4:3 right panel; the shot shows the side book drawn and working at the 16:9 right panel. Not a player bug |
+| Charms page (`charmpage`, `charmpage_grid`) | PASS | PASS | grid shown, all / by charm button, kept on reopen; `charmpage_grid` FAILs on 1 of 46 charms left in the backpack (45 in the tab) |
+| Rapture blue trail (`rel_rapture`) | PASS | | blue mist trail behind the player on the walking frames |
+
+Asserts: the known exit pool asserts, `last_used_frame != PrismGetFrameCount()`, one `skillDescTbl` assert in
+`charmpage_grid` (harness-learnt skill, as in lane leftskills). One `d2r-lastresort-crash-report` at launch in the first run
+(the handled first-chance report other lanes see); no crash.

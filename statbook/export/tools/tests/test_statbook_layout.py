@@ -1,6 +1,6 @@
 """Checks of the generated files and the shipped art: the plain D2R book (src/default_book.inc) and panel layouts
-(src/statbook_plain_layout.h) are what the tools make, every sprite the plain layouts name is in data/hd/..., the release
-zip's layout. The two "is current" checks need D2R's own files (D2R_DATA, tools/d2r_paths.py) and are skipped without them.
+(src/statbook_plain_layout.h) are what the tools make, every sprite the plain layouts name is in data/hd/..., every DC6 the
+legacy layouts (src/statbook_plain_legacy.h) name is in data/global/..., the release zip's layout. The two "is current" checks need D2R's own files (D2R_DATA, tools/d2r_paths.py) and are skipped without them.
 
   py -3 -m unittest discover -s tools/tests -v
 """
@@ -19,6 +19,12 @@ import statbook  # noqa: E402
 import statbook_layout as L  # noqa: E402
 
 ART = ROOT / package.ART
+LEGACY_HEADER = ROOT / "src" / "statbook_plain_legacy.h"
+
+
+def legacy_art() -> list[str]:
+    m = re.search(r"LegacyArt\[\] = \{([^}]*)\}", LEGACY_HEADER.read_text("utf-8"))
+    return re.findall(r'"([^"]+\.dc6)"', m.group(1))
 
 
 def have(rel: str) -> bool:
@@ -76,6 +82,19 @@ class PlainLayouts(unittest.TestCase):
         self.assertEqual(files, {a.lower() + ".sprite" for a in L.PLAIN_OWN_ART})
 
 
+class LegacyLayouts(unittest.TestCase):
+    def test_every_dc6_shipped(self):
+        names = legacy_art()
+        self.assertTrue(names)
+        for n in names:
+            self.assertTrue((ROOT / package.LEGACY_ART / n).is_file(), n)
+
+    def test_layouts_name_only_the_listed_art(self):
+        text = LEGACY_HEADER.read_text("utf-8")
+        named = {f.lower() + ".dc6" for f in re.findall(r'PANEL\\\\StatBook\\\\(\w+)"', text)}
+        self.assertEqual(named, set(legacy_art()))
+
+
 class Package(unittest.TestCase):
     def test_zip_layout(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,6 +107,8 @@ class Package(unittest.TestCase):
             self.assertIn(f"{base}/{n}", names)
         art = [n for n in names if n.startswith(f"{base}/{package.MOD}.mpq/data/hd/global/ui/panel/statbook/")]
         self.assertEqual(len(art), 2 * len(L.PLAIN_OWN_ART))
+        dc6 = [n for n in names if n.startswith(f"{base}/{package.MOD}.mpq/data/global/ui/panel/statbook/")]
+        self.assertEqual(sorted(n.rsplit("/", 1)[1] for n in dc6), sorted(legacy_art()))
         self.assertRegex(package.version(), r"^\d+\.\d+\.\d+$")
 
     def test_cmake_builds_every_source(self):

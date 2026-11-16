@@ -13,6 +13,9 @@ mod's data folder under work/, previews to work/invtabs_art/):
   data/global/ui/panel/invtabs_tab_<tab>.dc6   the tab's button, 3 frames of 24 x 24: normal (grey rim), pressed (icon one
       pixel down-right, darker rim), this tab (gold rim, lighter inside); the tab's classic item picture
       (global/items/<icon>.dc6) scaled down to fit 20 x 20 in the middle.
+  data/global/ui/panel/invtabs_listmode.dc6    the mode button of the charm tab's stat list (right end of the tab row), 4
+      frames of 24 x 24 in the tab buttons' style: 0 / 1 the "by charm" glyph (three charm stones with a line each; shown
+      while the list sums), 2 / 3 the "all stats" glyph (a sum sign; shown while it lists each charm), each normal / pressed.
   data/global/ui/panel/invtabs_button.dc6      the classic inventory's button, 2 frames of 32 x 32 (normal, pressed): D2R's
       blank square `buysellbtn` frames 0 / 1 with the first tab's picture centred (pressed one pixel down-right).
 
@@ -29,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 import dc6  # noqa: E402
 import fxpaths  # noqa: E402
@@ -135,6 +138,42 @@ def tab_frames(d2r, tab: "il.Tab") -> list[Image.Image]:
     return out
 
 
+LISTMODE_ART = "invtabs_listmode"
+CHARM_BLUE = (70, 110, 210)
+
+
+def _list_glyph(by_charm: bool, shift: int) -> Image.Image:
+    """The 24 x 24 glyph alone (transparent around it), drawn pixel by pixel: no scaling, so it stays crisp in classic."""
+    g = Image.new("RGBA", (il.TAB_W, il.TAB_H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(g)
+    gold, dim = TITLE_COLOUR + (255,), (140, 120, 72, 255)
+    o = shift
+    if by_charm:
+        for k, y in enumerate((5, 10, 15)):
+            d.rectangle([5 + o, y + o, 7 + o, y + 2 + o], fill=CHARM_BLUE + (255,), outline=None)
+            d.point([(4 + o, y + 1 + o), (8 + o, y + 1 + o), (6 + o, y - 1 + o), (6 + o, y + 3 + o)], fill=dim)
+            d.line([10 + o, y + 1 + o, (19 if k != 1 else 16) + o, y + 1 + o], fill=gold)
+    else:  # a sum sign: top and bottom bars, the two strokes meeting in the middle
+        d.line([6 + o, 4 + o, 17 + o, 4 + o], fill=gold, width=2)
+        d.line([6 + o, 18 + o, 17 + o, 18 + o], fill=gold, width=2)
+        d.line([7 + o, 5 + o, 12 + o, 11 + o], fill=gold, width=2)
+        d.line([12 + o, 11 + o, 7 + o, 17 + o], fill=gold, width=2)
+        d.point([(17 + o, 6 + o), (17 + o, 16 + o)], fill=gold)
+    return g
+
+
+def listmode_frames() -> list[Image.Image]:
+    """[by charm normal, by charm pressed, all stats normal, all stats pressed], TAB_W x TAB_H, in tab_frames' style."""
+    out = []
+    for by_charm in (True, False):
+        for rim, shift in ((RIM_GREY, 0), (RIM_DARK, 1)):
+            f = Image.new("RGBA", (il.TAB_W, il.TAB_H), rim + (255,))
+            f.paste(Image.new("RGBA", (il.TAB_W - 2, il.TAB_H - 2), TAB_INSIDE + (255,)), (1, 1))
+            f.alpha_composite(_list_glyph(by_charm, shift))
+            out.append(f)
+    return out
+
+
 def button_frames(d2r, tab: "il.Tab") -> list[Image.Image]:
     """[normal, pressed], 32 x 32: D2R's buysellbtn frames 0 / 1 with the tab's picture centred (pressed: +1, +1)."""
     pic = _fit(item_picture(d2r, tab.icon), BUTTON - 4)
@@ -173,6 +212,7 @@ def art(out_data: Path, median_data: Path, d2r, tabs: tuple, preview_dir: Path |
         files.append((il.art_name(tab), rsl.panel_tiles(panel)))
         files.append((il.tab_art_name(tab), [_q(f, d2r.pal, il.tab_art_name(tab)) for f in tab_frames(d2r, tab)]))
     files.append((il.BUTTON_ART, [_q(f, d2r.pal, il.BUTTON_ART) for f in button_frames(d2r, tabs[0])]))
+    files.append((LISTMODE_ART, [_q(f, d2r.pal, LISTMODE_ART) for f in listmode_frames()]))
     for name, frames in files:
         p = dest / f"{name}.dc6"
         p.write_bytes(rsl.dc6_bytes(frames))
