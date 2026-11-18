@@ -66,6 +66,48 @@ class ListMode(unittest.TestCase):
         self.assertRegex(src, r'ListArtClassic\[\]\s*=\s*"PANEL\\\\%s";' % ia.LISTMODE_ART)
 
 
+class Pages(unittest.TestCase):
+    """The charm tab's two pages in legacy graphics: geometry, page buttons (drawn here, no extraction) and the plugin."""
+
+    def test_geometry_matches_the_plugin(self):
+        # invtabs/src/layouts.h ClassicPageRowY, ClassicPageButtonsX, ClassicStatsBox (invtabs_test.cpp checks the same)
+        self.assertEqual(il.PAGE_ROW_Y, 87)
+        self.assertEqual(il.page_buttons_x(), 230)
+        self.assertEqual(il.toggle_x(), 282)
+        self.assertEqual(il.stats_box(), (20, 115, 302, 366))
+        self.assertEqual(il.stats_lines(), 20)
+        self.assertTrue(il.paged_fits(8))
+        self.assertFalse(il.paged_fits(9))
+        g = il.page_geometry()
+        self.assertEqual(g["page_buttons"], [[230, 87, 24, 24], [254, 87, 24, 24]])
+        self.assertGreater(g["stats"]["chars"], 40)
+        # the stats box is under the row and ends above the stash's bottom line; the row is under the header
+        self.assertGreater(il.stats_box()[1], il.PAGE_ROW_Y + il.TAB_H)
+        self.assertLess(il.stats_box()[3], il.GRID_BOTTOM - il.LINE)
+        self.assertGreaterEqual(il.PAGE_ROW_Y, il.BODY_TOP)
+
+    def test_six_frames(self):
+        frames = ia.page_frames()
+        self.assertEqual([f.size for f in frames], [(il.TAB_W, il.TAB_H)] * 6)
+        self.assertEqual(len({f.tobytes() for f in frames}), 6)
+        self.assertEqual(frames[2].getpixel((0, 0))[:3], ia.TITLE_COLOUR)  # the page shown: gold rim, as the tab shown
+        self.assertEqual(frames[5].getpixel((0, 0))[:3], ia.TITLE_COLOUR)
+        self.assertEqual(frames[0].getpixel((0, 0))[:3], ia.RIM_GREY)
+
+    def test_names(self):
+        self.assertEqual(il.page_art_name(il.CHARMS, "grid"), "invtabs_charms_grid")
+        self.assertEqual(il.page_art_name(il.CHARMS, "stats"), "invtabs_charms_stats")
+        with self.assertRaises(ValueError):
+            il.page_art_name(il.CHARMS, "other")
+
+    def test_plugin_agrees(self):
+        src = (Path(__file__).resolve().parents[2] / "invtabs" / "src" / "invtabs.cpp").read_text(encoding="utf-8")
+        self.assertRegex(src, r'PageArtClassicFile\[\]\s*=\s*"data/global/ui/panel/%s\.dc6";' % il.PAGE_ART)
+        self.assertRegex(src, r'PageArtClassic\[\]\s*=\s*"PANEL\\\\%s";' % il.PAGE_ART)
+        for page in il.PAGES:
+            self.assertIn('"_%s.dc6"' % page, src)
+
+
 class Art(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -92,6 +134,33 @@ class Art(unittest.TestCase):
             x0, y0, x1, y1 = il.summary_box(rows)
             self.assertGreater(max(a[y, x0 + 20:x1 - 20].mean() for y in range(y0, y0 + 4)), 60)  # the box's rim
             self.assertLess(a[y0 + 6:y1 - 6, x0 + 6:x1 - 6].mean(), 30)  # its dark inside
+
+    def test_pages(self):
+        tab = il.CHARMS
+        one = np.asarray(ia.panel_image(self.med, self.d2r, tab).convert("RGB")).astype(int)
+        grid_rgba = ia.panel_image(self.med, self.d2r, tab, "grid")
+        grid = np.asarray(grid_rgba.convert("RGB")).astype(int)
+        alpha = np.asarray(grid_rgba.getchannel("A")).astype(int)
+        stats = np.asarray(ia.panel_image(self.med, self.d2r, tab, "stats").convert("RGB")).astype(int)
+        gx, gy = il.grid_origin(tab.cols, tab.rows)
+        # page 1 is tight: the grid and everything under it (bottom band, close square) moved up by the shift, right
+        # under the row; the header and the row's dark body as on the one-page panel; below the band transparent
+        shift = il.paged_grid_shift(tab.rows)
+        self.assertEqual(shift, 81)
+        self.assertEqual(gy - 2 - shift, il.PAGE_ROW_Y + il.TAB_H + il.TAB_GAP)
+        self.assertTrue((grid[gy - 2 - shift:il.PANEL_H - shift] == one[gy - 2:]).all())
+        self.assertTrue((alpha[:il.PANEL_H - shift] == 255).all() and (alpha[il.PANEL_H - shift:] == 0).all())
+        self.assertLess(grid[il.PAGE_ROW_Y:il.PAGE_ROW_Y + il.TAB_H, 40:200].mean(), 30)
+        # page 2: the stats box's rim and dark inside, no grid lines where the grid was (inside the box)
+        sx0, sy0, sx1, sy1 = il.stats_box()
+        self.assertGreater(max(stats[y, sx0 + 20:sx1 - 20].mean() for y in range(sy0, sy0 + 4)), 60)
+        self.assertLess(stats[gy + 6:sy1 - 6, sx0 + 6:sx1 - 6].mean(), 30)
+        self.assertGreater(np.abs(stats[gy:sy1 - 6] - one[gy:sy1 - 6]).sum(), 0)
+        # header and bottom band unchanged on both pages
+        self.assertTrue((grid[:16] == one[:16]).all())
+        self.assertTrue((stats[:16] == one[:16]).all() and (stats[il.GRID_BOTTOM + 1:] == one[il.GRID_BOTTOM + 1:]).all())
+        with self.assertRaises(ValueError):
+            ia.panel_image(self.med, self.d2r, tab, "other")
 
     def test_title_is_drawn_and_too_long_refused(self):
         tab = il.Tab("charms", "Charms", "Charm Inventory", "invchm", 10, 6)
@@ -124,11 +193,18 @@ class Art(unittest.TestCase):
             self.assertFalse((panel / "invtabs_tab_maps.dc6").exists())  # no classic panel: no classic tab button either
             self.assertEqual(sizes(il.BUTTON_ART), [(ia.BUTTON, ia.BUTTON)] * 2)
             self.assertEqual(sizes(ia.LISTMODE_ART), [(il.TAB_W, il.TAB_H)] * 4)
-            for name in ("invtabs_charms", "invtabs_tab_charms", il.BUTTON_ART, ia.LISTMODE_ART):
+            # the first tab's two pages and the page buttons
+            self.assertEqual(sizes("invtabs_charms_grid"), PANEL_SIZES)
+            self.assertEqual(sizes("invtabs_charms_stats"), PANEL_SIZES)
+            self.assertEqual(sizes(il.PAGE_ART), [(il.TAB_W, il.TAB_H)] * 6)
+            self.assertFalse((panel / "invtabs_maps_stats.dc6").exists())
+            for name in ("invtabs_charms", "invtabs_tab_charms", il.BUTTON_ART, ia.LISTMODE_ART, "invtabs_charms_grid",
+                         "invtabs_charms_stats", il.PAGE_ART):
                 for w, h, _ox, _oy, block in dc6.read_dc6(panel / f"{name}.dc6"):
                     idx = np.array(_indices(w, h, block))
                     self.assertLessEqual(int(idx.max()), 224, name)
             self.assertTrue((Path(d) / "prev" / "mock_charms_10x6_x2.png").exists())
+            self.assertTrue((Path(d) / "prev" / "mock_charms_stats_x2.png").exists())
 
 
 def _indices(w: int, h: int, block: bytes) -> list[list[int]]:

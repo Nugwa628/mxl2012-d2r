@@ -16,7 +16,7 @@
 namespace mxl {
 
 #ifndef MXL_LAUNCHER_VERSION
-#define MXL_LAUNCHER_VERSION "0.1.5"  // the downloader version; CMake reads it from here for the version resource
+#define MXL_LAUNCHER_VERSION "0.1.6"  // the downloader version; CMake reads it from here for the version resource
                                       // (cmake -DMXL_LAUNCHER_VERSION=x.y.z overrides both, for tests of the self-update)
 #endif
 constexpr const char* LauncherVersion = MXL_LAUNCHER_VERSION;
@@ -101,6 +101,10 @@ public:
 	bool InstallOrUpdate(std::string& error);  // only what is missing or changed; removes files the release no longer has
 	bool Repair(std::string& error);           // the same with every file hashed again
 	bool Uninstall(std::string& error);        // mods\mxl2012 only (our marker required); never saves, D2RLoader, other mods
+	// docs/launcher.md "Uninstall and cleanup", after the player said yes: remove the downloader's own files in the data
+	// folder (state, log, downloads, staging); the save copies and the "removed" plugin copies stay (KeptOnCleanup). Refused
+	// while our mods\mxl2012 is still installed (its marker id lives in the state). Afterwards nothing is written there again.
+	bool CleanUp(std::string& error);
 	bool CheckFeed(std::string& error);        // read the channel and the manifest
 	// docs/bugs.md #53, each after the player said yes. FixDefaultMod sets only default_mod = "mxl2012" in D2RLoader's
 	// game-wide config (the one write outside mods\mxl2012); RemoveStrayPlugins moves every copy of our plugin outside
@@ -168,6 +172,7 @@ private:
 	decltype(Manifest::launcher) offer_;  // its launcher entry (set even when the release itself is refused)
 	mutable std::string selfSha256_;      // sha256 of this exe, read once: an offer of the same bytes is no update
 	std::string siteRoot_;     // SiteRoot(opt_.site)
+	bool cleanedUp_ = false;   // CleanUp ran: the state is not saved again
 };
 
 }  // namespace mxl

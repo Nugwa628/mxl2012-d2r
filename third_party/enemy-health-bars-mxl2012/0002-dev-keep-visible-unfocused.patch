@@ -1,0 +1,87 @@
+diff --git a/src/plugin.cpp b/src/plugin.cpp
+index 9ef7288..3bea42a 100644
+--- a/src/plugin.cpp
++++ b/src/plugin.cpp
+@@ -55,6 +55,7 @@ thread_local bool standaloneDrawing{};
+ std::mutex guard;
+ struct Config {
+     bool enabled=true, full=true, hidePanels=true, hdFrame=true, rarityOutline=true, aboveHeads=true;
++    bool devKeepVisibleUnfocused=false;  // dev only: test captures of a game window that is not focused
+     float width=64.6f, height=6, offset=-16, border=1, outlineWidth=2, red=.3f, yellow=.6f, opacity=1;
+     Color green{0,.933f,0,1}, amber{1,.8f,0,1}, low{.933f,.188f,.188f,1};
+     Color background{.09f,.09f,.09f,1}, edge{.03f,.03f,.03f,1};
+@@ -233,6 +234,7 @@ bool loadConfig(const D2RL::PluginContext* ctx) {
+             else if(key=="normal_outline")c.normalOutline=color();
+             else if(key=="champion_outline")c.championOutline=color();
+             else if(key=="unique_outline")c.uniqueOutline=color();
++            else if(key=="dev_keep_visible_unfocused")c.devKeepVisibleUnfocused=boolean();
+             else return false;
+         }
+         if(c.width<8||c.width>400||c.height<1||c.height>40||c.border<0||c.border>8
+@@ -240,6 +242,7 @@ bool loadConfig(const D2RL::PluginContext* ctx) {
+             ||c.opacity<0||c.opacity>1) return false;
+         if(!applyLauncherVisibility(ctx,c)){ctx->LogError("Enemy bars: invalid launcher visibility options.");return false;}
+     } catch(...) {return false;}
++    bars::standalone::keepVisibleUnfocused(c.devKeepVisibleUnfocused);
+     std::lock_guard lock(guard); config=c; return true;
+ }
+ 
+diff --git a/src/standalone_overlay.cpp b/src/standalone_overlay.cpp
+index 55cbe4e..7b9cc79 100644
+--- a/src/standalone_overlay.cpp
++++ b/src/standalone_overlay.cpp
+@@ -15,6 +15,7 @@ constexpr wchar_t ClassName[]=L"D2R_EnemyHealthBars_Standalone";
+ std::thread worker;
+ std::mutex lifecycle;
+ std::atomic<bool> stopping{false};
++std::atomic<bool> keepUnfocused{false};
+ thread_local uint32_t* target{};
+ thread_local int targetWidth{},targetHeight{};
+ Paint painter{};Log logger{};void* userData{};
+@@ -53,13 +54,14 @@ void run() noexcept {
+         MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+         if(!IsWindow(game)){Search search;EnumWindows(findGame,reinterpret_cast<LPARAM>(&search));game=search.best;}
+         const HWND foreground=GetForegroundWindow();RECT rect{};POINT origin{};
++        const bool keep=keepUnfocused.load();
+         const bool visible=game&&IsWindowVisible(game)&&!IsIconic(game)&&
+-            (foreground==game||GetAncestor(foreground,GA_ROOT)==game)&&
++            (keep||foreground==game||GetAncestor(foreground,GA_ROOT)==game)&&
+             GetClientRect(game,&rect)&&ClientToScreen(game,&origin)&&rect.right>0&&rect.bottom>0;
+         if(!visible){if(shown){ShowWindow(window,SW_HIDE);shown=false;}Sleep(16);continue;}
+         if(!window) {
+             // Owned, transparent, nonactivating: no keyboard/mouse hooks or input capture.
+-            window=CreateWindowExW(WS_EX_LAYERED|WS_EX_TRANSPARENT|WS_EX_NOACTIVATE|WS_EX_TOOLWINDOW|WS_EX_TOPMOST,
++            window=CreateWindowExW(WS_EX_LAYERED|WS_EX_TRANSPARENT|WS_EX_NOACTIVATE|WS_EX_TOOLWINDOW|(keep?0:WS_EX_TOPMOST),
+                 ClassName,L"",WS_POPUP,origin.x,origin.y,rect.right,rect.bottom,game,nullptr,instance,nullptr);
+             if(!window){failed=true;break;}
+         }
+@@ -95,7 +97,7 @@ void run() noexcept {
+         SIZE size{width,height};POINT source{};BLENDFUNCTION blend{AC_SRC_OVER,0,255,AC_SRC_ALPHA};
+         GdiFlush();
+         if(!UpdateLayeredWindow(window,nullptr,&origin,&size,memory,&source,0,&blend,ULW_ALPHA)){failed=true;break;}
+-        if(!shown)SetWindowPos(window,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_SHOWWINDOW);
++        if(!shown)SetWindowPos(window,keep?HWND_TOP:HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_SHOWWINDOW);
+         shown=true;
+         if(!logged){if(logger)logger("Enemy bars: standalone transparent renderer is presenting (no MapSense required).",userData);logged=true;}
+         // Sleep(16) plus drawing time drifts against the game's/monitor's frame
+@@ -122,6 +124,7 @@ void stop() noexcept {
+     ready.notify_all();if(worker.joinable())worker.join();
+     requester=nullptr;painter=nullptr;logger=nullptr;userData=nullptr;
+ }
++void keepVisibleUnfocused(bool keep) noexcept {keepUnfocused=keep;}
+ void snapshotReady() noexcept {
+     {std::lock_guard lock(readyMutex);++generation;}
+     ready.notify_one();
+diff --git a/src/standalone_overlay.h b/src/standalone_overlay.h
+index 80f9b04..ce28ead 100644
+--- a/src/standalone_overlay.h
++++ b/src/standalone_overlay.h
+@@ -8,5 +8,8 @@ using Log=void(*)(const char* text,void* user) noexcept;
+ bool start(Request request,Paint paint,Log log,void* user) noexcept;
+ void snapshotReady() noexcept;
+ void stop() noexcept;
++// Dev only (config dev_keep_visible_unfocused): keep drawing while the game window is not the foreground window, as a
++// window that is not topmost (it stays just above the game window, its owner, and below other programs' windows).
++void keepVisibleUnfocused(bool keep) noexcept;
+ void fill(float l,float t,float r,float b,float red,float green,float blue,float alpha) noexcept;
+ }

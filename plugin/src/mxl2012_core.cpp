@@ -20,6 +20,8 @@
 //      that fire such a skill keep their tooltip lines; item_effect.cpp, off word itemeffect, bug #40);
 //   +  D2R's skill remove returns at once for a unit that owns no skill instead of asserting `ptSkill` (the level-0 sumskills of
 //      Median's pets without skills: Batstrike's bats, Rampagor, Lamia; skill_remove.cpp, off word skillremove, bug #15);
+//   +  D2R's Ctrl stat range of a descfunc it has no range case for (Median's "Reanimate as:", descfunc 23) is D2R's plain line
+//      at min and max merged into "(min-max)" instead of an assert and a blank line (ranged_desc.cpp, off word rangedesc, bug #617);
 //   +  D2R's damage code skips the missing dodge / avoid / evade state list without its `hList` assert (Median gives those
 //      chances as plain stats; dodge_list.cpp, off word dodgelist, bug #53);
 //   +  D2R's blaze / spider-lay functions (states 13 / 22, where Median keeps shellshock / raptured as 1.13c did) leave a
@@ -124,6 +126,7 @@
 #include "stash_tip.h"
 #include "tab_flash.h"
 #include "save_mode.h"
+#include "ranged_desc.h"
 #include "skill_remove.h"
 #include "skill_text.h"
 #include "spirit_warp.h"
@@ -156,7 +159,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.24";
+constexpr const char* PluginVersion = "0.1.25";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -222,7 +225,7 @@ char g_otherImage[256] = "";  // the message for a player on another game image,
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove dodgelist statelist melttrail lobaim whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -482,6 +485,7 @@ char g_stubReport[192] = "";
 char g_noMissileReport[256] = "";
 char g_itemEffectReport[160] = "";
 char g_skillRemoveReport[160] = "";
+char g_rangedDescReport[160] = "";
 char g_dodgeListReport[160] = "";
 char g_stateListReport[160] = "";
 char g_meltTrailReport[160] = "";
@@ -554,7 +558,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 		const char* word;
 		const char* report;
 	} parts[] = {{"cltdo22", g_cltDoReport}, {"cltnomis", g_noMissileReport}, {"itemeffect", g_itemEffectReport},
-	             {"skillremove", g_skillRemoveReport}, {"dodgelist", g_dodgeListReport}, {"statelist", g_stateListReport},
+	             {"skillremove", g_skillRemoveReport}, {"rangedesc", g_rangedDescReport}, {"dodgelist", g_dodgeListReport}, {"statelist", g_stateListReport},
 	             {"melttrail", g_meltTrailReport}, {"lobaim", g_lobAimReport}, {"whirlwind", g_whirlwindReport}, {"moveonly", g_moveOnlyReport}, {"charmlen", g_charmLengthReport}, {"cubedupe", g_cubeDupeReport},
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
@@ -712,6 +716,8 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	SayPart(command, "itemeffect", line);
 	std::snprintf(line, sizeof(line), "%s; calls answered %ld (last skill %ld)", g_skillRemoveReport, SkillRemoveSkips(), SkillRemoveLastSkill());
 	SayPart(command, "skillremove", line);
+	std::snprintf(line, sizeof(line), "%s; lines built %ld (last descfunc %ld)", g_rangedDescReport, RangedDescLines(), RangedDescLastDescfunc());
+	SayPart(command, "rangedesc", line);
 	SayPart(command, "dodgelist", g_dodgeListReport);
 	SayPart(command, "statelist", g_stateListReport);
 	long trailsClient = 0, trailsServer = 0;
@@ -991,6 +997,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("skillremove")) {
 		InstallSkillRemoveGuard(context, g_skillRemoveReport, sizeof(g_skillRemoveReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_skillRemoveReport);
+		context->LogInfo(line);
+	}
+	if (!Off("rangedesc")) {
+		InstallRangedDesc(context, g_rangedDescReport, sizeof(g_rangedDescReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_rangedDescReport);
 		context->LogInfo(line);
 	}
 	if (!Off("dodgelist")) {

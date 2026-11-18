@@ -1,0 +1,109 @@
+# NOT ACTIVE. Optional CI path for signing the D2R-XL 2012 Downloader with Azure Artifact Signing (docs/launcher.md
+# "Release and signing"). GitHub runs workflows only from .github/workflows/; copy this file there on the public GitHub
+# mirror to use it. The default path is the release PC (tools/artifact_signing.py sign).
+#
+# Every push to main builds and tests the exe. Signing runs only from "Run workflow" with "sign" ticked.
+# Azure sign-in: OpenID Connect (no secret stored). An app registration with a federated credential for this repository
+# (subject repo:<owner>/<repo>:ref:refs/heads/main) and the role "Artifact Signing Certificate Profile Signer" on the
+# certificate profile. Settings on GitHub (Settings > Secrets and variables > Actions); no id is written in this file:
+#   secret   AZURE_CLIENT_ID             the app registration's client id
+#   secret   AZURE_TENANT_ID             the tenant id
+#   secret   AZURE_SUBSCRIPTION_ID       the subscription of the Artifact Signing account
+#   variable ARTIFACT_SIGNING_ENDPOINT   https://<region>.codesigning.azure.net/ (the account's region)
+#   variable ARTIFACT_SIGNING_ACCOUNT    the Artifact Signing account name
+#   variable ARTIFACT_SIGNING_PROFILE    the certificate profile name
+name: Downloader (build and sign with Artifact Signing)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "launcher/**"
+      - "tools/sign_launcher.py"
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: "Sign the build with Azure Artifact Signing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write  # OpenID Connect token for azure/login
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      EXE: build/launcher/Release/D2R-XL-2012-Downloader.exe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build the downloader (MSVC, x64, Release)
+        shell: pwsh
+        run: |
+          cmake -S launcher -B build/launcher -A x64
+          cmake --build build/launcher --config Release
+          if (-not (Test-Path $env:EXE)) { throw "no $env:EXE" }
+
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          build/launcher/tests/Release/launcher_tests.exe
+          if ($LASTEXITCODE -ne 0) { throw "launcher_tests failed" }
+          python tools/sign_launcher.py --exe $env:EXE --out dist-unsigned
+          if ($LASTEXITCODE -ne 0) { throw "unsigned build check failed" }
+
+      - name: Copy the build to sign
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force to-sign | Out-Null
+          Copy-Item $env:EXE to-sign/
+
+      - name: Azure sign-in (OpenID Connect)
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign with Azure Artifact Signing
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        uses: azure/artifact-signing-action@v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}/to-sign
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          # only the azure/login session signs
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+
+      - name: Check the signed exe (same program, valid timestamped signature)
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        shell: pwsh
+        run: python tools/sign_launcher.py --exe $env:EXE --signed to-sign/D2R-XL-2012-Downloader.exe --out dist-launcher
+
+      - name: Upload the signed build
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        uses: actions/upload-artifact@v4
+        with:
+          name: D2R-XL-2012-Downloader-signed
+          path: dist-launcher/
+          if-no-files-found: error

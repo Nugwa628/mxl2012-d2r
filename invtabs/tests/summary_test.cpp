@@ -249,6 +249,48 @@ void Patterns() {
 	CHECK(SummaryNativeOptional(FormatOne) && SummaryNativeOptional(StatRecord) && !SummaryNativeOptional(StatListText));
 }
 
+// Classic rows wrap long lines at a space, continuations indented and in the line's colour (summary_logic.h WrapLines).
+void Wrap() {
+	CHECK(WrapChars(272) == 38); // the stats page's text area (layouts.h ClassicStatsText)
+	CHECK(WrapChars(0) == 0);
+	CHECK(Glyphs("abc") == 3);
+	CHECK(Glyphs("\xC3\xA9t\xC3\xA9") == 3); // UTF-8 counts characters, not bytes
+	CHECK(GlyphBytes("\xC3\xA9t\xC3\xA9", 2) == 3);
+
+	const std::string spiral = "1% Chance to cast level 20 Death Spiral when Struck"; // 51 characters, seen running over
+	const auto w = WrapLines({ spiral, "+3 to All Skills" }, 38);
+	CHECK(w.size() == 3);
+	CHECK(w[0] == "1% Chance to cast level 20 Death");
+	CHECK(w[1] == "  Spiral when Struck");
+	CHECK(w[2] == "+3 to All Skills");
+	for (const auto& line : w) CHECK(Glyphs(line) <= 38);
+
+	// exact fit stays one line; one character more wraps
+	const std::string fit(38, 'x');
+	CHECK(WrapLines({ fit }, 38) == (std::vector<std::string> { fit }));
+	CHECK(WrapLines({ "aaaa bbbb cccc dddd" }, 14) == (std::vector<std::string> { "aaaa bbbb cccc", "  dddd" }));
+	// a word longer than the row is cut
+	const auto cut = WrapLines({ std::string(30, 'y') }, 12);
+	CHECK(cut.size() == 3 && cut[0] == std::string(12, 'y') && cut[1] == "  " + std::string(10, 'y') && cut[2] == "  " + std::string(8, 'y'));
+	// the leading colour code goes in front of every piece, not counted in the width
+	const std::string gold = std::string(ColourGold) + "Azmodan's Heart of the Burning Hells charm";
+	const auto        g    = WrapLines({ gold }, 20);
+	CHECK(g.size() >= 2);
+	for (const auto& line : g) {
+		CHECK(SplitColour(line).first == RowColour::Gold);
+		CHECK(Glyphs(SplitColour(line).second) <= 20);
+	}
+	CHECK(StripColour(g[0]) == "Azmodan's Heart of");
+	CHECK(StripColour(g[1]) == "  the Burning Hells");
+	// too narrow to wrap sensibly: unchanged; empty stays empty
+	CHECK(WrapLines({ spiral }, 5) == (std::vector<std::string> { spiral }));
+	CHECK(WrapLines({}, 38).empty());
+	// every piece's words survive, in order
+	std::string joined;
+	for (const auto& line : WrapLines({ spiral }, 15)) joined += (joined.empty() ? "" : " ") + line.substr(line.find_first_not_of(' '));
+	CHECK(joined == spiral);
+}
+
 } // namespace
 
 int main() {
@@ -259,6 +301,7 @@ int main() {
 	Order();
 	Lines();
 	LongLists();
+	Wrap();
 	Layout();
 	ByCharm();
 	Patterns();

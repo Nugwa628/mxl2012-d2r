@@ -1,0 +1,6 @@
+# Build output and test scratch
+/build/
+/dist-*/
+/signed/
+__pycache__/
+*.pyc

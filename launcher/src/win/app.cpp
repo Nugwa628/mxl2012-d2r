@@ -187,6 +187,8 @@ bool Launcher::LoadState() {
 }
 
 bool Launcher::SaveState() {
+	if (cleanedUp_)
+		return true;
 	state_.Set("launcher", LauncherVersion);
 	state_.Set("site", opt_.site.empty() ? state_["site"].Str(DefaultSite) : opt_.site);
 	state_.Set("channel", opt_.channel.empty() ? state_["channel"].Str(DefaultChannel) : opt_.channel);
@@ -1568,6 +1570,65 @@ bool Launcher::Uninstall(std::string& error) {
 	state_ = clean;
 	SaveState();
 	Report("D2R-XL 2012 is uninstalled (only " + Utf8(mod) + " was removed). Your characters stay in " + Utf8(saves) + ".");
+	return true;
+}
+
+bool Launcher::CleanUp(std::string& error) {
+	std::string ignore;
+	if (FindD2R(ignore)) {
+		std::wstring mod = ModDir();
+		std::string marker;
+		if (DirExists(mod) && ReadWholeFile(JoinPath(mod, Wide(InstallMarkerName)), marker) &&
+		    CheckMarker(marker, state_["install_id"].Str()) == MarkerVerdict::Ours) {
+			error = "D2R-XL 2012 is still installed in " + Utf8(mod) + ". Uninstall it first, then clean up.";
+			return false;
+		}
+	}
+	const std::wstring& data = opt_.dataDir;
+	if (!DirExists(data)) {
+		Report("Nothing to clean up: " + Utf8(data) + " does not exist.");
+		return true;
+	}
+	Report("Removing the downloader's own files in " + Utf8(data) + " ...");
+	LogStopFile();  // the log is one of the files; later lines go to the console only
+	cleanedUp_ = true;
+	std::vector<std::string> kept;
+	WIN32_FIND_DATAW fd;
+	HANDLE h = FindFirstFileExW(LongPath(JoinPath(data, L"*")).c_str(), FindExInfoBasic, &fd, FindExSearchNameMatch, nullptr, 0);
+	if (h != INVALID_HANDLE_VALUE) {
+		do {
+			std::wstring name = fd.cFileName;
+			if (name == L"." || name == L"..")
+				continue;
+			std::wstring p = JoinPath(data, name);
+			if (KeptOnCleanup(Utf8(name))) {
+				kept.push_back(Utf8(p));
+				continue;
+			}
+			bool dir = fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+			if (dir && !(fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+				if (!RemoveTree(p, error)) {
+					FindClose(h);
+					return false;
+				}
+			} else if (dir ? !RemoveDirectoryW(LongPath(p).c_str()) : !DeleteFileW(LongPath(p).c_str())) {
+				error = "cannot delete " + Utf8(p) + ": " + Utf8(LastErrorText(GetLastError()));
+				FindClose(h);
+				return false;
+			}
+		} while (FindNextFileW(h, &fd));
+		FindClose(h);
+	}
+	if (kept.empty()) {
+		RemoveDirectoryW(LongPath(data).c_str());
+		Report("The downloader's files are removed (" + Utf8(data) + "). Delete D2R-XL-2012-Downloader.exe itself to finish.");
+	} else {
+		std::string list;
+		for (const auto& k : kept)
+			list += (list.empty() ? "" : ", ") + k;
+		Report("The downloader's files are removed. Kept (yours to delete): " + list +
+		       ". Delete D2R-XL-2012-Downloader.exe itself to finish.");
+	}
 	return true;
 }
 

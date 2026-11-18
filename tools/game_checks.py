@@ -8785,6 +8785,148 @@ CHECKS += [("invtabs_seed", check_invtabs_seed), ("invtabs", check_invtabs), ("i
            ("invtabs_refused", check_invtabs_refused), ("invtabscore", check_invtabscore),
            ("invtabscore_outside", check_invtabscore_outside)]  # docs/invtabs.md
 CHECKS += [("charmpage_grid", check_charmpage_grid), ("charmpage", check_charmpage)]  # lane charmpage: bug #615, the list's mode
+# --- lane charmstats: the charm tab on two pages in legacy graphics (page 1 the grid, page 2 the stats) ----------------------
+# The classic left panel at 1600 x 900: 1.5 px per classic pixel, its top at y 90; x 320 in the 4:3 view (800 x 600 centred),
+# x 0 with D2R Legacy 16:9 (1066 x 600, the panels at the edges). Page buttons (invtabs/src/layouts.h ClassicPagedPanel):
+# 24 x 24 at panel (230, 87) grid and (254, 87) stats.
+CHARMSTATS_GRID_BTN, CHARMSTATS_STATS_BTN = (230 + 12, 87 + 12), (254 + 12, 87 + 12)
+
+
+def _charmstats_px(x0, px, py):
+    return x0 + 1.5 * px, 90 + 1.5 * py
+
+
+def _charmstats_page(log):
+    """'grid' / 'stats' from the status line's `classic page` (None: the charm tab has one page)."""
+    m = re.search(r"; classic page (grid|stats)", _invtabs_status_line(log))
+    return m.group(1) if m else None
+
+
+def _charmstats_wrap(log, hd_lines):
+    """The classic rows from the last `invtabs summary` in `log`: (ok, note). Every row fits the plugin's wrap width, the
+    long lines (wider than it) were split, and the words are those of the HD lines, in order."""
+    head = None
+    for i, x in enumerate(log):
+        m = re.search(r"summary classic: (\d+) line\(s\) in (\d+) row\(s\), wrapped at (\d+) character", x)
+        if m:
+            head = (i, m)
+    if head is None:
+        return False, "no classic lines in the log"
+    i, m = head
+    width = int(m.group(3))
+    colour = re.compile("ÿc.")
+    rows = [colour.sub("", re.sub(r"^.*summary classic line \d+: ", "", x)) for x in log[i + 1:] if "summary classic line " in x]
+    hd = [colour.sub("", x) for x in hd_lines]
+    wide = [x for x in hd if len(x) > width]
+    over = [r for r in rows if len(r) > width]
+    words_ok = " ".join(rows).split() == " ".join(hd).split()
+    cont = sum(1 for r in rows if r.startswith("  "))
+    ok = width > 0 and not over and words_ok and len(rows) >= len(hd) + len(wide) and cont >= len(wide)
+    return ok, "classic rows: %d (HD lines %d, %d wider than %d characters), %d continuation(s), %d over, words %s" % (
+        len(rows), len(hd), len(wide), width, cont, len(over), "kept" if words_ok else "CHANGED")
+
+
+def _charmstats_click(x0, at, want, log, notes, what):
+    """Click a page button; the page must be `want` afterwards. A miss is noted and the console sets the page."""
+    x, y = _charmstats_px(x0, *at)
+    g.click_bg(x / 1600, y / 900)
+    time.sleep(2.5)
+    got = _charmstats_page(log)
+    if got != want:
+        notes.append("%s: click at %d,%d gave %s: console used" % (what, x, y, got))
+        g.console_bg("invtabs page %s" % want)
+        time.sleep(2.0)
+    return got == want
+
+
+def check_charmstats():
+    """Lane charmstats (owner, 2026-11-16): legacy graphics show the charm tab on two pages, page 1 the grid and page 2 the
+    stats, switched by two buttons in the top row. On the filled tab of `charmpage_grid`: HD first (no change: the summary
+    band above the grid), then legacy: the tab opens on the grid; the stats button's tooltip and click; page 2 shows the
+    stats (20 rows), no item tooltip over where the grid was, PageDown scrolls, the list by charm; closed and opened again it
+    stays on page 2; the grid button goes back and the charms are where they were. MXL_CHARMSTATS_WIDE=1: the run has D2R
+    Legacy 16:9 (legacy169.dll) on, so legacy is 1066 x 600 and the left panel starts 120 px from the left (at 1600 x 900)."""
+    wide = os.environ.get("MXL_CHARMSTATS_WIDE") == "1"
+    name, tag, x0 = "charmstats", "w169" if wide else "43", 120 if wide else 320
+    mark = engine_mark()
+    log, shots, notes, results = [], [], [], {}
+    goto(1)
+    release_held_item()
+    set_graphics("hd")
+    Hl("xp 2000000000", log)
+    time.sleep(2)
+    with open(_invtabs_log(), encoding="utf-8", errors="replace") as f:
+        boot = [x for x in f.read().splitlines() if "charm tab in legacy graphics:" in x]
+    log.extend(boot[-1:])
+    results["paged"] = bool(boot) and "two pages" in boot[-1]
+    g.press_bg("i")
+    time.sleep(1.2)
+    n = _charmpage_fill(log, notes)
+    results["filled"] = n >= 30
+    g.console_bg("invtabs close")
+    time.sleep(1.0)
+    g.console_bg("invtabs open")
+    time.sleep(2.0)
+    _invtabs_visible("charmstats_hd_%s" % tag, "charms hd", log, shots, results)
+    before = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log))
+    g.console_bg("invtabs close")
+    time.sleep(0.8)
+    if set_graphics("legacy"):
+        time.sleep(2)
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+        if _charmstats_page(log) == "stats":  # a page left from an earlier check in this game
+            g.console_bg("invtabs page grid")
+            time.sleep(2.0)
+        results["grid_page"] = _charmstats_page(log) == "grid"
+        _invtabs_visible("charmstats_sd_%s_grid" % tag, "charms classic", log, shots, results)
+        # page 1 is tight (grid right under the row, 81 px higher than on page 2): the first cell's charm shows its tooltip
+        hover_px(*_charmstats_px(x0, 16 + 14, 117 + 14))
+        time.sleep(1.0)
+        shots.append(sh("charmstats_sd_%s_grid_hover_cell" % tag))
+        hover_px(*_charmstats_px(x0, *CHARMSTATS_STATS_BTN))
+        time.sleep(1.0)
+        shots.append(sh("charmstats_sd_%s_stats_tip" % tag))
+        results["click_stats"] = _charmstats_click(x0, CHARMSTATS_STATS_BTN, "stats", log, notes, "stats button")
+        _invtabs_visible("charmstats_sd_%s_stats" % tag, "charms classic", log, shots, results)
+        counted, skipped, lines = _invtabs_summary(log)
+        notes.append("summary: %s counted, %s left out, %d line(s)" % (counted, skipped, len(lines)))
+        results["stats_lines"] = len(lines) > 5
+        results["wrapped"], note = _charmstats_wrap(log, lines)
+        notes.append(note)
+        hover_px(*_charmstats_px(x0, 16 + 14, 198 + 14))  # where page 2's hidden grid has its first cell
+        time.sleep(1.0)
+        shots.append(sh("charmstats_sd_%s_stats_hover_cell" % tag))
+        g.press_bg("pgdn")
+        time.sleep(0.8)
+        shots.append(sh("charmstats_sd_%s_stats_pgdn" % tag))
+        g.console_bg("invtabs list charm")
+        time.sleep(2.0)
+        _invtabs_visible("charmstats_sd_%s_stats_by_charm" % tag, "charms classic", log, shots, results)
+        g.console_bg("invtabs list all")
+        time.sleep(2.0)
+        g.console_bg("invtabs close")
+        time.sleep(0.8)
+        g.console_bg("invtabs open")
+        time.sleep(1.5)
+        results["reopen_keeps_stats"] = _charmstats_page(log) == "stats"
+        results["click_grid"] = _charmstats_click(x0, CHARMSTATS_GRID_BTN, "grid", log, notes, "grid button")
+        _invtabs_visible("charmstats_sd_%s_grid_again" % tag, "charms classic", log, shots, results)
+        results["charms_kept"] = sorted((c["code"], c["x"], c["y"]) for c in _invtabs_page6(log)) == before
+        g.console_bg("invtabs close")
+        time.sleep(0.8)
+        set_graphics("hd")
+        time.sleep(2)
+    else:
+        results["legacy"] = False
+    g.console_bg("invtabs open")
+    time.sleep(1.5)
+    _invtabs_visible("charmstats_hd_after_%s" % tag, "charms hd", log, shots, results)
+    finish(name, all(results.values()), "%s; %s" % ("; ".join(notes), results), mark, shots, log, harness=INVTABS_HARNESS,
+           partial="the pages' look, by eye on the screenshots")
+
+
+CHECKS += [("charmstats", check_charmstats)]  # lane charmstats: the classic charm tab's two pages
 CHECKS += [("rpsignets", check_rpsignets)]  # lane phase3: engine-triage #24, signets (pSpell 3) and the Apple (pSpell 10)
 CHECKS += [("apple_use", check_apple_use)]  # lane apple: bug #499, the Apple bought, used, Save and Exit
 CHECKS += [("acts", check_acts)]
@@ -16871,6 +17013,16 @@ def check_devmenulook():
 CHECKS += [("devmenulook", check_devmenulook)]
 
 
+def check_devmenusock():
+    """A unique (Facebreaker) and a set item spawned from the developer menu have their maximum real sockets, HD and legacy, and a gem
+    goes in; the same rows from the game's generator are reported for comparison (tools/devmenu_checks.py run_sock)."""
+    import devmenu_checks
+    devmenu_checks.run_sock(sys.modules[__name__])
+
+
+CHECKS += [("devmenusock", check_devmenusock)]
+
+
 def check_advstats():
     """The character sheet's Advanced Stats panel with worn gear: HD (scrolled) and legacy shots, an item tooltip to compare and
     the client's stat values in the log (tools/advstats_checks.py)."""
@@ -17492,6 +17644,16 @@ def check_leftskills_pad():
 
 
 CHECKS += [("leftskills_pad", check_leftskills_pad)]
+
+
+def check_secrets():
+    """Lane secrets: Median's nine secret uniques roll from the game's generator and their tooltips in HD and legacy
+    (tools/secrets_checks.py)."""
+    import secrets_checks
+    secrets_checks.run(sys.modules[__name__])
+
+
+CHECKS += [("secrets", check_secrets)]
 
 if __name__ == "__main__":
     main()

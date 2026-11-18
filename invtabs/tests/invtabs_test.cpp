@@ -304,7 +304,9 @@ bool Balanced(const std::string& j) {
 
 void Layouts() {
 	namespace L = invtabs::layout;
-	CHECK(ClassicMarker(7401.0f) && !ClassicMarker(7400.0f) && SlotOfMarker(7403.0f, 7401.0f) == 3 && SlotOfMarker(7403.0f, 7402.0f) == -1);
+	CHECK(ClassicMarker(7401.0f) && !ClassicMarker(7400.0f) && SlotOfMarker(7403.0f, 7401.0f) == 3 && SlotOfMarker(7403.0f, 7403.0f) == -1);
+	// the classic stats page's hidden grid: classic, hidden, still its slot
+	CHECK(HiddenMarker(7402.0f) && ClassicMarker(7402.0f) && !HiddenMarker(7401.0f) && !HiddenMarker(7400.0f) && SlotOfMarker(7400.0f, 7402.0f) == 0);
 	// sprite round trip
 	L::Picture p = L::Blank(3, 2);
 	for (std::size_t i = 0; i < p.rgba.size(); ++i) p.rgba[i] = static_cast<unsigned char>(i * 7);
@@ -377,6 +379,41 @@ void Layouts() {
 	const auto classic = L::ClassicPanel({ { "invtabs/Charms", "Charms", "charms" } }, 0, 0, 10, 6, "");
 	CHECK(classic.find("ListMode") == std::string::npos);
 	CHECK(Balanced(classic) && classic.find("PANEL\\\\invtabs_charms") != std::string::npos && classic.find("\"x\": 7400, \"y\": 7401") != std::string::npos);
+	// the one-page panel keeps its widgets in the same order
+	CHECK(classic.find("invtabs/PanelClickCatcher") < classic.find("invtabs/Background") && classic.find("invtabs/Background") < classic.find("invtabs/Tab0")
+	      && classic.find("invtabs/Tab0") < classic.find("invtabs/Grid") && classic.find("invtabs/Grid") < classic.find("invtabs/Close"));
+	// classic, two pages (= tools/invtabs_legacy.py page_geometry): one row at y 87 on both pages, the stats box
+	// (20, 115)-(302, 366) with 20 lines, the page buttons at x 230 / 254 left of the list button
+	CHECK(L::ClassicPageRowY == 87 && L::ClassicPageButtonsX == 230);
+	const auto sb = L::ClassicStatsBox(), st = L::ClassicStatsText();
+	CHECK(sb.x == 20 && sb.y == 115 && sb.x + sb.w == 302 && sb.y + sb.h == 366 && st.h == 20 * 12 && st.y == 120);
+	CHECK(L::ClassicPagedFits(1) && L::ClassicPagedFits(8) && !L::ClassicPagedFits(9));
+	const std::vector<L::ClassicTab> one { { "invtabs/Charms", "Charms", "charms" } };
+	const L::ClassicPages            pages { "PANEL\\invtabs_page", "invtabs/PageGrid", "invtabs/PageStats" };
+	const auto                       grid = L::ClassicPagedPanel(one, 0, 0, 10, 6, false, "SUMMARY", pages, ct);
+	CHECK(Balanced(grid) && grid.find("PANEL\\\\invtabs_charms_grid") != std::string::npos && grid.find("\"x\": 7400, \"y\": 7401") != std::string::npos);
+	CHECK(grid.find("SUMMARY") == std::string::npos && grid.find("ListMode") == std::string::npos); // page 1: no stats, no list button
+	CHECK(grid.find(L::XYWH(17, 87, 24, 24)) != std::string::npos);                                  // the tab, in the top row
+	// page 1: the grid page's button is the shown one (frame 2, no click); the stats page's button clicks to its empty panel
+	CHECK(grid.find("\"invtabs/PageGrid\", \"fields\": {\"rect\": " + L::XYWH(230, 87, 24, 24)
+	                + ", \"filename\": \"PANEL\\\\invtabs_page\", \"normalFrame\": 2, \"pressedFrame\": 2, \"tooltipString\": \"Charm grid\", \"tooltipOffset\": {\"x\": 0, \"y\": -3}}}")
+	      != std::string::npos);
+	CHECK(grid.find(L::XYWH(254, 87, 24, 24)) != std::string::npos && grid.find("\"normalFrame\": 3, \"pressedFrame\": 4") != std::string::npos);
+	CHECK(grid.find("PanelManager:OpenPanel:invtabs/PageStats") != std::string::npos && grid.find("PanelManager:OpenPanel:invtabs/PageGrid") == std::string::npos);
+	// page 2: the stats, the list button at the row's right end, the grid bound but hidden (marker 7402)
+	const auto stats = L::ClassicPagedPanel(one, 0, 0, 10, 6, true, "SUMMARY", pages, ct);
+	CHECK(Balanced(stats) && stats.find("PANEL\\\\invtabs_charms_stats") != std::string::npos && stats.find("SUMMARY") != std::string::npos);
+	CHECK(stats.find("\"x\": 7400, \"y\": 7402") != std::string::npos && stats.find("\"y\": 7401") == std::string::npos);
+	CHECK(stats.find(L::XYWH(L::ClassicToggleX, 87, 24, 24)) != std::string::npos && stats.find("\"normalFrame\": 5, \"pressedFrame\": 5") != std::string::npos);
+	CHECK(stats.find("PanelManager:OpenPanel:invtabs/PageGrid") != std::string::npos && stats.find("PanelManager:OpenPanel:invtabs/PageStats") == std::string::npos);
+	CHECK(stats.find("PanelManager:ClosePanel:invtabs/Charms") != std::string::npos);
+	// page 1 is tight (= tools/invtabs_legacy.py paged_grid_shift): the grid's top line right under the row, so a 10 x 6
+	// grid moves up 81 (cell (0, 0) at y 117 instead of 198), the close button with it; page 2 keeps both where they were
+	CHECK(L::ClassicPagedGridShift(6) == 81 && L::ClassicPagedGridShift(7) == 52 && L::ClassicPagedGridShift(1) == 226);
+	CHECK(grid.find("\"invtabs/Grid\", \"fields\": {\"rect\": " + L::XY(16, 117)) != std::string::npos);
+	CHECK(grid.find("\"invtabs/Close\", \"fields\": {\"rect\": " + L::XYWH(275, 302, 32, 32)) != std::string::npos);
+	CHECK(stats.find("\"invtabs/Grid\", \"fields\": {\"rect\": " + L::XY(16, 198)) != std::string::npos);
+	CHECK(stats.find("\"invtabs/Close\", \"fields\": {\"rect\": " + L::XYWH(275, 383, 32, 32)) != std::string::npos);
 }
 
 int main() {

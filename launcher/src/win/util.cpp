@@ -214,6 +214,11 @@ void LogInit(const std::wstring& file, bool console) {
 		MoveFileExW(file.c_str(), (file + L".old").c_str(), MOVEFILE_REPLACE_EXISTING);
 }
 
+void LogStopFile() {
+	std::lock_guard<std::mutex> lock(g_logMutex);
+	g_logFile.clear();
+}
+
 namespace {
 void WriteLogLine(const std::string& line) {
 	SYSTEMTIME t;

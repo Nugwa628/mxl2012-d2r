@@ -1,8 +1,9 @@
 """Preview composite (not committed): the background with mock text and buttons at the downloader's layout rects
 (launcher/src/win/window.cpp: PanelRect, StatusRect, LineRect, BarRect, button rects, HowToPlayRect, FooterRect).
-Buttons are drawn the way DrawButton does (Exocet labels); this is only a mock-up, not the real window.
+Buttons are drawn the way DrawButton does (Cinzel Decorative labels); this is only a mock-up, not the real window.
 
   py -3 tools/launcher_art/make_preview.py <preview.png> [--res launcher/res] [--fonts <folder with the fonts>]
+                                          [--title-font FILE]   another button font, to compare (a before / after)
 """
 from __future__ import annotations
 
@@ -38,7 +39,10 @@ FOOT = ("Downloader 0.1.0  ·  D2R-XL 2012, a port of Median XL 2012 by Brother 
 S = 2
 
 
-def build(res: str, fonts) -> Image.Image:
+TITLE_FONT = "CinzelDecorative-Bold.ttf"  # launcher/res/launcher.rc resource 104
+
+
+def build(res: str, fonts, title_font=None) -> Image.Image:
     base = Image.open(f"{res}/background.png").convert("RGBA")
     assert base.size == (W, H), base.size
     base.alpha_composite(Image.open(f"{res}/popup-window.png").convert("RGBA"), PANEL)
@@ -46,7 +50,8 @@ def build(res: str, fonts) -> Image.Image:
     ov = Image.new("RGBA", big.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(ov)
     body = lambda sz: ImageFont.truetype(str(fonts / "RobotoCondensed.ttf"), int(sz * S))
-    title = lambda sz: ImageFont.truetype(str(fonts / "exocet.ttf"), int(sz * S)) if (fonts / "exocet.ttf").is_file() else body(sz)
+    tf = Path(title_font) if title_font else fonts / TITLE_FONT
+    title = lambda sz: ImageFont.truetype(str(tf), int(sz * S)) if tf.is_file() else body(sz)
 
     def text(xy, s, font, fill, anchor="la"):
         x, y = xy[0] * S, xy[1] * S
@@ -102,8 +107,9 @@ def main() -> None:
     ap.add_argument("out")
     ap.add_argument("--res", default=str(REPO / "launcher" / "res"))
     ap.add_argument("--fonts")
+    ap.add_argument("--title-font", help="button font file instead of the shipped one (comparisons)")
     a = ap.parse_args()
-    build(a.res, font_dir(a.fonts)).save(a.out)
+    build(a.res, font_dir(a.fonts), a.title_font).save(a.out)
     print("preview:", a.out)
 
 

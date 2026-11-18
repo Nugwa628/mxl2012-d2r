@@ -17,8 +17,11 @@ it must be inside the project root R or the repo, and only its own unpacked/ and
    description, website); a reference file the package lacks must be a byte copy of D2R's own (the D2R baseline or the shared
    D2R cache, package_release.baselines()); the package has no file the reference lacks except the bundled plugins' files
    (legacy169.dll / legacy169.toml, Buff HUD's DLL, MPQ, licences and buff-panel.toml, Auto Belt Refill's DLL and
-   auto-belt-refill.toml, Controller QOL's files, and CharmInv's DLL, MPQ and charm-inv.toml; checked in step 2: present, a
-   release build of the pinned version, CharmInv the author's pinned bytes with allow_inventory_charms = true). The charm
+   auto-belt-refill.toml, Controller QOL's files, CharmInv's DLL, MPQ and charm-inv.toml, Damage Overflow Fix's DLL, licence
+   and config, Enemy Health Bars' DLL, licences, notices and source zip, and Floating Damage's DLL, licences, notices, font
+   and config; checked in step 2: present, a release build of
+   the pinned version, CharmInv the author's pinned bytes with allow_inventory_charms = true, Damage Overflow Fix the author's
+   pinned bytes with our settings, Enemy Health Bars our patched build). The charm
    inventory (tools/charm_inventory.py): a package holds CharmInv or invtabs (invtabs.dll + invtabs.toml), never both, and
    its data is the one built for it (invtabs: its tables, art and the classic Charms button, no CharmInv tables; CharmInv:
    nothing of invtabs). When package_release.CHARM_INVENTORY is invtabs, a package without invtabs is refused
@@ -47,7 +50,8 @@ DIFFERS_BY_DESIGN = {"d2rloader/plugins/mxl2012-core.dll", "d2rloader/metadata.j
 # not install them
 BUNDLED = ({pr.LEGACY169["dll"], pr.LEGACY169["config"]} | {pr.BUFFHUD[k] for k in pr.BUFFHUD_FILES}
            | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES} | {pr.CONTROLLERQOL[k] for k in pr.CONTROLLERQOL_FILES}
-           | {pr.CHARMINV[k] for k in pr.CHARMINV_FILES})
+           | {pr.CHARMINV[k] for k in pr.CHARMINV_FILES} | {pr.DOF[k] for k in pr.DOF_FILES}
+           | {pr.EHB[k] for k in pr.EHB_FILES} | {pr.FD[k] for k in pr.FD_FILES})
 OPTIONAL = {pr.INVTABS["dll"], pr.INVTABS["config"]}
 STRING_FILES = ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json")
 
@@ -168,6 +172,28 @@ def check_mod_folder(mod: Path, version: str) -> list:
             problems.append(f"{pr.CHARMINV['config']} is missing")
         elif "allow_inventory_charms = true" not in cfg.read_text("utf-8"):
             problems.append(f"{pr.CHARMINV['config']} lacks allow_inventory_charms = true (charms work from the inventory too)")
+    problems += pr.check_dof(mod / Path(pr.DOF["dll"]).parent)
+    for k in ("licence", "config"):
+        if not (mod / pr.DOF[k]).is_file():
+            problems.append(f"{pr.DOF[k]} is missing")
+    if (mod / pr.DOF["config"]).is_file():
+        problems += pr.dof_config_problems((mod / pr.DOF["config"]).read_text("utf-8"))
+    ehb = mod / pr.EHB["dll"]
+    if ehb.is_file():
+        problems += pr.check_ehb(ehb)
+    for k in pr.EHB_FILES:  # GPL: the licence and the corresponding source go with the DLL
+        if not (mod / pr.EHB[k]).is_file():
+            problems.append(f"{pr.EHB[k]} is missing")
+    if (mod / pr.EHB["config"]).is_file():
+        problems += pr.ehb_config_problems((mod / pr.EHB["config"]).read_text("utf-8"))
+    fd = mod / pr.FD["dll"]
+    if fd.is_file():
+        problems += pr.check_fd(fd)
+    for k in pr.FD_FILES:
+        if not (mod / pr.FD[k]).is_file():
+            problems.append(f"{pr.FD[k]} is missing")
+    if (mod / pr.FD["config"]).is_file():
+        problems += pr.fd_config_problems((mod / pr.FD["config"]).read_text("utf-8"))
     if not (mod / "d2rloader" / "patches").is_dir():
         problems.append("d2rloader/patches/ is missing")
     data = mod / f"{NAME}.mpq" / "data"

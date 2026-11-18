@@ -79,9 +79,13 @@ def nine_slice(src: Image.Image, w: int, h: int, corner: int = NAME_CORNER) -> I
     return out
 
 
-def panel_image(median_data: Path, d2r, tab: "il.Tab") -> Image.Image:
-    """The classic 320 x 432 panel of `tab` (RGBA, before quantising). `d2r`: a rotw_stash_legacy.D2R (palette, font)."""
+def panel_image(median_data: Path, d2r, tab: "il.Tab", page: str | None = None) -> Image.Image:
+    """The classic 320 x 432 panel of `tab` (RGBA, before quantising). `d2r`: a rotw_stash_legacy.D2R (palette, font).
+    page: None the one-page panel (summary box above the tab row), "grid" page 1 of the paged panel (the grid, no box),
+    "stats" page 2 (no grid: the stats box from under the row down to the stash's bottom line)."""
     il.check_size(tab.cols, tab.rows)
+    if page is not None and page not in il.PAGES:
+        raise ValueError(f"page {page!r}: one of {il.PAGES}")
     ts = ui_art.panel_sets(Path(median_data) / "global" / "ui" / "panel" / "tradestash.dc6", d2r.pal)[0]
     im = ts.copy()
     gx, gy = il.grid_origin(tab.cols, tab.rows)
@@ -91,11 +95,13 @@ def panel_image(median_data: Path, d2r, tab: "il.Tab") -> Image.Image:
              (BODY_X[0], BODY_TOP))
     # the grid: the stash's last `rows` rows with the cell line above them (the frame's own top line, rows 80-82, carries
     # specks of the header's ornament: seen in game 2026-11-11), its first `cols` columns with their right line
-    block = ts.crop((GRID_LEFT, top, il.INNER_X0 + tab.cols * il.CELL + 1, il.GRID_BOTTOM + 1))
-    im.paste(block, (gx - 2, top))
-    # the summary box: the lower name box, stretched
-    x0, y0, x1, y1 = il.summary_box(tab.rows)
-    im.alpha_composite(nine_slice(ts.crop(NAME_OUTER), x1 - x0, y1 - y0), (x0, y0))
+    if page != "stats":
+        block = ts.crop((GRID_LEFT, top, il.INNER_X0 + tab.cols * il.CELL + 1, il.GRID_BOTTOM + 1))
+        im.paste(block, (gx - 2, top))
+    # the summary box (one page) or the stats box (page 2): the lower name box, stretched; page 1 has none
+    if page != "grid":
+        x0, y0, x1, y1 = il.stats_box() if page == "stats" else il.summary_box(tab.rows)
+        im.alpha_composite(nine_slice(ts.crop(NAME_OUTER), x1 - x0, y1 - y0), (x0, y0))
     # header: the upper name box plain, the title in the lower one
     dx0, dy0, dx1, dy1 = UPPER_DIVIDER
     im.paste(ts.crop((UPPER_PLAIN_X, dy0, UPPER_PLAIN_X + dx1 - dx0, dy1)), (dx0, dy0))
@@ -107,6 +113,13 @@ def panel_image(median_data: Path, d2r, tab: "il.Tab") -> Image.Image:
     if text.width > nx1 - nx0 or text.height > ny1 - ny0:
         raise ValueError(f"invtabs_art: title {tab.title!r} is {text.size}, the name box {nx1 - nx0} x {ny1 - ny0}")
     im.alpha_composite(text, (nx0 + (nx1 - nx0 - text.width) // 2, ny0 + (ny1 - ny0 - text.height) // 2))
+    if page == "grid":  # page 1: the grid's top line and all below it (the grid, the bottom band) moved up under the row
+        shift = il.paged_grid_shift(tab.rows)
+        if shift > 0:
+            tight = Image.new("RGBA", im.size, (0, 0, 0, 0))
+            tight.paste(im.crop((0, 0, im.width, top - shift)), (0, 0))
+            tight.paste(im.crop((0, top, im.width, im.height)), (0, top - shift))
+            im = tight
     return im
 
 
@@ -174,6 +187,38 @@ def listmode_frames() -> list[Image.Image]:
     return out
 
 
+def _page_glyph(stats: bool, shift: int) -> Image.Image:
+    """The 24 x 24 page glyph alone: a 3 x 2 block of grid cells (page 1), or a sheet of text lines (page 2)."""
+    g = Image.new("RGBA", (il.TAB_W, il.TAB_H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(g)
+    gold, dim = TITLE_COLOUR + (255,), (140, 120, 72, 255)
+    o = shift
+    if stats:
+        d.rectangle([6 + o, 4 + o, 17 + o, 19 + o], outline=dim)
+        for k, y in enumerate((7, 10, 13, 16)):
+            d.line([8 + o, y + o, (15 if k % 2 == 0 else 13) + o, y + o], fill=CHARM_BLUE + (255,) if k == 0 else gold)
+    else:
+        for cx in range(3):
+            for cy in range(2):
+                x, y = 4 + cx * 6, 7 + cy * 6
+                d.rectangle([x + o, y + o, x + 5 + o, y + 5 + o], outline=dim)
+                d.rectangle([x + 2 + o, y + 2 + o, x + 3 + o, y + 3 + o], fill=gold if (cx + cy) % 2 == 0 else CHARM_BLUE + (255,))
+    return g
+
+
+def page_frames() -> list[Image.Image]:
+    """[grid normal, grid pressed, grid shown, stats normal, stats pressed, stats shown], TAB_W x TAB_H, in tab_frames'
+    style (the shown page: gold rim, as the tab shown)."""
+    out = []
+    for stats in (False, True):
+        for rim, inside, shift in ((RIM_GREY, TAB_INSIDE, 0), (RIM_DARK, TAB_INSIDE, 1), (TITLE_COLOUR, TAB_INSIDE_ON, 0)):
+            f = Image.new("RGBA", (il.TAB_W, il.TAB_H), rim + (255,))
+            f.paste(Image.new("RGBA", (il.TAB_W - 2, il.TAB_H - 2), inside + (255,)), (1, 1))
+            f.alpha_composite(_page_glyph(stats, shift))
+            out.append(f)
+    return out
+
+
 def button_frames(d2r, tab: "il.Tab") -> list[Image.Image]:
     """[normal, pressed], 32 x 32: D2R's buysellbtn frames 0 / 1 with the tab's picture centred (pressed: +1, +1)."""
     pic = _fit(item_picture(d2r, tab.icon), BUTTON - 4)
@@ -211,6 +256,11 @@ def art(out_data: Path, median_data: Path, d2r, tabs: tuple, preview_dir: Path |
             continue
         files.append((il.art_name(tab), rsl.panel_tiles(panel)))
         files.append((il.tab_art_name(tab), [_q(f, d2r.pal, il.tab_art_name(tab)) for f in tab_frames(d2r, tab)]))
+        if tab is tabs[0]:  # the charm tab (the summary's): its two pages
+            for page in il.PAGES:
+                name = il.page_art_name(tab, page)
+                files.append((name, rsl.panel_tiles(_q(panel_image(median_data, d2r, tab, page), d2r.pal, name))))
+            files.append((il.PAGE_ART, [_q(f, d2r.pal, il.PAGE_ART) for f in page_frames()]))
     files.append((il.BUTTON_ART, [_q(f, d2r.pal, il.BUTTON_ART) for f in button_frames(d2r, tabs[0])]))
     files.append((LISTMODE_ART, [_q(f, d2r.pal, LISTMODE_ART) for f in listmode_frames()]))
     for name, frames in files:
@@ -250,6 +300,34 @@ def mock_up(dest: Path, d2r, tab: "il.Tab", tabs: tuple, mock_tabs: tuple = ()) 
     return im
 
 
+def mock_page(dest: Path, d2r, tab: "il.Tab", tabs: tuple, page: str) -> Image.Image:
+    """A page of the paged panel as the game should draw it: the row (tabs, page buttons, page 2's list mode button),
+    page 2's sample stats lines in classic font8, the close button."""
+    im = ui_art.panel_sets(dest / f"{il.page_art_name(tab, page)}.dc6", d2r.pal)[0]
+    for i, t in enumerate(il.classic_tabs(tabs)[:il.MAX_TABS]):
+        p = dest / f"{il.tab_art_name(t)}.dc6"
+        frames = _decoded(p, d2r.pal) if p.exists() else tab_frames(d2r, t)
+        im.alpha_composite(frames[2 if t.id == tab.id else 0], (il.TAB_X0 + i * il.TAB_W, il.PAGE_ROW_Y))
+    pages = _decoded(dest / f"{il.PAGE_ART}.dc6", d2r.pal)
+    stats = page == "stats"
+    im.alpha_composite(pages[0 if stats else 2], (il.page_buttons_x(), il.PAGE_ROW_Y))
+    im.alpha_composite(pages[5 if stats else 3], (il.page_buttons_x() + il.TAB_W, il.PAGE_ROW_Y))
+    if stats:
+        im.alpha_composite(_decoded(dest / f"{LISTMODE_ART}.dc6", d2r.pal)[0], (il.toggle_x(), il.PAGE_ROW_Y))
+        font = d2r.font(SAMPLE_FONT)
+        if font:
+            x0, y0, _x1, _y1 = il.stats_box()
+            inset = il.SUMMARY_RIM + il.SUMMARY_PAD
+            sample = ["+35 to Strength", "+20 to Dexterity", "+41 to Life", "All Resists +12%", "+8% Faster Hit Recovery",
+                      "5% Chance to Find Magic Items", "+3 to Light Radius", "Adds 5-10 fire damage"]
+            for i in range(il.stats_lines()):
+                t = font.render(sample[i % len(sample)], (110, 110, 255))
+                im.alpha_composite(t, (x0 + inset, y0 + inset + i * il.LINE_H + (il.LINE_H - t.height) // 2))
+    close = _decoded(Path(d2r.data) / "global" / "ui" / "panel" / "buysellbtn.dc6", d2r.pal)[il.CLOSE_FRAMES["normal"]]
+    im.alpha_composite(close, (il.CLOSE_RECT[0], il.CLOSE_RECT[1] - (0 if stats else il.paged_grid_shift(tab.rows))))
+    return im
+
+
 def preview(dest: Path, d2r, tabs: tuple, out: Path, mock: tuple = ()) -> list[Path]:
     """PNGs decoded back from the DC6 files: per tab the panel x2 with the cells traced, the mock-up x2; the buttons x4."""
     out.mkdir(parents=True, exist_ok=True)
@@ -273,7 +351,12 @@ def preview(dest: Path, d2r, tabs: tuple, out: Path, mock: tuple = ()) -> list[P
                          (f"mock_{tag}_x2.png", mock_up(dest, d2r, tab, tabs, mock).resize((W * 2, H * 2), Image.NEAREST))):
             ui_art.save_png(out / name, im)
             written.append(out / name)
-    for name in [il.tab_art_name(t) for t in il.classic_tabs(tabs)] + [il.BUTTON_ART]:
+    if tabs and (dest / f"{il.PAGE_ART}.dc6").exists() and (dest / f"{il.page_art_name(tabs[0], 'stats')}.dc6").exists():
+        for page in il.PAGES:
+            name = f"mock_{tabs[0].id}_{page}_x2.png"
+            ui_art.save_png(out / name, mock_page(dest, d2r, tabs[0], tabs, page).resize((W * 2, H * 2), Image.NEAREST))
+            written.append(out / name)
+    for name in [il.tab_art_name(t) for t in il.classic_tabs(tabs)] + [il.BUTTON_ART, il.PAGE_ART]:
         frames = _decoded(dest / f"{name}.dc6", d2r.pal)
         fw = max(f.width for f in frames)
         sheet = Image.new("RGBA", (len(frames) * (fw + 4), max(f.height for f in frames)))

@@ -7,6 +7,47 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.25 (2026-11-18)
+
+- **Downloader 0.1.6.** Downloader 0.1.5 offers this update when it starts and updates itself: say Yes. Uninstall now
+  also offers to remove the downloader's own files (settings, log, downloads in `%LOCALAPPDATA%\mxl2012`; your save
+  copies stay), and `--cli cleanup` does the same. The buttons use the free font Cinzel Decorative instead of Exocet,
+  and the "report a problem" icon is our own. Everything in the downloader is now open source. This downloader (0.1.6)
+  is not signed yet; code signing comes in a later version ([code signing policy](docs/code-signing-policy.md)).
+- Holding Ctrl for stat ranges no longer blanks the "Reanimate as" line of uniques, runewords and set items: it now reads,
+  for example, "(3-5)% Reanimate as: Crimson Templar". The game also no longer writes an error about it to its log
+  (bug #617).
+- Charm tab in legacy graphics: the stats now have a page of their own. Page 1 shows the charm grid, page 2 the stats
+  list (18 lines at a time instead of a few, scrolled with the wheel or PageUp / PageDown). Switch with the two buttons
+  next to the tab picture, or bind the new Controls action "Charm tab page". Long stat lines wrap onto the next line
+  instead of running over the box. The grid page is shorter: the grid sits right under the tabs, with no empty area
+  above it. HD graphics are unchanged.
+- **Nine secret uniques can now drop.** Median XL 2012 had them in its files but never let them drop: Lady of Storms,
+  Atomus and Bard's Joke (jewels), Grand Armor, Siggard's Revenge, Aeterna, Sword of the White Void, Fury of Hellfire and
+  Soul Reaver. Each is rarer than any other unique of its kind. Lady of Storms is the rarest jewel of all and now needs
+  level 40.
+- **New bundled plugin: Damage Overflow Fix** by CelestialRayOne (Bogdan Bulai,
+  <https://github.com/CelestialRayOne/d2rloader_plugins>, MIT). A hit or damage stat above about 8.4 million no longer
+  wraps around to 0–2 damage; it is capped at 8,388,607 instead. Normal damage is exactly as before. Settings in
+  `mods\mxl2012\d2rloader\config\celestialrayone.damage-overflow-fix.toml`.
+- **New bundled plugin: Enemy Health Bars** by Graxy_TV (<https://github.com/graxytv/D2R-Over-the-Head-Health-Bars>,
+  GPL-3.0, used with the author's permission). Health bars over damaged monsters in HD and legacy graphics (with or without
+  Legacy 16:9; we added the legacy placement), with blue outlines for champions and orange for uniques and bosses. For bars
+  on every monster, set `show_full_health = true` in `mods\mxl2012\d2rloader\config\enemy-health-bars.toml`. Its source
+  and licence come with it in `mods\mxl2012\d2rloader\plugins\`.
+- **New bundled plugin: Floating Damage** by RuffnecKk (<https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, MIT;
+  based on locbones' D2RHUD and Fr4nsson's D2RDamageNumbers). The damage of each hit rises over the monster, and a small DPS
+  counter sits at the bottom left. It works in HD and in legacy graphics, with or without Legacy 16:9; we added the legacy
+  placement. In legacy graphics the numbers are 2.5 times their HD size (`legacy_text_scale` under `[appearance]`). The
+  numbers use the font Cinzel Bold (The Cinzel Project Authors, SIL Open Font License). On by default; turn it off with
+  `enabled = false` under `[general]` in `mods\mxl2012\d2rloader\config\ruffneckk-floating-damage.toml`.
+- The 0.1.24 known issue "the left-click skill comes back as the normal attack after Save and Exit" (bug #616) was a
+  test mistake, not a game bug: the test gave its character a skill of another class, which the game never saves.
+  A skill of your own class on left click is kept by Save and Exit, as before.
+- Developer menu: uniques and set items now come with their maximum number of real sockets, like normal items (for
+  example Facebreaker "Socketed (4)"). Before, Facebreaker showed "Max Sockets: 4" but had no sockets, so nothing could
+  be put in. Drops are unchanged.
+
 ### 0.1.24 (2026-11-16)
 
 - Potion belt: each belt column now really shows a number (earlier versions announced it, but nothing appeared on

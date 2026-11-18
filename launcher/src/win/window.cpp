@@ -1,5 +1,5 @@
 // The downloader's window: the owner's background art with the title in it (launcher/res/ART.md), a stone panel for
-// status and progress, the big Install / Update and Play buttons and the smaller actions in Exocet, body text in Roboto
+// status and progress, the big Install / Update and Play buttons and the smaller actions in Cinzel Decorative, body text in Roboto
 // Condensed, the "How to play" line, the "close after Play" check box, a link icon. Play starts D2RLoader.exe -mod mxl2012.
 //
 // Plain Win32 + GDI+ (part of Windows): GDI+ decodes the PNGs, loads the two fonts from the exe's
@@ -119,6 +119,7 @@ struct Ui {
 	bool busy = false;
 	bool loaderFailed = false;  // Install D2RLoader failed: Get D2RLoader (its page) takes its place
 	bool closeAfterPlay = true;
+	bool cleanUpAfterUninstall = false;  // the player said yes to Launcher::CleanUp after Uninstall
 	std::thread worker;
 };
 Ui g;
@@ -475,6 +476,10 @@ void RunAction(int id) {
 		                 L")?\n\nOnly that folder is removed. Your characters, D2R, D2RLoader and other mods are not touched.";
 		if (MessageBoxW(g.wnd, q.c_str(), L"Uninstall D2R-XL 2012", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
 			return;
+		std::wstring c = L"Also remove the downloader's own files (settings, log, downloads) in " + g.launcher->options().dataDir +
+		                 L"?\n\nYour save copies (save-copies) and plugin copies moved aside (removed) stay. Answer No to keep the "
+		                 L"downloader set up. Delete D2R-XL-2012-Downloader.exe yourself afterwards if you no longer want it.";
+		g.cleanUpAfterUninstall = MessageBoxW(g.wnd, c.c_str(), L"Uninstall D2R-XL 2012", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES;
 	}
 	if (id == IdDefaultMod) {
 		std::wstring q = Wide(g.launcher->EnvironmentWarnings(g.view).front()) + L"\n\nMake D2R-XL 2012 the default mod? The downloader sets only "
@@ -513,7 +518,7 @@ void RunAction(int id) {
 		switch (id) {
 		case IdInstall: ok = l.InstallOrUpdate(err); break;
 		case IdRepair: ok = l.Repair(err); break;
-		case IdUninstall: ok = l.Uninstall(err); break;
+		case IdUninstall: ok = l.Uninstall(err) && (!g.cleanUpAfterUninstall || l.CleanUp(err)); break;
 		case IdSelfUpdate: ok = l.SelfUpdate(err); break;
 		case IdDefaultMod: ok = l.FixDefaultMod(err); break;
 		case IdMovePlugins: ok = l.RemoveStrayPlugins(err); break;

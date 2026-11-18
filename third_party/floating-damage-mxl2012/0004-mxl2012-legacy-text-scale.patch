@@ -1,0 +1,122 @@
+diff --git a/plugins/floating-damage/config/ruffneckk-floating-damage.toml b/plugins/floating-damage/config/ruffneckk-floating-damage.toml
+index d96cd8b..f52f795 100644
+--- a/plugins/floating-damage/config/ruffneckk-floating-damage.toml
++++ b/plugins/floating-damage/config/ruffneckk-floating-damage.toml
+@@ -40,6 +40,11 @@ text_outline_width = 1
+ shadow_left_right_offset = 0.0
+ shadow_up_down_offset = 0.0
+ 
++# D2R-XL 2012: in legacy graphics the numbers are this many times their size
++# (text_size / critical_hit_size). HD and the DPS counter are not affected.
++# Valid range: 0.25 to 8.
++legacy_text_scale = 2.5
++
+ [animation]
+ # Total lifetime in seconds for normal and critical numbers: 0.01 to 60.
+ display_time_seconds = 0.85
+diff --git a/plugins/floating-damage/src/config_parser.cpp b/plugins/floating-damage/src/config_parser.cpp
+index 9b43ab6..9258e36 100644
+--- a/plugins/floating-damage/src/config_parser.cpp
++++ b/plugins/floating-damage/src/config_parser.cpp
+@@ -174,6 +174,8 @@ bool ApplySetting(
+             return number(-512.0f, 512.0f, config.shadowLeftRightOffset);
+         if (key == "shadow_up_down_offset")
+             return number(-512.0f, 512.0f, config.shadowUpDownOffset);
++        if (key == "legacy_text_scale")
++            return number(0.25f, 8.0f, config.legacyTextScale);
+     } else if (table == "animation") {
+         if (key == "display_time_seconds")
+             return number(0.01f, 60.0f, config.displayTimeSeconds);
+diff --git a/plugins/floating-damage/src/floating_damage.cpp b/plugins/floating-damage/src/floating_damage.cpp
+index c2c0645..f1f7ae9 100644
+--- a/plugins/floating-damage/src/floating_damage.cpp
++++ b/plugins/floating-damage/src/floating_damage.cpp
+@@ -1133,6 +1133,9 @@ void Render(ImDrawList* drawList, const ImVec2& displaySize)
+         return;
+ 
+     const float resolutionScale = GetResolutionScale(displaySize.y);
++    // D2R-XL 2012: legacy graphics (the camera hook has set a classic screen size) scale the numbers by legacy_text_scale
++    const bool legacy = g_legacyClassicWidth.load(std::memory_order_relaxed) > 0
++        && g_legacyClassicHeight.load(std::memory_order_relaxed) > 0;
+ 
+     const bool enabled = IsEnabled();
+     const bool showNumbers = enabled;
+@@ -1146,7 +1149,9 @@ void Render(ImDrawList* drawList, const ImVec2& displaySize)
+     {
+         if (number.targetAnchored && !number.targetVisible)
+             continue;
+-        const float baseFontSize = (number.isProminent ? g_config.criticalHitSize : g_config.textSize) * resolutionScale;
++        const float baseFontSize = FloatingDamageMxl::LegacyNumberSize(
++            (number.isProminent ? g_config.criticalHitSize : g_config.textSize) * resolutionScale,
++            legacy, g_config.legacyTextScale);
+         for (const auto& tick : number.tickPopups)
+             RenderTickPopup(drawList, font, number, tick, baseFontSize, resolutionScale);
+     }
+@@ -1155,7 +1160,9 @@ void Render(ImDrawList* drawList, const ImVec2& displaySize)
+     {
+         if (number.targetAnchored && !number.targetVisible)
+             continue;
+-        const float baseFontSize = (number.isProminent ? g_config.criticalHitSize : g_config.textSize) * resolutionScale;
++        const float baseFontSize = FloatingDamageMxl::LegacyNumberSize(
++            (number.isProminent ? g_config.criticalHitSize : g_config.textSize) * resolutionScale,
++            legacy, g_config.legacyTextScale);
+         const float popScale = std::max(
+             CalculatePopScale(number.age),
+             CalculateHitPulseScale(number)
+diff --git a/plugins/floating-damage/src/floating_damage.hpp b/plugins/floating-damage/src/floating_damage.hpp
+index 5b21189..90765fc 100644
+--- a/plugins/floating-damage/src/floating_damage.hpp
++++ b/plugins/floating-damage/src/floating_damage.hpp
+@@ -30,6 +30,8 @@ struct Config {
+ 
+     float textSize = 38.0f;
+     float criticalHitSize = 48.0f;
++    // D2R-XL 2012: the numbers' size factor while the game draws legacy graphics (not the DPS counter, not HD)
++    float legacyTextScale = 2.5f;
+     int textOutlineWidth = 1;
+     float shadowLeftRightOffset = 0.0f;
+     float shadowUpDownOffset = 0.0f;
+diff --git a/plugins/floating-damage/src/legacy_projection.hpp b/plugins/floating-damage/src/legacy_projection.hpp
+index 84b94d4..d38b2f2 100644
+--- a/plugins/floating-damage/src/legacy_projection.hpp
++++ b/plugins/floating-damage/src/legacy_projection.hpp
+@@ -149,6 +149,12 @@ inline void PlaceInArea(
+     centerY = y;
+ }
+ 
++// A number's text size: in legacy graphics the classic picture's sprites are far bigger than HD's at the same window
++// height, so the numbers get the config's legacy_text_scale there. HD keeps the size it is given.
++inline float LegacyNumberSize(float size, bool legacy, float legacyScale) noexcept {
++    return legacy ? size * legacyScale : size;
++}
++
+ // The target of a rip-relative operand: the address after the instruction plus the signed 32-bit displacement.
+ constexpr std::uint64_t RipTarget(std::uint64_t nextInstruction, std::int32_t displacement) noexcept {
+     return nextInstruction + static_cast<std::uint64_t>(static_cast<std::int64_t>(displacement));
+diff --git a/plugins/floating-damage/tests/config_tests.cpp b/plugins/floating-damage/tests/config_tests.cpp
+index 30401a3..09e5aa0 100644
+--- a/plugins/floating-damage/tests/config_tests.cpp
++++ b/plugins/floating-damage/tests/config_tests.cpp
+@@ -165,6 +165,7 @@ int main(int argc, char** argv) {
+     }
+     ok &= Expect(Same(config.textSize, 38.0f), "text_size mismatch");
+     ok &= Expect(Same(config.criticalHitSize, 48.0f), "critical size mismatch");
++    ok &= Expect(Same(config.legacyTextScale, 2.5f), "legacy_text_scale mismatch");
+     ok &= Expect(config.textOutlineWidth == 1, "outline mismatch");
+     ok &= Expect(Same(config.shadowLeftRightOffset, 0.0f)
+         && Same(config.shadowUpDownOffset, 0.0f), "shadow offsets mismatch");
+@@ -215,6 +216,14 @@ int main(int argc, char** argv) {
+ 
+     ok &= Expect(RejectWithoutMutation("[unknown]\nx = 1\n"), "unknown table accepted");
+     ok &= Expect(RejectWithoutMutation("[general]\nwat = true\n"), "unknown key accepted");
++    ok &= Expect(RejectWithoutMutation("[appearance]\nlegacy_text_scale = 0.1\n"), "legacy_text_scale below range accepted");
++    ok &= Expect(RejectWithoutMutation("[appearance]\nlegacy_text_scale = 9.0\n"), "legacy_text_scale above range accepted");
++    {
++        FloatingDamage::Config scaled{};
++        std::string scaledError;
++        ok &= Expect(FloatingDamage::ParseConfigToml("[appearance]\nlegacy_text_scale = 1.0\n", scaled, scaledError)
++            && Same(scaled.legacyTextScale, 1.0f), "legacy_text_scale = 1.0 rejected");
++    }
+     ok &= Expect(RejectWithoutMutation("[general]\nenabled = true\nenabled = false\n"), "duplicate key accepted");
+     ok &= Expect(RejectWithoutMutation("[general]\nenabled = true\n[general]\nfont_index = 0\n"), "duplicate table accepted");
+     ok &= Expect(RejectWithoutMutation("[diagnostics]\nenabled = false\nenabled = true\n"), "duplicate diagnostics accepted");

@@ -2,7 +2,7 @@
 
 The panel and the icon are procedural: noise and gradients made here, no source images. The background is the
 owner's art (launcher/res/ART.md) and has no generator. The fonts the downloader ships
-(launcher/res/RobotoCondensed.ttf, exocet.ttf) are used only by the mock-up preview.
+(launcher/res/RobotoCondensed.ttf, CinzelDecorative-Bold.ttf) are used only by the mock-up preview.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def font_dir(arg: str | None = None) -> Path:
-    """Folder with RobotoCondensed.ttf / exocet.ttf: --fonts, $MXL_LAUNCHER_RES, else <repo>/launcher/res."""
+    """Folder with RobotoCondensed.ttf / CinzelDecorative-Bold.ttf: --fonts, $MXL_LAUNCHER_RES, else <repo>/launcher/res."""
     for cand in (arg, os.environ.get("MXL_LAUNCHER_RES"), str(REPO / "launcher" / "res")):
         if cand and (Path(cand) / "RobotoCondensed.ttf").is_file():
             return Path(cand)

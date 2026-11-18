@@ -177,10 +177,11 @@ inline std::string XY(int x, int y) { return R"({"x": )" + N(x) + R"(, "y": )" +
 
 inline std::string XYWH(int x, int y, int w, int h) { return R"({"x": )" + N(x) + R"(, "y": )" + N(y) + R"(, "width": )" + N(w) + R"(, "height": )" + N(h) + "}"; }
 
-// The grid bound to the page: 16 x 16 cells (the wrappers show the tab's area at its corner), our marker.
-inline std::string GridWidget(int slot, int x, int y, const std::string& cellSize, bool classic, int pageSize = 16) {
+// The grid bound to the page: 16 x 16 cells (the wrappers show the tab's area at its corner), our marker. hidden: the
+// classic stats page's grid (marker 7402): the wrappers neither draw it nor let it take an item.
+inline std::string GridWidget(int slot, int x, int y, const std::string& cellSize, bool classic, int pageSize = 16, bool hidden = false) {
 	char marker[96];
-	std::snprintf(marker, sizeof(marker), R"({"x": %d, "y": %d})", 7400 + slot, classic ? 7401 : 7400);
+	std::snprintf(marker, sizeof(marker), R"({"x": %d, "y": %d})", 7400 + slot, hidden ? 7402 : classic ? 7401 : 7400);
 	return R"({"type": "InventoryGridWidget", "name": "invtabs/Grid", "fields": {"rect": )" + XY(x, y) + R"(, "cellCount": )" + XY(pageSize, pageSize)
 	     + R"(, "cellSize": )" + cellSize + R"(, "gemSocketFilename": "PANEL\\gemsocket", "chronicleFlourishOffset": )" + marker + "}}";
 }
@@ -334,36 +335,116 @@ inline constexpr int ClassicToggleX = ClassicInnerX1 - ClassicTabW;
 
 inline bool ClassicToggleFits(std::size_t tabCount) { return ClassicInnerX0 + 1 + static_cast<int>(tabCount) * ClassicTabW + ClassicTabGap <= ClassicToggleX; }
 
-// The classic panel of tabs[self] (only tabs that fit classic are in `tabs`). summaryFragment replaces the empty rows.
-// toggle: the list mode button (classic frames: frame0 normal, frame0 + 1 pressed).
-inline std::string ClassicPanel(const std::vector<ClassicTab>& tabs, int self, int slot, int cols, int rows, const std::string& summaryFragment,
-                                const ListToggle& toggle = {}) {
-	const auto&       me   = tabs[static_cast<std::size_t>(self)];
-	const std::string name = me.panel;
-	std::string       j    = R"({"type": "Panel", "name": )" + Json(name) + R"(, "fields": {"priority": 10, "rect": {"x": -320, "y": -240, "width": 320, "height": 432}, "anchor": "$LeftPanelAnchor"}, "children": [)";
+// The panel root and its first widgets (click catcher, the 4-tile background PANEL\invtabs_<art>), "children" left open.
+inline std::string ClassicStart(const std::string& panel, const std::string& art) {
+	std::string j = R"({"type": "Panel", "name": )" + Json(panel) + R"(, "fields": {"priority": 10, "rect": {"x": -320, "y": -240, "width": 320, "height": 432}, "anchor": "$LeftPanelAnchor"}, "children": [)";
 	j += R"({"type": "ClickCatcherWidget", "name": "invtabs/PanelClickCatcher", "fields": {"rect": )" + XYWH(0, 0, ClassicW, ClassicH) + "}}";
-	j += R"(, {"type": "GridImageWidget", "name": "invtabs/Background", "fields": {"rect": )" + XYWH(0, 0, ClassicW, ClassicH) + R"(, "filename": )"
-	   + Json("PANEL\\invtabs_" + me.name) + R"(, "frames": 4, "rows": 2}})";
-	if (!summaryFragment.empty()) j += ", " + summaryFragment;
+	return j + R"(, {"type": "GridImageWidget", "name": "invtabs/Background", "fields": {"rect": )" + XYWH(0, 0, ClassicW, ClassicH) + R"(, "filename": )"
+	     + Json("PANEL\\invtabs_" + art) + R"(, "frames": 4, "rows": 2}})";
+}
+
+inline std::string ClassicTabButtons(const std::vector<ClassicTab>& tabs, int self, int y) {
+	std::string j;
 	for (std::size_t i = 0; i < tabs.size(); ++i) {
 		const bool mine = static_cast<int>(i) == self;
 		j += R"(, {"type": "ButtonWidget", "name": "invtabs/Tab)" + N(static_cast<int>(i)) + R"(", "fields": {"rect": )"
-		   + XYWH(ClassicInnerX0 + 1 + static_cast<int>(i) * ClassicTabW, ClassicTabRowY(rows), ClassicTabW, ClassicTabH) + R"(, "filename": )"
+		   + XYWH(ClassicInnerX0 + 1 + static_cast<int>(i) * ClassicTabW, y, ClassicTabW, ClassicTabH) + R"(, "filename": )"
 		   + Json("PANEL\\invtabs_tab_" + tabs[i].name) + R"(, "normalFrame": )" + N(mine ? 2 : 0) + R"(, "pressedFrame": )" + N(mine ? 2 : 1)
 		   + R"(, "tooltipString": )" + Json(tabs[i].label) + R"(, "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
 		   + Json("PanelManager:OpenPanel:" + tabs[i].panel) + "}}";
 	}
-	if (!toggle.filename.empty() && ClassicToggleFits(tabs.size()))
-		j += R"(, {"type": "ButtonWidget", "name": "invtabs/ListMode", "fields": {"rect": )" + XYWH(ClassicToggleX, ClassicTabRowY(rows), ClassicTabW, ClassicTabH)
-		   + R"(, "filename": )" + Json(toggle.filename) + R"(, "normalFrame": )" + N(toggle.frame0) + R"(, "pressedFrame": )" + N(toggle.frame0 + 1)
-		   + R"(, "tooltipString": )" + Json(toggle.tooltip) + R"(, "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
-		   + Json("PanelManager:OpenPanel:" + toggle.message) + "}}";
+	return j;
+}
+
+inline std::string ClassicToggleWidget(const ListToggle& toggle, int y) {
+	return R"(, {"type": "ButtonWidget", "name": "invtabs/ListMode", "fields": {"rect": )" + XYWH(ClassicToggleX, y, ClassicTabW, ClassicTabH)
+	     + R"(, "filename": )" + Json(toggle.filename) + R"(, "normalFrame": )" + N(toggle.frame0) + R"(, "pressedFrame": )" + N(toggle.frame0 + 1)
+	     + R"(, "tooltipString": )" + Json(toggle.tooltip) + R"(, "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
+	     + Json("PanelManager:OpenPanel:" + toggle.message) + "}}";
+}
+
+// dy: how far the close button moves up (page 1 of the paged panel, ClassicPagedGridShift).
+inline std::string ClassicClose(const std::string& panel, int dy = 0) {
+	return R"(, {"type": "ButtonWidget", "name": "invtabs/Close", "fields": {"rect": )" + XYWH(275, 383 - dy, 32, 32) + R"(, "filename": "PANEL\\buysellbtn", )"
+	       R"("normalFrame": 10, "pressedFrame": 11, "tooltipString": "Close", "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
+	     + Json("PanelManager:ClosePanel:" + panel) + "}}";
+}
+
+// The classic panel of tabs[self] (only tabs that fit classic are in `tabs`). summaryFragment replaces the empty rows.
+// toggle: the list mode button (classic frames: frame0 normal, frame0 + 1 pressed).
+inline std::string ClassicPanel(const std::vector<ClassicTab>& tabs, int self, int slot, int cols, int rows, const std::string& summaryFragment,
+                                const ListToggle& toggle = {}) {
+	const auto& me = tabs[static_cast<std::size_t>(self)];
+	std::string j  = ClassicStart(me.panel, me.name);
+	if (!summaryFragment.empty()) j += ", " + summaryFragment;
+	j += ClassicTabButtons(tabs, self, ClassicTabRowY(rows));
+	if (!toggle.filename.empty() && ClassicToggleFits(tabs.size())) j += ClassicToggleWidget(toggle, ClassicTabRowY(rows));
 	const Box g = ClassicGrid(cols, rows);
 	j += ", " + GridWidget(slot, g.x, g.y, "\"$ItemCellSize\"", true);
-	j += R"(, {"type": "ButtonWidget", "name": "invtabs/Close", "fields": {"rect": {"x": 275, "y": 383, "width": 32, "height": 32}, "filename": "PANEL\\buysellbtn", )"
-	     R"("normalFrame": 10, "pressedFrame": 11, "tooltipString": "Close", "tooltipOffset": {"x": 0, "y": -3}, "onClickMessage": )"
-	   + Json("PanelManager:ClosePanel:" + name) + "}}";
-	return j + "]}";
+	return j + ClassicClose(me.panel) + "]}";
+}
+
+// ---- classic, two pages: the charm tab with its stats (page 1 the grid, page 2 the stats; owner, 2026-11-16) ----
+// One row under the header on both pages: the tabs from the left, the two page buttons and (stats page) the list mode
+// button at the right. Page 2's stats box runs from under that row down to the stash's bottom line.
+// tools/invtabs_legacy.py (PAGE_ROW_Y, page_buttons_x, stats_box) draws the art for the same numbers.
+
+inline constexpr int ClassicPageRowY     = ClassicBodyTop + ClassicSummaryMargin;             // 87
+
+// How far page 1 moves the grid, the stash's bottom band and the close button up: the grid's top line right under the row
+// (owner, 2026-11-17; tools/invtabs_legacy.py paged_grid_shift). 81 for 6 rows; the art below the band is transparent.
+inline int ClassicPagedGridShift(int rows) {
+	return std::max(0, ClassicGrid(ClassicMaxCols, rows).y - (ClassicPageRowY + ClassicTabH + ClassicTabGap + ClassicLine - 1));
+}
+inline constexpr int ClassicPageButtonsX = ClassicToggleX - ClassicTabGap - 2 * ClassicTabW; // 230: grid page, then stats page
+
+inline bool ClassicPagedFits(std::size_t tabCount) { return ClassicInnerX0 + 1 + static_cast<int>(tabCount) * ClassicTabW + ClassicTabGap <= ClassicPageButtonsX; }
+
+// The stats page's box with its rim (as ClassicSummaryBox) and its text area.
+inline Box ClassicStatsBox() {
+	const int y0 = ClassicPageRowY + ClassicTabH + ClassicSummaryMargin;
+	const int y1 = ClassicGridBottom - ClassicLine + 1 - ClassicSummaryMargin;
+	return { ClassicInnerX0 + ClassicSummaryMargin, y0, ClassicInnerX1 - ClassicSummaryMargin - (ClassicInnerX0 + ClassicSummaryMargin), y1 - y0 };
+}
+
+inline Box ClassicStatsText() {
+	const Box b     = ClassicStatsBox();
+	const int lines = std::max(0, (b.h - 2 * ClassicSummaryInset) / ClassicLineH);
+	return { b.x + ClassicSummaryInset, b.y + ClassicSummaryInset, b.w - 2 * ClassicSummaryInset, lines * ClassicLineH };
+}
+
+// The page buttons: the mod's DC6 (frames 0-2 the grid glyph normal / pressed / shown, 3-5 the stats glyph), the clicks
+// to empty panel names of ours (full names). The button of the page shown has no click.
+struct ClassicPages {
+	std::string filename;
+	std::string gridMessage, statsMessage;
+	std::string gridTip = "Charm grid", statsTip = "Charm stats";
+};
+
+inline std::string ClassicPageButton(const char* name, int x, int frame0, bool shown, const std::string& tip, const std::string& message, const std::string& file) {
+	std::string j = R"(, {"type": "ButtonWidget", "name": "invtabs/)" + std::string(name) + R"(", "fields": {"rect": )" + XYWH(x, ClassicPageRowY, ClassicTabW, ClassicTabH)
+	              + R"(, "filename": )" + Json(file) + R"(, "normalFrame": )" + N(frame0 + (shown ? 2 : 0)) + R"(, "pressedFrame": )" + N(frame0 + (shown ? 2 : 1))
+	              + R"(, "tooltipString": )" + Json(tip) + R"(, "tooltipOffset": {"x": 0, "y": -3})";
+	if (!shown) j += R"(, "onClickMessage": )" + Json("PanelManager:OpenPanel:" + message);
+	return j + "}}";
+}
+
+// The classic panel of tabs[self] on page 1 (stats false: the grid, background PANEL\invtabs_<name>_grid) or page 2 (the
+// stats box with summaryFragment, background PANEL\invtabs_<name>_stats; the grid stays bound to the page but hidden).
+inline std::string ClassicPagedPanel(const std::vector<ClassicTab>& tabs, int self, int slot, int cols, int rows, bool stats, const std::string& summaryFragment,
+                                     const ClassicPages& pages, const ListToggle& toggle = {}) {
+	const auto& me = tabs[static_cast<std::size_t>(self)];
+	std::string j  = ClassicStart(me.panel, me.name + (stats ? "_stats" : "_grid"));
+	if (stats && !summaryFragment.empty()) j += ", " + summaryFragment;
+	j += ClassicTabButtons(tabs, self, ClassicPageRowY);
+	j += ClassicPageButton("PageGrid", ClassicPageButtonsX, 0, !stats, pages.gridTip, pages.gridMessage, pages.filename);
+	j += ClassicPageButton("PageStats", ClassicPageButtonsX + ClassicTabW, 3, stats, pages.statsTip, pages.statsMessage, pages.filename);
+	if (stats && !toggle.filename.empty()) j += ClassicToggleWidget(toggle, ClassicPageRowY);
+	// page 1: the grid and the close button moved up with the art (ClassicPagedGridShift); page 2's hidden grid stays put
+	const int shift = stats ? 0 : ClassicPagedGridShift(rows);
+	const Box g     = ClassicGrid(cols, rows);
+	j += ", " + GridWidget(slot, g.x, g.y - shift, "\"$ItemCellSize\"", true, 16, stats);
+	return j + ClassicClose(me.panel, shift) + "]}";
 }
 
 } // namespace invtabs::layout

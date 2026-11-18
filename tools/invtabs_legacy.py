@@ -203,6 +203,60 @@ def art_name(tab: Tab) -> str:
     return f"invtabs_{tab.id}"
 
 
+# ---------------------------------------------------------------- the first tab's two pages (the core's paged panel)
+# Legacy graphics show the charm tab (the first tab, the one with the summary) on two pages: page 1 the grid, page 2 the
+# stats (owner, 2026-11-16). Both pages have one row under the header: the tabs from the left, the two page buttons and
+# (page 2) the list mode button at the right. invtabs/src/layouts.h ClassicPagedPanel uses the same numbers.
+
+PAGES = ("grid", "stats")
+PAGE_ART = "invtabs_page"    # 6 frames: the grid glyph normal / pressed / shown, then the stats glyph
+PAGE_ROW_Y = BODY_TOP + SUMMARY_MARGIN
+
+
+def page_art_name(tab: Tab, page: str) -> str:
+    if page not in PAGES:
+        raise ValueError(f"page {page!r}: one of {PAGES}")
+    return f"invtabs_{tab.id}_{page}"
+
+
+def toggle_x() -> int:
+    """The list mode button's x: the row's right end."""
+    return INNER_X1 - TAB_W
+
+
+def page_buttons_x() -> int:
+    """x of the grid page's button; the stats page's follows it, then a gap and the list mode button."""
+    return toggle_x() - TAB_GAP - 2 * TAB_W
+
+
+def paged_fits(tab_count: int) -> bool:
+    return TAB_X0 + tab_count * TAB_W + TAB_GAP <= page_buttons_x()
+
+
+def paged_grid_shift(rows: int) -> int:
+    """How far page 1 moves the grid (and the stash's bottom band under it) up: its top line right under the row
+    (owner, 2026-11-17: no empty area above the grid). The panel's art ends that much higher; below it is transparent."""
+    return max(0, grid_origin(MAX_COLS, rows)[1] - (PAGE_ROW_Y + TAB_H + TAB_GAP + LINE - 1))
+
+
+def stats_box() -> tuple[int, int, int, int]:
+    """(x0, y0, x1, y1) of page 2's stats box (rim included, x1 / y1 exclusive): under the row, down to the stash's
+    bottom line."""
+    return INNER_X0 + SUMMARY_MARGIN, PAGE_ROW_Y + TAB_H + SUMMARY_MARGIN, INNER_X1 - SUMMARY_MARGIN, GRID_BOTTOM - LINE + 1 - SUMMARY_MARGIN
+
+
+def stats_lines() -> int:
+    _x0, y0, _x1, y1 = stats_box()
+    return (y1 - y0 - 2 * (SUMMARY_RIM + SUMMARY_PAD)) // LINE_H
+
+
+def page_geometry() -> dict:
+    x0, y0, x1, y1 = stats_box()
+    return {"row_y": PAGE_ROW_Y, "page_buttons": [[page_buttons_x() + i * TAB_W, PAGE_ROW_Y, TAB_W, TAB_H] for i in range(2)],
+            "list_button": [toggle_x(), PAGE_ROW_Y, TAB_W, TAB_H], "stats": {"box": [x0, y0, x1, y1], "lines": stats_lines(),
+            "chars": int((x1 - x0 - 2 * (SUMMARY_RIM + SUMMARY_PAD)) / SUMMARY_CHAR)}}
+
+
 def tab_art_name(tab: Tab) -> str:
     return f"invtabs_tab_{tab.id}"
 

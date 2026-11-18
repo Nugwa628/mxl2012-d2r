@@ -28,6 +28,15 @@ here unless --plugin is given) it writes into dist/:
                                    d2rloader/config/controller-qol-updates.toml (PyreFly's controller-qol at the pinned
                                    commit + our patches, the mxl2012 skill seed embedded; tools/build_controllerqol.ps1
                                    unless --controllerqol is given)
+                                   d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix.dll + licence,
+                                   d2rloader/config/celestialrayone.damage-overflow-fix.toml (Damage Overflow Fix 2.4.0 by
+                                   CelestialRayOne, the author's DLL checked by sha256: --dof DIR or dof_dir())
+                                   d2rloader/plugins/d2rl-enemy-health-bars.dll + licences, notices and its source zip
+                                   (Enemy Health Bars by Graxy_TV, GPL-3.0, the pinned source + our patches;
+                                   tools/build_enemyhealthbars.ps1 unless --ehb is given)
+                                   d2rloader/plugins/d2rl-ruffneckk-floating-damage.dll + licences, notices, font,
+                                   d2rloader/config/ruffneckk-floating-damage.toml (Floating Damage by RuffnecKk at the
+                                   pinned commit + our patches, tools/build_floatingdamage.ps1 unless --fd is given)
                                  The manual download for players, and where tools/publish_release.py reads the file bytes
                                  from. There is no zip (owner decision 2026-10-26). Needs 7-Zip: the run stops without it.
   release-manifest.json          schemaVersion 2: version, required D2R build, required D2RLoader + sha256, every file of
@@ -42,7 +51,7 @@ files: D2R reads those from its own install). Without a baseline that check cann
 The release plugin is built by tools/build_plugin.ps1 -Release (CMake on PATH or Visual Studio's, the PluginSDK of
 .mxl-local.json; nothing is downloaded). tools/verify_package.py checks the finished 7z; tools/cut_alpha.ps1 runs it all.
 
-  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--drawcap DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--charminv DIR] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
+  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--drawcap DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--charminv DIR] [--dof DIR] [--ehb DLL] [--fd DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
   py -3 tools/package_release.py --no-data --plugin build/mxl2012-core.dll   (CI: no game files there; plugin + config only)
 Version: PluginVersion of plugin/src/mxl2012_core.cpp; --version must equal it (only --no-data builds may differ).
 """
@@ -166,6 +175,65 @@ CHARMINV = {"name": "CharmInv", "version": "1.0.1", "author": "Dimentio",
             "size": {"dll": 68952, "mpq": 9591921}}
 CHARMINV_OURS = ROOT / "third_party" / "charm-inv"  # README, our charm-inv.toml (and a git-ignored local copy of the files)
 CHARMINV_FILES = ("dll", "mpq", "config")
+# Damage Overflow Fix by CelestialRayOne (Bogdan Bulai), MIT, docs/bundled-plugins.md and third_party/damage-overflow-fix/
+# README.md: the author's release DLL as committed at the pinned commit (its release/ folder), checked by sha256, not in git;
+# dof_dir() finds it. Its MIT licence goes next to it, and our config (the author's default with debug_log and log_each_site
+# off) is a `preserve` file, as legacy169's.
+DOF = {"name": "Damage Overflow Fix", "version": "2.4.0", "author": "CelestialRayOne (Bogdan Bulai)",
+       "repo": "https://github.com/CelestialRayOne/d2rloader_plugins", "commit": "924072545985e0d1bef58c3362c1c1572531aa2e",
+       "path": "release/d2rl-celestialrayone-damage-overflow-fix.dll",
+       "dll": "d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix.dll",
+       "licence": "d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix-license.txt",
+       "config": "d2rloader/config/celestialrayone.damage-overflow-fix.toml",
+       "sha256": "cfc95e328230c86d4659f04d223552afd90f3fd4990f3fd62c48e9770f144a58", "size": 111616}
+DOF_OURS = ROOT / "third_party" / "damage-overflow-fix"  # README, LICENSE, our config (and a git-ignored local copy of the DLL)
+DOF_FILES = ("dll", "licence", "config")
+# Enemy Health Bars by Graxy_TV, GPL-3.0-only, docs/bundled-plugins.md and third_party/enemy-health-bars-mxl2012/README.md:
+# built from the author's source (the source zip inside the release zip of the pinned commit) with our patches
+# (tools/build_enemyhealthbars.ps1, which records them in build/enemyhealthbars-src/EnemyHealthBars/PATCHES). The GPL wants
+# the corresponding source with the binary: the patched source as built, with our patches, goes next to the DLL as a zip,
+# with the author's licence and third-party notices. Its config is the patched source's (our defaults: bars only on damaged
+# monsters, show_full_health = false) and a `preserve` file, as legacy169's.
+EHB = {"name": "Enemy Health Bars", "version": "0.2.6+mxl2012", "author": "Graxy_TV", "licence_id": "GPL-3.0-only",
+       "repo": "https://github.com/graxytv/D2R-Over-the-Head-Health-Bars", "commit": "e6b929bfa5c59e79e0cbabf898eb777f6d359132",
+       "dll": "d2rloader/plugins/d2rl-enemy-health-bars.dll",
+       "licence": "d2rloader/plugins/d2rl-enemy-health-bars-license.txt",
+       "notices": "d2rloader/plugins/d2rl-enemy-health-bars-third-party.txt",
+       "imgui_licence": "d2rloader/plugins/d2rl-enemy-health-bars-imgui-license.txt",
+       "mapsense_licence": "d2rloader/plugins/d2rl-enemy-health-bars-mapsense-api-license.txt",
+       "sdk_licence": "d2rloader/plugins/d2rl-enemy-health-bars-pluginsdk-license.txt",
+       "source": "d2rloader/plugins/d2rl-enemy-health-bars-source.zip",
+       "config": "d2rloader/config/enemy-health-bars.toml"}
+# Floating Damage by RuffnecKk, MIT, docs/bundled-plugins.md and third_party/floating-damage-mxl2012/README.md: built from the
+# gitlink third_party/RuffnecKk-D2RLoader-Suite with our patches (the legacy graphics projection, the bundled font) by
+# tools/build_floatingdamage.ps1, which records the commit and patches in build/floatingdamage-src. Next to the DLL: the suite's
+# MIT licence, one third-party file (the suite's THIRD_PARTY_NOTICES.md and the licence texts it retains: PluginSDK, ImGui,
+# MinHook, D2R Damage Numbers ...), the font (Cinzel Bold) and its SIL OFL. Its config (the author's with our comment) is a
+# `preserve` file, as legacy169's.
+FD = {"name": "Floating Damage", "version": "1.5.6", "author": "RuffnecKk",
+      "repo": "https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite", "path": "plugins/floating-damage",
+      "dll": "d2rloader/plugins/d2rl-ruffneckk-floating-damage.dll",
+      "licence": "d2rloader/plugins/d2rl-ruffneckk-floating-damage-license.txt",
+      "notices": "d2rloader/plugins/d2rl-ruffneckk-floating-damage-third-party.txt",
+      "font": "d2rloader/plugins/ruffneckk-floating-damage-font.ttf",
+      "font_licence": "d2rloader/plugins/ruffneckk-floating-damage-font-license.txt",
+      "config": "d2rloader/config/ruffneckk-floating-damage.toml"}
+FD_BUILD = ROOT / "build" / "floatingdamage"
+FD_SRC = ROOT / "build" / "floatingdamage-src"
+FD_OURS = ROOT / "third_party" / "floating-damage-mxl2012"  # the patches, our tests, the font
+FD_FILES = ("dll", "licence", "notices", "font", "font_licence", "config")
+FD_FROM = {"dll": "d2rl-ruffneckk-floating-damage.dll", "licence": "LICENSE-floating-damage.txt",
+           "font": "ruffneckk-floating-damage-font.ttf", "font_licence": "LICENSE-floating-damage-font.txt",
+           "config": "ruffneckk-floating-damage.toml"}  # in build/floatingdamage/Release
+EHB_BUILD = ROOT / "build" / "enemyhealthbars"
+EHB_SRC = ROOT / "build" / "enemyhealthbars-src" / "EnemyHealthBars"
+EHB_OURS = ROOT / "third_party" / "enemy-health-bars-mxl2012"  # the patches
+EHB_FILES = ("dll", "licence", "notices", "imgui_licence", "mapsense_licence", "sdk_licence", "source", "config")
+# where each shipped file comes from in build/enemyhealthbars (tools/build_enemyhealthbars.ps1)
+EHB_FROM = {"dll": "Release/d2rl-enemy-health-bars.dll", "licence": "LICENSE", "notices": "THIRD_PARTY.md",
+            "imgui_licence": "licenses/ImGui.txt", "mapsense_licence": "licenses/MapSense-API-LICENSE.txt",
+            "sdk_licence": "licenses/PluginSDK.txt", "source": "d2rl-enemy-health-bars-source.zip",
+            "config": "enemy-health-bars.toml"}
 # The player's own settings: the downloader writes these only when they are missing (docs/release.md).
 PRESERVE = ["d2rloader/config/d2rloader.toml", "d2rloader/config/mxl2012-core.toml"]
 SCHEMA = 2  # 2: the 7z ("archive") replaced the zip; the downloader installs from it or from objects (docs/release.md)
@@ -420,6 +488,182 @@ def check_charminv(folder: Path) -> list:
     return problems
 
 
+def dof_dir(given: Path = None) -> Path:
+    """The folder with Damage Overflow Fix's DLL: `given` (--dof) as it is, else MXL_DOF_DIR, else third_party/damage-overflow-fix
+    when it holds it, else <MXL2012_RUNS>/shared/damage-overflow-fix-<version>. None when none of them has it."""
+    if given is not None:
+        return given
+    name = Path(DOF["dll"]).name
+    env = os.environ.get("MXL_DOF_DIR")
+    for d in (Path(env) if env else None, DOF_OURS, fxpaths.localconfig.shared_dir() / f"damage-overflow-fix-{DOF['version']}"):
+        if d is not None and (d / name).is_file():
+            return d
+    return None
+
+
+def check_dof(folder: Path) -> list:
+    """Problems of Damage Overflow Fix's DLL in `folder` (as it goes into the package): there, the pinned bytes."""
+    f = folder / Path(DOF["dll"]).name
+    if not f.is_file():
+        return [f"no {f.name} in {folder}"]
+    if f.stat().st_size != DOF["size"] or sha256(f) != DOF["sha256"]:
+        return [f"{f} is not Damage Overflow Fix {DOF['version']} (sha256 {sha256(f)[:16]}..., want {DOF['sha256'][:16]}...)"]
+    return []
+
+
+def dof_config_problems(text: str) -> list:
+    """Our settings the package must carry: no per-hit log, no line per site, leech on."""
+    want = {"debug_log": "false", "log_each_site": "false", "leech": "true"}
+    got = dict(re.findall(r"(?m)^(\w+)\s*=\s*(\w+)\s*$", text))
+    return [f"{DOF['config']}: {k} must be {v}" for k, v in want.items() if got.get(k) != v]
+
+
+def toml_values(text: str) -> dict:
+    """"section.key" -> value (the raw text, comments cut) of a flat TOML file."""
+    out, section = {}, ""
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+        elif "=" in line:
+            k, v = line.split("=", 1)
+            out[f"{section}.{k.strip()}" if section else k.strip()] = v.strip()
+    return out
+
+
+def ehb_config_problems(text: str) -> list:
+    """Our Enemy Health Bars defaults the package must carry: on, bars only on damaged monsters (show_full_health is the
+    setting for all monsters), the dev-only capture option not on."""
+    got = toml_values(text)
+    want = {"bars.enabled": "true", "bars.show_full_health": "false"}
+    problems = [f"{EHB['config']}: {k.split('.', 1)[1]} must be {v}" for k, v in want.items() if got.get(k) != v]
+    if got.get("bars.dev_keep_visible_unfocused", "false") != "false":
+        problems.append(f"{EHB['config']}: dev_keep_visible_unfocused is for test captures only")
+    return problems
+
+
+FD_LEGACY_TEXT_SCALE = "2.5"  # owner, 2026-11-17: the numbers in legacy graphics 2.5 times their HD size
+
+
+def fd_config_problems(text: str) -> list:
+    """Floating Damage is on by default: [general] enabled = true (the setting that turns it off), and its numbers are
+    FD_LEGACY_TEXT_SCALE times bigger in legacy graphics: [appearance] legacy_text_scale (patch 0004)."""
+    values = toml_values(text)
+    problems = []
+    if values.get("general.enabled") != "true":
+        problems.append(f"{FD['config']}: [general] enabled must be true (on by default)")
+    if values.get("appearance.legacy_text_scale") != FD_LEGACY_TEXT_SCALE:
+        problems.append(f"{FD['config']}: [appearance] legacy_text_scale must be {FD_LEGACY_TEXT_SCALE}")
+    return problems
+
+
+def fd_commit() -> str:
+    """The RuffnecKk-D2RLoader-Suite commit this repo pins: the gitlink third_party/RuffnecKk-D2RLoader-Suite."""
+    return pinned_commit("third_party/RuffnecKk-D2RLoader-Suite")
+
+
+def fd_patches(ours: Path = FD_OURS) -> list:
+    """Our Floating Damage patches as tools/build_floatingdamage.ps1 records them in PATCHES: "<sha256>  <name>"."""
+    return [f"{sha256(p)}  {p.name}" for p in sorted(ours.glob("*.patch"), key=lambda p: p.name)]
+
+
+def build_fd() -> Path:
+    """tools/build_floatingdamage.ps1: d2rl-ruffneckk-floating-damage.dll from the pinned commit with our patches."""
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if not pwsh:
+        raise SystemExit("no PowerShell to run tools/build_floatingdamage.ps1: build it there and pass --fd DLL")
+    subprocess.check_call([pwsh, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_floatingdamage.ps1")], cwd=ROOT)
+    return FD_BUILD / "Release" / FD_FROM["dll"]
+
+
+def check_fd(dll: Path) -> list:
+    """Problems of a Floating Damage DLL: ours (the author's version, with our font patch's file name in it)."""
+    b = dll.read_bytes()
+    if FD["version"].encode() not in b or Path(FD["font"]).name.encode() not in b:
+        return [f"{dll} is not Floating Damage {FD['version']} with our patches: build it with tools/build_floatingdamage.ps1"]
+    return []
+
+
+def fd_notices(src: Path) -> str:
+    """One third-party file: the suite's THIRD_PARTY_NOTICES.md, then every licence text it keeps (third_party/notices/*.txt
+    and the PluginSDK's LICENSE), each under its path."""
+    parts = [(src / "THIRD_PARTY_NOTICES.md").read_text("utf-8")]
+    for f in sorted((src / "third_party" / "notices").glob("*.txt")) + [src / "third_party" / "PluginSDK" / "LICENSE"]:
+        parts.append(f"\n\n===== {f.relative_to(src).as_posix()} =====\n\n" + f.read_text("utf-8"))
+    return "".join(parts).replace("\r\n", "\n")
+
+
+def stage_fd(mod: Path, dll: Path, src: Path = FD_SRC, ours: Path = FD_OURS) -> None:
+    """Floating Damage's DLL, licences, third-party notices and font into d2rloader/plugins/ (mod-scoped) and its config into
+    d2rloader/config/. The build must come from the pinned commit with this repo's patches (tools/build_floatingdamage.ps1
+    records both in build/floatingdamage-src)."""
+    pinned = (src / "PINNED_COMMIT").read_text("ascii").strip() if (src / "PINNED_COMMIT").is_file() else ""
+    if pinned != fd_commit():
+        raise SystemExit(f"{src} is not the pinned commit {fd_commit()[:9]} (it is {pinned}): run tools/build_floatingdamage.ps1")
+    applied = (src / "PATCHES").read_text("ascii").splitlines() if (src / "PATCHES").is_file() else []
+    if [ln.strip() for ln in applied if ln.strip()] != fd_patches(ours):
+        raise SystemExit(f"{src} was not built with the patches in {ours}: run tools/build_floatingdamage.ps1")
+    for k in FD_FILES:
+        target = mod / FD[k]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if k == "notices":
+            target.write_text(fd_notices(src), encoding="utf-8", newline="\n")
+            continue
+        source = dll if k == "dll" else dll.parent / FD_FROM[k]
+        if not source.is_file():
+            raise SystemExit(f"no {source} (Floating Damage {k}): run tools/build_floatingdamage.ps1")
+        if k == "config" and fd_config_problems(source.read_text("utf-8")):
+            raise SystemExit("; ".join(fd_config_problems(source.read_text("utf-8"))))
+        shutil.copy2(source, target)
+
+
+def ehb_patches(ours: Path = EHB_OURS) -> list:
+    """Our Enemy Health Bars patches as tools/build_enemyhealthbars.ps1 records them in PATCHES: "<sha256>  <name>"."""
+    return [f"{sha256(p)}  {p.name}" for p in sorted(ours.glob("*.patch"), key=lambda p: p.name)]
+
+
+def build_ehb() -> Path:
+    """tools/build_enemyhealthbars.ps1: d2rl-enemy-health-bars.dll from the pinned source with our patches."""
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if not pwsh:
+        raise SystemExit("no PowerShell to run tools/build_enemyhealthbars.ps1: build it there and pass --ehb DLL")
+    subprocess.check_call([pwsh, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_enemyhealthbars.ps1")], cwd=ROOT)
+    return EHB_BUILD / EHB_FROM["dll"]
+
+
+def check_ehb(dll: Path) -> list:
+    """Problems of an Enemy Health Bars DLL: ours (the version our patch sets, the dev option of our second patch, the
+    legacy graphics placement of our third)."""
+    b = dll.read_bytes()
+    problems = []
+    if (EHB["version"].encode() not in b or b"dev_keep_visible_unfocused" not in b
+            or b"legacy graphics placement" not in b):
+        problems.append(f"{dll} is not Enemy Health Bars {EHB['version']} with our patches: build it with "
+                        "tools/build_enemyhealthbars.ps1")
+    return problems
+
+
+def stage_ehb(mod: Path, dll: Path, src: Path = EHB_SRC, ours: Path = EHB_OURS) -> None:
+    """Enemy Health Bars' DLL, the author's licence and notices, and the corresponding source (GPL) into d2rloader/plugins/
+    (mod-scoped). The build must come from the pinned source with this repo's patches (PATCHES in the patched tree)."""
+    applied = (src / "PATCHES").read_text("ascii").splitlines() if (src / "PATCHES").is_file() else []
+    if [ln.strip() for ln in applied if ln.strip()] != ehb_patches(ours):
+        raise SystemExit(f"{src} was not built with the patches in {ours}: run tools/build_enemyhealthbars.ps1")
+    if EHB["commit"] not in (src / "SOURCE.txt").read_text("ascii"):
+        raise SystemExit(f"{src} is not the source of commit {EHB['commit'][:9]}: run tools/build_enemyhealthbars.ps1")
+    build = dll.parent.parent  # build/enemyhealthbars/Release/<dll>
+    for k in EHB_FILES:
+        source = dll if k == "dll" else build / EHB_FROM[k]
+        if not source.is_file():
+            raise SystemExit(f"no {source} (Enemy Health Bars {k}): run tools/build_enemyhealthbars.ps1")
+        if k == "config" and ehb_config_problems(source.read_text("utf-8")):
+            raise SystemExit("; ".join(ehb_config_problems(source.read_text("utf-8"))))
+        (mod / EHB[k]).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, mod / EHB[k])
+
+
 def build_beltrefill() -> Path:
     """tools/build_beltrefill.ps1: d2rl-auto-belt-refill.dll from the pinned commit's source with our patches."""
     shell = shutil.which("pwsh") or shutil.which("powershell")
@@ -464,7 +708,7 @@ def sha256(path: Path) -> str:
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
           legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None, controllerqol: Path = None,
           profile: Path = None, drawcap: Path = None, charminv: Path = None, invtabs: Path = None,
-          statbook: Path = None) -> None:
+          statbook: Path = None, dof: Path = None, ehb: Path = None, fd: Path = None) -> None:
     if invtabs is not None and charminv is not None:
         raise SystemExit("invtabs and CharmInv cannot be staged together")
     if data_from is not None:
@@ -493,6 +737,12 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
         stage_invtabs(mod, invtabs)
     if charminv is not None:
         stage_charminv(mod, charminv)
+    if dof is not None:
+        stage_dof(mod, dof)
+    if ehb is not None:
+        stage_ehb(mod, ehb)
+    if fd is not None:
+        stage_fd(mod, fd)
     # the data must be built for the charm inventory the package ships (tools/build.py --charm-inventory): invtabs' files and
     # classic Charms button only with invtabs, CharmInv's tables never with it
     wrong = [] if no_data else charm_inventory.data_problems(data, "invtabs" if invtabs is not None else "charminv")
@@ -607,15 +857,27 @@ def stage_charminv(mod: Path, folder: Path, ours: Path = CHARMINV_OURS) -> None:
     shutil.copy2(ours / "charm-inv.toml", mod / CHARMINV["config"])
 
 
+def stage_dof(mod: Path, folder: Path, ours: Path = DOF_OURS) -> None:
+    """Damage Overflow Fix's DLL (the author's bytes, checked) and its MIT licence into d2rloader/plugins/ (mod-scoped) and
+    our config into d2rloader/config/."""
+    problems = check_dof(folder) + dof_config_problems((ours / Path(DOF["config"]).name).read_text("utf-8"))
+    if problems:
+        raise SystemExit("; ".join(problems))
+    for k, source in (("dll", folder / Path(DOF["dll"]).name), ("licence", ours / "LICENSE"),
+                      ("config", ours / Path(DOF["config"]).name)):
+        (mod / DOF[k]).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, mod / DOF[k])
+
+
 def preserve_list(mod: Path) -> list:
     """PRESERVE plus the bundled plugins' configs the package holds."""
     return PRESERVE + [c for c in (DRAWCAP["config"], STATBOOK["config"], INVTABS["config"], LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"],
-                                   CHARMINV["config"])
+                                   CHARMINV["config"], DOF["config"], EHB["config"], FD["config"])
                        if (mod / c).is_file()]
 
 
 def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, controllerqol: bool = False,
-                    charminv: bool = False) -> list:
+                    charminv: bool = False, dof: bool = False, ehb: bool = False, fd: bool = False) -> list:
     """The manifest's bundledPlugins: name, version, repository, source commit and files of each plugin the package holds."""
     out = []
     if legacy169:
@@ -637,6 +899,18 @@ def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, co
         out.append({"name": CHARMINV["name"], "version": CHARMINV["version"], "source": CHARMINV["source"],
                     "author": CHARMINV["author"], "sha256": dict(CHARMINV["sha256"]),
                     "files": [CHARMINV[k] for k in CHARMINV_FILES]})
+    if dof:
+        out.append({"name": DOF["name"], "version": DOF["version"], "repo": DOF["repo"], "path": DOF["path"],
+                    "author": DOF["author"], "commit": DOF["commit"], "sha256": DOF["sha256"],
+                    "files": [DOF[k] for k in DOF_FILES]})
+    if ehb:
+        out.append({"name": EHB["name"], "version": EHB["version"], "repo": EHB["repo"], "author": EHB["author"],
+                    "licence": EHB["licence_id"], "commit": EHB["commit"], "patches": ehb_patches(),
+                    "files": [EHB[k] for k in EHB_FILES]})
+    if fd:
+        out.append({"name": FD["name"], "version": FD["version"], "repo": FD["repo"], "path": FD["path"],
+                    "author": FD["author"], "commit": fd_commit(), "patches": fd_patches(),
+                    "files": [FD[k] for k in FD_FILES]})
     return out
 
 
@@ -843,8 +1117,16 @@ def main() -> int:
                     "builds leave it out)")
     ap.add_argument("--charminv", type=Path, help="a folder holding CharmInv's d2rl-charm-inv.dll and .mpq (checked by sha256; "
                     "default: charminv_dir(); --no-data builds leave it out unless given)")
+    ap.add_argument("--dof", type=Path, help="a folder holding Damage Overflow Fix's d2rl-celestialrayone-damage-overflow-fix.dll "
+                    "(checked by sha256; default: dof_dir(); --no-data builds leave it out unless given)")
+    ap.add_argument("--ehb", type=Path, help="a release d2rl-enemy-health-bars.dll of the pinned source with our patches, in "
+                    "build/enemyhealthbars/Release with its licences and source zip (default: build it with "
+                    "tools/build_enemyhealthbars.ps1; --no-data builds leave it out unless given)")
+    ap.add_argument("--fd", type=Path, help="a release d2rl-ruffneckk-floating-damage.dll of the pinned commit with our patches, "
+                    "its licences, font and config next to it (default: build it with tools/build_floatingdamage.ps1; "
+                    "--no-data builds leave it out unless given)")
     ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD, Auto Belt Refill, Controller "
-                    "QOL and CharmInv unless given "
+                    "QOL, CharmInv, Damage Overflow Fix, Enemy Health Bars and Floating Damage unless given "
                     "(unit tests; "
                     "tools/verify_package.py refuses such a package)")
     ap.add_argument("--data-from", type=Path, help="copy this finished mxl2012.mpq/data instead of building it")
@@ -940,6 +1222,17 @@ def main() -> int:
         problems.append("CharmInv's d2rl-charm-inv.dll / .mpq not found: pass --charminv DIR (third_party/charm-inv/README.md)")
     if charminv is not None:
         problems += check_charminv(charminv)
+    dof = dof_dir(a.dof) if a.dof or not (a.no_data or a.no_bundled) else None
+    if not (a.no_data or a.no_bundled) and dof is None:
+        problems.append("Damage Overflow Fix's DLL not found: pass --dof DIR (third_party/damage-overflow-fix/README.md)")
+    if dof is not None:
+        problems += check_dof(dof)
+    ehb = a.ehb or (None if a.no_data or a.no_bundled else build_ehb())
+    if ehb is not None:
+        problems += check_ehb(ehb) if ehb.is_file() else [f"no d2rl-enemy-health-bars.dll at {ehb}"]
+    fd = a.fd or (None if a.no_data or a.no_bundled else build_fd())
+    if fd is not None:
+        problems += check_fd(fd) if fd.is_file() else [f"no d2rl-ruffneckk-floating-damage.dll at {fd}"]
     if problems:
         print("\n".join(problems))
         return 1
@@ -947,7 +1240,7 @@ def main() -> int:
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
     stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile, drawcap, charminv, a.invtabs,
-          statbook)
+          statbook, dof, ehb, fd)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
@@ -974,7 +1267,7 @@ def main() -> int:
     files = file_list(mod)
     man_path = a.out / "release-manifest.json"
     bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None, controllerqol is not None,
-                              charminv is not None)
+                              charminv is not None, dof is not None, ehb is not None, fd is not None)
     if a.invtabs is not None:
         bundled.append(invtabs_entry())
     man = manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod), bundled)

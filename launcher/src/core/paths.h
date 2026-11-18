@@ -120,6 +120,10 @@ std::string SaveCopyFolderName(const std::string& stamp, const std::string& from
 // the downloader's and are never listed.
 std::vector<std::string> SaveCopiesToRemove(const std::vector<std::string>& folders, size_t keep = SaveCopiesKept);
 
+// docs/launcher.md "Uninstall and cleanup": the entries of the data folder that the cleanup keeps (the player's save copies
+// and the plugin copies Move plugin put aside, "removed"; case-insensitive). Everything else there is the downloader's own.
+bool KeptOnCleanup(const std::string& name);
+
 // True for a path the official Median XL owns or this downloader must never use: <localAppData>\mxl-launcher (its
 // launcher), <roamingAppData>\MedianXL (its saves), <localAppData>\MedianXL, and a classic Diablo II folder (any path
 // segment named "Diablo II"). Case-insensitive, '\' or '/'.

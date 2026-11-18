@@ -284,6 +284,7 @@ std::vector<std::string> Summary::Format(const std::vector<StatValue>& totals, v
 void Summary::Refresh(void* const* items, std::size_t count, const CharmMeta* meta) {
 	totals_.clear();
 	lines_.clear();
+	raw_.clear();
 	counted_ = skipped_ = 0;
 	if (!ready_) return;
 	std::vector<ItemStats> stats;
@@ -322,12 +323,17 @@ void Summary::Refresh(void* const* items, std::size_t count, const CharmMeta* me
 		lines_ = Format(totals_, context);
 	}
 	lines_.insert(lines_.begin(), notice_.begin(), notice_.end()); // the core's notice first (a read-only tab in a joined game)
-	lines_  = CapLines(std::move(lines_));
+	raw_    = CapLines(std::move(lines_));
+	lines_  = wrap_ ? CapLines(WrapLines(raw_, wrap_)) : raw_;
 	first_  = ClampFirst(static_cast<long long>(first_), lines_.size(), rows_);
 }
 
 std::string Summary::Fragment(LayoutMode mode, Rect area, int barInset, int cornerWidth) {
 	mode_  = mode;
+	if (mode == LayoutMode::Classic) { // the classic rows wrap at the area's width (summary_logic.h WrapLines)
+		wrap_  = WrapChars(area.width);
+		lines_ = wrap_ ? CapLines(WrapLines(raw_, wrap_)) : raw_;
+	}
 	rows_  = LayoutRows(mode, area.height, lines_.size());
 	first_ = 0;
 	shown_.assign(rows_, std::string("\x01")); // never equal to a real text: the first ApplyTexts sets every row

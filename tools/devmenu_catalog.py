@@ -9,12 +9,12 @@ The plugin reads it from the installed mod folder (`<mod>.mpq/data/mxl2012-devme
 the tables it was built with and no Median text is committed. Line kinds (tab separated; a name is the last field, cleaned of
 colour codes, newlines and tabs):
 
-  #devmenu <format> <tables hash>
+  #devmenu <format> <tables hash> <sock property>   the properties.txt id of `sock`: the plugin asks a set / unique spawn's sockets by it
   I <cat> <code> <quality> <row> <sockets> <name> [tag]
                                                   items: cat U unique, S set, C charm, Q misc / quest, B base; quality 0 base,
                                                   5 set, 7 unique (Items::Quality); row is the zero-based native row, -1 for bases;
-                                                  sockets: the empty sockets a spawned normal item gets (its maximum, `max_sockets`);
-                                                  0 for uniques and sets, whose sockets are their row's fixed `sock` property or none
+                                                  sockets: the empty sockets a spawned item gets: its base's maximum (`max_sockets`), for
+                                                  uniques and sets at least their row's fixed `sock` property (`spawn_sockets`)
   K <basecode> <sockets> <rune codes, comma separated> <name>      runeword kit: the base with empty sockets and the runes in order
   L <id> <act> <note> <waypoint> <name>           level; note 0 none, 1 map only (uber arena), 2 portal-only area; waypoint number or 255
   U <level> <entry> <how> <name>                  uber level (its entrance says "DANGER - Uberquest Area"): the menu warps to the entry level,
@@ -42,7 +42,7 @@ import strings_ns  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 EXCEL = Path(os.environ.get("MXL_DEVMENU_EXCEL") or ROOT / "work" / "mod" / "data" / "global" / "excel")
 OUT = ROOT / "work" / "mod" / "data" / "mxl2012-devmenu" / "catalog.tsv"
-FORMAT = 3
+FORMAT = 4
 SPAWN_ITEM_LEVEL = 99  # the item level the plugin gives a spawned base or misc item (devmenu.cpp ItemLevel)
 
 # level ids that have no ordinary entrance: Median's uber arenas (map only: the fight needs its normal summon) and the portal areas
@@ -67,7 +67,7 @@ def table(name: str) -> list[dict[str, str]]:
 
 def tables_hash() -> str:
     h = hashlib.sha256()
-    for name in ("uniqueitems", "setitems", "runes", "misc", "armor", "weapons", "itemtypes", "levels", "experience"):
+    for name in ("uniqueitems", "setitems", "runes", "misc", "armor", "weapons", "itemtypes", "levels", "experience", "properties"):
         h.update((EXCEL / f"{name}.txt").read_bytes())
     return h.hexdigest()[:16]
 
@@ -146,6 +146,47 @@ def max_sockets(item_type: dict[str, str] | None, gemsockets: str, item_level: i
     return max(0, min(by_level, own))
 
 
+def fixed_sockets(r: dict[str, str], props: int) -> int:
+    """The sockets a unique or set row gives itself: the highest `sock` property among prop1..propN (its max, else its min), 0 without one."""
+    best = 0
+    for i in range(1, props + 1):
+        if (r.get(f"prop{i}") or "").strip() != "sock":
+            continue
+        for key in (f"max{i}", f"min{i}"):
+            try:
+                best = max(best, int((r.get(key) or "").strip() or 0))
+            except ValueError:
+                pass
+    return best
+
+
+def spawn_sockets(base_max: int, fixed: int) -> int:
+    """The sockets the developer menu asks for on a unique or set item: the base's maximum at the spawn item level (the same rule as a normal
+    base), and never fewer than the row's own fixed `sock` property."""
+    return max(base_max, fixed, 0)
+
+
+def sock_property() -> int:
+    """The properties.txt id of `sock` (func 14, item_numsockets): its `*Id`, else its record number; -1 when missing."""
+    for i, r in enumerate(table("properties")):
+        if r.get("code") == "sock":
+            try:
+                return int((r.get("*Id") or r.get("Id") or "").strip() or i)
+            except ValueError:
+                return i
+    return -1
+
+
+def base_max_sockets(types: dict[str, dict[str, str]]) -> dict[str, int]:
+    """item code -> `max_sockets` of armor, weapons and misc at the spawn item level."""
+    out = {}
+    for name in ("armor", "weapons", "misc"):
+        for r in table(name):
+            if r.get("code"):
+                out[r["code"]] = max_sockets(types.get(r.get("type", "")), r.get("gemsockets", ""), SPAWN_ITEM_LEVEL)
+    return out
+
+
 def native_records(rows: list[dict[str, str]], key: str = "index") -> list[dict[str, str]]:
     """The records the game counts: the 'Expansion' separator lines are not records."""
     return [r for r in rows if (r.get(key) or "") not in ("", "Expansion")]
@@ -180,7 +221,8 @@ def row_skill(r: dict[str, str], skills: dict[str, tuple[str, str]]) -> tuple[st
     return skills.get(granted[0].strip()) if len(granted) == 1 else None
 
 
-def collect_uniques(names, types, bases, skills=None) -> list[str]:
+def collect_uniques(names, types, bases, skills=None, base_sockets=None) -> list[str]:
+    base_sockets = base_sockets or {}
     charm_cells = {c for c in types if "char" in equiv_chain(types, c)}
     records = native_records(table("uniqueitems"))
     shared = {}
@@ -202,11 +244,13 @@ def collect_uniques(names, types, bases, skills=None) -> list[str]:
         if skill:
             name = skill_label(name, skill)
         tag = "" if spawnable else "retired row"
-        lines.append("\t".join(["I", "C" if is_charm else "U", code, "7", str(row), "0", name] + ([tag] if tag else [])))
+        sockets = spawn_sockets(base_sockets.get(code, 0), fixed_sockets(r, 12))
+        lines.append("\t".join(["I", "C" if is_charm else "U", code, "7", str(row), str(sockets), name] + ([tag] if tag else [])))
     return lines
 
 
-def collect_sets(names, bases) -> list[str]:
+def collect_sets(names, bases, base_sockets=None) -> list[str]:
+    base_sockets = base_sockets or {}
     sets = {r["index"]: names(r.get("name", "")) or clean(r["index"]) for r in table("sets") if r.get("index")}
     lines = []
     for row, r in enumerate(native_records(table("setitems"))):
@@ -214,7 +258,8 @@ def collect_sets(names, bases) -> list[str]:
             continue  # a vanilla row whose base Median removed cannot be created
         name = names(r["index"]) or clean(r["index"])
         label = f"{name} ({sets.get(r.get('set', ''), r.get('set', ''))})" if r.get("set") else name
-        lines.append("\t".join(["I", "S", r["item"], "5", str(row), "0", label]))
+        sockets = spawn_sockets(base_sockets.get(r["item"], 0), fixed_sockets(r, 9))
+        lines.append("\t".join(["I", "S", r["item"], "5", str(row), str(sockets), label]))
     return lines
 
 
@@ -357,8 +402,9 @@ def build() -> list[str]:
     names = Names()
     types = {r["Code"]: r for r in table("itemtypes") if r.get("Code")}
     bases = bases_with_type()
-    lines = [f"#devmenu\t{FORMAT}\t{tables_hash()}"]
-    for part in (collect_uniques(names, types, bases, skill_names(names)), collect_sets(names, bases), collect_misc(names, types), collect_bases(names, types), collect_runewords(names, types),
+    socks = base_max_sockets(types)
+    lines = [f"#devmenu\t{FORMAT}\t{tables_hash()}\t{sock_property()}"]
+    for part in (collect_uniques(names, types, bases, skill_names(names), socks), collect_sets(names, bases, socks), collect_misc(names, types), collect_bases(names, types), collect_runewords(names, types),
                  collect_levels(names), collect_ubers(names), collect_experience()):
         lines += part
     return lines

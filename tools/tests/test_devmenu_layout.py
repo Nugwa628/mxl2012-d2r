@@ -327,6 +327,78 @@ class Catalog(unittest.TestCase):
         self.assertEqual(bases, ["I\tB\tlrg\t0\t-1\t4\tLarge Shield", "I\tB\tssd\t0\t-1\t2\tShort Sword", "I\tB\tgis\t0\t-1\t6\tGiant Sword"])
         self.assertEqual(misc, ["I\tQ\trin\t0\t-1\t0\tRing", "I\tQ\tbox\t0\t-1\t0\tHoradric Cube"])
 
+    def test_fixed_sockets(self):
+        self.assertEqual(cat.fixed_sockets({"prop1": "sock", "min1": "4", "max1": "4", "prop2": "ac%"}, 12), 4, "Facebreaker's `sock 4`")
+        self.assertEqual(cat.fixed_sockets({"prop3": "sock", "min3": "2", "max3": "5"}, 12), 5, "a range: its top")
+        self.assertEqual(cat.fixed_sockets({"prop1": "sock", "min1": "3"}, 12), 3, "min without max")
+        self.assertEqual(cat.fixed_sockets({"prop1": "ac%", "min1": "4", "max1": "4"}, 12), 0, "no `sock` property")
+        self.assertEqual(cat.fixed_sockets({"prop10": "sock", "min10": "6", "max10": "6"}, 9), 0, "only the row's own property columns")
+        self.assertEqual(cat.fixed_sockets({"prop1": "sock", "min1": "x", "max1": ""}, 12), 0, "unreadable numbers")
+
+    def test_sock_property(self):
+        with tempfile.TemporaryDirectory() as d:
+            old = cat.EXCEL
+            cat.EXCEL = Path(d)
+            try:
+                (Path(d) / "properties.txt").write_text("code\t*Id\tfunc1\nac%\t0\t1\nsock\t133\t14\n", "utf-8")
+                self.assertEqual(cat.sock_property(), 133, "its *Id")
+                (Path(d) / "properties.txt").write_text("code\tfunc1\nac%\t1\ndur\t1\nsock\t14\n", "utf-8")
+                self.assertEqual(cat.sock_property(), 2, "no *Id column: its record number")
+                (Path(d) / "properties.txt").write_text("code\tfunc1\nac%\t1\n", "utf-8")
+                self.assertEqual(cat.sock_property(), -1, "missing")
+            finally:
+                cat.EXCEL = old
+
+    def test_spawn_sockets(self):
+        self.assertEqual(cat.spawn_sockets(4, 4), 4, "Facebreaker: Sacred Chain Gloves allow 4, its row says 4")
+        self.assertEqual(cat.spawn_sockets(6, 2), 6, "the base's maximum above the row's own")
+        self.assertEqual(cat.spawn_sockets(2, 4), 4, "never fewer than the row's own `sock`")
+        self.assertEqual(cat.spawn_sockets(0, 0), 0, "a ring or amulet: none")
+
+    def test_uniques_and_sets_get_their_max_sockets(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "weapons.txt").write_text("name\tcode\tnamestr\ttype\tgemsockets\nGiant Sword\tgis\tgis\tswor\t6\n", "utf-8")
+            (Path(d) / "armor.txt").write_text("name\tcode\tnamestr\ttype\tgemsockets\nChain Gloves\t@35\t@35\tglov\t4\nCap\tcap\tcap\thelm\t2\n", "utf-8")
+            (Path(d) / "misc.txt").write_text("name\tcode\tnamestr\ttype\tgemsockets\nRing\trin\trin\tring\t1\n", "utf-8")
+            (Path(d) / "uniqueitems.txt").write_text(
+                "index\tcode\tspawnable\tprop1\tmin1\tmax1\n"
+                "Facebreaker\t@35\t1\tsock\t4\t4\n"
+                "Giant Killer\tgis\t1\tac%\t10\t10\n"
+                "Archer's Ring\trin\t1\t\t\t\n"
+                "Capped\tcap\t1\tsock\t3\t3\n", "utf-8")
+            (Path(d) / "setitems.txt").write_text("index\titem\tset\tspawnable\nSet Gloves\t@35\tS\t1\nSet Ring\trin\tS\t1\n", "utf-8")
+            (Path(d) / "sets.txt").write_text("index\tname\nS\tS\n", "utf-8")
+            six = {"MaxSockets1": "6", "MaxSockets2": "6", "MaxSockets3": "6", "MaxSocketsLevelThreshold1": "25", "MaxSocketsLevelThreshold2": "40"}
+            none = {"MaxSockets1": "0", "MaxSockets2": "0", "MaxSockets3": "0", "MaxSocketsLevelThreshold1": "25", "MaxSocketsLevelThreshold2": "40"}
+            types = {"swor": six, "glov": six, "helm": six, "ring": none}
+            old = cat.EXCEL
+            cat.EXCEL = Path(d)
+            try:
+                socks = cat.base_max_sockets(types)
+                bases = cat.bases_with_type()
+                uniques = cat.collect_uniques(lambda ref: ref, types, bases, None, socks)
+                sets = cat.collect_sets(lambda ref: ref, bases, socks)
+            finally:
+                cat.EXCEL = old
+        self.assertEqual(socks, {"gis": 6, "@35": 4, "cap": 2, "rin": 0})
+        self.assertEqual(uniques, ["I\tU\t@35\t7\t0\t4\tFacebreaker", "I\tU\tgis\t7\t1\t6\tGiant Killer", "I\tU\trin\t7\t2\t0\tArcher's Ring",
+                                   "I\tU\tcap\t7\t3\t3\tCapped"],
+                         "the base's maximum; a row's own `sock` above the base's gemsockets is kept; a ring gets none")
+        self.assertEqual(sets, ["I\tS\t@35\t5\t0\t4\tSet Gloves (S)", "I\tS\trin\t5\t1\t0\tSet Ring (S)"])
+
+    def test_built_catalog_facebreaker_socketed(self):
+        built = cat.OUT
+        if not built.exists():
+            self.skipTest("catalog not built (tools/build.py)")
+        lines = [ln.split("\t") for ln in built.read_text("utf-8").splitlines()]
+        self.assertEqual(lines[0][:2], ["#devmenu", str(cat.FORMAT)])
+        self.assertEqual(len(lines[0]), 4, "header: format, hash, `sock` property id")
+        self.assertGreaterEqual(int(lines[0][3]), 0, "the built properties.txt has `sock`")
+        face = [f for f in lines if f[0] == "I" and f[1] == "U" and f[6] == "Facebreaker"]
+        self.assertEqual([f[5] for f in face], ["4"], "Facebreaker (Sacred Chain Gloves): 4 sockets")
+        sets = [f for f in lines if f[0] == "I" and f[1] == "S"]
+        self.assertTrue(any(int(f[5]) > 0 for f in sets), "set items on socketable bases get sockets")
+
     def test_counts(self):
         self.assertEqual(cat.counts(["#devmenu\t1\ta", "I\tU\tx", "I\tU\ty", "L\t1"]), {"#devmenu": 1, "U": 2, "L": 1})
 

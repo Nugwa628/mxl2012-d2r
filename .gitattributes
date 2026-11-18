@@ -4,3 +4,5 @@
 *.patch text eol=lf
 # PyreFly's controller-qol sources are CRLF: its patches keep their bytes (git apply needs the CR of each line).
 third_party/controller-qol-mxl2012/*.patch -text
+# Enemy Health Bars' source mixes CRLF and LF files: its patches keep their bytes too.
+third_party/enemy-health-bars-mxl2012/*.patch -text

@@ -99,6 +99,45 @@ the wheel and the arrows.
 **Classic (legacy).** A fixed window of rows (pitch 13, height 12, `fontType` 8pt, rgba 110,110,255). The window is
 moved with `ScrollBy`, clamped so the last line ends at the bottom row (`ClampFirst`).
 
+## Classic pages: grid, then stats (lane charmstats)
+
+In legacy graphics the charm tab has two pages (owner request 2026-11-16): page 1 is the charm grid, page 2 the stats
+list. A one-page panel only had room for 2 to 8 summary lines above the grid; page 2 shows 18 rows at a time in a box
+of 282 x 251 (panel pixels (20,115)-(302,366)), scrolled with the wheel or PageUp / PageDown as before.
+
+**Wrapping.** A classic text box does not wrap, so a long line ("1% Chance to cast level 20 Death Spiral when Struck")
+ran over the box's sides. The classic rows now get the lines wrapped (`summary_logic.h` WrapLines): at most
+`width / 7` characters a row (7 px is the 8pt font's widest average per character on game screenshots; 38 on the stats
+page's 272 px of text), broken at a space, a word longer than a row cut. The continuation rows start with two spaces
+and keep the line's colour (the list by charm). Wrapped rows count as rows: the 18 visible rows and the scrolling use
+the wrapped list. HD keeps its lines unwrapped. The one-page panel wraps the same way. The rows are centred, so the
+indent shows only as a small shift. `invtabs summary` also logs the classic rows (`summary classic: <n> line(s) in <r>
+row(s), wrapped at <w> character(s)`, then `summary classic line <i>: ...`); the check `charmstats` asserts that every
+row fits, each long line was split, and the words are the HD lines' words in order.
+
+- **Switch:** two 24 x 24 buttons in the tab row (x 230 grid, x 254 stats, y 87), in the tab buttons' style: a grid
+  glyph and a list glyph, the shown page's button with a gold rim and no click. Tooltips "Charm grid" / "Charm stats".
+  Art: `data/global/ui/panel/invtabs_page.dc6`, 6 frames (grid normal, pressed, shown; stats normal, pressed, shown).
+  The "all stats / by charm" button (x 282) shows on page 2 only.
+- **Panels:** `invtabs_<tab>_grid.dc6` (the stash grid, no summary box) and `invtabs_<tab>_stats.dc6` (the big box, no
+  grid), both built by `tools/invtabs_art.py` next to the one-page `invtabs_<tab>.dc6`.
+- **Page 1 is tight** (owner, 2026-11-17): the grid's top line sits right under the tab row, and the stash's bottom band
+  with the close button follows right under the grid. A 10 x 6 grid moves up 81 px (cell (0, 0) at y 117 instead of 198, close at
+  y 302). The art ends there and the panel below it is transparent (`invtabs_legacy.paged_grid_shift`,
+  `Lay::ClassicPagedGridShift`). The panel's click catcher still covers the full 320 x 432, so a click in that
+  transparent strip does nothing, as on the other classic panels. Page 2 keeps the full height with its stats box. Its hidden grid
+  stays at y 198.
+- **Page 2 has no grid.** The layout keeps a hidden grid widget (marker 7402) so the plugin still reads the tab's items
+  and the list stays current, but it is not drawn and takes no clicks or tooltips.
+- **Also:** the console `invtabs page grid|stats|toggle` and the Controls action "Charm tab page: grid / stats
+  (classic graphics)" (logical id `charm-page`, unbound by default). The legacy panel has no controller support, so a
+  pad has no way to the page; the gamepad layout keeps its own list.
+- The page is not saved; each game starts on page 1. Closing and reopening the tab keeps the page.
+- **Falls back to one page** (log "charm tab in legacy graphics: one page: <reason>") when the summary is off, the tab
+  has no classic layout, the page art is missing, more than 8 tabs share the row, or the click listener did not
+  register. Otherwise the log says "charm tab in legacy graphics: two pages (grid, stats)".
+- HD is unchanged: its band above the grid scrolls and has no such shortage of room.
+
 ## All stats or by charm
 
 The list has two modes, switched by a button at the top right of the list (lane charmpage):
@@ -133,7 +172,7 @@ start.
   `tools/hd_buttons.py`: D2R's stone rim and the stash cell well. Without it, the core draws a plain stand-in.
 - **Classic:** a 24 x 24 button at the right end of the tab row (x 282). It is shown only when there are 10 tabs or
   fewer and the mod has `data/global/ui/panel/invtabs_listmode.dc6`: 4 frames, normal and pressed for each glyph, in
-  the tab buttons' style (`tools/invtabs_art.py`).
+  the tab buttons' style (`tools/invtabs_art.py`). With the two pages (above) it shows on page 2 only.
 - **Gamepad:** the controller panel keeps the sum. Its 20 rows are fixed and it has no scrolling, so a long list by
   charm would be cut off.
 - The click reaches the plugin through an empty panel name of its own (`invtabs/ListMode`, no panel), which a shared

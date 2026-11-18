@@ -1,0 +1,72 @@
+diff --git a/plugins/floating-damage/config/ruffneckk-floating-damage.toml b/plugins/floating-damage/config/ruffneckk-floating-damage.toml
+index dd28bce..d96cd8b 100644
+--- a/plugins/floating-damage/config/ruffneckk-floating-damage.toml
++++ b/plugins/floating-damage/config/ruffneckk-floating-damage.toml
+@@ -16,6 +16,8 @@ max_numbers_on_screen = 160
+ # Kodia is read from the active mod at data/hd/ui/fonts/kodia.ttf and is not
+ # bundled. Exocet is read from the active mod at
+ # data/hd/ui/fonts/exocetblizzardot-medium.otf and is not bundled either.
++# D2R-XL 2012: when the mod has no Exocet, index 13 uses the font next to the
++# plugin, ruffneckk-floating-damage-font.ttf (Cinzel Bold, SIL OFL 1.1).
+ # If either mod font is unavailable, its index safely falls back to index 0.
+ font_index = 13
+ 
+diff --git a/plugins/floating-damage/src/plugin.cpp b/plugins/floating-damage/src/plugin.cpp
+index eca59f1..16ceb45 100644
+--- a/plugins/floating-damage/src/plugin.cpp
++++ b/plugins/floating-damage/src/plugin.cpp
+@@ -1493,6 +1493,29 @@ bool InstallDamageHook() noexcept {
+     return true;
+ }
+ 
++// D2R-XL 2012: ruffneckk-floating-damage-font.ttf in the folder of this DLL, or empty.
++std::filesystem::path FindFontNextToModule() noexcept {
++    try {
++        std::wstring path(MAX_PATH, L'\0');
++        for (;;) {
++            const DWORD length = GetModuleFileNameW(Module, path.data(), static_cast<DWORD>(path.size()));
++            if (length == 0) return {};
++            if (length < path.size()) {
++                path.resize(length);
++                break;
++            }
++            path.resize(path.size() * 2);
++        }
++        const auto candidate = std::filesystem::path(path).parent_path() / L"ruffneckk-floating-damage-font.ttf";
++        std::error_code error;
++        if (std::filesystem::is_regular_file(candidate, error) && !error)
++            return candidate;
++    }
++    catch (...) {
++    }
++    return {};
++}
++
+ std::filesystem::path FindOptionalModFont(
+     const D2RL::PluginContext* context,
+     const char* relativePath) noexcept {
+@@ -2008,14 +2031,20 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context)
+     const auto kodiaFont = FindOptionalModFont(context, "data/hd/ui/fonts/kodia.ttf");
+     const auto exocetFont = FindOptionalModFont(
+         context, "data/hd/ui/fonts/exocetblizzardot-medium.otf");
++    // D2R-XL 2012: D2R keeps Exocet in its game archive, never as a loose file, so a mod without its own copy gets the
++    // font that ships next to this DLL (ruffneckk-floating-damage-font.ttf, Cinzel Bold, SIL OFL 1.1) for index 13.
++    const auto bundledFont = exocetFont.empty() ? FindFontNextToModule() : std::filesystem::path{};
+     D3D12::SetOptionalKodiaFontPath(
+         kodiaFont.empty() ? nullptr : kodiaFont.c_str());
+     D3D12::SetOptionalExocetFontPath(
+-        exocetFont.empty() ? nullptr : exocetFont.c_str());
++        !exocetFont.empty() ? exocetFont.c_str()
++            : !bundledFont.empty() ? bundledFont.c_str() : nullptr);
+     context->LogInfo(
+-        exocetFont.empty()
+-            ? "FloatingDamage: Exocet was not found in the active mod; font index 13 will fall back to index 0."
+-            : "FloatingDamage: active-mod Exocet detected for default font index 13.");
++        !exocetFont.empty()
++            ? "FloatingDamage: active-mod Exocet detected for default font index 13."
++            : !bundledFont.empty()
++                ? "FloatingDamage: Exocet was not found in the active mod; font index 13 uses the bundled font next to the plugin (ruffneckk-floating-damage-font.ttf)."
++                : "FloatingDamage: Exocet was not found in the active mod; font index 13 will fall back to index 0.");
+     context->LogInfo(
+         kodiaFont.empty()
+             ? "FloatingDamage: Kodia was not found in the active mod; font index 12 will fall back to index 0."

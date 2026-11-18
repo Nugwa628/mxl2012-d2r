@@ -57,6 +57,7 @@ public:
 
 	std::string Fragment(LayoutMode mode, Rect area, int barInset = 0, int cornerWidth = 0);
 	std::size_t Rows() const { return rows_; }
+	std::size_t WrapWidth() const { return wrap_; } // characters a classic row holds (0: no wrapping)
 	bool NeedsRelayout() const { return !Fits(mode_, rows_, lines_.size()); }
 
 	void ApplyTexts(const char* panelName, bool force = false);
@@ -76,7 +77,9 @@ private:
 	std::uintptr_t fn_[SummaryNativeCount] {};
 
 	std::vector<StatValue>   totals_;
-	std::vector<std::string> lines_;
+	std::vector<std::string> lines_;   // what the rows show: raw_, wrapped to wrap_ characters in the classic layout
+	std::vector<std::string> raw_;     // the lines as formatted
+	std::size_t              wrap_ = 0; // 0: no wrapping (HD)
 	std::vector<std::string> notice_;
 	std::vector<std::string> shown_;
 	std::size_t              counted_ = 0, skipped_ = 0;

@@ -39,6 +39,25 @@ players who join a TCP/IP game can use it too. Settings: `mods\mxl2012\d2rloader
 It replaces **CharmInv** by **Dimentio**, D2RLoader's author (<https://d2rloader.net/hub/plugins/charm-inventory>), which
 the mod shipped in 0.1.19; charms kept in CharmInv's inventory are in the new one, in the same cells.
 
+Shipped with the mod: **Damage Overflow Fix** by **CelestialRayOne (Bogdan Bulai)**
+(<https://github.com/CelestialRayOne/d2rloader_plugins>, MIT; licence in
+`mods\mxl2012\d2rloader\plugins\d2rl-celestialrayone-damage-overflow-fix-license.txt`). It stops huge hits (above about 8.4
+million damage) from wrapping around to almost nothing; they are capped instead. Settings:
+`mods\mxl2012\d2rloader\config\celestialrayone.damage-overflow-fix.toml`.
+
+Shipped with the mod: **Enemy Health Bars** by **Graxy_TV** (<https://github.com/graxytv/D2R-Over-the-Head-Health-Bars>,
+GPL-3.0, used with the author's permission), health bars over damaged monsters in HD and legacy graphics (our patches add
+the legacy placement). Its source as we build it and its licence come with it in `mods\mxl2012\d2rloader\plugins\`
+(`d2rl-enemy-health-bars-source.zip`, `-license.txt`). Bars on every monster: `show_full_health = true` in
+`mods\mxl2012\d2rloader\config\enemy-health-bars.toml`.
+
+Shipped with the mod: **Floating Damage** by **RuffnecKk**
+(<https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, `plugins/floating-damage`, MIT; based on locbones' D2RHUD and
+Fr4nsson's D2RDamageNumbers), the damage of each hit rising over the monster and a DPS counter, in HD and legacy graphics (our
+patches add the legacy placement). Its numbers use the font **Cinzel Bold** by Natanael Gama / The Cinzel Project Authors
+(SIL Open Font License 1.1). On by default; turn it off with `enabled = false` under `[general]` in
+`mods\mxl2012\d2rloader\config\ruffneckk-floating-damage.toml`.
+
 Shipped with the mod: our own plugin **D2R Legacy 16:9** (`legacy169.dll`, <https://github.com/Nugwa628/D2R-Legacy169>, MIT), the
 classic graphics in 16:9 (1066x600 / 853x480). Turn it off with `enabled = false` in
 `mods\mxl2012\d2rloader\config\legacy169.toml`.
@@ -57,6 +76,11 @@ its skills rescaled to Median XL 2012's rules (still lightly tested). Legacy gra
 
 This is an **alpha**: playable, but expect bugs. Known issues are listed in each release's notes and in
 [docs/bugs.md](docs/bugs.md). Report bugs with the issue templates (include `d2rloader.log` after a crash).
+
+**Code signing policy:** the D2R-XL 2012 Downloader is signed with Azure Artifact Signing under the project owner's
+validated identity. Team roles, how a release is built and signed, and the privacy statement (the downloader sends no
+data about you anywhere): [docs/code-signing-policy.md](docs/code-signing-policy.md). Removing everything again:
+[docs/launcher.md](docs/launcher.md) "Uninstall and cleanup".
 
 ## What is in this repository
 

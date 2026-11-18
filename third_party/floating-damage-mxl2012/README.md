@@ -1,0 +1,40 @@
+# Floating Damage for D2R-XL 2012
+
+**Floating Damage** is by **RuffnecKk**: <https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, folder
+`plugins/floating-damage`. MIT licence, "Copyright (c) 2026 RuffnecKk and contributors" (the suite's `LICENSE`, shipped next
+to the DLL as `d2rl-ruffneckk-floating-damage-license.txt`). The author credits locbones' D2RHUD and Fr4nsson's D2RDamageNumbers as its
+origins (the suite's `THIRD_PARTY_NOTICES.md`).
+
+The author's source is the submodule `third_party/RuffnecKk-D2RLoader-Suite`, pinned at commit `514359f`
+(`514359f7b27fbc1026c17e7e2b440179fefdf9ba`). It is never changed and never forked: `tools/build_floatingdamage.ps1` exports
+that commit (`plugins/floating-damage`, `common`, the suite's vendored `third_party/PluginSDK`, `scripts`, the licence files),
+applies the patches here in name order and builds Release into `build\floatingdamage\Release\`. The plugin's CMake fetches
+MinHook and Dear ImGui at the commits it pins (kept in `build\floatingdamage-deps`, so only the first build needs the network).
+
+    pwsh -NoProfile -File tools\build_floatingdamage.ps1          # -NoTests skips the unit tests, -Src DIR another clone
+
+Output: `d2rl-ruffneckk-floating-damage.dll`, `ruffneckk-floating-damage.toml` (the author's config with our comment),
+`LICENSE-floating-damage.txt`, `ruffneckk-floating-damage-font.ttf` and `LICENSE-floating-damage-font.txt`. `tools/package_release.py` (`FD`)
+puts the DLL, the font and the two licences (renamed `d2rl-ruffneckk-floating-damage-license.txt` and
+`ruffneckk-floating-damage-font-license.txt`) in `d2rloader\plugins\` with `d2rl-ruffneckk-floating-damage-third-party.txt`
+(the suite's `THIRD_PARTY_NOTICES.md` followed by every licence text it keeps: PluginSDK, Dear ImGui, MinHook, D2R Damage
+Numbers and the rest), and the TOML, a `preserve` file, in `d2rloader\config\`. It refuses a build of another commit or patch set.
+
+| File | What it is |
+|-|-|
+| `0001-mxl2012-legacy-projection.patch` | Numbers over the target in legacy graphics. The author's projection (D2R's HD `ProjectUnitToScreen` with the HD render context, then a plain ratio to the window) is for HD only; in legacy the numbers landed off the target. In legacy the camera hook now projects with the classic isometric camera the classic engine draws with: unit pixel X / Y minus the view offset X / Y (D2R's own routines), raised by a fixed head height (56 classic pixels), then the classic screen (its width / height globals: 800x600, 640x480, or 1066x600 / 853x480 with legacy169) scaled to the window height and centred, as D2R composes it. HD keeps the author's path unchanged. Everything new is found at load by expected bytes (the HD / legacy test, the unit pixel routines, both view offset routines, the camera's screen size read; the size globals are decoded from that read's RIP displacements), never by build constants; a mismatch turns the legacy path off with a log line and HD is not affected. The `floating-damage status` command adds a legacy line (projection, graphics, legacy frames, projections, classic size) and both status lines go to the plugin log. Pure logic in the new `src/legacy_projection.hpp`, tests in the CMake target `floating_damage_mxl_tests` |
+| `0002-mxl2012-bundled-font.patch` | The mod has no Exocet (D2R keeps it in its CASC, never as a loose file the plugin can read), so the default font index 13 fell back to Segoe UI. Index 13 now uses `ruffneckk-floating-damage-font.ttf` next to the plugin DLL when the mod has no Exocet (log line); the TOML comment says so |
+| `0003-mxl2012-legacy-dps-counter.patch` | The DPS counter in legacy graphics. The author places it by percent of the whole window, so with a 4:3 classic picture in a wide window it sat in the black side bar. In legacy the camera hook now passes the classic screen size to the renderer, and the counter is placed by the same percents inside the classic picture (fitted to the window height and centred) and moved up when it would cover the classic HUD (800 classic pixels wide, centred, 104 high). With Legacy 16:9 the bottom left corner is left of the HUD, so it stays there. HD is unchanged |
+| `0004-mxl2012-legacy-text-scale.patch` | Bigger numbers in legacy graphics (owner, 2026-11-17). New config key `legacy_text_scale` under `[appearance]` (default and shipped `2.5`, valid 0.25 to 8): while the camera hook has set a classic screen size, each number's size (`text_size` / `critical_hit_size`, after the resolution scale) is multiplied by it, tick popups included. HD and the DPS counter are unchanged. The parser takes the key with its range; the author's config tests check the default and the range |
+| `tests/floating_damage_mxl_tests.cpp` | Unit tests of `legacy_projection.hpp` (classic point, classic screen to window for 800x600 / 1066x600 / 640x480, off-screen and invalid sizes, the RIP decode, the DPS counter's place in 4:3 and 16:9, the legacy number size); copied next to the author's tests and run by the build script |
+| `fonts/Cinzel-Bold.ttf`, `fonts/OFL.txt` | The bundled font (below) |
+
+## Font
+
+**Cinzel Bold** by Natanael Gama, "Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)" (the
+licence also names "Copyright 2012 Natanael Gama, with Reserved Font Name Cinzel Decorative", a font we do not ship), 
+SIL Open Font License 1.1 (`fonts/OFL.txt`, shipped as `ruffneckk-floating-damage-font-license.txt`). Taken unmodified from the project's
+repository at commit `dd598495b0fb2ad84270d5cc75d642d2f1e8eabf` (`fonts/ttf/Cinzel-Bold.ttf`, sha256
+`0c23ec565db45c5508ee95889c60ad87debd167ca07167a43a5d68572b4e2eac`). A classical capital face close to the game's Exocet.
+The OFL allows bundling it with software; it is shipped under a file name of our own but its name inside the font is
+unchanged (the font is not modified, so the Reserved Font Name rule does not apply).

@@ -9,7 +9,7 @@
 1 ICON "icon.ico"
 101 10 "background.png"
 103 10 "popup-window.png"
-104 10 "exocet.ttf"
+104 10 "CinzelDecorative-Bold.ttf"
 105 10 "RobotoCondensed.ttf"
 106 10 "comment.svg"
 
@@ -26,7 +26,7 @@ BEGIN
 			VALUE "CompanyName", "mxl2012-d2r"
 			VALUE "FileDescription", "D2R-XL 2012 Downloader"
 			VALUE "FileVersion", MXL_LV_STR
-			VALUE "ProductName", "mxl2012"
+			VALUE "ProductName", "D2R-XL 2012"  // the project name, as SignPath's artifact configuration requires (docs/code-signing-policy.md)
 			VALUE "ProductVersion", MXL_LV_STR
 			VALUE "LegalCopyright", "D2R-XL 2012, a port of Median XL 2012 by Brother Laz. Diablo II by Blizzard Entertainment."
 			VALUE "OriginalFilename", "D2R-XL-2012-Downloader.exe"

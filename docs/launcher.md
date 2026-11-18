@@ -218,6 +218,36 @@ Archive failures fall back to objects in auto mode; forced 7z mode reports the f
 Saves remain at `Saved Games\Diablo II Resurrected\mods\mxl2012` (or the modinfo savepath).
 D2R, D2RLoader, other mods, and the game-wide `default_mod` setting remain.
 
+## Uninstall and cleanup
+
+Everything the downloader can leave on a PC, and how it goes away (the code signing policy's "System changes and uninstalling",
+docs/code-signing-policy.md):
+
+| What | Made by | Removed by |
+|-|-|-|
+| `<D2R>\mods\mxl2012` (the mod) | Install / Update / Repair | **Uninstall** (`--cli uninstall`); needs our marker |
+| `%LOCALAPPDATA%\mxl2012`: `launcher.json`, `launcher.log`(`.old`), `download`, `loader-staging` | every run | the **second question of Uninstall** ("Also remove the downloader's own files"), or `--cli cleanup` after `--cli uninstall` |
+| `%LOCALAPPDATA%\mxl2012\save-copies` | copies of your saves before each install (docs/bugs.md #536) | kept by the cleanup (your data); delete the folder yourself |
+| `%LOCALAPPDATA%\mxl2012\removed` | Move plugin (old plugin copies, moved, never deleted) | kept by the cleanup; delete the folder yourself |
+| `D2R-XL-2012-Downloader.exe` (and `.old` / `.download` next to it during a self-update) | you, self-update | delete the exe; it installs nothing else (no registry keys, services, shortcuts or scheduled tasks) |
+| D2RLoader's files in the D2R folder | Install D2RLoader, after you confirmed | D2RLoader is its own program: remove it as its own documentation says (`D2RLoader.exe`, `D2RCore.dll`, `d2rloader.mpq`, `d2rloader\`) |
+| `default_mod = "mxl2012"` in `<D2R>\d2rloader\config\d2rloader.toml` | Default mod, after you confirmed | pick another mod in D2RLoader (gear, Default Mod) |
+| your characters (`Saved Games\Diablo II Resurrected\mods\mxl2012`) | the game | never touched by the downloader; delete them yourself if you want |
+
+`Launcher::CleanUp` refuses while our `mods\mxl2012` is still installed (the state holds its marker id, without which
+Uninstall would refuse it). It deletes every entry of the data folder except `save-copies` and `removed`
+(`KeptOnCleanup`, `launcher/src/core/paths.h`), stops writing the log and the state, and removes the folder when nothing is
+kept. Tested on fake folders (docs/testing.md "Lane signpath"): refused with an installed marked mod; with save copies
+and moved plugins only those two stayed; without them the data folder was gone.
+
+## Privacy
+
+The downloader sends no telemetry, crash reports or usage data. On the network it only reads the release channel and
+manifest and downloads files from the download site (`--site`, default `https://files.wyrd.games/mxl2012/`, plain GET
+requests with the user agent `D2R-XL-2012-Downloader/<version>`), and D2RLoader from <https://d2rloader.net/> after you
+confirm Install D2RLoader. The links (Get D2RLoader, Report a problem) open the browser. The full statement is in
+[docs/code-signing-policy.md](code-signing-policy.md).
+
 ## What D2RLoader really starts
 
 On refresh the downloader checks `<D2R>\d2rloader\config\d2rloader.toml`, section
@@ -255,6 +285,58 @@ The GUI offers a restart; the CLI reports the update for the next run. Old execu
 cleanup happens after the previous process exits. Signing is a separate release step
 via `tools/sign_launcher.py`; no signing certificate is required by self-update.
 
+## Release and signing
+
+The build leaves the unsigned exe and its `.sha256`. `tools/sign_launcher.py` turns that pair into the exe to publish
+(`--out`), unsigned, signed by a local command (`--command`), or signed elsewhere (`--signed FILE`). It refuses an exe whose
+bytes differ from the build beyond the signature, a signature Windows does not accept or that has no timestamp, and a
+version resource a signing service would refuse (ProductName not `D2R-XL 2012`, FileVersion not equal to ProductVersion,
+OriginalFilename not the exe's name).
+
+Signed releases use **Azure Artifact Signing** (the owner's account; policy, roles and privacy statement:
+[docs/code-signing-policy.md](code-signing-policy.md)). `tools/artifact_signing.py` drives `signtool` with Microsoft's
+Artifact Signing dlib through `sign_launcher.py --command`. Nothing is installed on the PC:
+
+- **signtool**: the x64 `signtool.exe` of Windows SDK 10.0.22621 or newer (the newest under
+  `Windows Kitsin` is taken, or `MXL_SIGNTOOL`); it comes with Visual Studio's C++ workload.
+- **dlib**: NuGet `Microsoft.ArtifactSigning.Client` **1.0.146**, pinned by SHA-256; `setup` unpacks its `bin/x64` into
+  `work/signing-tools/` (git-ignored). It is the last build for **.NET 8**; 1.0.147 and later need the .NET 10 runtime.
+- **.NET 8 runtime (x64)**: the dlib runs in it (`dotnet --list-runtimes` shows `Microsoft.NETCore.App 8.x`).
+- **Timestamp**: `http://timestamp.acs.microsoft.com` (`/tr`, `/td SHA256`). Artifact Signing certificates last 3 days,
+  so a signature without a timestamp would stop being valid; `sign_launcher.py` refuses one.
+
+The account is given at run time, never in git: `MXL_SIGNING_ENDPOINT` (`https://<region>.codesigning.azure.net/`, the
+region the account was created in), `MXL_SIGNING_ACCOUNT`, `MXL_SIGNING_PROFILE` and `MXL_SIGNING_AUTH`, or `--config FILE`
+(JSON with `endpoint`, `account`, `profile`, `auth`) outside git. The tool writes `work/signing-tools/metadata.json`
+(Endpoint, CodeSigningAccountName, CertificateProfileName, ExcludeCredentials) with every Azure SDK credential excluded
+except the chosen one, so the dlib never uses another sign-in on the PC:
+
+- `cli` (default): the Azure CLI's sign-in (`az login`) of a user or service principal with the role
+  *Artifact Signing Certificate Profile Signer* on the certificate profile.
+- `env`: a service principal (app registration) with that role, from `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and
+  `AZURE_CLIENT_SECRET` set in the signing process only.
+
+A release, step by step:
+
+1. Build and test (`cmake --build build/launcher --config Release`, `launcher_tests.exe`).
+2. `py -3 tools/artifact_signing.py setup` once (and after a version change); `check` repeats the checks.
+3. `py -3 tools/artifact_signing.py sign --exe build/launcher/Release/D2R-XL-2012-Downloader.exe --out dist-launcher`
+   (`command` prints the `--command` for running `sign_launcher.py` by hand).
+4. `py -3 tools/publish_release.py ... --launcher dist-launcher/D2R-XL-2012-Downloader.exe`.
+
+Optional CI: `docs/ci/artifact-signing.github.yml` is a GitHub Actions workflow for the public mirror (not active:
+copy it into the mirror's .github/workflows folder to use it). It builds and tests on `windows-latest` and, from **Run workflow**
+with *sign* ticked, signs with `azure/artifact-signing-action` after `azure/login` with OpenID Connect (a federated
+credential on an app registration with the signer role; repository secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID`, variables `ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT`, `ARTIFACT_SIGNING_PROFILE`),
+then checks the result with `sign_launcher.py --signed`. The forge's runners cannot use OpenID Connect with Azure; there
+it would need a client secret, so the release PC path above is the default.
+
+**On hold (owner, 2026-11-17): SignPath Foundation.** The application, `launcher/signpath-artifact-configuration.xml`,
+`tools/downloader_repo.py` (export of the downloader into its own repository) and its `downloader-repo/` files, with the
+SignPath workflow at `downloader-repo/.github/workflows/sign-launcher.yml`, are kept but not used; nothing under
+.github/workflows runs them.
+
 The download host's `tools/dl_ingest.py` is told the exe's name by its unit (`--launcher-name D2R-XL-2012-Downloader.exe`,
 docs/hosting.md) and refuses any other file name. The host needs this multi-product `dl_ingest.py` (docs/hosting.md,
 "Owner steps") before the first release with a downloader is published.
@@ -262,7 +344,7 @@ docs/hosting.md) and refuses any other file name. The host needs this multi-prod
 ## Command line and build
 
 ```text
-D2R-XL-2012-Downloader.exe --cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader|play
+D2R-XL-2012-Downloader.exe --cli status|detect|install|update|repair|uninstall|cleanup|self-update|fix-default-mod|remove-stray-plugins|install-loader|play
   --game-dir DIR --data-dir DIR --site URL|DIR --channel stable|test
   --replace --via auto|7z|objects
 ```

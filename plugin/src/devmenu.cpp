@@ -137,7 +137,8 @@ std::atomic<long> g_presses{0}, g_actions{0}, g_refused{0}, g_faults{0}, g_liste
 std::atomic<long>& g_textsSet = g_client.textsSet;
 std::atomic<long>& g_textFails = g_client.textFails;
 std::atomic<long> g_socketFails{0};                       // spawned items whose sockets did not read back as real
-std::atomic<uint32_t> g_lastItemFlags{0};                 // the native flag word of the last spawned item that asked for sockets
+std::atomic<long> g_sockProps{0};                         // set / unique spawns that asked their sockets by the `sock` property (PlanSockets)
+std::atomic<uint32_t> g_lastItemFlags{0};               // the native flag word of the last spawned item that asked for sockets
 std::string g_portsSeen;
 std::mutex g_uiMutex;          // guards the strings the native text boxes show
 std::string g_rowTexts[layout::MaxRows];
@@ -344,7 +345,15 @@ auto CreateOne(D2RL::PlayerHandle player, uint32_t code, uint32_t quality, int32
 	spec.itemLevel = row >= 0 ? ForcedRowItemLevel : ItemLevel;
 	spec.quantity = D2RL::Items::DefaultValue;
 	spec.durability = D2RL::Items::DefaultValue;
-	spec.socketCount = sockets;
+	const SocketPlan plan = PlanSockets(quality, sockets, g_catalog.sockProperty);
+	const D2RL::Items::PropertySpec sockProp = D2RL::Items::MakeExactProperty(static_cast<uint32_t>(plan.propertyId < 0 ? 0 : plan.propertyId),
+	                                                                          plan.propertyValue);
+	spec.socketCount = plan.socketCount;
+	if (plan.propertyId >= 0) {
+		spec.propertyCount = 1;
+		spec.properties = &sockProp;
+		g_sockProps.fetch_add(1);
+	}
 	spec.stateFlags = SpawnIdentified(quality) ? D2RL::Items::ItemStateIdentified : 0;  // "Socketed (N)", not "Max Sockets: N"
 	spec.flags = quality == QualityUnique ? D2RL::Items::ItemCreateFlagBit(D2RL::Items::ItemCreateFlag::AllowDuplicateUnique) : 0;
 	spec.destination.structSize = D2RL::Items::ItemDestinationSize;
@@ -1146,7 +1155,7 @@ void DevMenuStatus(char* out, size_t size) noexcept {
 }
 
 void DevMenuSockets(char* out, size_t size) noexcept {
-	std::snprintf(out, size, "sockfails=%ld lastitemflags=0x%x", g_socketFails.load(), g_lastItemFlags.load());
+	std::snprintf(out, size, "sockfails=%ld sockprops=%ld lastitemflags=0x%x", g_socketFails.load(), g_sockProps.load(), g_lastItemFlags.load());
 }
 
 auto DevMenuHarness(const char* verb, const char* argument) noexcept -> bool {

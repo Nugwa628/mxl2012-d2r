@@ -1,0 +1,41 @@
+diff --git a/src/build_signatures.h b/src/build_signatures.h
+index a5ba195..459ec02 100644
+--- a/src/build_signatures.h
++++ b/src/build_signatures.h
+@@ -13,6 +13,4 @@ inline constexpr Signature kUnitListNext { 0x9F270, "48 85 C0 74 ?? 44 39 40 08
+ inline constexpr Signature kRenderWidth { 0x7F510, "48 83 EC 28 E8 ?? ?? ?? ?? 84 C0 74 09 48 83 C4 28 E9 ?? ?? ?? ?? 8B 05 ?? ?? ?? ?? 48 83 C4 28 C3", 0 };
+ inline constexpr Signature kRenderHeight { 0x7F4A0, "48 83 EC 28 E8 ?? ?? ?? ?? 84 C0 74 0E E8 ?? ?? ?? ?? 48 C1 E8 20 48 83 C4 28 C3 8B 05 ?? ?? ?? ?? 48 83 C4 28 C3", 0 };
+ inline constexpr Signature kIsHdGraphics { 0x846210, "48 8B 05 ?? ?? ?? ?? 48 85 C0 74 08 0F B6 80 B9 00 00 00 C3 E9", 0 };
+-inline constexpr uint32_t Timestamp = 0x6AB3782C;
+-inline constexpr uint32_t ImageSize = 0x5643000;
+ }
+\ No newline at end of file
+diff --git a/src/plugin.cpp b/src/plugin.cpp
+index 3c8bf94..9ef7288 100644
+--- a/src/plugin.cpp
++++ b/src/plugin.cpp
+@@ -139,9 +139,10 @@ bool bindNative(const D2RL::PluginContext* ctx) {
+     const auto base=ctx->exeBase;
+     IMAGE_DOS_HEADER dos{}; IMAGE_NT_HEADERS64 nt{};
+     if(!read(base,dos) || dos.e_magic!=IMAGE_DOS_SIGNATURE || !read(base+dos.e_lfanew,nt)
+-       || nt.Signature!=IMAGE_NT_SIGNATURE || nt.FileHeader.TimeDateStamp!=native_build::Timestamp
+-       || nt.OptionalHeader.SizeOfImage!=native_build::ImageSize) {
+-        ctx->LogError("Enemy bars: requires D2R 3.3.93847; executable fingerprint differs."); return false;
++       || nt.Signature!=IMAGE_NT_SIGNATURE) {
++        // No build fingerprint (timestamp / image size): the signatures below decide, so a game update that keeps the
++        // code these reads need keeps the bars, and one that changes it turns them off with a log line.
++        ctx->LogError("Enemy bars: the game executable's headers could not be read; not loaded."); return false;
+     }
+     using namespace native_build;
+     const Signature signatures[]={kProjectAboveHead,kClientGetLocalPlayer,kGetUnitStat,kIsHostile,
+@@ -417,8 +418,8 @@ D2RL::ConsoleCommandResult command(D2R::Game::Client*,const D2RL::ConsoleCommand
+     }catch(...){return D2RL::ConsoleCommandResult::Failed;}
+ }
+ constexpr D2RL::PluginInfo info{.infoSize=D2RL::PluginInfoSize,.abiVersion=D2RL_PLUGIN_ABI_VERSION,
+-    .id="enemy-health-bars",.name="Enemy Health Bars",.version="0.2.6",.author="Custom",
+-    .description="Compact red health bars above hostile enemies, with optional rarity outlines. D2R 3.3.93847.",.flags=D2RL::PluginFlags::Client};
++    .id="enemy-health-bars",.name="Enemy Health Bars",.version="0.2.6+mxl2012",.author="Graxy_TV",
++    .description="Compact red health bars above hostile enemies, with optional rarity outlines.",.flags=D2RL::PluginFlags::Client};
+ }
+ D2RL_PLUGIN_EXPORT const D2RL::PluginInfo* D2RLoaderGetPluginInfo() noexcept {return &info;}
+ D2RL_PLUGIN_EXPORT bool D2RLoaderLoadPlugin(const D2RL::PluginContext* ctx) noexcept {

@@ -307,11 +307,12 @@ void NoteItem(int x, int y, int w, int h) {
 // ---- grid wrappers (UI thread) ----
 
 // The slot of one of our grid widgets (tab index, AllSlot for the whole page), -1 for any other grid.
-int SlotOf(const void* widget, bool* classic = nullptr) noexcept {
+int SlotOf(const void* widget, bool* classic = nullptr, bool* hidden = nullptr) noexcept {
 	float marker[2] {};
 	std::memcpy(marker, static_cast<const std::uint8_t*>(widget) + WidgetMarker, sizeof(marker));
 	const int slot = invtabs::SlotOfMarker(marker[0], marker[1]);
 	if (classic) *classic = invtabs::ClassicMarker(marker[1]);
+	if (hidden) *hidden = invtabs::HiddenMarker(marker[1]);
 	return slot == invtabs::AllSlot || (slot >= 0 && slot < static_cast<int>(Tabs.size())) ? slot : -1;
 }
 
@@ -327,10 +328,10 @@ struct Seen {
 };
 
 // Page items outside the area get the page byte PageHidden for the stock draw, then their own back (also when the
-// draw faults). Collects the area's items (for the reach and the summary). No C++ objects in here: __try needs a frame
-// without unwinding.
+// draw faults). Collects the area's items (for the reach and the summary). draw false (the classic stats page's hidden
+// grid): collects only, the stock draw is not called. No C++ objects in here: __try needs a frame without unwinding.
 std::uint64_t DrawArea(void* widget, void* a, void* b, void* c, const Area& area, Seen* seen, std::size_t& seenCount, std::uint64_t& signature,
-                       void*& owner) noexcept {
+                       void*& owner, bool draw = true) noexcept {
 	owner                 = GridOwner(widget);
 	void* const inventory = owner ? InventoryOf(owner, SourceName, __LINE__) : nullptr;
 	if (!inventory) return 0; // nothing rather than the whole page in the wrong place
@@ -352,12 +353,12 @@ std::uint64_t DrawArea(void* widget, void* a, void* b, void* c, const Area& area
 				                                           + (static_cast<std::uint64_t>(data[DataPage]) << 24));
 				if (seenCount < 512) seen[seenCount++] = { item, x, y, mine };
 			}
-			if (data[DataPage] != page || mine) continue;
+			if (!draw || data[DataPage] != page || mine) continue;
 			if (count == sizeof(hidden) / sizeof(hidden[0])) break;
 			data[DataPage]  = PageHidden;
 			hidden[count++] = data;
 		}
-		result = NextDraw(widget, a, b, c);
+		if (draw) result = NextDraw(widget, a, b, c);
 	} __finally {
 		for (std::size_t i = 0; i < count; ++i) hidden[i][DataPage] = page;
 	}
@@ -390,8 +391,8 @@ void AfterDraw(int slot, const Seen* seen, std::size_t seenCount, std::uint64_t 
 }
 
 std::uint64_t HookDraw(void* widget, void* a, void* b, void* c) noexcept {
-	bool      classic = false;
-	const int slot    = widget ? SlotOf(widget, &classic) : -1;
+	bool      classic = false, hidden = false;
+	const int slot    = widget ? SlotOf(widget, &classic, &hidden) : -1;
 	if (slot < 0) return NextDraw(widget, a, b, c);
 	const std::uint64_t now  = GetTickCount64();
 	const std::uint64_t last = LastDrawn[static_cast<std::size_t>(slot)].exchange(now);
@@ -402,7 +403,7 @@ std::uint64_t HookDraw(void* widget, void* a, void* b, void* c) noexcept {
 	std::size_t   seenCount = 0;
 	std::uint64_t signature = 1469598103934665603ULL;
 	void*         owner     = nullptr;
-	const auto    result    = DrawArea(widget, a, b, c, AreaOfSlot(slot), seen, seenCount, signature, owner);
+	const auto    result    = DrawArea(widget, a, b, c, AreaOfSlot(slot), seen, seenCount, signature, owner, !hidden);
 	if (owner) ClientOwner.store(owner);
 	AfterDraw(slot, seen, seenCount, signature, !last || now - last > 300);
 	return result;
@@ -427,16 +428,18 @@ bool TakeOnly(int slot) noexcept {
 }
 
 bool HookValidCell(void* widget, std::uint64_t cell) noexcept {
-	const int any = widget ? SlotOf(widget) : -1;
-	if (any >= 0 && TakeOnly(any)) return false;
+	bool      hidden = false;
+	const int any    = widget ? SlotOf(widget, nullptr, &hidden) : -1;
+	if (any >= 0 && (hidden || TakeOnly(any))) return false;
 	const int slot = any == invtabs::AllSlot ? -1 : any;
 	if (slot < 0) return NextValidCell(widget, cell);
 	return cell != invtabs::NoCell && invtabs::Inside(AreaOfSlot(slot), invtabs::CellX(cell), invtabs::CellY(cell)) && NextValidCell(widget, cell);
 }
 
 std::uint64_t* HookCellAtPoint(void* widget, std::uint64_t* out, std::uint64_t point) noexcept {
-	const int any = widget ? SlotOf(widget) : -1;
-	if (any >= 0 && TakeOnly(any)) {
+	bool      hidden = false;
+	const int any    = widget ? SlotOf(widget, nullptr, &hidden) : -1;
+	if (any >= 0 && (hidden || TakeOnly(any))) { // the stats page's grid: no cell under the mouse, no item tooltip
 		*out = invtabs::NoCell;
 		return out;
 	}
@@ -1418,6 +1421,25 @@ constexpr char    ListArtClassic[]     = "PANEL\\invtabs_listmode";
 constexpr char    ListPanel[]          = "ListMode"; // the click's target: an empty panel name of ours (panel_shared.cpp's way)
 std::string       ListHdFile, ListClassicFile;       // empty: no button in that look
 std::atomic<bool> ListByCharm {};
+bool              UiListenerOn = false;              // OnUiMessage listens (the list mode and page buttons' clicks)
+
+// ---- the classic charm tab's two pages (grid / stats) ----
+
+constexpr char    PageArtClassicFile[] = "data/global/ui/panel/invtabs_page.dc6";
+constexpr char    PageArtClassic[]     = "PANEL\\invtabs_page";
+constexpr char    PageGridPanel[]      = "PageGrid";  // the page buttons' click targets: empty panel names of ours
+constexpr char    PageStatsPanel[]     = "PageStats";
+bool              Paged = false;                      // legacy graphics show the charm tab on two pages (PreparePages)
+std::atomic<bool> StatsPage {};                       // the page shown: false the grid, true the stats
+void              SetPage(int page);
+
+Lay::ClassicPages PagesOf() {
+	Lay::ClassicPages p;
+	p.filename     = PageArtClassic;
+	p.gridMessage  = PanelName(PageGridPanel);
+	p.statsMessage = PanelName(PageStatsPanel);
+	return p;
+}
 
 // The drawn stand-in of the HD button when the mod has no listmode.sprite: 8 frames, 0-3 a list (shown while summing),
 // 4-7 a sum sign; normal, hovered, pressed, disabled. The mod's art (tools/invtabs_hdart.py) is in D2R's button style.
@@ -1502,8 +1524,13 @@ std::string ClassicText(int slot) {
 			if (static_cast<int>(i) == slot) self = static_cast<int>(refs.size());
 			refs.push_back({ PanelName(Tabs[i].id), Tabs[i].cfg.label, Tabs[i].cfg.name });
 		}
-	const auto frag = slot == 0 ? SummaryFragment(SummaryClassic, invtabs::summary::LayoutMode::Classic, Lay::ClassicSummaryText(tab->area.h)) : std::string();
 	const bool toggle = slot == 0 && SummaryOn && !ListClassicFile.empty();
+	if (slot == 0 && Paged) { // page 1 the grid, page 2 the stats (the summary rows only there)
+		const bool stats = StatsPage.load();
+		const auto frag  = stats ? SummaryFragment(SummaryClassic, invtabs::summary::LayoutMode::Classic, Lay::ClassicStatsText()) : std::string();
+		return Lay::ClassicPagedPanel(refs, self, slot, tab->area.w, tab->area.h, stats, frag, PagesOf(), toggle ? ListToggleOf(false) : Lay::ListToggle {});
+	}
+	const auto frag = slot == 0 ? SummaryFragment(SummaryClassic, invtabs::summary::LayoutMode::Classic, Lay::ClassicSummaryText(tab->area.h)) : std::string();
 	return Lay::ClassicPanel(refs, self, slot, tab->area.w, tab->area.h, frag, toggle ? ListToggleOf(false) : Lay::ListToggle {});
 }
 
@@ -1600,6 +1627,7 @@ void __cdecl SummaryTask(const D2RL::PluginContext*, void*) noexcept {
 			if (SyncLayout(0) && open) (void)PanelApi->openPanel(Context, Tabs[0].panel); // the texts follow on its first draw
 			return;
 		}
+		if (classic && Paged && !StatsPage.load()) return; // the grid page has no summary rows
 		(classic ? SummaryClassic : SummaryHd).ApplyTexts(name.c_str(), fresh);
 	} catch (...) {
 	}
@@ -1703,6 +1731,7 @@ std::string StatusLine() {
 	std::snprintf(line, sizeof(line), "; link %s", ModeName(LinkMode.load()));
 	out += line;
 	if (const int peers = WelcomedPeers.load(); peers > 0) out += ", " + std::to_string(peers) + " joined";
+	if (Paged) out += StatsPage.load() ? "; classic page stats" : "; classic page grid"; // the classic charm tab's page
 	return out;
 }
 
@@ -1727,11 +1756,22 @@ auto Command(D2R::Game::Client*, const D2RL::ConsoleCommandContext* command, voi
 			const bool by = name == "charm" || name == "by_charm" ? true : name == "all" ? false : !ListByCharm.load();
 			SetListMode(by, true);
 			Context->WriteConsoleMessage(by ? "invtabs: charm list by charm" : "invtabs: charm list all stats");
+		} else if (verb == "page") { // the classic charm tab's page: grid | stats | toggle (as its page buttons)
+			if (!Paged) Context->WriteConsoleMessage("invtabs: the charm tab has one page (see invtabs.log)");
+			else {
+				SetPage(name == "grid" ? 0 : name == "stats" ? 1 : -1);
+				Context->WriteConsoleMessage(StatsPage.load() ? "invtabs: charm tab page stats" : "invtabs: charm tab page grid");
+			}
 		} else if (verb == "summary") { // the charm tab's summary lines into invtabs.log (tests compare them with tooltips)
 			SummaryTask(Context, nullptr); // fresh totals (a level-up changes what counts without a page change)
 			const auto& lines = SummaryHd.Lines();
 			Log(false, "summary: %s, %zu counted, %zu left out, %zu line(s)", SummaryOn ? "on" : "off", SummaryHd.Counted(), SummaryHd.Skipped(), lines.size());
 			for (std::size_t i = 0; i < lines.size(); ++i) Log(false, "summary line %zu: %s", i, lines[i].c_str());
+			if (Tabs[0].classic) { // the legacy rows: the same lines wrapped to the box (summary_logic.h WrapLines)
+				const auto& rows = SummaryClassic.Lines();
+				Log(false, "summary classic: %zu line(s) in %zu row(s), wrapped at %zu character(s)", rows.size(), SummaryClassic.Rows(), SummaryClassic.WrapWidth());
+				for (std::size_t i = 0; i < rows.size(); ++i) Log(false, "summary classic line %zu: %s", i, rows[i].c_str());
+			}
 			Context->WriteConsoleMessage("invtabs: summary lines written to the log");
 		} else {
 			const std::string line = StatusLine();
@@ -1804,11 +1844,42 @@ void QueueListToggle() {
 	if (ThreadApi) (void)ThreadApi->runOnUiThread(Context, ToggleListTask, nullptr);
 }
 
+// UI thread: the classic charm tab's page (0 the grid, 1 the stats, -1 the other one), its layout registered again and
+// the tab closed and opened again when it was open (as SetListMode). Not saved: each game starts on the grid.
+void SetPage(int page) {
+	if (Tabs.empty() || !Paged) return;
+	const bool stats = page < 0 ? !StatsPage.load() : page != 0;
+	if (stats == StatsPage.load()) return;
+	StatsPage = stats;
+	Log(false, "charm tab page: %s", stats ? "stats" : "grid");
+	const bool open = PanelOpen(Tabs[0]);
+	if (open) (void)PanelApi->closePanel(Context, Tabs[0].panel);
+	(void)SyncLayout(0);
+	if (open) (void)PanelApi->openPanel(Context, Tabs[0].panel);
+	SummaryFresh     = true; // the stats page's first draw sets every row
+	LastSignature[0] = ~std::uint64_t {};
+}
+
+void __cdecl PageTask(const D2RL::PluginContext*, void* user) noexcept {
+	try {
+		SetPage(static_cast<int>(reinterpret_cast<std::intptr_t>(user)));
+	} catch (...) {
+	}
+}
+
+void QueuePage(int page) {
+	if (ThreadApi) (void)ThreadApi->runOnUiThread(Context, PageTask, reinterpret_cast<void*>(static_cast<std::intptr_t>(page)));
+}
+
 // The button's click: D2R sends "PanelManager:OpenPanel:invtabs/ListMode" (an empty panel name of ours, so nothing opens).
 auto __cdecl OnUiMessage(const D2RL::PluginContext*, const D2RL::SharedEvents::UiMessageEvent* event, void*) noexcept -> D2RL::SharedEvents::UiMessageAction {
 	if (event == nullptr || event->target == nullptr || event->command == nullptr || event->text == nullptr || std::strcmp(event->target, "PanelManager") != 0
 	    || std::strcmp(event->command, "OpenPanel") != 0)
 		return D2RL::SharedEvents::UiMessageAction::Continue;
+	if (std::strcmp(event->text, "invtabs/PageGrid") == 0 || std::strcmp(event->text, "invtabs/PageStats") == 0) {
+		QueuePage(std::strcmp(event->text, "invtabs/PageStats") == 0 ? 1 : 0);
+		return D2RL::SharedEvents::UiMessageAction::Consume;
+	}
 	if (std::strcmp(event->text, "invtabs/ListMode") != 0) return D2RL::SharedEvents::UiMessageAction::Continue;
 	QueueListToggle(); // after this message: the panel is closed and opened again there
 	return D2RL::SharedEvents::UiMessageAction::Consume;
@@ -1818,6 +1889,14 @@ auto OnListAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent* ev
 	if (!D2RL::Input::HasActionEventField(event, D2RL::Input::ActionEventRequiredSize) || event->kind != D2RL::Input::ActionEventKind::Pressed) return D2RL::Input::ActionResult::Ignored;
 	if (Tabs.empty() || ShownSlot() != 0) return D2RL::Input::ActionResult::Ignored;
 	QueueListToggle();
+	return D2RL::Input::ActionResult::Handled;
+}
+
+// Classic graphics, the charm tab shown: its other page (grid / stats).
+auto OnPageAction(const D2RL::PluginContext*, const D2RL::Input::ActionEvent* event, void*) noexcept -> D2RL::Input::ActionResult {
+	if (!D2RL::Input::HasActionEventField(event, D2RL::Input::ActionEventRequiredSize) || event->kind != D2RL::Input::ActionEventKind::Pressed) return D2RL::Input::ActionResult::Ignored;
+	if (Tabs.empty() || !Paged || ShownSlot() != 0 || !DrawnClassic[0].load()) return D2RL::Input::ActionResult::Ignored;
+	QueuePage(-1);
 	return D2RL::Input::ActionResult::Handled;
 }
 
@@ -1841,12 +1920,38 @@ void PrepareListToggle() {
 		Log(true, "charm list: the mode button's click could not be registered: no mode button");
 		return;
 	}
+	UiListenerOn = true;
 	if (ModFileExists(ListArtFile)) ListHdFile = ListArt;
 	else if (RegisterSprite("listmode", ListFrames())) ListHdFile = std::string("d2rloader\\") + PluginId + "\\listmode";
 	if (ModFileExists(ListArtClassicFile)) ListClassicFile = ListArtClassic;
 	Log(false, "charm list: %s; mode button HD %s, classic %s", Settings.listByCharm ? "by charm" : "all stats",
 	    ListHdFile.empty() ? "off" : ListHdFile == ListArt ? "the mod's art (listmode.sprite)" : "drawn stand-in",
 	    ListClassicFile.empty() ? "off (the mod has no invtabs_listmode.dc6)" : "the mod's art");
+}
+
+// The classic charm tab's two pages (Load, after PrepareListToggle, before the panels' layouts are built): on when the
+// summary is on, the charm tab has a classic panel, the mod has the page art and the tabs leave room for the buttons.
+void PreparePages() {
+	if (Tabs.empty() || !SummaryOn || !Tabs[0].classic) return;
+	const std::string name = Tabs[0].cfg.name;
+	std::size_t       classicTabs = 0;
+	for (const auto& t : Tabs) classicTabs += t.classic ? 1 : 0;
+	const char* off = nullptr;
+	if (!ModFileExists(PageArtClassicFile) || !ModFileExists("data/global/ui/panel/invtabs_" + name + "_grid.dc6") || !ModFileExists("data/global/ui/panel/invtabs_" + name + "_stats.dc6"))
+		off = "the mod has no page art (invtabs_page.dc6, invtabs_<tab>_grid.dc6, invtabs_<tab>_stats.dc6)";
+	else if (!Lay::ClassicPagedFits(classicTabs)) off = "too many tabs for the page buttons";
+	if (!off) {
+		bool ok = UiListenerOn;
+		for (const char* id : { PageGridPanel, PageStatsPanel }) {
+			if (!ok) break;
+			const Panels::PanelRegistration reg { .structSize = Panels::PanelRegistrationSize, .flags = Panels::PanelFlags::None, .localId = id };
+			Panels::RegistrationHandle      handle = Panels::InvalidHandle;
+			ok = PanelApi->registerPanel(Context, &reg, &handle) == Panels::Result::Success;
+		}
+		if (!ok) off = "the page buttons' clicks could not be registered (they share the list mode button's listener)";
+	}
+	Paged = !off;
+	Log(!Paged && off != nullptr, "charm tab in legacy graphics: %s%s", Paged ? "two pages (grid, stats)" : "one page: ", off ? off : "");
 }
 
 // ---- character load and leave ----
@@ -2094,6 +2199,7 @@ bool Load() {
 		}
 		Strings = Query<D2RL::LocalizationService>("localization");
 		PrepareListToggle();
+		PreparePages();
 		for (std::size_t i = 0; i < Tabs.size(); ++i) Tabs[i].panel = AddPanel(static_cast<int>(i));
 		AllTab.id    = "All";
 		AllTab.area  = { 0, 0, invtabs::PageSize, invtabs::PageSize };
@@ -2142,7 +2248,8 @@ bool Load() {
 		for (const Action& a : { Action { "toggle-charms", "Open/close charms", openKey, OnToggleAction, nullptr },
 		                         Action { "summary-up", "Charm summary up (classic graphics)", D2RL::Input::Key::PageUp, OnScrollAction, nullptr },
 		                         Action { "summary-down", "Charm summary down (classic graphics)", D2RL::Input::Key::PageDown, OnScrollAction, reinterpret_cast<void*>(1) },
-		                         Action { "summary-list", "Charm list: all stats / by charm", D2RL::Input::Key::None, OnListAction, nullptr } }) {
+		                         Action { "summary-list", "Charm list: all stats / by charm", D2RL::Input::Key::None, OnListAction, nullptr },
+		                         Action { "charm-page", "Charm tab page: grid / stats (classic graphics)", D2RL::Input::Key::None, OnPageAction, nullptr } }) {
 			const D2RL::Input::ActionRegistration action {
 				.structSize       = D2RL::Input::ActionRegistrationSize,
 				.logicalId        = a.id,
@@ -2159,7 +2266,7 @@ bool Load() {
 		}
 	}
 	(void)Context->RegisterConsoleCommand("invtabs", Command,
-	                                      "Inventory tabs: 'invtabs' status, 'invtabs open|close|toggle [tab]' a tab (the charm tab without a name), 'invtabs all' the whole page, 'invtabs scroll n' the classic summary, 'invtabs list all|charm|toggle' the charm list.");
+	                                      "Inventory tabs: 'invtabs' status, 'invtabs open|close|toggle [tab]' a tab (the charm tab without a name), 'invtabs all' the whole page, 'invtabs scroll n' the classic summary, 'invtabs list all|charm|toggle' the charm list, 'invtabs page grid|stats|toggle' the classic charm tab's page.");
 	const Area a = Tabs[0].area;
 	Log(false, "%s: page 16x16 owned, %zu tab(s), charm tab %dx%d at %d,%d, charms count %s, areas %s", PluginVersion, Tabs.size(), a.w, a.h, a.x, a.y,
 	    Settings.inventoryCharms ? "in the inventory and the tab" : "in the tab only", NativesOk ? "found (wrapped once tables load)" : "OFF");

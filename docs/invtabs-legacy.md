@@ -109,6 +109,14 @@ border and bottom band stay Median's own art. Top to bottom:
 - Grid: the stash's own cells (its last `rows` rows, its first `cols` columns), centred, dark at the sides of a narrow grid.
 - Bottom band: the stash's, with D2R's classic close button on its gold-framed square.
 
+With the summary on, the first tab also gets two page panels (docs/invtabs-summary.md "Classic pages"):
+`invtabs_<tab>_grid` (the panel above without the summary box, its grid and bottom band moved up right under the row,
+transparent below) and `invtabs_<tab>_stats` (no grid: one box
+(20,115)-(302,366), 20 lines of 12 px), plus `invtabs_page` (the 6 frames of the page buttons). On both pages the tab
+row moves up to y 87, right under the title; the page buttons sit at x 230 and 254. Up to 8 tabs fit this row
+(`invtabs_legacy.paged_fits`, `Lay::ClassicPagedFits`); a unit test checks that the Python geometry and the plugin's
+agree. Previews: `mock_<tab>_grid_x2.png`, `mock_<tab>_stats_x2.png`, `invtabs_page_x4.png`.
+
 Previews (`work/invtabs_art/`, `--mock maps,potions,...` draws review-only extra tabs and sample summary lines):
 `mock_<tab>_<cols>x<rows>_x2.png`, `panel_..._x2_grid.png` (cells traced in cyan).
 

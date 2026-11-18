@@ -20,3 +20,6 @@
 [submodule "third_party/D2R-Mods"]
 	path = third_party/D2R-Mods
 	url = https://github.com/Pyre-Flies/D2R-Mods
+[submodule "third_party/RuffnecKk-D2RLoader-Suite"]
+	path = third_party/RuffnecKk-D2RLoader-Suite
+	url = https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite

@@ -2,6 +2,7 @@
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -475,6 +476,218 @@ class PackageReleaseTests(unittest.TestCase):
                 mock.patch.object(pr, "CHARMINV_OURS", empty), \
                 mock.patch.object(pr.fxpaths.localconfig, "shared_dir", lambda: empty):
             self.assertIsNone(pr.charminv_dir())
+
+    def dof_files(self):
+        """A fake Damage Overflow Fix DLL in a folder, and the pins of package_release.DOF patched to its bytes."""
+        folder = self.tmp / "dof"
+        folder.mkdir(exist_ok=True)
+        dll = folder / "d2rl-celestialrayone-damage-overflow-fix.dll"
+        dll.write_bytes(b"MZ damage-overflow-fix\0 2.4.0")
+        pins = mock.patch.dict(pr.DOF, {"sha256": pr.sha256(dll), "size": dll.stat().st_size})
+        pins.start()
+        self.addCleanup(pins.stop)
+        return folder
+
+    def test_dof_pins_the_authors_release_and_our_settings(self):
+        self.assertEqual(pr.DOF["dll"], "d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix.dll")
+        self.assertEqual(pr.DOF["config"], "d2rloader/config/celestialrayone.damage-overflow-fix.toml")
+        self.assertEqual((pr.DOF["version"], pr.DOF["sha256"]),
+                         ("2.4.0", "cfc95e328230c86d4659f04d223552afd90f3fd4990f3fd62c48e9770f144a58"))
+        readme = (pr.DOF_OURS / "README.md").read_text("utf-8")
+        for pin in (pr.DOF["sha256"], pr.DOF["commit"], pr.DOF["repo"]):
+            self.assertIn(pin, readme)
+        self.assertIn("Copyright (c) 2026 Bogdan Bulai", (pr.DOF_OURS / "LICENSE").read_text("utf-8"))
+        # the owner's settings (2026-11-16): no per-hit log, no line per site, leech on
+        cfg = (pr.DOF_OURS / "celestialrayone.damage-overflow-fix.toml").read_text("utf-8")
+        self.assertEqual(pr.dof_config_problems(cfg), [])
+        self.assertEqual(len(pr.dof_config_problems(cfg.replace("\ndebug_log = false\n", "\ndebug_log = true\n"))), 1)
+
+    def test_dof_staged_with_licence_and_its_config_preserved(self):
+        mod = self.staged()
+        folder = self.dof_files()
+        self.assertEqual(pr.check_dof(folder), [])
+        pr.stage_dof(mod, folder)
+        self.assertEqual((mod / pr.DOF["dll"]).read_bytes(), (folder / "d2rl-celestialrayone-damage-overflow-fix.dll").read_bytes())
+        self.assertIn("MIT License", (mod / pr.DOF["licence"]).read_text("utf-8"))
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, dof=True))
+        self.assertIn(pr.DOF["config"], m["preserve"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["version"], entry["commit"]), ("Damage Overflow Fix", "2.4.0", pr.DOF["commit"]))
+        self.assertEqual(set(entry["files"]), {pr.DOF[k] for k in pr.DOF_FILES})
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+
+    def test_dof_other_bytes_and_settings_are_refused(self):
+        mod = self.staged()
+        folder = self.dof_files()
+        (folder / "d2rl-celestialrayone-damage-overflow-fix.dll").write_bytes(b"MZ damage-overflow-fix\0 2.4.1")
+        self.assertIn("is not Damage Overflow Fix 2.4.0", "\n".join(pr.check_dof(folder)))
+        with self.assertRaises(SystemExit):
+            pr.stage_dof(mod, folder)
+        self.assertFalse((mod / pr.DOF["dll"]).exists())
+        folder = self.dof_files()
+        ours = self.tmp / "dof-ours"
+        shutil.copytree(pr.DOF_OURS, ours, ignore=shutil.ignore_patterns("*.dll"))
+        cfg = ours / "celestialrayone.damage-overflow-fix.toml"
+        cfg.write_text(cfg.read_text("utf-8").replace("\nleech = true\n", "\nleech = false\n"), "utf-8")
+        with self.assertRaisesRegex(SystemExit, "leech must be true"):
+            pr.stage_dof(mod, folder, ours)
+
+    def test_dof_dir_lookup(self):
+        folder = self.dof_files()
+        self.assertEqual(pr.dof_dir(folder), folder)
+        with mock.patch.dict(os.environ, {"MXL_DOF_DIR": str(folder)}):
+            self.assertEqual(pr.dof_dir(), folder)
+        empty = self.tmp / "nothing-dof"
+        empty.mkdir()
+        with mock.patch.dict(os.environ, {"MXL_DOF_DIR": str(empty)}), mock.patch.object(pr, "DOF_OURS", empty), \
+                mock.patch.object(pr.fxpaths.localconfig, "shared_dir", lambda: empty):
+            self.assertIsNone(pr.dof_dir())
+
+    def test_ehb_is_pinned_with_our_patches(self):
+        self.assertEqual((pr.EHB["author"], pr.EHB["licence_id"]), ("Graxy_TV", "GPL-3.0-only"))
+        script = (HERE / "build_enemyhealthbars.ps1").read_text("utf-8")
+        self.assertIn(f"$pin = '{pr.EHB['commit']}'", script)  # one pin for the build and the manifest
+        names = [p.split("  ")[1] for p in pr.ehb_patches()]
+        self.assertEqual(names, ["0001-no-build-fingerprint.patch", "0002-dev-keep-visible-unfocused.patch",
+                                 "0003-legacy-placement-damaged-only.patch"])
+        readme = (pr.EHB_OURS / "README.md").read_text("utf-8")
+        self.assertIn(pr.EHB["commit"], readme)
+        self.assertIn("GPL-3.0", readme)
+
+    def test_ehb_staged_with_licences_and_source(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        dll, tree = tvp.fake_ehb_build(self.tmp)
+        self.assertEqual(pr.check_ehb(dll), [])
+        pr.stage_ehb(mod, dll, tree)
+        for k in pr.EHB_FILES:
+            self.assertTrue((mod / pr.EHB[k]).is_file(), k)
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, ehb=True))
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["author"], entry["licence"], entry["commit"]),
+                         ("Enemy Health Bars", "Graxy_TV", "GPL-3.0-only", pr.EHB["commit"]))
+        self.assertEqual(entry["patches"], pr.ehb_patches())
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+        self.assertIn(pr.EHB["config"], m["preserve"])  # a player's show_full_health survives updates
+
+    def test_ehb_defaults_to_damaged_monsters_only_with_a_setting_for_all(self):
+        import test_verify_package as tvp
+        self.assertEqual(pr.ehb_config_problems(tvp.EHB_CONFIG), [])
+        for bad, why in ((tvp.EHB_CONFIG.replace("show_full_health = false", "show_full_health = true"), "show_full_health"),
+                         (tvp.EHB_CONFIG.replace("show_full_health = false\n", ""), "show_full_health"),
+                         (tvp.EHB_CONFIG.replace("enabled = true", "enabled = false"), "enabled"),
+                         (tvp.EHB_CONFIG + "dev_keep_visible_unfocused = true\n", "test captures only")):
+            self.assertIn(why, "\n".join(pr.ehb_config_problems(bad)))
+        # the patch sets the default in the plugin and in its config, and places the bars in legacy graphics too
+        patch = (pr.EHB_OURS / "0003-legacy-placement-damaged-only.patch").read_text("utf-8")
+        self.assertIn("+show_full_health = false", patch)
+        self.assertIn("+    bool enabled=true, full=false,", patch)
+        self.assertIn("bars::shown(c.full,ratio)", patch)
+        self.assertIn("+++ b/src/legacy_projection.h", patch)
+        self.assertNotIn("TimeDateStamp", patch)  # placement found by expected bytes, never by build
+        mod = self.staged()
+        dll, tree = tvp.fake_ehb_build(self.tmp)
+        (dll.parent.parent / pr.EHB_FROM["config"]).write_text(tvp.EHB_CONFIG.replace("= false", "= true"), "utf-8")
+        with self.assertRaisesRegex(SystemExit, "show_full_health must be false"):
+            pr.stage_ehb(mod, dll, tree)
+
+    def test_ehb_builds_that_are_not_ours_are_refused(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        dll, tree = tvp.fake_ehb_build(self.tmp)
+        dll.write_bytes(b"MZ 0.2.6\0")  # the author's build: no patches
+        self.assertIn("with our patches", "\n".join(pr.check_ehb(dll)))
+        dll.write_bytes(b"MZ " + pr.EHB["version"].encode() + b"\0dev_keep_visible_unfocused\0")  # no legacy placement
+        self.assertIn("with our patches", "\n".join(pr.check_ehb(dll)))
+        (tree / "PATCHES").write_text(pr.ehb_patches()[0] + "\n", encoding="ascii")
+        with self.assertRaisesRegex(SystemExit, "not built with the patches"):
+            pr.stage_ehb(mod, dll, tree)
+        (tree / "PATCHES").write_text("\n".join(pr.ehb_patches()) + "\n", encoding="ascii")
+        (tree / "SOURCE.txt").write_text("commit 0000\n", encoding="ascii")
+        with self.assertRaisesRegex(SystemExit, "is not the source of commit"):
+            pr.stage_ehb(mod, dll, tree)
+        self.assertFalse((mod / pr.EHB["dll"]).exists())
+
+    def test_fd_is_pinned_with_our_patches_and_font(self):
+        self.assertEqual(len(pr.fd_commit()), 40)
+        names = [p.split("  ")[1] for p in pr.fd_patches()]
+        self.assertEqual(names, ["0001-mxl2012-legacy-projection.patch", "0002-mxl2012-bundled-font.patch",
+                                 "0003-mxl2012-legacy-dps-counter.patch", "0004-mxl2012-legacy-text-scale.patch"])
+        readme = (pr.FD_OURS / "README.md").read_text("utf-8")
+        self.assertIn(pr.fd_commit(), readme)
+        self.assertIn("SIL Open Font License 1.1", readme)
+        self.assertIn("SIL OPEN FONT LICENSE", (pr.FD_OURS / "fonts" / "OFL.txt").read_text("utf-8").upper())
+
+    def test_fd_staged_with_licences_font_and_its_config_preserved(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        dll, src = tvp.fake_fd_build(self.tmp)
+        self.assertEqual(pr.check_fd(dll), [])
+        pr.stage_fd(mod, dll, src)
+        for k in pr.FD_FILES:
+            self.assertTrue((mod / pr.FD[k]).is_file(), k)
+        notices = (mod / pr.FD["notices"]).read_text("utf-8")
+        self.assertIn("===== third_party/notices/IMGUI-LICENSE.txt =====", notices)
+        self.assertIn("===== third_party/PluginSDK/LICENSE =====", notices)
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, fd=True))
+        self.assertIn(pr.FD["config"], m["preserve"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["author"], entry["commit"]), ("Floating Damage", "RuffnecKk", pr.fd_commit()))
+        self.assertEqual(entry["patches"], pr.fd_patches())
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+
+    def test_fd_legacy_numbers_ship_two_and_a_half_times_bigger(self):
+        import test_verify_package as tvp
+        for other in ("legacy_text_scale = 1.0", "# legacy_text_scale = 2.5"):
+            bad = tvp.FD_CONFIG.replace("legacy_text_scale = 2.5", other)
+            self.assertIn("legacy_text_scale must be 2.5", "\n".join(pr.fd_config_problems(bad)))
+        # the key belongs to [appearance]: the same key in another table does not count
+        moved = tvp.FD_CONFIG.replace("[appearance]\nlegacy_text_scale = 2.5\n", "").replace(
+            "[diagnostics]\n", "[diagnostics]\nlegacy_text_scale = 2.5\n")
+        self.assertTrue(pr.fd_config_problems(moved))
+
+    def test_fd_is_on_by_default_with_a_setting_to_turn_it_off(self):
+        import test_verify_package as tvp
+        self.assertEqual(pr.fd_config_problems(tvp.FD_CONFIG), [])
+        off = tvp.FD_CONFIG.replace("[general]\n# Master switch.\nenabled = true", "[general]\nenabled = false")
+        self.assertIn("enabled must be true", "\n".join(pr.fd_config_problems(off)))
+        # [diagnostics] enabled is another key: without [general] enabled the default is not proven
+        self.assertTrue(pr.fd_config_problems("[diagnostics]\nenabled = true\n"))
+        # the author's config: its master switch is on; legacy_text_scale is ours (patch 0004), so only that is missing
+        author = pr.ROOT / "third_party" / "RuffnecKk-D2RLoader-Suite" / "plugins" / "floating-damage" / "config"
+        if (author / "ruffneckk-floating-damage.toml").is_file():
+            self.assertEqual(pr.fd_config_problems((author / "ruffneckk-floating-damage.toml").read_text("utf-8")),
+                             [f"{pr.FD['config']}: [appearance] legacy_text_scale must be 2.5"])
+        # the config the build ships (all our patches applied)
+        built = pr.ROOT / "build" / "floatingdamage" / "Release" / "ruffneckk-floating-damage.toml"
+        if built.is_file() and "legacy_text_scale" in built.read_text("utf-8"):
+            self.assertEqual(pr.fd_config_problems(built.read_text("utf-8")), [])
+        mod = self.staged()
+        dll, src = tvp.fake_fd_build(self.tmp)
+        (dll.parent / pr.FD_FROM["config"]).write_text(off, "utf-8")
+        with self.assertRaisesRegex(SystemExit, "enabled must be true"):
+            pr.stage_fd(mod, dll, src)
+
+    def test_fd_builds_that_are_not_ours_are_refused(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        dll, src = tvp.fake_fd_build(self.tmp)
+        dll.write_bytes(b"MZ 1.5.6\0")  # the author's build: no font patch
+        self.assertIn("with our patches", "\n".join(pr.check_fd(dll)))
+        (src / "PINNED_COMMIT").write_text("0" * 40, encoding="ascii")
+        with self.assertRaisesRegex(SystemExit, "is not the pinned commit"):
+            pr.stage_fd(mod, dll, src)
+        (src / "PINNED_COMMIT").write_text(pr.fd_commit(), encoding="ascii")
+        (src / "PATCHES").write_text(pr.fd_patches()[0] + "\n", encoding="ascii")
+        with self.assertRaisesRegex(SystemExit, "not built with the patches"):
+            pr.stage_fd(mod, dll, src)
+        self.assertFalse((mod / pr.FD["dll"]).exists())
 
     def test_controllerqol_source_of_another_commit_patch_set_or_seed_is_refused(self):
         mod = self.staged()

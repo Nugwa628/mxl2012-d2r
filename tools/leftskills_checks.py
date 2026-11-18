@@ -13,9 +13,10 @@ Parts, each a row of the report:
     counter of srvstfunc 71 refusals is recorded);
   - pop-ups: the left and the right skill pop-up shot in HD and in legacy graphics (Move Only and the learnt skills shown on
     the left are judged on the shots);
-  - save: Save and Exit with a formerly right-only skill on the left, back in the game the left button still holds it and Move
-    Only is still known.
+  - save: Save and Exit with a formerly right-only skill of the player's class (LS_SAVE) on the left, back in the game the
+    left button still holds it and Move Only is still known.
 The gamepad part is `leftskills_pad` (MXL_CHAR on a gamepad UI, harness `pad` / `padui`)."""
+import os
 import re
 import time
 
@@ -23,7 +24,11 @@ LS_CAST = (("Slayer", "summon", "unit"), ("Sacrifices", "missile", "unit"), ("De
            ("Bend the Shadows", "teleport", "ground"), ("Cleave", "melee", "unit"), ("Blink", "teleport", "ground"))
 # right only: an aura, a corpse-targeted skill (the totems cast nothing from the left) and an item skill
 LS_RIGHT = ("Wolf Stance", "Deaths Fury Totem", "Scroll of Identify")
-LS_SAVE = "Sacrifices"
+# save: a skill of the player's own class (`h state` class id), formerly right-only where the class has one (the Barbarian has
+# none: Aerials Disaster was already on the left). D2 saves only the class's own skills, so a skill of another class given by
+# `setskill` (Sacrifices on an Amazon, bug #616) is gone after Save and Exit and the left button falls back to Attack.
+LS_SAVE = {0: "Ecstatic Frenzy", 1: "Flamestrike", 2: "Sacrifices", 3: "Tainted Blood", 4: "Aerials Disaster",
+           5: "Plague Avatar", 6: "Blink"}
 MO = "Move Only"
 SKILL_MODES = set(range(9, 17)) | {18}  # BL SC TH KK S1-S4 DD SQ (plrmode.txt): a skill, not a plain attack (A1 / A2)
 SUB_X, SUB_Y = 27, 13.5  # HD screen pixels per sub-tile along x - y / x + y (game_checks.click_unit)
@@ -73,6 +78,14 @@ def target(gc, log, dx=4):
         for s in (7, 6):
             gc.setstat("mon:%d" % mid, s, 30000 << 8)
     return mid
+
+
+def save_skill(gc):
+    """(class id, LS_SAVE name, skill id) for the player in the game; the id is None for a class LS_SAVE does not name."""
+    cls = gc.hstate()["player"].get("class")
+    name = LS_SAVE.get(cls)
+    sid, _ = gc.pic_skill(name) if name else (None, None)
+    return cls, name, sid
 
 
 def moveonly_counter(gc):
@@ -266,10 +279,16 @@ def run(gc):
     for mode in ("hd", "legacy"):
         if not gc.pic_popups(mode, log, shots):
             bad.append("graphics mode %s not reached" % mode)
-    gc.set_graphics("hd")
-    # save: a formerly right-only skill on the left survives Save and Exit
-    sid, _ = gc.pic_skill(LS_SAVE)
-    gc.Hl("skill left %d" % sid, log)
+    gc.set_graphics(os.environ.get("MXL_GRAPHICS") or "hd")  # the save part in the run's graphics mode
+    # save: a formerly right-only skill of the player's class on the left survives Save and Exit
+    cls, name, sid = save_skill(gc)
+    if sid is None:
+        bad.append("no save skill for class %s" % cls)
+        sid = 0
+    else:
+        gc.learn(sid, 1)
+    picked, _ = gc.Hl("skill left %d" % sid, log)
+    rows.append("save skill of class %s: %s (id %d) on the left: %s" % (cls, name, sid, picked))
     gc.Hl("skill right %d" % mo, log)
     gc.leave_and_reenter()
     time.sleep(2)
@@ -283,6 +302,7 @@ def run(gc):
     rows.append("Move Only known after the reload: %s" % ok)
     if not ok:
         bad.append("Move Only gone after the reload")
+    time.sleep(6)  # the HUD is drawn some seconds after the harness answers (a shot at once caught the loading screen)
     shots.append(gc.sh("leftskills_after_reload"))
     if not gc.game_alive():
         bad.append("the game died")
@@ -300,7 +320,6 @@ LS_PAD_STEPS = ("start wait:1 | start wait:1 | rb wait:0.6 | rb wait:1 | rt wait
 def run_pad(gc):
     """Check `leftskills_pad`: the gamepad's skill assignment with every skill now on both buttons. A pad script
     (MXL_LS_PAD, default LS_PAD_STEPS) runs step by step with a shot after each; `skill` reads the buttons afterwards."""
-    import os
     import pad_input as pi
     mark = gc.engine_mark()
     if not gc.need_game():
@@ -309,8 +328,9 @@ def run_pad(gc):
     gc.goto(1, timeout=60)
     gc.set_graphics("hd")
     mo, _ = gc.pic_skill(MO)
-    sid, _ = gc.pic_skill(LS_SAVE)
-    gc.learn(sid, 1)
+    _, _, sid = save_skill(gc)
+    if sid is not None:
+        gc.learn(sid, 1)
     gc.Hl("skill left 0", log)
     gc.Hl("skill right 0", log)
     st = pi.on(gc.H, log)

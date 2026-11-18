@@ -168,12 +168,16 @@ inline int AreaAt(const std::vector<Area>& areas, int x, int y) {
 
 // ---- grid marker ----
 // Our grid widgets carry chronicleFlourishOffset {MarkerBase + slot, MarkerBase} in HD layouts and
-// {MarkerBase + slot, MarkerBase + 1} in classic ones; slot MaxTabs is the whole-page view.
+// {MarkerBase + slot, MarkerBase + 1} in classic ones; slot MaxTabs is the whole-page view. The classic stats page of the
+// charm tab carries {MarkerBase + slot, MarkerBase + 2}: a grid that is not drawn and takes no item (it only tells the
+// core that the tab is on screen and which charms it holds).
 
 inline constexpr float MarkerBase = 7400.0f;
 inline constexpr int   AllSlot    = MaxTabs;
 
-inline bool ClassicMarker(float second) { return second == MarkerBase + 1.0f; }
+inline bool HiddenMarker(float second) { return second == MarkerBase + 2.0f; }
+
+inline bool ClassicMarker(float second) { return second == MarkerBase + 1.0f || HiddenMarker(second); }
 
 inline int SlotOfMarker(float first, float second) {
 	if (second != MarkerBase && !ClassicMarker(second)) return -1;

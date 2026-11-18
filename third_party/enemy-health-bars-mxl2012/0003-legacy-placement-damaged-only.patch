@@ -1,0 +1,374 @@
+diff --git a/src/plugin.cpp b/src/plugin.cpp
+index eff09f6..11c0577 100644
+--- a/src/plugin.cpp
++++ b/src/plugin.cpp
+@@ -13,6 +13,7 @@
+ #include "visibility_config.h"
+ #include "standalone_overlay.h"
+ #include "overlay_host_api.hpp"
++#include "legacy_projection.h"
+ #include <imgui.h>
+ #include <array>
+ #include <atomic>
+@@ -38,9 +39,15 @@ using RootFn = void*(__fastcall*)();
+ using ProjectFn = bool(__fastcall*)(void*, Unit*, float*, bool);
+ using DimensionFn = int(__fastcall*)();
+ using HdFn = bool(__fastcall*)();
++using PixelFn = int(__fastcall*)(Unit*);
++using ViewFn = int(__fastcall*)();
+ LocalFn localPlayer{}; StatFn stat{}; HostileFn hostile{};
+ RootFn root{}; ProjectFn project{}; DimensionFn renderW{},renderH{}; HdFn isHd{};
+ uintptr_t table{}, panelSide{}; int nextOffset{};
++// Legacy graphics (legacy_projection.h): the classic draw code's unit pixel and view offset helpers and the classic
++// screen size. Off when their code is not what it expects; HD does not depend on them.
++PixelFn unitPixelX{},unitPixelY{}; ViewFn viewOffsetX{},viewOffsetY{}; uintptr_t classicWidth{},classicHeight{};
++bool legacyReady{};
+ const D2RL::ThreadService* threads{};
+ const D2RL::WidgetService* widgets{};
+ const D2RL::DataTableService* tables{};
+@@ -54,7 +61,8 @@ thread_local ImDrawList* hostedList{};
+ thread_local bool standaloneDrawing{};
+ std::mutex guard;
+ struct Config {
+-    bool enabled=true, full=true, hidePanels=true, hdFrame=true, rarityOutline=true, aboveHeads=true;
++    // full: bars on monsters at full life too (show_full_health); off by default, so only damaged monsters get one
++    bool enabled=true, full=false, hidePanels=true, hdFrame=true, rarityOutline=true, aboveHeads=true;
+     bool devKeepVisibleUnfocused=false;  // dev only: test captures of a game window that is not focused
+     float width=64.6f, height=6, offset=-16, border=1, outlineWidth=2, red=.3f, yellow=.6f, opacity=1;
+     Color green{0,.933f,0,1}, amber{1,.8f,0,1}, low{.933f,.188f,.188f,1};
+@@ -63,6 +71,7 @@ struct Config {
+ } config;
+ struct Bar { float x,y,life; bars::Rarity rarity{}; float headCorrection{}; };
+ std::array<float,4096> headCorrections{};
++std::array<int,4096> pixHeights{};  // monstats2 pixHeight per monster class (classic pixels)
+ 
+ // Read the active mod's type dimensions instead of maintaining enemy-name exceptions.
+ std::vector<std::string> fields(const std::string& line) {
+@@ -97,13 +106,14 @@ void loadHeadSizes(const D2RL::PluginContext* ctx) {
+             unsigned index{};auto value=row[id];auto [end,error]=std::from_chars(value.data(),value.data()+value.size(),index);
+             const auto h=heights.find(row[model]);
+             if(error==std::errc{}&&end==value.data()+value.size()&&index<headCorrections.size()&&h!=heights.end()) {
+-                headCorrections[index]=bars::headCorrection(h->second);++count;
++                headCorrections[index]=bars::headCorrection(h->second);pixHeights[index]=h->second;++count;
+             }}
+         if(count){char msg[128];std::snprintf(msg,sizeof(msg),"Enemy bars: loaded size-based headroom for %zu monster types.",count);ctx->LogInfo(msg);return;}
+     }
+     ctx->LogWarn("Enemy bars: monster size tables unavailable; preserving native head anchors.");
+ }
+-struct Snapshot { std::array<Bar,2048> bars{}; size_t count{}; int width{},height{}; ULONGLONG at{}; } snapshot;
++// legacy: the points are classic screen pixels and width/height the classic screen size
++struct Snapshot { std::array<Bar,2048> bars{}; size_t count{}; int width{},height{}; bool legacy{}; ULONGLONG at{}; } snapshot;
+ std::array<std::array<bool,4096>,4> bossRows{};
+ std::atomic<unsigned> frames{0}, collections{0};
+ 
+@@ -175,6 +185,30 @@ bool bindNative(const D2RL::PluginContext* ctx) {
+     const auto valid=[&](uintptr_t p){ return p>=base && p<base+nt.OptionalHeader.SizeOfImage; };
+     return valid(table) && valid(panelSide) && valid(reinterpret_cast<uintptr_t>(root)) && valid(reinterpret_cast<uintptr_t>(project));
+ }
++// Legacy graphics placement, each part found by its expected bytes (no build check). A mismatch only leaves the bars
++// off in legacy graphics, with a log line.
++void bindLegacy(const D2RL::PluginContext* ctx) {
++    const auto base=ctx->exeBase;
++    struct Part { const char* name; uint32_t rva; const char* pattern; };
++    const Part parts[]={
++        {"unit pixel X",0x34AF60,"40 53 48 83 EC 20 48 8B D9 48 85 C9 75 13 88 4C 24 30 48 8D 4C 24 30 E8 ?? ?? ?? ?? 84 C0 74 01"},
++        {"unit pixel Y",0x34AFB0,"40 53 48 83 EC 20 48 8B D9 48 85 C9 75 13 88 4C 24 30 48 8D 4C 24 30 E8 ?? ?? ?? ?? 84 C0 74 01"},
++        // view offset X up to the side panel shift (D2R Legacy 16:9 rewrites the arithmetic after these bytes)
++        {"view offset X",0xB9B20,"8B 0D ?? ?? ?? ?? 83 E9 01 74 29 83 F9 01 74 0B 8B 05 ?? ?? ?? ?? 33 C9 2B C1 C3"},
++        {"view offset Y",0xB9B70,"8B 05 ?? ?? ?? ?? 83 C0 F8 C3"},
++        // the camera update: mov eax,[ScreenSizeX]; cdq; sub eax,edx; sar eax,1; sub edi,eax; mov eax,[ScreenSizeY]
++        {"classic screen size",0xB9BBD,"8B 05 ?? ?? ?? ?? 99 2B C2 D1 F8 2B F8 8B 05 ?? ?? ?? ??"},
++    };
++    for(const auto& p:parts) if(!match(base+p.rva,p.pattern)) {
++        char message[160];std::snprintf(message,sizeof(message),"Enemy bars: legacy graphics placement off (%s: the game code is not what it expects); HD is not affected.",p.name);
++        ctx->LogWarn(message);return;
++    }
++    unitPixelX=reinterpret_cast<PixelFn>(base+0x34AF60);unitPixelY=reinterpret_cast<PixelFn>(base+0x34AFB0);
++    viewOffsetX=reinterpret_cast<ViewFn>(base+0xB9B20);viewOffsetY=reinterpret_cast<ViewFn>(base+0xB9B70);
++    classicWidth=rel(base+0xB9BBD,2,6);classicHeight=rel(base+0xB9BBD+13,2,6);
++    legacyReady=classicWidth&&classicHeight;
++    if(legacyReady)ctx->LogInfo("Enemy bars: legacy graphics placement ready (classic unit position minus view offset).");
++}
+ std::string trim(std::string s) {
+     const auto first=s.find_first_not_of(" \t\r\n");
+     return first==std::string::npos?"":s.substr(first,s.find_last_not_of(" \t\r\n")-first+1);
+@@ -249,18 +283,26 @@ bool loadConfig(const D2RL::PluginContext* ctx) {
+ void collectImpl(const D2RL::PluginContext* ctx) {
+     Snapshot next; Config c; {std::lock_guard lock(guard);c=config;}
+     Unit* me=localPlayer(0); int side{}; read(panelSide,side);
+-    const bool hd=isHd(); unsigned seen=0,enemies=0,live=0;
++    const bool hd=isHd(), legacy=!hd&&legacyReady; unsigned seen=0,enemies=0,live=0;
+     bool paused=false;
+     if(widgets) {
+         if(!pausePanel) (void)widgets->findPanel(ctx,"PauseLayout",&pausePanel);
+         D2RL::Widgets::State state{};
+         if(pausePanel && widgets->getWidgetState(ctx,pausePanel,&state)==D2RL::Widgets::Result::Success)paused=state.visible;
+     }
+-    if(c.enabled && me && hd && !paused && !(c.hidePanels && side!=0)) {
+-        next.width=renderW(); next.height=renderH();
+-        uintptr_t renderer{}; const auto rootPtr=reinterpret_cast<uintptr_t>(root());
+-        if(rootPtr) read(rootPtr+0x20,renderer);
+-        if(renderer && next.width>0 && next.height>0) {
++    if(c.enabled && me && (hd||legacy) && !paused && !(c.hidePanels && side!=0)) {
++        uintptr_t renderer{}; int viewX{},viewY{}; bool ready=false;
++        if(legacy) {
++            next.legacy=true; read(classicWidth,next.width); read(classicHeight,next.height);
++            ready=bars::legacy::classicSizeValid(next.width,next.height);
++            if(ready){viewX=viewOffsetX();viewY=viewOffsetY();}
++        } else {
++            next.width=renderW(); next.height=renderH();
++            const auto rootPtr=reinterpret_cast<uintptr_t>(root());
++            if(rootPtr) read(rootPtr+0x20,renderer);
++            ready=renderer && next.width>0 && next.height>0;
++        }
++        if(ready) {
+             for(uint32_t bucket=0;bucket<128 && next.count<next.bars.size();++bucket) {
+                 uintptr_t ptr{}; read(table+1024+bucket*8,ptr);
+                 for(int limit=0;ptr && limit<4096 && next.count<next.bars.size();++limit) {
+@@ -275,16 +317,27 @@ void collectImpl(const D2RL::PluginContext* ctx) {
+                         if(hp>0) {
+                             ++live;
+                             const float ratio=bars::lifeRatio(hp); float point[2]{};
+-                            // Use the native top-of-bounds anchor for monster-sized head placement.
+-                            if((c.full||ratio<1) && project(reinterpret_cast<void*>(renderer),u,point,c.aboveHeads)
+-                               && std::isfinite(point[0])&&std::isfinite(point[1])
++                            uint32_t classId{}; read(ptr+4,classId);
++                            bool placed=false;
++                            if(bars::shown(c.full,ratio)) {
++                                if(legacy) {
++                                    // the classic draw position, raised by the monster type's classic height
++                                    const auto p=bars::legacy::classicUnitPoint(unitPixelX(u),unitPixelY(u),viewX,viewY,
++                                        bars::legacy::headHeight(classId<pixHeights.size()?pixHeights[classId]:0));
++                                    point[0]=p.x;point[1]=p.y;placed=true;
++                                } else {
++                                    // Use the native top-of-bounds anchor for monster-sized head placement.
++                                    placed=project(reinterpret_cast<void*>(renderer),u,point,c.aboveHeads);
++                                }
++                            }
++                            if(placed && std::isfinite(point[0])&&std::isfinite(point[1])
+                                && point[0]>=0&&point[0]<=next.width&&point[1]>=0&&point[1]<=next.height) {
+-                                uintptr_t monsterData{};uint16_t kind{};uint8_t bank{};uint32_t classId{};bool boss=false;
++                                uintptr_t monsterData{};uint16_t kind{};uint8_t bank{};bool boss=false;
+                                 if(read(ptr+0x10,monsterData)&&monsterData)read(monsterData+0x1a,kind);
+-                                read(ptr+0x1bd,bank);read(ptr+4,classId);
++                                read(ptr+0x1bd,bank);
+                                 if(bank<4&&classId<4096){std::lock_guard lock(guard);boss=bossRows[bank][classId];}
+                                 next.bars[next.count++]={point[0],point[1],ratio,bars::rarity(kind,boss),
+-                                    c.aboveHeads&&classId<headCorrections.size()?headCorrections[classId]:0};
++                                    !legacy&&c.aboveHeads&&classId<headCorrections.size()?headCorrections[classId]:0};
+                             }
+                         }
+                     }
+@@ -296,7 +349,7 @@ void collectImpl(const D2RL::PluginContext* ctx) {
+     ++collections;
+     static ULONGLONG lastLog=0;static std::string previous;static unsigned logCount=0;
+     if(logCount<16 && GetTickCount64()-lastLog>=3000) {
+-        char detail[256];std::snprintf(detail,sizeof(detail),"Enemy bars UI: player=%s HD=%d pause=%d side=%d units=%u hostile=%u alive=%u bars=%zu render=%dx%d",me?"yes":"no",hd,paused,side,seen,enemies,live,next.count,next.width,next.height);
++        char detail[256];std::snprintf(detail,sizeof(detail),"Enemy bars UI: player=%s HD=%d legacy=%d pause=%d side=%d units=%u hostile=%u alive=%u bars=%zu render=%dx%d",me?"yes":"no",hd,legacy,paused,side,seen,enemies,live,next.count,next.width,next.height);
+         if(previous!=detail){ctx->LogInfo(detail);previous=detail;++logCount;lastLog=GetTickCount64();}
+     }
+     next.at=GetTickCount64(); std::lock_guard lock(guard); snapshot=next;
+@@ -328,7 +381,9 @@ void drawImpl(const D2RL::PluginContext* ctx,const D2RL::Overlay::Frame* frame)
+     const float w=std::max(8.f,std::round(c.width*scale)),h=std::max(1.f,std::round(c.height*scale));
+     const float border=c.border==0?0:std::max(1.f,std::round(c.border*scale));
+     for(size_t i=0;i<s.count;++i) {
+-        const auto& bar=s.bars[i];const float l=std::round(bar.x*sx-w/2),t=std::round(bar.y*sy+(c.offset+bar.headCorrection)*scale);
++        const auto& bar=s.bars[i];float x=bar.x*sx,y=bar.y*sy;
++        if(s.legacy&&!bars::legacy::classicToDisplay(bar.x,bar.y,s.width,s.height,frame->screenWidth,frame->screenHeight,x,y))continue;
++        const float l=std::round(x-w/2),t=std::round(y+(c.offset+bar.headCorrection)*scale);
+         if(l<0||l+w>frame->screenWidth||t<0||t+h+border>frame->screenHeight)continue;
+         auto band=bars::band(bar.life,c.red,c.yellow);
+         Color fill=band==bars::Band::Green?c.green:band==bars::Band::Yellow?c.amber:c.low;
+@@ -422,7 +477,7 @@ D2RL::ConsoleCommandResult command(D2R::Game::Client*,const D2RL::ConsoleCommand
+ }
+ constexpr D2RL::PluginInfo info{.infoSize=D2RL::PluginInfoSize,.abiVersion=D2RL_PLUGIN_ABI_VERSION,
+     .id="enemy-health-bars",.name="Enemy Health Bars",.version="0.2.6+mxl2012",.author="Graxy_TV",
+-    .description="Compact red health bars above hostile enemies, with optional rarity outlines.",.flags=D2RL::PluginFlags::Client};
++    .description="Compact red health bars above hostile enemies, with optional rarity outlines; HD and legacy graphics.",.flags=D2RL::PluginFlags::Client};
+ }
+ D2RL_PLUGIN_EXPORT const D2RL::PluginInfo* D2RLoaderGetPluginInfo() noexcept {return &info;}
+ D2RL_PLUGIN_EXPORT bool D2RLoaderLoadPlugin(const D2RL::PluginContext* ctx) noexcept {
+@@ -437,6 +492,7 @@ D2RL_PLUGIN_EXPORT bool D2RLoaderLoadPlugin(const D2RL::PluginContext* ctx) noex
+             || !D2RL::HasWidgetServiceField(widgets,D2RL::WidgetServiceGetWidgetStateFieldEnd)
+             || !widgets->findPanel || !widgets->getWidgetState)widgets=nullptr;
+         if(!bindNative(ctx)||!loadConfig(ctx))return false;
++        bindLegacy(ctx);
+         loadHeadSizes(ctx);
+         if(ctx->QueryService(&tables)==D2RL::ServiceQueryResult::Success
+             && D2RL::HasDataTableServiceField(tables,D2RL::DataTableServiceRequiredSize)&&tables->getTable
+diff --git a/src/policy.h b/src/policy.h
+index 22e65eb..6f0b7f4 100644
+--- a/src/policy.h
++++ b/src/policy.h
+@@ -26,6 +26,10 @@ inline bool eligible(uint32_t type, uint32_t mode, uint32_t flags, bool hostile,
+     return type == 1 && mode != 0 && mode != 12 && !(flags & 0x10000)
+         && (flags & 4) && hostile && life > 0;
+ }
++// show_full_health: false (the default) shows a bar only on monsters below full life.
++inline bool shown(bool fullHealth, float ratio) {
++    return fullHealth || ratio < 1.0f;
++}
+ inline float lifeRatio(int clientLife) {
+     // Client monster stat 6 is a normalized 0..32768 value, not absolute HP.
+     return std::clamp(clientLife / 32768.0f, 0.0f, 1.0f);
+diff --git a/src/policy_tests.cpp b/src/policy_tests.cpp
+index 1216d98..ac64ad3 100644
+--- a/src/policy_tests.cpp
++++ b/src/policy_tests.cpp
+@@ -1,6 +1,7 @@
+ #include "policy.h"
+ #include "visibility_config.h"
+ #include "raster.h"
++#include "legacy_projection.h"
+ #include <sstream>
+ #include <cstdlib>
+ #include <iostream>
+@@ -56,5 +57,27 @@ int main() {
+     check(!eligible(1,0,4,true,100) && !eligible(1,12,4,true,100));
+     check(!eligible(1,1,0x10004,true,100));
+     check(!eligible(1,1,0,true,100) && !eligible(1,1,4,true,0));
++    // show_full_health: off shows damaged monsters only
++    check(!shown(false,1.f) && shown(false,lifeRatio(32767)) && shown(false,.5f));
++    check(shown(true,1.f) && shown(true,.25f));
++    // legacy graphics placement (legacy_projection.h)
++    {
++        using namespace bars::legacy;
++        const auto p=classicUnitPoint(500,400,100,50,60);
++        check(p.x==400.f && p.y==290.f);
++        check(headHeight(0)==kDefaultHeadHeight && headHeight(-3)==kDefaultHeadHeight && headHeight(80)==80);
++        check(classicSizeValid(800,600) && classicSizeValid(1066,600) && classicSizeValid(640,480));
++        check(!classicSizeValid(0,600) && !classicSizeValid(800,0) && !classicSizeValid(5000,600) && !classicSizeValid(800,3000));
++        float x{},y{};
++        check(classicToDisplay(400,300,800,600,1920,1080,x,y) && x==960.f && y==540.f);  // 4:3 centred, side bars of 240
++        check(classicToDisplay(0,0,800,600,1920,1080,x,y) && x==240.f && y==0.f);
++        check(classicToDisplay(533,300,1066,600,1920,1080,x,y) && std::fabs(x-960.f)<.01f && y==540.f);  // Legacy 16:9
++        check(classicToDisplay(320,240,640,480,1280,720,x,y) && x==640.f && y==360.f);
++        x=y=-1;
++        check(!classicToDisplay(-200,300,800,600,1920,1080,x,y) && x==-1 && y==-1);  // left of the window
++        check(!classicToDisplay(400,700,800,600,1920,1080,x,y));  // below the window
++        check(!classicToDisplay(400,300,0,600,1920,1080,x,y) && !classicToDisplay(400,300,800,600,0,1080,x,y));
++    }
++    std::cout << "Damaged-only visibility and legacy placement checks passed.\n";
+     std::cout << "Launcher visibility combinations, invalid-config rejection, size placement, rarity, health and enemy-filter checks passed.\n";
+ }
+diff --git a/src/legacy_projection.h b/src/legacy_projection.h
+new file mode 100644
+index 0000000..9d9dcca
+--- /dev/null
++++ b/src/legacy_projection.h
+@@ -0,0 +1,45 @@
++// SPDX-License-Identifier: GPL-3.0-only
++// D2R-XL 2012 addition: where a monster stands on the screen in D2R's legacy (classic) graphics, the same placement the
++// D2R-XL 2012 build of RuffnecKk's Floating Damage uses.
++//
++// In legacy graphics D2R runs the classic engine: it draws the world into a fixed classic screen (800x600 or 640x480,
++// 1066x600 / 853x480 with the D2R Legacy 16:9 plugin) and composes that picture into the window fitted to the window
++// height and centred (side bars when the window is wider). A unit is drawn at its client pixel position minus the view
++// offset (the two helpers every classic unit draw calls), so the bars do the same and then map the classic point into
++// the window like the compose pass. The HD camera projection describes the 3D view, which the legacy picture does not show.
++//
++// Pure code (no Windows or D2RLoader headers): policy_tests.cpp checks it without the game.
++#pragma once
++#include <cmath>
++#include <cstdint>
++namespace bars::legacy {
++// Classic pixels from a unit's feet to the top of a man-sized monster, for monster types without a size in monstats2.
++inline constexpr int kDefaultHeadHeight = 56;
++struct Point { float x, y; };
++// The classic screen point above a unit: its client pixel position minus the view offset, raised by its height.
++constexpr Point classicUnitPoint(int32_t pixelX, int32_t pixelY, int32_t viewX, int32_t viewY, int32_t headHeight) noexcept {
++    return Point{static_cast<float>(pixelX - viewX), static_cast<float>(pixelY - viewY - headHeight)};
++}
++// The height to raise a bar by: the monster type's classic pixel height (monstats2 pixHeight), else the default.
++constexpr int32_t headHeight(int pixHeight) noexcept {
++    return pixHeight > 0 && pixHeight < 2000 ? pixHeight : kDefaultHeadHeight;
++}
++// A usable classic screen size: both sides positive and not larger than any classic mode, so a stray read never turns
++// into a huge scale.
++constexpr bool classicSizeValid(int32_t width, int32_t height) noexcept {
++    return width > 0 && height > 0 && width <= 4096 && height <= 2048;
++}
++// A classic screen point in window pixels: the compose pass fits the classic picture to the window height and centres
++// it. False when a size is unusable, the result is not finite, or it falls outside the window.
++inline bool classicToDisplay(float x, float y, int32_t classicWidth, int32_t classicHeight, float displayWidth,
++                             float displayHeight, float& outX, float& outY) noexcept {
++    if (!classicSizeValid(classicWidth, classicHeight) || !(displayWidth > 0) || !(displayHeight > 0)) return false;
++    const float scale = displayHeight / static_cast<float>(classicHeight);
++    const float left = (displayWidth - static_cast<float>(classicWidth) * scale) * 0.5f;
++    const float dx = left + x * scale, dy = y * scale;
++    if (!std::isfinite(dx) || !std::isfinite(dy) || dx < 0 || dx > displayWidth || dy < 0 || dy > displayHeight) return false;
++    outX = dx;
++    outY = dy;
++    return true;
++}
++}  // namespace bars::legacy
+diff --git a/enemy-health-bars.toml b/enemy-health-bars.toml
+index 7ca1d4b..00eddec 100644
+--- a/enemy-health-bars.toml
++++ b/enemy-health-bars.toml
+@@ -1,37 +1,37 @@
+-# Reload with: enemybars reload (D2RLoader console), or restart the game.
+-[bars]
+-enabled = true
+-# Dimensions are pixels at 1080p; automatically scale with window height.
+-width = 64.6
+-height = 6
++# Reload with: enemybars reload (D2RLoader console), or restart the game.
++[bars]
++enabled = true
++# Dimensions are pixels at 1080p; automatically scale with window height.
++width = 64.6
++height = 6
+ # Native top-of-monster anchor, with clearance above the head.
+ above_heads = true
+-offset_y = -16
+-border = 1
+-# Compact dark-metal inset and visible rarity stroke.
+-hd_frame = true
++offset_y = -16
++border = 1
++# Compact dark-metal inset and visible rarity stroke.
++hd_frame = true
+ # Rarity outlines: true = blue/orange for special enemies.
+ # false = the same dark frame and red health fill for every enemy.
+ rarity_outline = true
+ # Visible stroke width at 1080p (1 to 4 pixels).
+-outline_width = 2
+-normal_outline = "#000000"
+-champion_outline = "#429EFF"
+-unique_outline = "#FF9E14"
+-# All health bands share muted blood red; no visible threshold color changes.
+-red_at_or_below = 30
+-yellow_at_or_below = 60
+-green = "#942B28"
+-yellow = "#942B28"
+-red = "#942B28"
+-background = "#171717"
+-border_color = "#080808"
+-opacity = 1.0
+-# Always show health bars: true = include undamaged enemies.
+-# false = only show enemies currently below full health.
+-show_full_health = true
+-# Hide bars while a character/inventory/stash/skill side panel is open.
+-hide_with_side_panels = true
++outline_width = 2
++normal_outline = "#000000"
++champion_outline = "#429EFF"
++unique_outline = "#FF9E14"
++# All health bands share muted blood red; no visible threshold color changes.
++red_at_or_below = 30
++yellow_at_or_below = 60
++green = "#942B28"
++yellow = "#942B28"
++red = "#942B28"
++background = "#171717"
++border_color = "#080808"
++opacity = 1.0
++# false (the default) = only show enemies currently below full health.
++# true = show health bars on every enemy, undamaged ones included.
++show_full_health = false
++# Hide bars while a character/inventory/stash/skill side panel is open.
++hide_with_side_panels = true
+ 
+ 
+ 

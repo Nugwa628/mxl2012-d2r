@@ -129,13 +129,28 @@ All in a loader game-thread callback (`runOnGameThread`), one at a time (`g_busy
   tested) the way 1.13c and D2R limit sockets: the item type's `MaxSockets1/2/3` (Median's `MaxSock1/25/40`) by item level against the thresholds
   25 / 40, never more than the base's `gemsockets`, at the spawn item level 99 (so the third column). Median's weapon and armour types allow 6 at
   every level, so a base gets its `gemsockets`; rings, amulets, jewels, charms, potions and quest items (types with 0) get none. Uniques and set
-  items ask for no sockets: their sockets are the row's fixed `sock` property (1,828 unique and 170 set rows have one) or none, as Median drops
-  them, and Median's socket recipe (845) only takes normal items. The status says "with n of m sockets". Catalog format 2 adds the column.
-  Every spawned item is created identified (`SpawnIdentified`). Until lane devmenu4 normal items were made unidentified (`stateFlags` 0), and
-  D2R's tooltip shows an unidentified item's sockets as "Max Sockets: N"; the item service had set both the count (stat 194) and the socketed
-  flag (0x800, flag word 0x82800) all along. Identified, the tooltip reads "Socketed (N)" and a gem clicked onto the item goes in (check
-  `devmenutype`: an Amethyst into the Balanced Axe, "Gemmed Balanced Axe", +30% attack rating). After creation the native item is read back
-  (`CheckSockets`: count, socketed, identified; harness `devmenu state` `sockfails`, `lastitemflags`).
+  items get the same: their base's maximum, and never fewer than their row's own fixed `sock` property (`fixed_sockets` / `spawn_sockets`,
+  unit tested). Built catalog: uniques 0-6 (Facebreaker 4; 202 rows, the jewellery, jewels and charms, 0), set items 2-6 on socketable bases
+  (22 rows 0). Only the developer menu does this (owner, 2026-11-17: "they need to be actually socketed with the max sockets"); drops are
+  unchanged: a unique drops with its row's `sock`, a set item without one has none. The status says "with n of m sockets".
+  How each quality asks (`PlanSockets`): a normal item by the item service's `socketCount`; a set or unique item by the `sock` property
+  (properties.txt, func 14) in the create spec, with `socketCount` 0. D2R caps a socket count asked of those qualities: a forced set row asked
+  for 4 was refused (`Unsupported`) on every one of the 64 tries, the service's `editItem` to 4 as well, and the item kept 1 socket. The `sock`
+  property is how Median's own rows give theirs (a generated Facebreaker drops with 4 and the socketed flag); the game sets the count and the
+  flag, capped by the base. The property's id is the catalog header's fourth field (format 4; 133 in the built tables); without it a spawn
+  asks the socket count as before. Format 2 added the socket column, format 4 the uniques' and sets' counts and the property id.
+  Every spawned item is created identified (`SpawnIdentified`). After creation the native item is read back (`CheckSockets`: count, socketed,
+  identified; harness `devmenu state` `sockfails`, `sockprops`, `lastitemflags`). Identified with real sockets, the tooltip reads "Socketed (N)"
+  and a gem clicked onto the item goes in (checks `devmenutype`: an Amethyst into the Balanced Axe; `devmenusock`: into Facebreaker and
+  Isenhart's Lightbrand, HD and legacy).
+  **"Max Sockets: N"** is not D2R's own line: it is D2RLoader's D2RCore option `[d2rcore.items] maximum_sockets` (on in the test slots'
+  `d2rloader.toml`; our installer does not set it), which adds the most sockets the base could have to the tooltip of an item **without**
+  sockets. Facebreaker from the menu before this change had stat 194 = 4 from its row but no socketed flag (0x800), so it showed that line and
+  took nothing. Earlier lanes read the same line on unidentified normal items. Players with the option on see it on drops too: every set item
+  without a `sock` property (Isenhart's Lightbrand from the game's generator: 0 sockets, flags 0x10082010, "Max Sockets: 4"), and normal or
+  magic items that rolled none. A unique with a `sock` row drops socketed and reads "Socketed (N)". For set items the line promises sockets a
+  Median player cannot add (the socket recipe 845 takes normal items only). Drops are left as they are; whether to say so in the docs for
+  players or turn the option off is the owner's call.
 - **Kits:** the base with exactly the sockets its runes need (not the maximum: a runeword needs the exact count), then each rune, each by the same placement. `executeTransaction` with no inputs returns `InvalidArgument`, so
   a kit is not all-or-nothing: a full character gets what fits and the status counts it.
 - **Travel:** the harness's route: D2R's warp `0x488180` inside an act; across acts the NPC travel `0x4f2e40` to the act's town, a 2 s settle, then the

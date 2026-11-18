@@ -451,6 +451,13 @@ std::vector<std::string> SaveCopiesToRemove(const std::vector<std::string>& fold
 	return ours;
 }
 
+bool KeptOnCleanup(const std::string& name) {
+	std::string n;
+	for (char c : name)
+		n += char(std::tolower(static_cast<unsigned char>(c)));
+	return n == SaveCopiesFolder || n == "removed";
+}
+
 bool OfficialMedianXLPath(const std::string& path, const std::string& localAppData, const std::string& roamingAppData) {
 	if (PathIsOrUnder(path, Join(localAppData, "mxl-launcher")) || PathIsOrUnder(path, Join(localAppData, "MedianXL")) ||
 	    PathIsOrUnder(path, Join(roamingAppData, "MedianXL")))

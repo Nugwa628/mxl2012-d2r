@@ -6,7 +6,7 @@ step takes that pair and writes the exe to publish into --out, unsigned or signe
 
   py -3 tools/sign_launcher.py --exe build/launcher/Release/D2R-XL-2012-Downloader.exe --out dist-launcher
         [--command "signtool sign /fd SHA256 /tr <timestamp url> /td SHA256 ... {file}"]   sign here (a local tool)
-        [--signed FILE]                                                                   signed elsewhere (SignPath)
+        [--signed FILE]                                                                   signed elsewhere (a CI job)
         [--allow-untrusted]                                                               test certificates
 
   then: py -3 tools/publish_release.py publish ... --launcher dist-launcher/D2R-XL-2012-Downloader.exe
@@ -15,7 +15,12 @@ Checks:
   - the exe still matches the build's .sha256 (the file that is signed is the file that was built and tested);
   - a signed exe is the same program: its bytes equal the unsigned build except the PE checksum, the security
     directory entry, the zero padding and the signature appended at the end (the parts Authenticode leaves out);
-  - on Windows, Get-AuthenticodeSignature must say Valid and show a timestamp (--allow-untrusted: any signature).
+  - on Windows, Get-AuthenticodeSignature must say Valid and show a timestamp (--allow-untrusted: any signature);
+  - the version resource names the project (ProductName "D2R-XL 2012") and FileVersion equals ProductVersion: SignPath's
+    artifact configuration enforces both (docs/code-signing-policy.md), so a build that would be refused there stops here.
+
+Azure Artifact Signing: tools/artifact_signing.py sign runs this with --command (signtool + the Artifact Signing dlib);
+the optional CI template docs/ci/artifact-signing.github.yml runs it with --signed.
 
 Writes --out/D2R-XL-2012-Downloader.exe, .sha256 (of the final file: publish_release puts that in the release manifest,
 and the downloader's self-update checks it, signed or not) and signing.json (what was done).
@@ -24,6 +29,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import struct
@@ -32,6 +38,9 @@ import sys
 from pathlib import Path
 
 NAME = "D2R-XL-2012-Downloader.exe"
+PRODUCT = "D2R-XL 2012"  # the project name in the version resource (launcher/res/launcher.rc, SignPath's metadata restriction)
+VERSION_KEYS = ("CompanyName", "FileDescription", "FileVersion", "LegalCopyright", "OriginalFilename", "ProductName",
+                "ProductVersion")
 
 
 def sha256(data: bytes) -> str:
@@ -69,6 +78,35 @@ def program_bytes(data: bytes) -> bytes:
             pad += 1
         body = body[:len(body) - pad] if pad else body
     return bytes(body)
+
+
+def version_strings(data: bytes) -> dict:
+    """The StringFileInfo values of the exe's version resource (UTF-16 key, padding, value), {} when it has none."""
+    # after VS_VERSION_INFO's fixed part (signature 0xFEEF04BD): the code may hold the same words for VerQueryValue
+    fixed = data.find("VS_VERSION_INFO".encode("utf-16-le"))
+    start = data.find("StringFileInfo".encode("utf-16-le"), fixed) if fixed >= 0 else -1
+    if start < 0:
+        return {}
+    blob = data[start:start + 8192].decode("utf-16-le", "ignore")
+    out = {}
+    for k in VERSION_KEYS:
+        m = re.search(k + r"\0+([^\0]+)", blob)
+        if m:
+            out[k] = m.group(1)
+    return out
+
+
+def metadata_problems(data: bytes) -> list:
+    """What SignPath's metadata restrictions would refuse: product name and the two version strings."""
+    v = version_strings(data)
+    problems = []
+    if v.get("ProductName") != PRODUCT:
+        problems.append(f"ProductName is {v.get('ProductName')!r}, not {PRODUCT!r}")
+    if not v.get("FileVersion") or v.get("FileVersion") != v.get("ProductVersion"):
+        problems.append(f"FileVersion {v.get('FileVersion')!r} and ProductVersion {v.get('ProductVersion')!r} differ")
+    if v.get("OriginalFilename") != NAME:
+        problems.append(f"OriginalFilename is {v.get('OriginalFilename')!r}, not {NAME!r}")
+    return problems
 
 
 def same_program(unsigned: bytes, signed: bytes) -> bool:
@@ -113,6 +151,10 @@ def main() -> int:
     if pe_layout(unsigned)[3]:
         print(f"{a.exe}: already signed; give the unsigned build")
         return 1
+    problems = metadata_problems(unsigned)
+    if problems:
+        print(f"{a.exe}: version resource: " + "; ".join(problems))
+        return 1
 
     a.out.mkdir(parents=True, exist_ok=True)
     out = a.out / NAME
@@ -131,7 +173,7 @@ def main() -> int:
     final = out.read_bytes()
     signed = bool(pe_layout(final)[3])
     record = {"unsignedSha256": want, "sha256": sha256(final), "size": len(final), "signed": signed,
-              "programSha256": sha256(program_bytes(final))}
+              "programSha256": sha256(program_bytes(final)), "version": version_strings(final)}
     if (a.command or a.signed) and not signed:
         print(f"{out}: no signature after signing")
         return 1

@@ -25,10 +25,10 @@ std::string Xline(int cls) {
 }
 
 std::string Sample() {
-	return "#devmenu\t3\tabc\n"
+	return "#devmenu\t4\tabc\t133\n"
 	       "I\tU\tvip\t7\t0\t0\tAmulet of the Viper\n"
 	       "I\tC\ta56\t7\t180\t0\tAzmodan's Heart\tretired row\n"
-	       "I\tS\tlrg\t5\t0\t0\tCiverb's Ward (Civerb's Vestments)\n"
+	       "I\tS\tlrg\t5\t0\t4\tCiverb's Ward (Civerb's Vestments)\n"
 	       "I\tQ\tbox\t0\t-1\t0\tHoradric Cube\n"
 	       "I\tB\tswd\t0\t-1\t2\tShort Sword\n"
 	       "K\tcrs\t2\tr01,r02\tWhite Noise\n"
@@ -36,7 +36,7 @@ std::string Sample() {
 	       "I\tU\tjew\t7\t1804\t0\tCornerstone of the World: Barrage (Amazon)\n"
 	       "I\tU\tjew\t7\t1960\t0\tCornerstone of the World: Frost Nova (Sorceress)\n"
 	       "I\tB\tlrg\t0\t-1\t4\tLarge Shield\n"
-	       "I\tU\tswd\t7\t12\t0\tGull\n"
+	       "I\tU\tswd\t7\t12\t2\tGull\n"
 	       "L\t1\t0\t0\t0\tRogue Encampment\n"
 	       "L\t59\t1\t0\t255\tFauztinville\n"
 	       "L\t125\t4\t1\t255\tWelcome to Toraja\n"
@@ -87,18 +87,33 @@ int main() {
 	Check(!ParseCatalog("#devmenu\t9\tabc\nL\t1\t0\t0\t0\tx\nI\tU\tab\t7\t0\t0\ty\n").ok, "wrong format");
 	Check(!ParseCatalog("#devmenu\t1\tabc\nI\tU\tvip\t7\t0\tAmulet of the Viper\nL\t1\t0\t0\t0\tx\n").ok, "format 1 (no socket column) refused");
 
-	// sockets per sample item: a normal weapon and shield get their maximum, a normal item that cannot have sockets none, uniques and sets none
-	// asked (their row's own `sock` property decides)
+	// sockets per sample item: every quality gets the catalog's count, the base's maximum (at least a unique / set row's fixed `sock`); an
+	// item that cannot have sockets (an amulet, a jewel, the Cube) none
 	Check(c.items[4].name == "Short Sword" && c.items[4].sockets == 2 && SpawnSockets(c.items[4]) == 2, "sockets: a normal weapon gets its maximum");
 	Check(c.items[8].name == "Large Shield" && SpawnSockets(c.items[8]) == 4, "sockets: a normal armour gets its maximum");
 	Check(c.items[3].name == "Horadric Cube" && SpawnSockets(c.items[3]) == 0, "sockets: an item without sockets stays without");
-	Check(SpawnSockets(c.items[0]) == 0 && SpawnSockets(c.items[9]) == 0, "sockets: a unique keeps its row's sockets");
-	Check(SpawnSockets(c.items[2]) == 0, "sockets: a set item keeps its row's sockets");
+	Check(SpawnSockets(c.items[9]) == 2, "sockets: a unique on a weapon gets its maximum (owner report: Facebreaker had none)");
+	Check(SpawnSockets(c.items[2]) == 4, "sockets: a set item on a shield gets its maximum");
+	Check(SpawnSockets(c.items[0]) == 0 && SpawnSockets(c.items[6]) == 0, "sockets: a unique amulet or jewel gets none");
 	Item odd;
 	odd.quality = QualityUnique;
 	odd.sockets = 6;
-	Check(SpawnSockets(odd) == 0, "sockets: never asked for a unique, whatever the line says");
-
+	Check(SpawnSockets(odd) == 6, "sockets: a unique asks for the catalog's count");
+	odd.sockets = -1;
+	Check(SpawnSockets(odd) == 0, "sockets: a negative count asks for none");
+	Check(c.sockProperty == 133, "sockets: the `sock` property id from the header");
+	SocketPlan plan = PlanSockets(QualityNormal, 4, 133);
+	Check(plan.socketCount == 4 && plan.propertyId < 0, "sockets: a normal item asks the socket count");
+	plan = PlanSockets(QualitySet, 4, 133);
+	Check(plan.socketCount == 0 && plan.propertyId == 133 && plan.propertyValue == 4, "sockets: a set item asks by the `sock` property");
+	plan = PlanSockets(QualityUnique, 6, 133);
+	Check(plan.socketCount == 0 && plan.propertyId == 133 && plan.propertyValue == 6, "sockets: a unique asks by the `sock` property");
+	plan = PlanSockets(QualityUnique, 0, 133);
+	Check(plan.socketCount == 0 && plan.propertyId < 0, "sockets: nothing asked, no property");
+	plan = PlanSockets(QualitySet, 4, -1);
+	Check(plan.socketCount == 4 && plan.propertyId < 0, "sockets: without the property id, the socket count as before");
+	Check(ParseCatalog("#devmenu\t4\tabc\nI\tU\tvip\t7\t0\t0\tAmulet of the Viper\nL\t1\t0\t0\t0\tx\n").sockProperty == -1,
+	      "sockets: a header without the property id");
 	// real sockets: identified (an unidentified item's tooltip says "Max Sockets: N"), a count and the socketed flag
 	for (uint32_t q : {QualityNormal, QualitySet, QualityUnique}) {
 		Check(SpawnIdentified(q), "sockets: every spawned item is created identified");
@@ -182,6 +197,8 @@ int main() {
 	      "uber arrival text");
 	Check(UberArrivalText(c, c.ubers[2]).find("red portal") != std::string::npos, "uber arrival: red portal");
 	Check(!ParseCatalog("#devmenu\t2\tabc\nI\tU\tvip\t7\t0\t0\tAmulet of the Viper\nL\t1\t0\t0\t0\tx\n").ok, "format 2 refused");
+	Check(!ParseCatalog("#devmenu\t3\tabc\nI\tU\tvip\t7\t0\t0\tAmulet of the Viper\nL\t1\t0\t0\t0\tx\n").ok,
+	      "format 3 (uniques and sets without their sockets) refused");
 
 	Page p = PageOf(25, 0, 12);
 	Check(p.pages == 3 && p.count == 12 && p.first == 0, "first page");

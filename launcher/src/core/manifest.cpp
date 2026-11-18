@@ -1,5 +1,7 @@
 #include "manifest.h"
 
+#include "sha256.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -279,11 +281,12 @@ std::string SiteRoot(const std::string& setting) {
 	return u.back() == '/' ? u : u + "/";
 }
 
-std::string MigrateRetiredSite(const std::string& site) {
-	static const struct {
-		const char* from;
-		const char* to;
-	} moves[] = {{"files.werdegames.com", "files.wyrd.games"}, {"dl.werdegames.com", "dl.wyrd.games"}};
+const std::vector<SiteMove> RetiredSiteHosts = {
+	{"6f747908ae2105d5bbe1029fa759f8f7187ccede1fd64548c7616a5b4fb2f083", "files.wyrd.games"},  // the retired files host
+	{"90896a6b8b8bda046f67d7c575dd6ef4dad5f59c394773033e98c120e67bc7c8", "dl.wyrd.games"},     // the retired dl host
+};
+
+std::string MigrateRetiredSite(const std::string& site, const std::vector<SiteMove>& moves) {
 	auto lower = [](std::string s) {
 		for (char& c : s)
 			if (c >= 'A' && c <= 'Z')
@@ -297,8 +300,11 @@ std::string MigrateRetiredSite(const std::string& site) {
 	if (end == std::string::npos)
 		end = site.size();
 	const std::string host = lower(site.substr(scheme.size(), end - scheme.size()));
+	if (host.empty())
+		return site;
+	const std::string hash = Sha256Hex(host.data(), host.size());
 	for (const auto& m : moves)
-		if (host == m.from)
+		if (hash == m.hostSha256)
 			return scheme + m.to + site.substr(end);
 	return site;
 }
@@ -353,6 +359,23 @@ bool KnownBundledFile(const std::string& path) {
 		"d2rloader/plugins/controller qol updates-license.txt",
 		"d2rloader/plugins/controller qol updates-pluginsdk-license.txt",
 		"d2rloader/config/controller-qol-updates.toml",
+		"d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix.dll",
+		"d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix-license.txt",
+		"d2rloader/config/celestialrayone.damage-overflow-fix.toml",
+		"d2rloader/plugins/d2rl-enemy-health-bars.dll",
+		"d2rloader/plugins/d2rl-enemy-health-bars-license.txt",
+		"d2rloader/plugins/d2rl-enemy-health-bars-third-party.txt",
+		"d2rloader/plugins/d2rl-enemy-health-bars-imgui-license.txt",
+		"d2rloader/plugins/d2rl-enemy-health-bars-mapsense-api-license.txt",
+		"d2rloader/plugins/d2rl-enemy-health-bars-pluginsdk-license.txt",
+		"d2rloader/plugins/d2rl-enemy-health-bars-source.zip",
+		"d2rloader/config/enemy-health-bars.toml",
+		"d2rloader/plugins/d2rl-ruffneckk-floating-damage.dll",
+		"d2rloader/plugins/d2rl-ruffneckk-floating-damage-license.txt",
+		"d2rloader/plugins/d2rl-ruffneckk-floating-damage-third-party.txt",
+		"d2rloader/plugins/ruffneckk-floating-damage-font.ttf",
+		"d2rloader/plugins/ruffneckk-floating-damage-font-license.txt",
+		"d2rloader/config/ruffneckk-floating-damage.toml",
 	};
 	std::string p = Lower(path);
 	if (known.count(p))

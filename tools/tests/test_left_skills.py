@@ -141,6 +141,33 @@ class MoveOnlyTests(unittest.TestCase):
             move_only.make_row(["skill"], {"nosuch": "1"})
 
 
+BUILT_SKILLS = TOOLS.parent / "work" / "mod" / "data" / "global" / "excel" / "skills.txt"
+NAMED_SKILLS = TOOLS.parent / "work" / "named" / "skills.txt"
+
+
+@unittest.skipUnless(BUILT_SKILLS.exists() and NAMED_SKILLS.exists(), "needs a built mod (tools/build.py)")
+class SaveSkillTests(unittest.TestCase):
+    """Bug #616: the `leftskills` save part puts a skill of the player's own class on the left. D2 saves only the class's own
+    skills, so a skill of another class (Sacrifices on an Amazon) was dropped by Save and Exit and the left button read Attack."""
+
+    def test_each_class_saves_one_of_its_own_left_skills(self):
+        import leftskills_checks as lc
+        codes = ("ama", "sor", "nec", "pal", "bar", "dru", "ass")  # `h state` class ids 0-6 (game_checks.CLASSES)
+        self.assertEqual(sorted(lc.LS_SAVE), list(range(len(codes))))
+        h, built = tm.read_tsv(BUILT_SKILLS)
+        nh, named = tm.read_tsv(NAMED_SKILLS)
+        rows = {r[0]: dict(zip(h, r)) for r in built if r and r[0]}
+        before = {r[0]: dict(zip(nh, r)) for r in named if r and r[0]}
+        for cls, name in lc.LS_SAVE.items():
+            r = rows.get(name)
+            self.assertIsNotNone(r, name)
+            self.assertEqual(r["charclass"], codes[cls], name)
+            self.assertEqual(r["leftskill"], "1", name)
+            self.assertNotEqual(r["aura"], "1", name)
+            if codes[cls] != "bar":  # every Barbarian skill on the left was there in Median already
+                self.assertNotEqual(before[name].get("leftskill"), "1", "%s: not formerly right-only" % name)
+
+
 class MoveOnlyTextTests(unittest.TestCase):
     def test_every_language_has_its_own_text(self):
         recs = move_only.string_records()

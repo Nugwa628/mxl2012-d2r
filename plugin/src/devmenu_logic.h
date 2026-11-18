@@ -32,7 +32,7 @@ using panel_logic::TypedKey;
 using panel_logic::WrapText;
 
 // --- catalog (tools/devmenu_catalog.py writes it, data/mxl2012-devmenu/catalog.tsv in the mod) ----------------------------------------------
-inline constexpr int CatalogFormat = 3;
+inline constexpr int CatalogFormat = 4;
 inline constexpr int MaxLevel = 120;
 inline constexpr int ClassCount = 8;
 inline constexpr int MaxRunes = 6;
@@ -57,7 +57,7 @@ struct Item {
 	uint32_t code = 0;
 	uint32_t quality = QualityNormal;  // QualityNormal, QualitySet or QualityUnique
 	int32_t row = -1;                  // zero-based uniqueitems / setitems record, -1 for the rest
-	int sockets = 0;                   // a normal item's maximum sockets (catalog); uniques and sets keep their row's
+	int sockets = 0;                   // the sockets a spawn asks for (catalog): the base's maximum, for uniques / sets at least their row's
 	std::string name;
 	std::string tag;  // "retired row" or empty
 };
@@ -88,6 +88,7 @@ struct Uber {
 struct Catalog {
 	bool ok = false;
 	std::string hash;
+	int32_t sockProperty = -1;  // properties.txt id of `sock` (header field 4), -1 when missing
 	std::vector<Item> items;  // all categories but runewords, in the file's order
 	std::vector<Kit> kits;
 	std::vector<Level> levels;
@@ -121,6 +122,7 @@ inline auto ParseCatalog(std::string_view text) -> Catalog {
 				return c;
 			}
 			c.hash = std::string(f[2]);
+			c.sockProperty = f.size() > 3 ? ToInt(f[3], -1) : -1;
 			header = true;
 		} else if (f[0] == "I" && f.size() >= 7 && f[2].size() <= 4) {
 			static constexpr struct {
@@ -208,10 +210,12 @@ inline auto ParseCatalog(std::string_view text) -> Catalog {
 }
 
 // --- search ---------------------------------------------------------------------------------------------------------------------------
-// The empty sockets asked for when an item is spawned: a normal item gets its maximum (the catalog's count, 0 for an item that cannot have
-// sockets); a unique or set item asks for none, so it keeps its row's fixed `sock` property or stays without sockets, as Median makes it.
+// The empty sockets asked for when an item is spawned: the catalog's count for every quality (0 for an item that cannot have sockets). For a
+// normal item that is its base's maximum; for a unique or set item the base's maximum and at least its row's fixed `sock` property
+// (devmenu_catalog.py spawn_sockets). Asking for none left a row's `sock` as a bare count without the socketed flag: D2R then shows
+// "Max Sockets: N" and nothing goes in (owner report 2026-11-17, Facebreaker).
 inline auto SpawnSockets(const Item& item) -> uint32_t {
-	return item.quality == QualityNormal && item.sockets > 0 ? static_cast<uint32_t>(item.sockets) : 0;
+	return item.sockets > 0 ? static_cast<uint32_t>(item.sockets) : 0;
 }
 
 // Real sockets. D2 has two parts to a socketed item: the socket count (stat 194, item_numsockets) and the item flag "socketed" (0x800 in the
@@ -221,6 +225,31 @@ inline auto SpawnSockets(const Item& item) -> uint32_t {
 inline constexpr uint32_t ItemFlagIdentified = 0x10;
 inline constexpr uint32_t ItemFlagSocketed = 0x800;
 inline constexpr int StatNumSockets = 194;
+
+// How a spawn asks for its sockets. A normal item: the item service's socketCount. A set or unique item: D2R caps a socket count asked of
+// those qualities (lane devsock: a forced set row asked for 4 was refused with Unsupported on every try, the service's edit to 4 too, and
+// the item kept 1 socket), so it asks with the `sock` property instead (properties.txt, func 14), the way Median's own rows (Facebreaker's
+// `sock 4`) and drops get theirs: the game sets the count and the socketed flag, capped by the base. Without the property's id in the
+// catalog, the socket count is asked as before.
+struct SocketPlan {
+	uint32_t socketCount = 0;    // ItemCreateSpec::socketCount
+	int32_t propertyId = -1;     // a `sock` property to add, -1 for none
+	int32_t propertyValue = 0;
+};
+
+inline auto PlanSockets(uint32_t quality, uint32_t sockets, int32_t sockProperty) -> SocketPlan {
+	SocketPlan p;
+	if (sockets == 0) {
+		return p;
+	}
+	if (quality != QualityNormal && sockProperty >= 0) {
+		p.propertyId = sockProperty;
+		p.propertyValue = static_cast<int32_t>(sockets);
+	} else {
+		p.socketCount = sockets;
+	}
+	return p;
+}
 
 inline auto SpawnIdentified(uint32_t /*quality*/) -> bool {
 	return true;

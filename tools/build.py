@@ -8,6 +8,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   mxl2012_prep.py    the pure v005 MPQ's tables (assets/median) -> work/named/ (UTF-8, normalised, docs/txt-migrate.md)
   tbl2json.py        strings                  -> work/mod/data/local/lng/ (namespace mxl2012, docs/strings.md)
   txt_migrate.py     D2R table layout         -> work/mod/data/global/excel/{base,} (ids: tools/idmap.py, docs/id-mapping.md)
+  secret_items.py apply  Median's nine secret uniques drop (data/secret_items.tsv: spawnable, rarity, Lady of Storms'
+                     level; the other uniques on their bases x4 / x10 rarity), before chronicle.py
   d2r_adds.py        D2R's own additions (Terror Zones and others) switched off, docs/d2r-additions.md
   shrine_lines.py apply  one extra blue tooltip line per crafting shrine: the stats of its Cube recipes (docs/bugs.md #563)
   chronicle.py       D2R's Chronicle over Median's uniques / sets / runewords: item type UI categories, disableChronicle
@@ -144,6 +146,7 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["tbl2json.py", "--tbl-dir", str(SRC.parent.parent / "local" / "lng" / "eng"),
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng"), "--excel-dir", str(ROOT / "work" / "named")],
               ["txt_migrate.py"],
+              ["secret_items.py", "apply", "--mod", str(MOD)],
               ["d2r_adds.py", "--mod", str(ROOT / "work" / "mod"), "--d2r", str(D2R_EXTRACT)],
               ["shrine_colours.py", "tables", str(MOD / "data")],
               ["elixir_colours.py", "tables", str(MOD / "data")],

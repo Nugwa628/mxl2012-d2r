@@ -1,7 +1,8 @@
 # Third-party D2RLoader plugins planned to ship with D2R-XL 2012
 
 Planned 2026-11-04. Shipped so far: D2R Legacy 16:9 and Buff HUD (0.1.12), Auto Belt Refill (0.1.15), PyreFly's Controller QOL
-Updates (0.1.17), CharmInv by Dimentio (next release); add new candidates to
+Updates (0.1.17), CharmInv by Dimentio (0.1.19), and Damage Overflow Fix by CelestialRayOne, Enemy Health Bars by Graxy_TV and
+Floating Damage by RuffnecKk (next release); add new candidates to
 the tables below. The compatibility work (which plugins
 need changes for Median XL 2012's data)
 starts after release 0.1.11. Each plugin keeps its author's credit in the release notes, the README credits and this file.
@@ -361,6 +362,128 @@ CHANGELOG / release notes, NOTICE.md, `third_party/charm-inv/README.md` and this
 - **Turn it off:** `inject_inventory_button = false` hides the button; delete the DLL and MPQ to remove it (the items in it
   stay on page 6 of the save).
 - **Test runs:** a dev install (`tools/install_mod.py`) removes it; `--charminv` installs it as a release does.
+
+## Damage Overflow Fix by CelestialRayOne (next release)
+
+[Damage Overflow Fix](https://github.com/CelestialRayOne/d2rloader_plugins) 2.4.0 by **CelestialRayOne (Bogdan Bulai)**,
+`plugins/damage-overflow-fix`, commit `9240725`. D2R does most of its damage math in 32 bits, in 1/256ths of a point, so a hit
+or a damage stat above about 8.39 million wraps negative and then deals 0–2 damage. The plugin does that math in 64 bits and
+caps it at 8,388,607 instead. Below the limit, every result is bit-identical to the game's own. **Licence:** MIT, "Copyright
+(c) 2026 Bogdan Bulai". The licence text ships next to the DLL. Credit: README, CHANGELOG / release notes, NOTICE.md,
+`third_party/damage-overflow-fix/README.md` and this file (lane plug125).
+
+- **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-celestialrayone-damage-overflow-fix.dll` (the author's release
+  build from the pinned commit, unchanged, mod-scoped), `d2rl-celestialrayone-damage-overflow-fix-license.txt`, and our
+  config `mods\mxl2012\d2rloader\config\celestialrayone.damage-overflow-fix.toml`, a `preserve` file. The manifest's
+  `bundledPlugins` lists it with its repository, commit, author and SHA-256.
+- **No binaries in git.** The DLL is pinned by size and SHA-256 in `tools/package_release.py` (`DOF`). It is looked up by
+  `--dof DIR`, `MXL_DOF_DIR`, a git-ignored copy in `third_party/damage-overflow-fix/` or
+  `<runs>/shared/damage-overflow-fix-2.4.0/`, and other bytes are refused.
+- **Config** (owner decision 2026-11-16): the author's default with `debug_log = false` (no per-hit `.hits.log`, up to
+  256 MB) and `log_each_site = false`. `leech = true` stays on. `tools/verify_package.py` checks the three keys.
+- **How it decides to work:** it patches about 100 sites, in Game.exe and in D2RCore.dll's stat engine. It checks each site
+  against its expected bytes first and skips any that differ, with a log line. It has no build or version check. In game:
+  "104 site(s) active, 1 disabled, 0 failed", and mxl2012-core reports no plugin clashes (none of its sites are ours).
+- **Median data:** realistic Median damage (a few 100k per hit) never reaches the limit, so for normal play nothing changes.
+  Monster life fits: Uber Izual has about 1.96M. An extreme build gets a capped hit instead of a hit for 1. Tested in
+  lane plug125: 30,000 damage × 30,000% ED dealt 1–2 without the plugin and killed a 7.81M-life monster in one hit with it.
+  Resist and leech results are identical with and without it.
+- **Console:** `dmgoverflow` lists the sites, and `dmgoverflow hit` shows the last hit's damage types before and after resistances.
+- **Turn it off:** delete the DLL, or set `dry_run = true` (it checks every site and patches none).
+
+## Enemy Health Bars by Graxy_TV (next release)
+
+[Enemy Health Bars](https://github.com/graxytv/D2R-Over-the-Head-Health-Bars) 0.2.6 by **Graxy_TV** (graxytv, also on the
+[d2rloader.net hub](https://d2rloader.net/hub/plugins/enemy-health-bars)) draws compact health bars over hostile monsters in
+HD and (with our patch) legacy graphics. Champions get blue outlines, and uniques and bosses orange. It is used with the author's permission (owner,
+2026-11-16). **Licence:** GPL-3.0-only. It builds on SirCabby's D2RCabbyCodes (GPL-3.0), D2RLoader's PluginSDK (MIT), Dear
+ImGui (MIT) and RuffnecKk's MapSense OverlayHost API (MIT). Credit: README, CHANGELOG / release notes, NOTICE.md,
+`third_party/enemy-health-bars-mxl2012/README.md` and this file (lane plug125).
+
+- **Built from source** by `tools/build_enemyhealthbars.ps1`, from the author's source zip in commit `e6b929b` (both zips
+  checked by sha256), with our three patches in `third_party/enemy-health-bars-mxl2012/`:
+  - `0001-no-build-fingerprint`: removes the check of Game.exe's time stamp and size, which refused every build but one (owner
+    rule: never tie a plugin to a build). Its nine byte signatures stay, so on code it does not know it turns itself off
+    with its own log line. This also sets the version to `0.2.6+mxl2012`.
+  - `0002-dev-keep-visible-unfocused`: a test-only key, `dev_keep_visible_unfocused` (default `false`, not in any shipped
+    config). It keeps the overlay drawn while the game is in the background, so test runs can capture it without taking focus.
+  - `0003-legacy-placement-damaged-only`: **bars in legacy graphics**, with and without Legacy 16:9, placed the way our
+    Floating Damage patch places its numbers: the unit's classic pixel position minus D2R's view offset, raised by the
+    monster type's classic height (`pixHeight` in `monstats2`, 56 when it has none), then the classic screen (800x600, or
+    1066x600 with Legacy 16:9) fitted to the window height and centred. Everything it reads is found at load by expected
+    bytes; if they don't match, legacy stays without bars (log line) and HD is unchanged. It also makes **bars only on
+    damaged monsters** the default (owner, 2026-11-16): `show_full_health` now defaults to `false` in the plugin and its config.
+- **Setting, bars on all monsters:** `show_full_health = true` under `[bars]` in
+  `mods\mxl2012\d2rloader\config\enemy-health-bars.toml` (the plugin's own key) also shows bars on monsters at full life;
+  `false` (shipped) shows them only once a monster is below full life. `enemybars reload` in the D2RLoader console applies it
+  without a restart.
+- **In the package (GPL: the binary comes with its source):** `mods\mxl2012\d2rloader\plugins\d2rl-enemy-health-bars.dll`,
+  `d2rl-enemy-health-bars-license.txt` (GPL-3.0), `-third-party.txt` with the ImGui, MapSense API and PluginSDK licences
+  (`-imgui-license.txt`, `-mapsense-api-license.txt`, `-pluginsdk-license.txt`), and `d2rl-enemy-health-bars-source.zip`.
+  The zip holds the patched source as built, our patches and a `SOURCE.txt` with the exact refs. The manifest's
+  `bundledPlugins` names the repository, commit, licence and patch hashes. Its config
+  `mods\mxl2012\d2rloader\config\enemy-health-bars.toml` (the patched source's, `show_full_health = false`) is a `preserve`
+  file, so a player's choice survives Update and Repair. `tools/package_release.py` and `tools/verify_package.py` refuse a
+  config that is not on, shows full-life monsters, or has the test-only key on.
+- **How it works:** it reads game memory only, with no hooks or byte patches. Life comes from the client's normalized life
+  stat, so Median's huge monster life (Uber Izual about 1.96M) cannot overflow it. The boss outline comes from MonStats
+  flags. Head heights come from the mod's `monstats` / `monstats2` (1839 monster types). It draws in its own transparent
+  window over the game, which hides while the game is not focused.
+- **Tests:** the author's `policy_tests` plus ours (damaged-only visibility, the legacy placement maths for 800x600,
+  1066x600 and 640x480) run in the build script; the packaging tests check the shipped config.
+- **Screenshots** (lane plug125, background mode, overlay captured and laid over the game capture, docs/testing.md "Lane
+  plug125"): HD, legacy, and legacy with Legacy 16:9; a Fallen at full life without a bar next to Fallen at 70/25% and a
+  Median normal at 50% with bars, and the same with `show_full_health = true`; Andariel and Uber Izual with boss outlines.
+- **Turn it off:** `enabled = false` in its config, or delete the DLL.
+
+## Floating Damage by RuffnecKk (next release)
+
+[Floating Damage](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/floating-damage) 1.5.6 by
+**RuffnecKk** shows the damage of each hit as a number rising over the monster, plus a small DPS counter. It is based on locbones'
+D2RHUD and the design of Fr4nsson's D2RDamageNumbers. **Licence:** MIT, "Copyright (c) 2026 RuffnecKk and contributors".
+Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/floating-damage-mxl2012/README.md` and this file
+(lane plug125).
+
+- **Built from source** by `tools/build_floatingdamage.ps1`, from the submodule `third_party/RuffnecKk-D2RLoader-Suite`
+  (commit `514359f`), with our patches in `third_party/floating-damage-mxl2012/`. The plugin's CMake fetches MinHook and
+  Dear ImGui at the commits it pins.
+  - `0001-mxl2012-legacy-projection`: **numbers over the target in legacy graphics**, with and without Legacy 16:9. The
+    author's projection is HD only, so in legacy the numbers landed off the target or not at all. In legacy the plugin now
+    places a number where the classic engine draws the unit: the unit's pixel position minus D2R's view offset, raised
+    56 classic pixels to the head. The classic screen (800x600, or 1066x600 with Legacy 16:9) is then scaled to the window
+    height and centred, as D2R does. Everything it reads is found at load by expected bytes. If they don't match, the legacy
+    path turns off with a log line and HD keeps working. HD is unchanged.
+  - `0002-mxl2012-bundled-font`: the default font is Exocet, which a plugin cannot read from D2R's CASC, so it fell back to
+    Segoe UI. It now uses the bundled **Cinzel Bold** (Natanael Gama / The Cinzel Project Authors, SIL Open Font License 1.1,
+    unmodified), a classical capital face close to Exocet.
+  - `0003-mxl2012-legacy-dps-counter`: in legacy graphics the **DPS counter sits inside the game picture**. The author
+    places it by percent of the whole window, so a 4:3 picture in a wide window had it in the black side bar. It now uses the
+    same percents inside the classic picture and moves up when it would cover the classic HUD (globes and control panel).
+    With Legacy 16:9 the bottom left corner is free, so it stays there. HD is unchanged.
+  - `0004-mxl2012-legacy-text-scale`: **bigger numbers in legacy graphics** (owner, 2026-11-17). The author's sizes are
+    reference pixels scaled to the window height, the same in HD and legacy, which looked small next to the classic
+    sprites. The new key `legacy_text_scale` under `[appearance]` (shipped `2.5`, valid 0.25 to 8) multiplies the numbers'
+    size (`text_size`, `critical_hit_size`) while legacy graphics are drawn, with or without Legacy 16:9. HD and the DPS
+    counter keep their size. The packaging checks refuse a shipped config without `legacy_text_scale = 2.5`.
+- **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-ruffneckk-floating-damage.dll`,
+  `d2rl-ruffneckk-floating-damage-license.txt` (MIT), `d2rl-ruffneckk-floating-damage-third-party.txt` (the suite's
+  third-party notices and every licence text they keep: PluginSDK, Dear ImGui, MinHook, D2R Damage Numbers ...),
+  `ruffneckk-floating-damage-font.ttf` with `ruffneckk-floating-damage-font-license.txt` (OFL), and the config
+  `mods\mxl2012\d2rloader\config\ruffneckk-floating-damage.toml` (the author's, with a comment on the font), a `preserve`
+  file.
+- **How it works:** inline hooks where the game commits monster life (two call sites) and on the camera update, each
+  checked against its expected bytes. It also hooks DXGI Present for its own D3D12 ImGui renderer, which draws into the game's
+  frame. It has no build check. The amount shown is int32 visible life, so one number can show up to about 8.39M (the same
+  limit as Damage Overflow Fix's cap).
+- **Console:** `floating-damage status` (HD and legacy projection lines), `floating-damage preview`.
+- **Tests:** the author's config tests and our legacy projection tests run in the build script. In game (lane plug125):
+  numbers over a Fallen and over Andariel in HD, in legacy and in legacy with Legacy 16:9, and DPS 910 / 2.4K / 4.6K in
+  legacy; the numbers 2.5 times bigger in legacy 4:3 and Legacy 16:9 with the shipped `legacy_text_scale`.
+- **Bigger or smaller numbers:** `legacy_text_scale` (legacy only) or `text_size` / `critical_hit_size` (both modes) in
+  `ruffneckk-floating-damage.toml`.
+- **On by default; turn it off:** `enabled = false` under `[general]` in `ruffneckk-floating-damage.toml` (the author's
+  master switch; shipped `true`), then start the game again: no renderer or combat hook is loaded. The packaging checks
+  refuse a shipped config without `[general] enabled = true`. Or delete the DLL.
 
 ## Checks before shipping (after 0.1.11)
 

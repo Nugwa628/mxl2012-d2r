@@ -66,6 +66,23 @@ class SignLauncherTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             sl.program_bytes(bytes(s) + b"trailing")
 
+    def test_version_resource(self):
+        def res(**kv):
+            # the code's VerQueryValue path comes first in a real exe; the resource is after VS_VERSION_INFO
+            s = "\\StringFileInfo\\%s\0FileVersion\0\0VS_VERSION_INFO\0\0StringFileInfo\0\0"
+            for k, v in kv.items():
+                s += k + "\0" * (2 if len(k) % 2 else 1) + v + "\0"
+            return bytes(pe()) + b"\0" + s.encode("utf-16-le")  # at an odd offset: found where it is
+        good = dict(ProductName="D2R-XL 2012", FileVersion="0.1.5", ProductVersion="0.1.5",
+                    OriginalFilename="D2R-XL-2012-Downloader.exe")
+        self.assertEqual(sl.version_strings(res(**good))["ProductName"], "D2R-XL 2012")
+        self.assertEqual(sl.metadata_problems(res(**good)), [])
+        self.assertEqual(len(sl.metadata_problems(res(**dict(good, ProductName="mxl2012")))), 1)
+        self.assertEqual(len(sl.metadata_problems(res(**dict(good, ProductVersion="0.1.6")))), 1)
+        self.assertEqual(len(sl.metadata_problems(res(**dict(good, OriginalFilename="x.exe")))), 1)
+        self.assertEqual(sl.version_strings(bytes(pe())), {})
+        self.assertEqual(len(sl.metadata_problems(bytes(pe()))), 3)
+
     def test_not_a_pe(self):
         with self.assertRaises(ValueError):
             sl.pe_layout(b"ZM" + b"\0" * 300)

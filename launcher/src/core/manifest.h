@@ -77,10 +77,17 @@ std::string ChannelReadError(const std::string& channel, const std::string& url,
 // ("D:\site", "\\server\share\mxl") becomes file:///D:/site/.
 std::string SiteRoot(const std::string& setting);
 
-// A saved site on a retired host name moved to its new name: https://files.werdegames.com/<x> becomes
-// https://files.wyrd.games/<x>, https://dl.werdegames.com/<x> becomes https://dl.wyrd.games/<x> (scheme and host in any
-// case, the rest kept as written). Every other setting (other hosts, a port, http://, file://, folders) is returned unchanged.
-std::string MigrateRetiredSite(const std::string& site);
+// A saved site on a retired host name of the download site moved to its new name: https://<retired files host>/<x> becomes
+// https://files.wyrd.games/<x>, https://<retired dl host>/<x> becomes https://dl.wyrd.games/<x> (scheme and host in any case,
+// the rest kept as written). Every other setting (other hosts, a port, http://, file://, folders) is returned unchanged.
+// The retired hosts are matched by the SHA-256 of the lower-case host name, so the public sources do not name the
+// retired domain (RetiredSiteHosts; the hosts moved to wyrd.games on 2026-11-13).
+struct SiteMove {
+	std::string hostSha256;  // sha256 hex of the retired host, lower case
+	std::string to;          // its new host
+};
+extern const std::vector<SiteMove> RetiredSiteHosts;
+std::string MigrateRetiredSite(const std::string& site, const std::vector<SiteMove>& moves = RetiredSiteHosts);
 
 // <objectsBase><sha[0:2]>/<sha>
 std::string ObjectPath(const std::string& objectsBase, const std::string& sha256);

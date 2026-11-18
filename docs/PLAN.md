@@ -50,6 +50,7 @@ Overall: roughly 96 % (2026-11-01, after 0.1.10 and 0.1.9; 95 % after 0.1.8 and 
 - [x] Migrate the standard tables, merge with D2R's rows, both banks; `tools/install_mod.py` into slot 2 (mods\mxl2012)
 - [x] First boot with `-txt`, fix load asserts (lane boot: main menu clean, Act 1 enterable; asserts #6, #7 fixed since)
 - [x] Strings: namespace `mxl2012` (docs/strings.md)
+- [x] Median's secret uniques with wiki stats drop, rarer than the other uniques of their base ([secret-items.md](secret-items.md))
 
 ## Phase 3: Triage of engine differences
 - [x] docs/engine-triage.md (static reading of 1.13c rules against D2R 3.3)

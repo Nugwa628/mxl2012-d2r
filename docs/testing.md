@@ -4,6 +4,75 @@ Changes that are built and installed but not yet confirmed in the game. Restart 
 "Confirmed" (or into docs/bugs.md) once tested. Console command `mxl` shows the plugin version and how many skill
 functions it installed.
 
+## Lane devsock: developer menu uniques and set items with their maximum sockets (2026-11-17, slots 5 and 2, HD and legacy, background input)
+
+Owner report 2026-11-17: Facebreaker (Chain Gloves (Sacred)) from the developer menu showed "Max Sockets: 4" and took nothing; a Cap
+showed "Socketed (4)". Based on main a2052ae, full build of the lane, dev DLLs of the lane. Check `devmenusock`
+(tools/devmenu_checks.py `run_sock`): `MXL_SLOT=2 MXL_RUN=devsock MXL_CHAR=<new name> py -3 <runs>/tools/heavy_lock.py game devsock --
+py -3 <runs>/devsock/session.py <worktree>` (slot lock, install with `--invtabs`, the check, the slot back). In HD and in legacy
+graphics it spawns Facebreaker and Isenhart's Lightbrand from the menu, reads count, socketed flag and identified back, screenshots the
+tooltips, clicks an Amethyst onto each and screenshots again; then the same two rows from the game's generator (`item <code>
+unique|set <row> inv`, the drop path), reported only.
+
+| Run | Build | Result |
+|-|-|-|
+| `checks-20261117-111937-s5` | catalog with set / unique sockets, plugin asks every quality by `socketCount` | Facebreaker 4 sockets, flags 0x10080810, "Socketed (4)", gem in (HD). Set row not found by the check (its label carries the set name); legacy gem click missed (the check toggled the inventory shut) |
+| `checks-20261117-112417-s5` | same, check fixed | Facebreaker PASS both modes. Isenhart's Lightbrand not created: the item service answers `Unsupported` for a set row asked with 4 sockets on all 64 tries. Generator: Facebreaker 4 sockets, flags 0x10082810; Isenhart's Lightbrand 0 sockets, flags 0x10082010, tooltip "Max Sockets: 4" |
+| `checks-20261117-113251-s5` | set fallback: created without sockets, then `editItem` to 4 | edit also `Unsupported`; the set item ends with 1 socket (D2R's cap for that quality). Not kept |
+| `checks-20261117-114113-s2` | final: set / unique ask by the `sock` property (id 133) | all 8 rows PASS: Facebreaker and Isenhart's Lightbrand 4 of 4 sockets, flags 0x10080810 (socketed, identified), "Socketed (4)", an Amethyst goes into each (Isenhart's: +30% attack rating), HD and legacy |
+
+Shots `mxl2012-runs/devsock/shots/` (`devsock_<hd|sd>_<unique|set>_{status,tooltip,gem_tooltip}.png`, generator tooltips
+`devsock_drop_<unique|set>_tooltip.png`). "Max Sockets: N" is D2RLoader's D2RCore option `maximum_sockets` (dev-menu.md "Sockets"),
+shown on items without sockets, drops included. Engine: each start wrote one `d2r-lastresort-crash-report` at game start and the
+exit-time pool asserts, as in earlier lanes; no crash during the check. Unit tests: `tools/tests/test_devmenu_layout.py`
+(`test_fixed_sockets`, `test_spawn_sockets`, `test_sock_property`, `test_uniques_and_sets_get_their_max_sockets`,
+`test_built_catalog_facebreaker_socketed`), `devmenu_tests` (`PlanSockets`, format 4, header property id).
+**Not seen in game:** a unique whose row's `sock` is below its base's maximum (the built tables have none), quivers with `sock 1` on a
+type that allows 0.
+
+## Lane bug617: Ctrl stat range of "Reanimate as" (bug #617, 2026-11-17, slot 5, HD and legacy, background input)
+
+Build of lane/bug617 (data and plugin) installed into slot 5. Script `mxl2012-runs/bug617/lab617.py` (outside git): character
+ReanimLab / ReanimLabB (Assassin, made by the run), Rogue Encampment, `asserttrace on`; per mode each item made in the emptied
+backpack (`packclear`, `item <code> unique <row> inv` / `item j25 q=4 inv`), hovered without Ctrl, then with Ctrl held
+(virtual modifier + posted Ctrl, as lane statranges). Items: Catechumen `w23` (Reanimate as 3-5 %), an amulet unique with a
+fixed 5 % Reanimate, Blade Talons `j25` q4 (ranges on other stats). Legacy cells: `SR_LEGACY_CELL=828,405,43,43` (the lab's
+old default missed the grid). Evidence `mxl2012-runs/bug617/`.
+
+| Run | Build | Result |
+|-|-|-|
+| `run1-control` | `MXL_CONTROL=rangedesc` (part off) | the mods.cpp:998 assert ("invalid DescFunc type", nDescFunc = 23) at the plain HD hover of Catechumen; with Ctrl the "5% Reanimate as: Crimson Templar" line is an empty line (`hd_catechumen_plain.png` / `hd_catechumen_ctrl.png`) |
+| `run3-fixed` | part on | HD: with Ctrl "(3-5)% Reanimate as: Crimson Templar", the other stats keep their ranges; the fixed amulet line stays "5% Reanimate as: Magma Demon" next to "(3-6)% Life stolen per Hit"; 0 asserts (legacy hovers of this run missed the grid) |
+| `run4-fixed-legacy` | part on | legacy: the same "(3-5)% Reanimate as: Crimson Templar" with Ctrl, 0 asserts |
+
+`run2-fixed` is void (the reused character's backpack was full, `item` refused). Every slot-5 launch of the day, other lanes'
+and the control included, left the same first-chance access violation report (`d2rloader\crashes`, module offset +0x15299);
+the game kept running, not related to this part. `asserttrace count` did not count the BC_VERIFY (it stayed 0 while
+d2rloader.log had the assert), so the result is read from d2rloader.log. Slot 5 closed and unlocked.
+
+## Lane secrets: Median's secret uniques drop (2026-11-16, slot 2, HD and legacy, background input)
+
+Owner request 2026-11-16, [secret-items.md](secret-items.md). Based on main e2805cd, full build of the lane, dev DLLs of the lane.
+Check `secrets` (tools/secrets_checks.py): `MXL_SLOT=2 MXL_RUN=secrets MXL_CHAR=Secrets py -3 <runs>/tools/heavy_lock.py game secrets --
+py -3 <runs>/secrets/session.py <worktree>` (slot lock, install with `--invtabs`, the check, the slot back). `SECRETS_ROLLS` (default 60)
+sets the rolls per base, and `SECRETS_PART=drops|tooltips` runs one part.
+
+- **Drops** (`checks-20261116-220745-s2`, new Barbarian Secrets): `item <base> unique ilvl=120 inv` with no row, so the game's
+  generator picks the unique by rarity, 60 rolls on each of the six sacred bases. Every secret rolled: Grand Armor 6, Siggard's
+  Revenge 5, Aeterna 4, Sword of the White Void 5, Fury of Hellfire 2, Soul Reaver 7. Together 29 of 360, about 1 in 12.4 (expected
+  1 in 13). No unspawnable row rolled. The jewels (1 in 13,865 to 1 in 41,596 of unique jewels) were not rolled. Their built
+  `spawnable` cells are checked.
+- **Tooltips**: all nine made by row and hovered in the backpack, in HD and in legacy graphics. Every stat line of the wiki shows.
+  Aeterna reads "5% Chance to cast level 25 Singularity on Attack", Bard's Joke "+1 to Disco Inferno", and Lady of Storms "Required
+  Level: 40". The differences from the wiki are listed in secret-items.md. Shots `mxl2012-runs/secrets/shots/`
+  (`secrets_<row>_<hd|legacy>.png`, overviews `secrets_sacred_<hd|legacy>_montage.png`).
+- Engine: only the exit-time pool asserts (BC_ASSERT s_StatsPool / m_allocated, as in earlier runs), plus one handled first-chance
+  access violation report at game start (a module in the Windows DLL range; the game went on, same as lane zonenames). The report is
+  copied to the shots folder.
+- Unit tests: `tools/tests/test_secret_items.py` (data list, apply on both banks, idempotent, build order, built mod).
+- **Not seen in game:** a secret jewel from a real roll (too rare to roll), a monster kill drop (the harness generator stands in
+  for it), a wearer's proc / oskill working.
+
 ## Lane zonenames: the "Entering ..." banner names the area as Median does (2026-11-15, slot 2, HD and legacy, foreground)
 
 docs/bugs.md #612. Based on main 0511af9, full build of the lane, dev DLLs of the lane (no plugin change). Check `zonenames`
@@ -7895,6 +7964,20 @@ Checks `leftskills` and `leftskills_pad` (`tools/leftskills_checks.py`), Necroma
 - Each launch left one `d2r-lastresort-crash-report` (a handled first-chance access violation at start, other lanes' runs
   on slot 3 too; see bugs.md #17).
 
+## Lane bug616: left-click skill after Save and Exit (2026-11-17, slot 2, HD and legacy, background input)
+
+Bug #616 (release smoke 0.1.24: `leftskills` read (0, 1110) after Save and Exit) is the check's fault, not the game's.
+The check put Sacrifices (a Necromancer skill) on the left; the release smoke ran an Amazon. A d2s stores only the class's
+own skills, so the harness-given skill is gone after the reload and the game puts Attack on the left, although the save
+holds the button (header dword 0x68 = left skill, 0x6c = right skill). Probe `mxl2012-runs/bug616/probe616.py`
+(`MXL_SLOT=2 MXL_RUN=bug616 MXL_CHAR=Bugsixama py -3 probe616.py all probe616`), run `checks-20261117-112129-s2`:
+Sacrifices on an Amazon comes back as (0, 1110), Ecstatic Frenzy as (324, 1110); the HUD shots
+`probe616_after_other.png` / `probe616_after_own.png` show Attack / Ecstatic Frenzy on the left button.
+
+- `leftskills` now saves with a skill of the player's class (`LS_SAVE`, learnt first) and does the save part in the
+  run's graphics mode (`MXL_GRAPHICS`). Amazon `Bugsixama`: `checks-20261117-112541-s2` (HD) and
+  `checks-20261117-113144-s2` (`MXL_GRAPHICS=legacy`), both (324, 1110) after Save and Exit, every judged row ok.
+
 ## Lane buffhud: Buff HUD 1.2.0, debuffs, moving the icons, hover names (2026-11-16, slot 3, HD and legacy, background input)
 
 Owner requests for the bundled Buff HUD (docs/bundled-plugins.md): hover names that show, harmful effects in their own group,
@@ -7951,3 +8034,122 @@ with the extra checks `rel_belt`, `rel_buffhover`, `rel_ghost`, `rel_rapture`; n
 Asserts: the known exit pool asserts, `last_used_frame != PrismGetFrameCount()`, one `skillDescTbl` assert in
 `charmpage_grid` (harness-learnt skill, as in lane leftskills). One `d2r-lastresort-crash-report` at launch in the first run
 (the handled first-chance report other lanes see); no crash.
+
+## Lane charmstats: the legacy charm tab's stats on a second page (2026-11-17, slot 2, HD, legacy 4:3 and Legacy 16:9, background input)
+
+Check `charmstats` (`tools/game_checks.py`) on the CharmStats character with 45 charms in the tab (80 summary lines),
+1600 x 900. Runs under `mxl2012-runs/charmstats/runs/`:
+
+- `checks-20261117-003130-s2` (legacy 4:3, panel at x 320): every step true. The tab opens on page 1 (the grid, status
+  `; classic page grid`); the stats button's tooltip "Charm stats" and a real click switch to page 2 (18 rows, 80 lines
+  in the list); no item tooltip over where the grid was; PageDown scrolls; the list by charm shows; closed and opened
+  again the tab stays on page 2; the grid button's click goes back and the 45 charms are where they were. HD before and
+  after: the band above the grid as before.
+- `checks-20261117-005954-s2` (Legacy 16:9, release legacy169.dll, panel at x 120): the same steps, all true with real
+  clicks. (Run `checks-20261117-005132-s2` used a wrong panel offset; its clicks missed and the check fell back to the
+  console, the pages themselves were right.)
+- Verdict FAIL on the first run only from an engine assert while the HD fill put the charms in (before any legacy or
+  page step): "Tried to get a ranged mod string on an invalid DescFunc type 23" (D2Client mods.cpp:998), on a unique
+  charm (index 1782). Not from the pages; bug #617. Otherwise the usual exit pool asserts and one
+  launch-time last-resort crash report per run.
+- **Not covered:** a controller (the legacy panel has none), more than one tab, other resolutions.
+
+Long lines wrapped (slot 5, after the merge of 0.1.24; same check, now with the step `wrapped`):
+
+- `checks-20261117-015131-s5` (legacy 4:3) and `checks-20261117-015719-s5` (Legacy 16:9): every step true. 81 summary
+  lines, 10 of them wider than 38 characters, give 91 classic rows with 10 continuations, none over 38 characters, the
+  words unchanged. On `charmstats_sd_43_stats.png` / `charmstats_sd_w169_stats.png` the Death Spiral, Dark Summoning,
+  Time Strike and Blast Wave lines sit on two rows inside the box. The list by charm keeps its colours.
+- The 4:3 run filled the tab again and hit the DescFunc 23 assert again (bug #617); the 16:9 run found the tab filled.
+
+## Lane plug125: Damage Overflow Fix, Enemy Health Bars, Floating Damage (2026-11-16, slots 2 and 5, HD and legacy, background input)
+
+Owner decisions of 2026-11-16 for three bundled plugins (docs/bundled-plugins.md): Damage Overflow Fix with our settings,
+Enemy Health Bars built from source (no build check, legacy placement, bars only on damaged monsters by default with
+`show_full_health` for all), Floating Damage with legacy placement, the bundled Cinzel Bold font and its `[general] enabled`
+switch on. Runners, logs and the overlay capture in `mxl2012-runs/plug125/` (`run_plug125.py`, `run_ehb.py`,
+`ehbtools/overlay_capture.py`, `run*.out`): `MXL_SLOT=2 MXL_RUN=plug125 MXL_CHAR=Plug MXL_CHAR_CLASS=barbarian py -3
+<runs>/plug125/run_ehb.py pkg[,l169]`. The runner places the plugins' files after the slot lock and removes them before
+it is released. `pkg` takes the files from a no-data package made by `tools/package_release.py --no-data --dof
+third_party/damage-overflow-fix --ehb build/enemyhealthbars/Release/d2rl-enemy-health-bars.dll --fd
+build/floatingdamage/Release/d2rl-ruffneckk-floating-damage.dll` (extracted 7z); `l169` adds D2R Legacy 16:9.
+
+Enemy Health Bars draws in its own window over the game, which the author hides while the game is not focused. The test
+config turns on the test-only key `dev_keep_visible_unfocused` (patch 0002, never shipped on), and the runner captures that
+window with PrintWindow and lays it over the game's own capture (`<shot>_ehb.png`; black is the transparent key, so the
+test config draws the normal outline `#010101`). Nothing takes the focus. Monsters are spawned in Cold Plains
+(`act1/outdoors`) with damage resist 100 and their life set by `stat`: Fallen at 100, 70 and 25 %, a Median normal
+(class 160) at 50 %, Andariel at 40 % and Uber Izual at 85 %. Each round is shot with the shipped default and again after
+`show_full_health = true` and `enemybars reload`.
+
+| Check | Run | Result |
+|-|-|-|
+| EHB HD | `checks-20261116-234642-s2` (1600 x 900) | PASS: `hd_normal_ehb.png` bars over the Fallen at 70 and 25 % and the class 160 at 50 %, none over the full-life Fallen; `hd_normal_all_ehb.png` a bar over every monster; `hd_boss_ehb.png` orange boss outlines on Andariel and Uber Izual |
+| EHB legacy (800 x 600 classic) | same run | PASS: log `HD=0 legacy=1 render=800x600`; `legacy_normal_ehb.png` three bars over the damaged monsters and none over the full-life Fallen, `legacy_normal_all_ehb.png` all of them, `legacy_boss_ehb.png` bars with boss outlines over Andariel and Izual |
+| EHB legacy with Legacy 16:9 (1066 x 600 classic) | `checks-20261117-000622-s2` | PASS: log `render=1066x600`; the same three shots, bars over the targets across the full 16:9 width |
+| FD HD, legacy, legacy with Legacy 16:9 | `checks-20261116-222909-s2`, `checks-20261116-223120-s2` | PASS: numbers over the Fallen and Andariel, DPS counter 910 / 2.4K / 4.6K in legacy (`legacy_dps.png`, `legacy_cast_0.png`) |
+| DOF in game | `checks-20261116-204747-s2` and runs 4 / 6 / 9 / 11 | PASS: hits above 8,388,607 capped instead of wrapping (`ovf_d30000_ed30000.png`) |
+| All three together from the package | both EHB runs | PASS: all three load (d2rloader log), 0 cursor changes, foreground window changed 0 times, no new crash files |
+| The whole packaged plugin set, Legacy 16:9 on | `checks-20261117-014958-s2`, `checks-20261117-015959-s2` | PASS: a data package built from this branch (`package_release.py` with every bundled plugin, `verify_package.py` OK) placed whole: legacy169, Buff HUD, Auto Belt Refill, Controller QOL, invtabs, drawcap, Stat Book and the three new ones with their configs (the slot's test-harness mxl2012-core and its `d2rloader.toml` / `mxl2012-core.toml` kept). D2RLoader `11 plugins loaded`, in game in HD and legacy: bars (`hd_normal_ehb.png`, `legacy_normal_ehb.png`), `legacy_fight7_ehb.png` a number over Andariel with her bar and `DPS 7` in the bottom left corner beside the HUD, `hd_fight7_ehb.png` bar and `DPS 3` |
+| The whole packaged plugin set, legacy169 off (4:3 legacy) | `checks-20261117-020224-s2` | PASS: `11 plugins loaded`; `legacy_fight7_ehb.png` a number over Andariel with her bar and `DPS 4` inside the 4:3 picture, above the life globe (before patch 0003 the counter sat in the black side bar, `checks-20261116-234642-s2/legacy_normal_ehb.png`) |
+| FD numbers 2.5x in legacy (patch 0004, `legacy_text_scale = 2.5`), Legacy 16:9 and HD | `checks-20261117-080402-s2` | PASS: the packaged set with this build's Floating Damage, `11 plugins loaded`; `legacy_fight4_ehb.png` / `legacy_fight6_ehb.png` numbers 18 / 17 about 2.5 times the earlier legacy size over a Median normal and a Fallen, its bar, `DPS 4` unchanged in the corner; `hd_fight4_ehb.png` / `hd_fight9_ehb.png` the HD numbers at their old size |
+| FD numbers 2.5x in legacy, 4:3 (legacy169 off) | `checks-20261117-075516-s2` | PASS: `11 plugins loaded`; `legacy_fight2_ehb.png` / `legacy_fight5_ehb.png` numbers 16 / 18 over Andariel at the new size; the DPS counter unchanged inside the picture |
+
+- Native tests: Enemy Health Bars `policy_tests` (the author's plus damaged-only visibility and the legacy placement for
+  800 x 600, 1066 x 600 and 640 x 480), run by `tools/build_enemyhealthbars.ps1`; Floating Damage's config tests and
+  `floating_damage_mxl_tests`, run by `tools/build_floatingdamage.ps1`.
+- Packaging tests (`tools/test_package_release.py`, `tools/test_verify_package.py`): 65 tests, among them the shipped
+  defaults (`show_full_health = false`, FD `[general] enabled = true`, DOF `debug_log` / `log_each_site` false and `leech`
+  true) and refusal of other builds and configs. Launcher `launcher_tests`: 421 checks, 0 failures.
+- A run with the older 0.1.22 plugin builds (legacy169, Buff HUD, Auto Belt Refill and Controller QOL from a 0.1.22 build
+  folder, Controller QOL and Buff HUD without their configs, `checks-20261116-235557-s2`) did not reach the main menu within
+  3 minutes (D2RLoader wrote no new log line). That set is not what a package ships: the whole set from a package of this
+  branch, configs included, loads and plays in both full-set runs above.
+- The first full-set run ended with the game's own object pool asserts at exit (`m_freed == 0` and the like), as did the
+  earlier run `checks-20261116-234642-s2`; the other two had none. No new crash files.
+- Each game start wrote one D2RLoader last-resort crash report file, as before these plugins; the game kept running.
+- In legacy the Floating Damage numbers were small (the author's 2160p text size scaled to the window height); patch 0004
+  (below) makes them 2.5 times bigger there.
+- **Not covered:** the gamepad, other resolutions than 1600 x 900, MapSense as the bars' renderer, D2R 3.4 (slot 1).
+
+Page 1 tight (owner, 2026-11-17; slot 2, after the merge of ff094a7 and a full tools/build.py):
+
+- `checks-20261117-075936-s2` (legacy 4:3) and `checks-20261117-080141-s2` (Legacy 16:9): every step true. Page 1's grid
+  sits right under the tab row, the bottom band and close button right under the grid, and the game world shows below
+  (D2R's own thin outer panel frame stays at the full height). The new shot `charmstats_sd_<tag>_grid_hover_cell.png`
+  hovers the first cell at its new place (y 117): the charm's tooltip shows, so the grid widget matches the art. Page 2,
+  the wrapping and HD are as before.
+
+## Lane signpath: downloader ready for SignPath Foundation code signing (2026-11-17, no game slot)
+
+Static and downloader-only work; no game was started.
+
+- Build: `cmake -S launcher -B build/launcher -A x64`, Release with Visual Studio 18 / MSVC: no warnings;
+  `launcher_tests.exe` **433 checks, 0 failures** (new: `KeptOnCleanup` in `TestSaveCopies`). The exe's version resource:
+  ProductName `D2R-XL 2012`, FileVersion = ProductVersion `0.1.5`, OriginalFilename `D2R-XL-2012-Downloader.exe`;
+  `tools/sign_launcher.py --exe ... --out ...` (unsigned) passes, and refused the older build with ProductName `mxl2012`.
+- `--cli cleanup` on fake folders (`mxl2012-runs/signpath/cleanup-test.log`): refused while a marked `mods\mxl2012` is
+  installed (nothing removed); afterwards only `save-copies` and `removed` stayed; without them the data folder was gone
+  and neither the log nor the state came back.
+- Window: `--snapshot` with a fake game folder (`mxl2012-runs/signpath/window-after.png`): buttons in Cinzel Decorative
+  Bold, labels fit their rects, the new speech-bubble icon draws. Font before / after mock-ups:
+  `preview-before-exocet.png`, `preview-after-cinzel-decorative.png`; candidate sheet `font-specimen.png` (Exocet, Cinzel
+  Bold, Cinzel Decorative Bold, Pirata One, Uncial Antiqua, Metamorphous, Marcellus SC).
+- Python: `tools/tests/test_code_signing.py` (4) and `tools/test_sign_launcher.py` (7) pass. Full discovers: the
+  failures left (`test_advanced_stats` needing the local v005 extraction; `test_package_release` x2 and
+  `test_game_checks_unporteda` needing built plugins / tables) fail the same way on the untouched base commit.
+- The SignPath GitHub workflow (now `downloader-repo/.github/workflows/sign-launcher.yml`, on hold) was not run (it needs the public mirror and the SignPath
+  secrets); no signature was made.
+
+Follow-up (2026-11-17), same lane:
+
+- Retired download hosts are matched by SHA-256 of the host (`RetiredSiteHosts`), so the source no longer names the old
+  domain; a saved site on either old host still moves to `files.wyrd.games` / `dl.wyrd.games`
+  (`mxl2012-runs/signpath/migrate-check.log`). `launcher_tests.exe` **437 checks, 0 failures**.
+- On hold (owner): the separate downloader repository and SignPath. `tools/downloader_repo.py` (18 tests) exported a tree
+  to `mxl2012-runs/signpath/export-test` that configured, built and passed `launcher_tests.exe` (437 / 0), its tools tests
+  (7) and the unsigned `sign_launcher.py` check from only that folder (`export-test-build.log`).
+- Azure Artifact Signing: `tools/artifact_signing.py` (12 tests, no Azure calls). `setup` fetched
+  `Microsoft.ArtifactSigning.Client` 1.0.146 (SHA-256 checked) into `work/signing-tools` and found Windows SDK signtool
+  10.0.28000 and the .NET 8.0.8 runtime; 1.0.147+ need .NET 10 (`runtimeconfig.json` of 1.0.151: `net10.0`). No signing
+  run yet: it needs the owner's account (endpoint, account, certificate profile) and an Azure sign-in.

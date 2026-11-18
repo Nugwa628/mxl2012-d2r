@@ -1,0 +1,473 @@
+diff --git a/plugins/floating-damage/CMakeLists.txt b/plugins/floating-damage/CMakeLists.txt
+index afbfa08..308b45d 100644
+--- a/plugins/floating-damage/CMakeLists.txt
++++ b/plugins/floating-damage/CMakeLists.txt
+@@ -128,6 +128,12 @@ if(BUILD_TESTING)
+         COMMAND ruffneckk_floating_damage_tests "${FLOATING_DAMAGE_CONFIG}"
+     )
+ 
++    # D2R-XL 2012: the pure logic of our additions (legacy_projection.hpp)
++    add_executable(floating_damage_mxl_tests tests/floating_damage_mxl_tests.cpp)
++    target_include_directories(floating_damage_mxl_tests PRIVATE src)
++    target_compile_features(floating_damage_mxl_tests PRIVATE cxx_std_20)
++    add_test(NAME mxl2012.floating-damage.legacy COMMAND floating_damage_mxl_tests)
++
+     set(FLOATING_DAMAGE_TEST_EXOCET_FONT "" CACHE FILEPATH
+         "Local Exocet OpenType asset for font atlas validation; never packaged")
+     if(FLOATING_DAMAGE_TEST_EXOCET_FONT)
+diff --git a/fd-mid/plugins/floating-damage/src/legacy_projection.hpp b/plugins/floating-damage/src/legacy_projection.hpp
+new file mode 100644
+index 0000000..a595cc6
+--- /dev/null
++++ b/plugins/floating-damage/src/legacy_projection.hpp
+@@ -0,0 +1,82 @@
++#pragma once
++
++// D2R-XL 2012 addition (third_party/floating-damage-mxl2012 in the D2R-XL 2012 repository, MIT like this plugin):
++// where a monster stands on the screen in D2R's legacy (classic) graphics.
++//
++// In legacy graphics D2R runs the classic engine: it draws the world into a fixed classic screen (800x600 or 640x480,
++// 1066x600 / 853x480 with the D2R Legacy 16:9 plugin) and composes that picture into the window fitted to the window
++// height and centred (side bars when the window is wider). A unit is drawn at its client pixel position minus the view
++// offset (the same two helpers every classic unit draw calls), so the plugin does the same and then maps the classic
++// point into the window like the compose pass. The HD camera projection is not used there: it describes the 3D view,
++// which the legacy picture does not show.
++//
++// Pure code (no Windows or D2RLoader headers): tests/floating_damage_mxl_tests.cpp checks it without the game.
++
++#include <cmath>
++#include <cstdint>
++
++namespace FloatingDamageMxl {
++
++// Classic pixels between a unit's feet and the place its number starts: about the height of a man-sized monster in
++// the classic sprites, so the number starts at the upper body like the HD head anchor.
++constexpr int LegacyHeadOffset = 56;
++
++struct ClassicPoint {
++    float x;
++    float y;
++};
++
++// The classic screen point of a unit: its client pixel position minus the view offset (what the classic draw code
++// does), raised by the head offset.
++constexpr ClassicPoint ClassicUnitPoint(
++    std::int32_t pixelX,
++    std::int32_t pixelY,
++    std::int32_t viewOffsetX,
++    std::int32_t viewOffsetY,
++    std::int32_t headOffset = LegacyHeadOffset) noexcept {
++    return ClassicPoint{
++        static_cast<float>(pixelX - viewOffsetX),
++        static_cast<float>(pixelY - viewOffsetY - headOffset),
++    };
++}
++
++// The classic screen size is usable: both sides positive and not larger than any classic mode (the widest is 16:9
++// at 600 high), so a stray read never turns into a huge scale.
++constexpr bool ClassicSizeValid(std::int32_t width, std::int32_t height) noexcept {
++    return width > 0 && height > 0 && width <= 4096 && height <= 2048;
++}
++
++// A classic screen point in window (display) pixels: the compose pass fits the classic picture to the display height
++// and centres it. False when a size is unusable, the result is not finite, or it falls outside the display.
++inline bool ClassicToDisplay(
++    float classicX,
++    float classicY,
++    std::int32_t classicWidth,
++    std::int32_t classicHeight,
++    float displayWidth,
++    float displayHeight,
++    float& outX,
++    float& outY) noexcept {
++    if (!ClassicSizeValid(classicWidth, classicHeight)
++            || !(displayWidth > 0.0f) || !(displayHeight > 0.0f)) {
++        return false;
++    }
++    const float scale = displayHeight / static_cast<float>(classicHeight);
++    const float left = (displayWidth - static_cast<float>(classicWidth) * scale) * 0.5f;
++    const float x = left + classicX * scale;
++    const float y = classicY * scale;
++    if (!std::isfinite(x) || !std::isfinite(y)
++            || x < 0.0f || x > displayWidth || y < 0.0f || y > displayHeight) {
++        return false;
++    }
++    outX = x;
++    outY = y;
++    return true;
++}
++
++// The target of a rip-relative operand: the address after the instruction plus the signed 32-bit displacement.
++constexpr std::uint64_t RipTarget(std::uint64_t nextInstruction, std::int32_t displacement) noexcept {
++    return nextInstruction + static_cast<std::uint64_t>(static_cast<std::int64_t>(displacement));
++}
++
++}  // namespace FloatingDamageMxl
+diff --git a/plugins/floating-damage/src/plugin.cpp b/plugins/floating-damage/src/plugin.cpp
+index 0b5eec8..eca59f1 100644
+--- a/plugins/floating-damage/src/plugin.cpp
++++ b/plugins/floating-damage/src/plugin.cpp
+@@ -10,6 +10,7 @@
+ #include "d3d12_renderer.hpp"
+ #include "default_config.hpp"
+ #include "floating_damage.hpp"
++#include "legacy_projection.hpp"
+ #include <RuffnecKk/native_stat_compat.hpp>
+ #include <RuffnecKk/maps_stat_compat.hpp>
+ #include <RuffnecKk/tracked_native_transform_d2rl.hpp>
+@@ -51,6 +52,14 @@ constexpr std::uintptr_t GetRenderThreadContextRootRva = 0x685750;
+ constexpr std::uintptr_t ProjectUnitToScreenRva = 0x76A7D0;
+ constexpr std::uintptr_t GetNativeHeightRva = 0x07F4A0;
+ constexpr std::uintptr_t GetNativeWidthRva = 0x07F510;
++// D2R-XL 2012: legacy graphics (legacy_projection.hpp). Each is checked for its expected bytes at load; a mismatch turns
++// only the legacy projection off (log line), HD is unchanged.
++constexpr std::uintptr_t IsHdRva = 0x846210;             // byte (): the panel manager's +0xb9, 1 in HD, 0 in legacy
++constexpr std::uintptr_t UnitPixelXRva = 0x34AF60;       // int (unit): client pixel X of a unit (classic draw code)
++constexpr std::uintptr_t UnitPixelYRva = 0x34AFB0;       // int (unit): client pixel Y
++constexpr std::uintptr_t ViewOffsetXRva = 0x0B9B20;      // int (): classic view offset X (with the side panel shift)
++constexpr std::uintptr_t ViewOffsetYRva = 0x0B9B70;      // int (): classic view offset Y
++constexpr std::uintptr_t CameraScreenSizeReadRva = 0x0B9BBD;  // in UpdateCamera: mov eax, [ScreenSizeX] ... [ScreenSizeY]
+ constexpr std::uint16_t CriticalStrikeResultFlag = 0x2000;
+ constexpr std::uint32_t MonsterUnitType = 1;
+ constexpr std::int32_t HitPointsStatId = 6;
+@@ -139,6 +148,22 @@ UpdateCameraFn OriginalUpdateCamera{};
+ GetRenderThreadContextRootFn GetRenderThreadContextRoot{};
+ GetNativeDimensionFn GetNativeHeight{};
+ GetNativeDimensionFn GetNativeWidth{};
++using IsHdFn = std::uint8_t(__fastcall*)() noexcept;
++using UnitPixelFn = std::int32_t(__fastcall*)(UnitView*) noexcept;
++using ViewOffsetFn = std::int32_t(__fastcall*)() noexcept;
++IsHdFn IsHd{};
++UnitPixelFn UnitPixelX{};
++UnitPixelFn UnitPixelY{};
++ViewOffsetFn ViewOffsetX{};
++ViewOffsetFn ViewOffsetY{};
++const std::int32_t* ClassicScreenWidth{};
++const std::int32_t* ClassicScreenHeight{};
++std::atomic_bool LegacyProjectionReady{};
++std::atomic<std::int32_t> CachedClassicWidth{};
++std::atomic<std::int32_t> CachedClassicHeight{};
++std::atomic<std::uint64_t> LegacyCameraFrames{};
++std::atomic<std::uint64_t> LegacyProjections{};
++std::atomic_bool LegacyFrameLogged{};
+ 
+ constexpr std::size_t ProjectionCacheSize = 8192;
+ constexpr std::uint64_t ProjectionFreshnessMs = 250;
+@@ -155,6 +180,7 @@ struct ProjectionCacheEntry {
+     std::atomic<std::uint64_t> baseTick{};
+     std::atomic<std::uint64_t> attemptTick{};
+     std::atomic_bool visible{};
++    std::atomic_bool legacy{};  // the points are classic screen pixels (legacy graphics)
+ };
+ 
+ struct ProjectionRequestSlot {
+@@ -629,7 +655,8 @@ void RefreshNativeDimensions(std::uint64_t now) noexcept {
+ void CacheNativeProjection(
+     UnitView* unit,
+     const NativeScreenPoint& point,
+-    bool elevated) noexcept {
++    bool elevated,
++    bool legacy = false) noexcept {
+     __try {
+         if (!unit
+                 || unit->unitType != MonsterUnitType
+@@ -658,10 +685,12 @@ void CacheNativeProjection(
+             entry.baseTick.store(now, std::memory_order_relaxed);
+         }
+         entry.visible.store(true, std::memory_order_relaxed);
++        entry.legacy.store(legacy, std::memory_order_relaxed);
+         entry.attemptTick.store(now, std::memory_order_relaxed);
+         entry.key.store(key, std::memory_order_release);
+         entry.writing.clear(std::memory_order_release);
+-        RefreshNativeDimensions(now);
++        if (!legacy)
++            RefreshNativeDimensions(now);
+     }
+     __except (EXCEPTION_EXECUTE_HANDLER) {
+     }
+@@ -747,6 +776,93 @@ void ProjectRequestedTargets(
+     ProjectionSweepActive = false;
+ }
+ 
++// Legacy graphics: true when the game draws the classic picture (D2R's own HD test says no). False when the legacy
++// projection is off (its expected bytes did not match) or the test faults.
++bool InLegacyGraphics() noexcept {
++    if (!LegacyProjectionReady.load(std::memory_order_acquire) || !IsHd)
++        return false;
++    __try {
++        return IsHd() == 0;
++    }
++    __except (EXCEPTION_EXECUTE_HANDLER) {
++        return false;
++    }
++}
++
++// The requested targets in legacy graphics, on the camera update (the view offset was just set for this frame): the
++// classic screen point each unit is drawn at (legacy_projection.hpp), cached like the HD points but marked legacy.
++void ProjectRequestedTargetsLegacy(std::uint64_t now) noexcept {
++    if (!GetClientUnit || ProjectionSweepActive)
++        return;
++    std::uint64_t previous = LastProjectionSweepTick.load(
++        std::memory_order_relaxed);
++    if (now - previous < ProjectionSweepIntervalMs
++            || !LastProjectionSweepTick.compare_exchange_strong(
++                previous, now, std::memory_order_acq_rel)) {
++        return;
++    }
++
++    std::int32_t viewX{};
++    std::int32_t viewY{};
++    std::int32_t classicWidth{};
++    std::int32_t classicHeight{};
++    __try {
++        viewX = ViewOffsetX();
++        viewY = ViewOffsetY();
++        classicWidth = *ClassicScreenWidth;
++        classicHeight = *ClassicScreenHeight;
++    }
++    __except (EXCEPTION_EXECUTE_HANDLER) {
++        return;
++    }
++    if (!FloatingDamageMxl::ClassicSizeValid(classicWidth, classicHeight))
++        return;
++    CachedClassicWidth.store(classicWidth, std::memory_order_release);
++    CachedClassicHeight.store(classicHeight, std::memory_order_release);
++
++    ProjectionSweepActive = true;
++    for (ProjectionRequestSlot& slot : ProjectionRequests) {
++        if (slot.writing.test(std::memory_order_acquire))
++            continue;
++        const std::uint64_t key = slot.key.load(std::memory_order_acquire);
++        const std::uint64_t requestedUntil = slot.requestedUntil.load(
++            std::memory_order_acquire);
++        if (key == 0 || requestedUntil < now
++                || slot.writing.test(std::memory_order_acquire)
++                || slot.key.load(std::memory_order_acquire) != key) {
++            continue;
++        }
++
++        const std::uint32_t unitType = static_cast<std::uint32_t>(key >> 32);
++        const std::uint32_t unitId = static_cast<std::uint32_t>(key);
++        bool projected{};
++        __try {
++            UnitView* target = GetClientUnit(unitId, unitType);
++            if (target) {
++                const FloatingDamageMxl::ClassicPoint classic =
++                    FloatingDamageMxl::ClassicUnitPoint(
++                        UnitPixelX(target), UnitPixelY(target), viewX, viewY);
++                CacheNativeProjection(
++                    target, NativeScreenPoint{classic.x, classic.y}, true, true);
++                projected = true;
++            }
++        }
++        __except (EXCEPTION_EXECUTE_HANDLER) {
++            projected = false;
++        }
++
++        ActiveProjectionAttempts.fetch_add(1, std::memory_order_relaxed);
++        if (projected) {
++            LegacyProjections.fetch_add(1, std::memory_order_relaxed);
++        }
++        else {
++            ActiveProjectionMisses.fetch_add(1, std::memory_order_relaxed);
++            CacheNativeProjectionFailure(unitType, unitId, now);
++        }
++    }
++    ProjectionSweepActive = false;
++}
++
+ void __fastcall HookUpdateCamera() noexcept {
+     if (OriginalUpdateCamera)
+         OriginalUpdateCamera();
+@@ -755,6 +871,15 @@ void __fastcall HookUpdateCamera() noexcept {
+         return;
+ 
+     CameraFrameTicks.fetch_add(1, std::memory_order_relaxed);
++    if (InLegacyGraphics()) {
++        LegacyCameraFrames.fetch_add(1, std::memory_order_relaxed);
++        if (!LegacyFrameLogged.exchange(true, std::memory_order_acq_rel) && Context) {
++            Context->LogInfo(
++                "FloatingDamage: legacy graphics; numbers follow the classic view (unit pixel minus view offset).");
++        }
++        ProjectRequestedTargetsLegacy(GetTickCount64());
++        return;
++    }
+     void* renderContext{};
+     __try {
+         auto* root = static_cast<std::uint8_t*>(
+@@ -785,7 +910,8 @@ void __fastcall HookUpdateCamera() noexcept {
+ bool TryReadCachedNativeProjection(
+     std::uint32_t unitType,
+     std::uint32_t unitId,
+-    NativeScreenPoint& point) noexcept {
++    NativeScreenPoint& point,
++    bool& legacy) noexcept {
+     const std::uint64_t key = MakeProjectionKey(unitType, unitId);
+     ProjectionCacheEntry& entry = ProjectionCache[ProjectionCacheIndex(key)];
+     if (entry.writing.test(std::memory_order_acquire)
+@@ -815,6 +941,7 @@ bool TryReadCachedNativeProjection(
+     else {
+         return false;
+     }
++    legacy = entry.legacy.load(std::memory_order_relaxed);
+ 
+     if (entry.writing.test(std::memory_order_acquire)
+             || entry.key.load(std::memory_order_acquire) != key) {
+@@ -844,13 +971,32 @@ bool TryProjectTargetToScreen(
+     RequestTargetProjection(unitType, unitId);
+ 
+     NativeScreenPoint native{};
++    bool legacy{};
++    if (!TryReadCachedNativeProjection(unitType, unitId, native, legacy)) {
++        ProjectionFailures.fetch_add(1, std::memory_order_relaxed);
++        return false;
++    }
++    if (legacy) {
++        // classic screen pixels: fitted to the display height and centred, as D2R composes the legacy picture
++        const std::int32_t classicWidth = CachedClassicWidth.load(std::memory_order_acquire);
++        const std::int32_t classicHeight = CachedClassicHeight.load(std::memory_order_acquire);
++        float legacyX{};
++        float legacyY{};
++        if (!FloatingDamageMxl::ClassicToDisplay(native.x, native.y, classicWidth, classicHeight,
++                displayWidth, displayHeight, legacyX, legacyY)) {
++            ProjectionFailures.fetch_add(1, std::memory_order_relaxed);
++            return false;
++        }
++        *screenX = legacyX;
++        *screenY = legacyY;
++        ProjectionSuccesses.fetch_add(1, std::memory_order_relaxed);
++        return true;
++    }
+     const std::int32_t nativeWidth = CachedNativeWidth.load(
+         std::memory_order_acquire);
+     const std::int32_t nativeHeight = CachedNativeHeight.load(
+         std::memory_order_acquire);
+-    if (nativeWidth <= 0
+-            || nativeHeight <= 0
+-            || !TryReadCachedNativeProjection(unitType, unitId, native)) {
++    if (nativeWidth <= 0 || nativeHeight <= 0) {
+         ProjectionFailures.fetch_add(1, std::memory_order_relaxed);
+         return false;
+     }
+@@ -1123,6 +1269,74 @@ bool MatchesSignature(
+         static_cast<std::uint32_t>(expected.size()));
+ }
+ 
++// D2R-XL 2012: the legacy projection's game code, each part checked for the bytes it expects. Nothing is hooked or
++// patched here (only called and read on the camera update). A mismatch leaves the legacy projection off with a log
++// line; the HD projection and the damage capture do not depend on it.
++void SetUpLegacyProjection() noexcept {
++    LegacyProjectionReady.store(false, std::memory_order_release);
++    // IsHd: mov rax, [panel manager]; test rax, rax; jz; movzx eax, byte [rax + 0xb9]; ret
++    constexpr std::array<std::uint8_t, 20> isHdExpected{
++        0x48,0x8B,0x05,0x59,0x9F,0xBF,0x02,0x48,0x85,0xC0,
++        0x74,0x08,0x0F,0xB6,0x80,0xB9,0x00,0x00,0x00,0xC3,
++    };
++    // unit pixel X / Y: the null check, then by unit type (players, missiles, monsters: the path)
++    constexpr std::array<std::uint8_t, 32> unitPixelXExpected{
++        0x40,0x53,0x48,0x83,0xEC,0x20,0x48,0x8B,0xD9,0x48,0x85,0xC9,0x75,0x13,0x88,0x4C,
++        0x24,0x30,0x48,0x8D,0x4C,0x24,0x30,0xE8,0x94,0xA3,0xFF,0xFF,0x84,0xC0,0x74,0x01,
++    };
++    constexpr std::array<std::uint8_t, 32> unitPixelYExpected{
++        0x40,0x53,0x48,0x83,0xEC,0x20,0x48,0x8B,0xD9,0x48,0x85,0xC9,0x75,0x13,0x88,0x4C,
++        0x24,0x30,0x48,0x8D,0x4C,0x24,0x30,0xE8,0x94,0x9D,0xFF,0xFF,0x84,0xC0,0x74,0x01,
++    };
++    // view offset X up to the panel shift (D2R Legacy 16:9 rewrites the shift arithmetic after these bytes, which
++    // this plugin only calls)
++    constexpr std::array<std::uint8_t, 27> viewOffsetXExpected{
++        0x8B,0x0D,0x8A,0xD0,0x96,0x02,0x83,0xE9,0x01,0x74,0x29,0x83,0xF9,0x01,
++        0x74,0x0B,0x8B,0x05,0x72,0xD0,0x96,0x02,0x33,0xC9,0x2B,0xC1,0xC3,
++    };
++    constexpr std::array<std::uint8_t, 10> viewOffsetYExpected{
++        0x8B,0x05,0x36,0xD0,0x96,0x02,0x83,0xC0,0xF8,0xC3,
++    };
++    // UpdateCamera: mov eax, [ScreenSizeX]; cdq; sub eax, edx; sar eax, 1; sub edi, eax; mov eax, [ScreenSizeY]
++    constexpr std::array<std::uint8_t, 19> screenSizeReadExpected{
++        0x8B,0x05,0xA5,0x71,0x1E,0x02,0x99,0x2B,0xC2,0xD1,
++        0xF8,0x2B,0xF8,0x8B,0x05,0x9C,0x71,0x1E,0x02,
++    };
++    const char* failed = nullptr;
++    if (!MatchesSignature(IsHdRva, isHdExpected)) failed = "HD test";
++    else if (!MatchesSignature(UnitPixelXRva, unitPixelXExpected)) failed = "unit pixel X";
++    else if (!MatchesSignature(UnitPixelYRva, unitPixelYExpected)) failed = "unit pixel Y";
++    else if (!MatchesSignature(ViewOffsetXRva, viewOffsetXExpected)) failed = "view offset X";
++    else if (!MatchesSignature(ViewOffsetYRva, viewOffsetYExpected)) failed = "view offset Y";
++    else if (!MatchesSignature(CameraScreenSizeReadRva, screenSizeReadExpected)) failed = "classic screen size";
++    if (failed) {
++        if (Context) {
++            char message[256]{};
++            std::snprintf(message, sizeof(message),
++                "FloatingDamage: legacy graphics projection off (%s: the game code is not what it expects); HD is not affected.",
++                failed);
++            Context->LogWarn(message);
++        }
++        return;
++    }
++    std::int32_t widthDisplacement{};
++    std::int32_t heightDisplacement{};
++    std::memcpy(&widthDisplacement, Base + CameraScreenSizeReadRva + 2, sizeof(widthDisplacement));
++    std::memcpy(&heightDisplacement, Base + CameraScreenSizeReadRva + 15, sizeof(heightDisplacement));
++    ClassicScreenWidth = reinterpret_cast<const std::int32_t*>(
++        Base + FloatingDamageMxl::RipTarget(CameraScreenSizeReadRva + 6, widthDisplacement));
++    ClassicScreenHeight = reinterpret_cast<const std::int32_t*>(
++        Base + FloatingDamageMxl::RipTarget(CameraScreenSizeReadRva + 19, heightDisplacement));
++    IsHd = reinterpret_cast<IsHdFn>(Base + IsHdRva);
++    UnitPixelX = reinterpret_cast<UnitPixelFn>(Base + UnitPixelXRva);
++    UnitPixelY = reinterpret_cast<UnitPixelFn>(Base + UnitPixelYRva);
++    ViewOffsetX = reinterpret_cast<ViewOffsetFn>(Base + ViewOffsetXRva);
++    ViewOffsetY = reinterpret_cast<ViewOffsetFn>(Base + ViewOffsetYRva);
++    LegacyProjectionReady.store(true, std::memory_order_release);
++    if (Context)
++        Context->LogInfo("FloatingDamage: legacy graphics projection ready (classic view offset and screen size).");
++}
++
+ bool InstallDamageHook() noexcept {
+     constexpr std::array<std::uint8_t, 32> checkStateExpected{
+         0x48,0x89,0x5C,0x24,0x08,0x48,0x89,0x74,
+@@ -1249,6 +1463,7 @@ bool InstallDamageHook() noexcept {
+         Base + GetNativeHeightRva);
+     GetNativeWidth = reinterpret_cast<GetNativeDimensionFn>(
+         Base + GetNativeWidthRva);
++    SetUpLegacyProjection();
+     gFloatingDamageDirectContinuation = Base + HitpointsCommitCallRva + 5;
+     gFloatingDamagePeriodicContinuation =
+         Base + PeriodicHitpointsCommitCallRva + 5;
+@@ -1601,6 +1816,23 @@ auto ConsoleCommand(
+             displayHeight,
+             FloatingDamage::GetResolutionScale(displayHeight));
+         command->plugin->WriteConsoleMessage(message);
++        // D2R-XL 2012: the legacy projection's state, and both lines in the plugin log (scripted checks read it)
++        char legacyMessage[256]{};
++        std::snprintf(
++            legacyMessage,
++            sizeof(legacyMessage),
++            "FloatingDamage legacy: projection=%s; graphics=%s; legacy_frames=%llu; legacy_projected=%llu; classic=%dx%d.",
++            LegacyProjectionReady.load(std::memory_order_acquire) ? "ready" : "off",
++            InLegacyGraphics() ? "legacy" : "hd",
++            static_cast<unsigned long long>(LegacyCameraFrames.load(std::memory_order_relaxed)),
++            static_cast<unsigned long long>(LegacyProjections.load(std::memory_order_relaxed)),
++            CachedClassicWidth.load(std::memory_order_relaxed),
++            CachedClassicHeight.load(std::memory_order_relaxed));
++        command->plugin->WriteConsoleMessage(legacyMessage);
++        if (Context) {
++            Context->LogInfo(message);
++            Context->LogInfo(legacyMessage);
++        }
+         return D2RL::ConsoleCommandResult::Handled;
+     }
+     if (action == "on" || action == "off" || action == "toggle") {
+@@ -1856,6 +2088,14 @@ D2RL_PLUGIN_EXPORT void D2RLoaderUnloadPlugin() noexcept {
+     gFloatingDamagePeriodicContinuation = nullptr;
+     OriginalUpdateCamera = nullptr;
+     GetNativeWidth = nullptr;
++    LegacyProjectionReady.store(false, std::memory_order_release);
++    IsHd = nullptr;
++    UnitPixelX = nullptr;
++    UnitPixelY = nullptr;
++    ViewOffsetX = nullptr;
++    ViewOffsetY = nullptr;
++    ClassicScreenWidth = nullptr;
++    ClassicScreenHeight = nullptr;
+     GetNativeHeight = nullptr;
+     GetRenderThreadContextRoot = nullptr;
+     ProjectUnitToScreen = nullptr;

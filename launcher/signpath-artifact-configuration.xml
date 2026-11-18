@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ON HOLD (owner, 2026-11-17): signing uses Azure Artifact Signing; kept for a possible SignPath Foundation application. -->
+<!-- SignPath artifact configuration of the D2R-XL 2012 Downloader (docs/code-signing-policy.md). Paste it as the SignPath
+     project's default artifact configuration. The artifact is the ZIP that .github/workflows/sign-launcher.yml uploads
+     (only the exe at its root). Metadata restrictions as SignPath Foundation requires: the product name is the project's
+     name and the product version is the downloader version, passed by the workflow as the parameter "version"
+     (launcher/src/win/app.h MXL_LAUNCHER_VERSION; the version resource's FileVersion and ProductVersion both carry it,
+     tools/sign_launcher.py checks that before submitting). -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="D2R-XL-2012-Downloader.exe" product-name="D2R-XL 2012" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

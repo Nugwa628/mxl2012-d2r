@@ -13,6 +13,7 @@
 #include "../src/core/zip.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -196,24 +197,38 @@ void TestHosting() {
 	Check(mxl::SiteRoot(bs + bs + "srv" + bs + "mxl2012") == "file://srv/mxl2012/", "UNC share becomes a file URL");
 	Check(mxl::ResolveUrl(mxl::SiteRoot("http://h/mxl2012"), "objects/aa/x") == "http://h/mxl2012/objects/aa/x", "object URL under the root");
 
-	// a saved site on the retired host names moves to wyrd.games; everything else stays as saved
-	auto moved = [](const std::string& from, const std::string& to, const char* what) { Check(mxl::MigrateRetiredSite(from) == to, what); };
-	moved("https://files.werdegames.com/mxl2012/", "https://files.wyrd.games/mxl2012/", "files host moves");
-	moved("https://dl.werdegames.com/mxl2012/", "https://dl.wyrd.games/mxl2012/", "dl host moves");
-	moved("https://files.werdegames.com/mxl2012", "https://files.wyrd.games/mxl2012", "no trailing '/' kept");
-	moved("https://dl.werdegames.com/other/sub/", "https://dl.wyrd.games/other/sub/", "any path kept");
-	moved("https://files.werdegames.com", "https://files.wyrd.games", "bare host moves");
-	moved("HTTPS://Files.WerdeGames.COM/mxl2012/", "https://files.wyrd.games/mxl2012/", "scheme and host in any case");
-	moved("https://DL.werdegames.com/MXL2012/", "https://dl.wyrd.games/MXL2012/", "path case kept");
-	moved("https://files.werdegames.com?x", "https://files.wyrd.games?x", "query after the host kept");
+	// a saved site on a retired host name moves to wyrd.games; everything else stays as saved. The real table names its
+	// hosts by SHA-256 (manifest.h); these cases use a stand-in table with example hosts.
+	Check(mxl::RetiredSiteHosts.size() == 2 && mxl::RetiredSiteHosts[0].to == "files.wyrd.games" && mxl::RetiredSiteHosts[1].to == "dl.wyrd.games",
+	      "retired hosts move to files / dl.wyrd.games");
+	for (const auto& r : mxl::RetiredSiteHosts)
+		Check(r.hostSha256.size() == 64 && r.hostSha256.find_first_not_of("0123456789abcdef") == std::string::npos, "retired host hash is sha256 hex");
+	const std::vector<mxl::SiteMove> table = {{mxl::Sha256Hex("files.retired.example", 21), "files.wyrd.games"},
+	                                          {mxl::Sha256Hex("dl.retired.example", 18), "dl.wyrd.games"}};
+	auto moved = [&](const std::string& from, const std::string& to, const char* what) {
+		std::string low = from;
+		for (char& ch : low)
+			ch = char(std::tolower(static_cast<unsigned char>(ch)));
+		// the real table leaves the example hosts alone and agrees on everything else
+		Check(mxl::MigrateRetiredSite(from, table) == to && mxl::MigrateRetiredSite(from) == (low.find("retired.example") == std::string::npos ? to : from), what);
+	};
+	moved("https://files.retired.example/mxl2012/", "https://files.wyrd.games/mxl2012/", "files host moves");
+	moved("https://dl.retired.example/mxl2012/", "https://dl.wyrd.games/mxl2012/", "dl host moves");
+	moved("https://files.retired.example/mxl2012", "https://files.wyrd.games/mxl2012", "no trailing '/' kept");
+	moved("https://dl.retired.example/other/sub/", "https://dl.wyrd.games/other/sub/", "any path kept");
+	moved("https://files.retired.example", "https://files.wyrd.games", "bare host moves");
+	moved("HTTPS://Files.Retired.EXAMPLE/mxl2012/", "https://files.wyrd.games/mxl2012/", "scheme and host in any case");
+	moved("https://DL.retired.example/MXL2012/", "https://dl.wyrd.games/MXL2012/", "path case kept");
+	moved("https://files.retired.example?x", "https://files.wyrd.games?x", "query after the host kept");
 	moved("https://files.wyrd.games/mxl2012/", "https://files.wyrd.games/mxl2012/", "new host unchanged");
-	moved("https://git.werdegames.com/mxl2012/", "https://git.werdegames.com/mxl2012/", "other retired-domain host unchanged");
-	moved("https://werdegames.com/mxl2012/", "https://werdegames.com/mxl2012/", "apex unchanged");
-	moved("https://xfiles.werdegames.com/mxl2012/", "https://xfiles.werdegames.com/mxl2012/", "look-alike host unchanged");
-	moved("https://files.werdegames.com.example.org/m/", "https://files.werdegames.com.example.org/m/", "suffix host unchanged");
-	moved("https://files.werdegames.com:8443/mxl2012/", "https://files.werdegames.com:8443/mxl2012/", "explicit port unchanged");
-	moved("http://files.werdegames.com/mxl2012/", "http://files.werdegames.com/mxl2012/", "http:// unchanged");
-	moved("https://example.org/files.werdegames.com/", "https://example.org/files.werdegames.com/", "host only, not the path");
+	moved("https://git.retired.example/mxl2012/", "https://git.retired.example/mxl2012/", "other retired-domain host unchanged");
+	moved("https://retired.example/mxl2012/", "https://retired.example/mxl2012/", "apex unchanged");
+	moved("https://xfiles.retired.example/mxl2012/", "https://xfiles.retired.example/mxl2012/", "look-alike host unchanged");
+	moved("https://files.retired.example.example.org/m/", "https://files.retired.example.example.org/m/", "suffix host unchanged");
+	moved("https://files.retired.example:8443/mxl2012/", "https://files.retired.example:8443/mxl2012/", "explicit port unchanged");
+	moved("http://files.retired.example/mxl2012/", "http://files.retired.example/mxl2012/", "http:// unchanged");
+	moved("https://example.org/files.retired.example/", "https://example.org/files.retired.example/", "host only, not the path");
+	moved("https:///mxl2012/", "https:///mxl2012/", "no host unchanged");
 	moved("file:///D:/site/", "file:///D:/site/", "file URL unchanged");
 	moved("D:" + bs + "test site" + bs, "D:" + bs + "test site" + bs, "folder unchanged");
 	moved("http://127.0.0.1:8765/", "http://127.0.0.1:8765/", "local test server unchanged");
@@ -331,6 +346,13 @@ void TestPlanPlayerPlugins() {
 	          !mxl::KnownBundledFile("d2rloader/plugins/x/mxl2012-core.dll") && !mxl::PlayerPluginArea("data/d2rloader/x") &&
 	          mxl::PlayerPluginArea("D2RLoader/plugins/x.dll"),
 	      "known names and the d2rloader/ area");
+	Check(mxl::KnownBundledFile("d2rloader/plugins/d2rl-celestialrayone-damage-overflow-fix.dll") &&
+	          mxl::KnownBundledFile("d2rloader/plugins/D2RL-Enemy-Health-Bars-source.zip") &&
+	          mxl::KnownBundledFile("d2rloader/plugins/ruffneckk-floating-damage-font.ttf") &&
+	          mxl::KnownBundledFile("d2rloader/config/ruffneckk-floating-damage.toml") &&
+	          mxl::KnownBundledFile("d2rloader/config/enemy-health-bars.toml") &&
+	          !mxl::KnownBundledFile("d2rloader/config/enemy-health-bars-visibility.toml"),
+	      "Damage Overflow Fix, Enemy Health Bars and Floating Damage files and configs are ours (other names are not)");
 }
 
 void TestVersions() {
@@ -1143,6 +1165,11 @@ void TestSaveCopies() {
 	Check(gone.size() == 2 && gone[0].rfind("20261101-", 0) == 0 && gone[1].rfind("20261102-", 0) == 0, "the two oldest of 12 go, 10 stay");
 	Check(mxl::SaveCopiesToRemove(folders, 20).empty(), "nothing goes when fewer than keep");
 	Check(mxl::SaveCopiesToRemove({"my notes", "x"}, 0).empty(), "folders without a stamp are never removed");
+	// docs/launcher.md "Uninstall and cleanup": what the cleanup leaves in the data folder
+	for (const char* n : {"save-copies", "Save-Copies", "removed", "REMOVED"})
+		Check(mxl::KeptOnCleanup(n), (std::string("kept on cleanup: ") + n).c_str());
+	for (const char* n : {"launcher.json", "launcher.log", "launcher.log.old", "download", "loader-staging", "removed.txt", "save-copies2", ""})
+		Check(!mxl::KeptOnCleanup(n), (std::string("removed on cleanup: ") + n).c_str());
 }
 
 int main() {

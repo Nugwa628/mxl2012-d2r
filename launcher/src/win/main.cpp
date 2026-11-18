@@ -19,7 +19,8 @@ using namespace mxl;
 namespace {
 
 const wchar_t* Usage =
-	L"D2R-XL-2012-Downloader.exe [--cli status|detect|install|update|repair|uninstall|self-update|fix-default-mod|remove-stray-plugins|install-loader|play] [options]\n"
+	L"D2R-XL-2012-Downloader.exe [--cli status|detect|install|update|repair|uninstall|cleanup|self-update|fix-default-mod|remove-stray-plugins|install-loader|play] [options]\n"
+	L"  cleanup          after uninstall: remove the downloader's own files in the data folder (save copies stay)\n"
 	L"  --data-dir DIR   state, download and log (default %LOCALAPPDATA%\\mxl2012)\n"
 	L"  --site URL|DIR   download site root (default https://files.wyrd.games/mxl2012/; backup https://dl.wyrd.games/mxl2012/; http://, file:// or a folder for tests)\n"
 	L"  --channel NAME   release channel: stable (default) or test\n"
@@ -152,6 +153,7 @@ int RunCli(Cli& c) {
 	if (c.command == L"install" || c.command == L"update") ok = l.InstallOrUpdate(err);
 	else if (c.command == L"repair") ok = l.Repair(err);
 	else if (c.command == L"uninstall") ok = l.Uninstall(err);
+	else if (c.command == L"cleanup") ok = l.CleanUp(err);
 	else if (c.command == L"fix-default-mod") ok = l.FixDefaultMod(err);
 	else if (c.command == L"remove-stray-plugins") ok = l.RemoveStrayPlugins(err);
 	else if (c.command == L"install-loader") {

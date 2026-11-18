@@ -5,9 +5,12 @@ The background is the owner's art; the panel and the icon are original and proce
 
 | File | Size / format | Used for |
 |---|---|---|
-| `background.png` | 960 x 640, PNG RGB | window background, drawn 1:1 (the canvas is its size). **Owner art**, made by the project owner for the downloader (2026-10-28, "option B"): a black eclipse over rune-carved spires, with the title "D2R-XL 2012" and the subtitle "MEDIAN XL 2012 FOR DIABLO II: RESURRECTED" baked in. Converted from the owner's `D2R_XL_top_center_loop.webp` (960 x 640, one frame) to PNG with no scaling. No generator: do not regenerate or edit it with the tools |
+| `background.png` | 960 x 640, PNG RGB | window background, drawn 1:1 (the canvas is its size). **Owner art**, made by the project owner for the downloader (2026-10-28, "option B"): a black eclipse over rune-carved spires, with the title "D2R-XL 2012" and the subtitle "MEDIAN XL 2012 FOR DIABLO II: RESURRECTED" baked in. Converted from the owner's `D2R_XL_top_center_loop.webp` (960 x 640, one frame) to PNG with no scaling. **MIT** as part of the downloader (owner, 2026-11-17; NOTICE.md). No generator: do not regenerate or edit it with the tools |
 | `popup-window.png` | 500 x 170, PNG RGBA (transparent corners, ~98 % opaque stone) | the status panel at (230,262) |
 | `icon.ico` | 256 (PNG), 128, 64, 48, 32, 16 (BMP), 32-bit alpha | exe icon |
+| `comment.svg` | SVG, viewBox 512 | the "report a problem" link icon: a speech bubble with three dots, drawn for this project (plain path data, MIT) |
+| `CinzelDecorative-Bold.ttf` | font | button labels (Install, Play, the small buttons); SIL OFL 1.1, `OFL-CinzelDecorative.txt` |
+| `RobotoCondensed.ttf` | font | status, panel and body text; Apache License 2.0 |
 
 `docs/icon.png` (512 x 512) is the same icon for the README.
 
@@ -38,8 +41,9 @@ py -3 -m venv .venv-art && .venv-art\Scripts\pip install -r tools/launcher_art/r
 Output goes to `launcher/res/` and `docs/icon.png` (`--out`, `--icon-png`, `--only panel|icon`); `background.png` is
 never written. Fixed seeds: the output is deterministic for a given Pillow/numpy. `--preview` (or
 `py -3 tools/launcher_art/make_preview.py <preview.png>`) renders the background and panel with mock text and buttons at
-the layout rects of `launcher/src/win/window.cpp`, in Exocet and Roboto Condensed read from `--fonts`,
-`$MXL_LAUNCHER_RES` or `launcher/res/`; it is for review and is not committed.
+the layout rects of `launcher/src/win/window.cpp`, in Cinzel Decorative and Roboto Condensed read from `--fonts`,
+`$MXL_LAUNCHER_RES` or `launcher/res/` (`--title-font FILE` draws the buttons in another font, for a before / after); it
+is for review and is not committed.
 
 If the window layout moves (PanelRect, button rects, HowToPlayRect, FooterRect), update `make_preview.py` and check the
 zones above in the preview.

@@ -148,6 +148,73 @@ inline std::vector<std::string> CapLines(std::vector<std::string> lines, std::si
 	return lines;
 }
 
+// --- wrapping (classic) -----------------------------------------------------------------------------------------------
+// A classic text box does not wrap: a line wider than the box runs over its sides. So the classic rows get the lines
+// wrapped at a space (or cut where a word alone is too long) onto the next rows, each continuation indented by
+// WrapIndent and in the line's colour. HD keeps its lines as they are (its rows are wide enough).
+// ClassicCharWidth: the 8pt font's widest average per character in panel pixels, measured on game screenshots
+// (6.0 to 6.8 for stat lines), rounded up so a wrapped row never runs over.
+inline constexpr int    ClassicCharWidth = 7;
+inline constexpr char   WrapIndent[]     = "  ";
+inline constexpr std::size_t WrapMinChars = 12; // narrower than this: no wrapping (it would only chop words)
+
+inline std::size_t WrapChars(int width) { return width <= 0 ? 0 : static_cast<std::size_t>(width / ClassicCharWidth); }
+
+// Characters (UTF-8 code points) of a text without colour codes.
+inline std::size_t Glyphs(std::string_view text) {
+	std::size_t n = 0;
+	for (const char c : text)
+		if ((static_cast<unsigned char>(c) & 0xC0) != 0x80) ++n;
+	return n;
+}
+
+// Byte offset of the first `count` code points of `text` (its whole size if it has fewer).
+inline std::size_t GlyphBytes(std::string_view text, std::size_t count) {
+	std::size_t i = 0;
+	for (std::size_t n = 0; i < text.size(); ++i) {
+		if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+			if (n == count) break;
+			++n;
+		}
+	}
+	return i;
+}
+
+inline std::vector<std::string> WrapLines(const std::vector<std::string>& lines, std::size_t maxChars) {
+	if (maxChars < WrapMinChars) return lines;
+	const std::size_t indent = sizeof(WrapIndent) - 1;
+	std::vector<std::string> out;
+	out.reserve(lines.size());
+	for (const std::string& line : lines) {
+		// a leading colour code (the list by charm) goes in front of every piece; codes inside the line count as text,
+		// which only wraps it a little early
+		std::size_t codeLen = 0;
+		if (line.size() >= 4 && static_cast<unsigned char>(line[0]) == 0xC3 && static_cast<unsigned char>(line[1]) == 0xBF && line[2] == 'c') codeLen = 4;
+		const std::string code = line.substr(0, codeLen);
+		std::string_view  rest = std::string_view(line).substr(codeLen);
+		bool              first = true;
+		while (true) {
+			const std::size_t room = maxChars - (first ? 0 : indent);
+			if (Glyphs(rest) <= room) {
+				out.push_back(code + (first ? "" : WrapIndent) + std::string(rest));
+				break;
+			}
+			const std::size_t limit = GlyphBytes(rest, room); // bytes of the first `room` characters
+			std::size_t       cut   = rest.substr(0, limit + 1).rfind(' ');
+			std::size_t       next  = cut;
+			if (cut == std::string_view::npos || cut == 0) cut = next = limit; // one word too long: cut it
+			std::string_view piece = rest.substr(0, cut);
+			while (!piece.empty() && piece.back() == ' ') piece.remove_suffix(1);
+			out.push_back(code + (first ? "" : WrapIndent) + std::string(piece));
+			rest = rest.substr(next);
+			while (!rest.empty() && rest.front() == ' ') rest.remove_prefix(1);
+			first = false;
+			if (rest.empty()) break;
+		}
+	}
+	return out;
+}
+
 // --- the list by charm ------------------------------------------------------------------------------------------------
 // The player can list the charms one by one instead of the sum (the charm tab's mode button, invtabs.toml
 // `summary_list`): each charm's name, then its own stat lines as its tooltip words them. The core passes the charms in

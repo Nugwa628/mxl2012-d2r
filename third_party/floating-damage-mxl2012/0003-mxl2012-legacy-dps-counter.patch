@@ -1,0 +1,181 @@
+diff --git a/plugins/floating-damage/src/floating_damage.cpp b/plugins/floating-damage/src/floating_damage.cpp
+index dd21337..c2c0645 100644
+--- a/plugins/floating-damage/src/floating_damage.cpp
++++ b/plugins/floating-damage/src/floating_damage.cpp
+@@ -1,4 +1,5 @@
+ #include "floating_damage.hpp"
++#include "legacy_projection.hpp"
+ 
+ // The original player-facing feature design is credited to Fr4nsson's D2R
+ // Damage Numbers project (MIT). This implementation's queuing, combining,
+@@ -690,6 +691,9 @@ void RenderTickPopup(
+     );
+ }
+ 
++std::atomic<int> g_legacyClassicWidth{};
++std::atomic<int> g_legacyClassicHeight{};
++
+ void RenderDpsNumber(ImDrawList* drawList, ImFont* font, const ImVec2& displaySize, float resolutionScale)
+ {
+     if (!g_config.showDpsCounter)
+@@ -709,6 +713,30 @@ void RenderDpsNumber(ImDrawList* drawList, ImFont* font, const ImVec2& displaySi
+     const ImVec2 blockSize{textSize};
+     ImVec2 blockCenter{anchorX, anchorY};
+ 
++    // D2R-XL 2012: in legacy graphics the counter belongs to the classic picture (not the black side bars of a 4:3
++    // picture in a wide window) and stays clear of the classic HUD.
++    FloatingDamageMxl::DisplayRect frame{};
++    FloatingDamageMxl::DisplayRect hud{};
++    if (FloatingDamageMxl::LegacyFrame(
++            g_legacyClassicWidth.load(std::memory_order_relaxed),
++            g_legacyClassicHeight.load(std::memory_order_relaxed),
++            displaySize.x, displaySize.y, frame, hud)) {
++        float centerX{};
++        float centerY{};
++        FloatingDamageMxl::PlaceInArea(frame, &hud, xPercent, yPercent, blockSize.x, blockSize.y,
++            10.0f * resolutionScale, 6.0f * resolutionScale, centerX, centerY);
++        DrawStyledText(
++            drawList,
++            font,
++            fontSize,
++            ImVec2(centerX, centerY - (blockSize.y * 0.5f) + (textSize.y * 0.5f)),
++            text.c_str(),
++            g_config.normalColor,
++            1.0f,
++            resolutionScale);
++        return;
++    }
++
+     if (xPercent <= 10.0f)
+         blockCenter.x += blockSize.x * 0.5f + (10.0f * resolutionScale);
+     else if (xPercent >= 90.0f)
+@@ -1089,6 +1117,12 @@ void Update(float dt)
+     TrimActiveNumbers();
+ }
+ 
++void SetLegacyScreen(int classicWidth, int classicHeight) noexcept
++{
++    g_legacyClassicWidth.store(classicWidth, std::memory_order_relaxed);
++    g_legacyClassicHeight.store(classicHeight, std::memory_order_relaxed);
++}
++
+ void Render(ImDrawList* drawList, const ImVec2& displaySize)
+ {
+     if (!IsGameplayActive() || !drawList)
+diff --git a/plugins/floating-damage/src/floating_damage.hpp b/plugins/floating-damage/src/floating_damage.hpp
+index cd37a9d..5b21189 100644
+--- a/plugins/floating-damage/src/floating_damage.hpp
++++ b/plugins/floating-damage/src/floating_damage.hpp
+@@ -112,6 +112,9 @@ void QueuePreviewBurstAt(float screenX, float screenY);
+ 
+ void Update(float dt);
+ void Render(ImDrawList* drawList, const ImVec2& displaySize);
++// D2R-XL 2012: the classic screen size while the game draws legacy graphics, 0 x 0 in HD (the DPS counter then sits in
++// the classic picture, above the classic HUD). Set on the camera update, read on the render thread.
++void SetLegacyScreen(int classicWidth, int classicHeight) noexcept;
+ 
+ void DrawSettingsPanel(float menuScale);
+ void SpawnPreviewBurstAtScreenCenter(const ImVec2& displaySize);
+diff --git a/plugins/floating-damage/src/legacy_projection.hpp b/plugins/floating-damage/src/legacy_projection.hpp
+index a595cc6..84b94d4 100644
+--- a/plugins/floating-damage/src/legacy_projection.hpp
++++ b/plugins/floating-damage/src/legacy_projection.hpp
+@@ -74,6 +74,81 @@ inline bool ClassicToDisplay(
+     return true;
+ }
+ 
++// The classic HUD (the control panel with the globes): 800 classic pixels wide, centred on the classic screen, and this
++// many classic pixels high at the bottom, globes included.
++constexpr int LegacyHudWidth = 800;
++constexpr int LegacyHudHeight = 104;
++
++struct DisplayRect {
++    float left;
++    float top;
++    float right;
++    float bottom;
++};
++
++// Legacy graphics: the classic picture in window pixels (fitted to the window height and centred) and the classic HUD
++// inside it. False when a size is unusable.
++inline bool LegacyFrame(
++    std::int32_t classicWidth,
++    std::int32_t classicHeight,
++    float displayWidth,
++    float displayHeight,
++    DisplayRect& frame,
++    DisplayRect& hud) noexcept {
++    if (!ClassicSizeValid(classicWidth, classicHeight)
++            || !(displayWidth > 0.0f) || !(displayHeight > 0.0f)) {
++        return false;
++    }
++    const float scale = displayHeight / static_cast<float>(classicHeight);
++    const float left = (displayWidth - static_cast<float>(classicWidth) * scale) * 0.5f;
++    frame = DisplayRect{left, 0.0f, left + static_cast<float>(classicWidth) * scale, displayHeight};
++    const float hudWidth = static_cast<float>(
++        classicWidth < LegacyHudWidth ? classicWidth : LegacyHudWidth) * scale;
++    const float hudLeft = left + (static_cast<float>(classicWidth) * scale - hudWidth) * 0.5f;
++    hud = DisplayRect{hudLeft, displayHeight - static_cast<float>(LegacyHudHeight) * scale, hudLeft + hudWidth, displayHeight};
++    return true;
++}
++
++// The centre of a text block of the given size placed at xPercent / yPercent of an area, kept inside the area by the
++// margins and, when it would cover the HUD, moved up above it (the DPS counter's placement).
++inline void PlaceInArea(
++    const DisplayRect& area,
++    const DisplayRect* hud,
++    float xPercent,
++    float yPercent,
++    float blockWidth,
++    float blockHeight,
++    float horizontalMargin,
++    float verticalMargin,
++    float& centerX,
++    float& centerY) noexcept {
++    const float width = area.right - area.left;
++    const float height = area.bottom - area.top;
++    float x = area.left + width * xPercent / 100.0f;
++    float y = area.top + height * yPercent / 100.0f;
++    if (xPercent <= 10.0f)
++        x += blockWidth * 0.5f + horizontalMargin;
++    else if (xPercent >= 90.0f)
++        x -= blockWidth * 0.5f + horizontalMargin;
++    if (yPercent <= 10.0f)
++        y += blockHeight * 0.5f + verticalMargin;
++    else if (yPercent >= 90.0f)
++        y -= blockHeight * 0.5f + verticalMargin;
++    const auto clamp = [](float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); };
++    x = blockWidth + 2.0f * horizontalMargin <= width
++        ? clamp(x, area.left + horizontalMargin + blockWidth * 0.5f, area.right - horizontalMargin - blockWidth * 0.5f)
++        : area.left + width * 0.5f;
++    y = blockHeight + 2.0f * verticalMargin <= height
++        ? clamp(y, area.top + verticalMargin + blockHeight * 0.5f, area.bottom - verticalMargin - blockHeight * 0.5f)
++        : area.top + height * 0.5f;
++    if (hud && x + blockWidth * 0.5f > hud->left && x - blockWidth * 0.5f < hud->right
++            && y + blockHeight * 0.5f > hud->top - verticalMargin) {
++        y = hud->top - verticalMargin - blockHeight * 0.5f;
++    }
++    centerX = x;
++    centerY = y;
++}
++
+ // The target of a rip-relative operand: the address after the instruction plus the signed 32-bit displacement.
+ constexpr std::uint64_t RipTarget(std::uint64_t nextInstruction, std::int32_t displacement) noexcept {
+     return nextInstruction + static_cast<std::uint64_t>(static_cast<std::int64_t>(displacement));
+diff --git a/plugins/floating-damage/src/plugin.cpp b/plugins/floating-damage/src/plugin.cpp
+index 16ceb45..c0f620e 100644
+--- a/plugins/floating-damage/src/plugin.cpp
++++ b/plugins/floating-damage/src/plugin.cpp
+@@ -878,8 +878,12 @@ void __fastcall HookUpdateCamera() noexcept {
+                 "FloatingDamage: legacy graphics; numbers follow the classic view (unit pixel minus view offset).");
+         }
+         ProjectRequestedTargetsLegacy(GetTickCount64());
++        FloatingDamage::SetLegacyScreen(
++            CachedClassicWidth.load(std::memory_order_acquire),
++            CachedClassicHeight.load(std::memory_order_acquire));
+         return;
+     }
++    FloatingDamage::SetLegacyScreen(0, 0);
+     void* renderContext{};
+     __try {
+         auto* root = static_cast<std::uint8_t*>(

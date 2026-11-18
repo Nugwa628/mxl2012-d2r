@@ -1,0 +1,123 @@
+# ON HOLD (owner, 2026-11-17): the downloader is signed with Azure Artifact Signing instead (docs/launcher.md "Release and
+# signing"). Kept for a possible SignPath Foundation application; not under .github/workflows, so nothing runs it.
+#
+# D2R-XL 2012 Downloader: build from source on a GitHub-hosted Windows runner and, when asked, have it signed by SignPath
+# (free code signing by SignPath.io, certificate by SignPath Foundation; docs/code-signing-policy.md).
+#
+# It runs in the downloader's own repository (github.com/Nugwa628/d2r-xl-2012-downloader), which is exported from the
+# D2R-XL 2012 repository by its tools/downloader_repo.py (there this file is downloader-repo/.github/workflows/, so the
+# mod's own GitHub mirror never runs it). It builds from this repository alone. Every push to main builds and tests the
+# exe and keeps the unsigned build as an artifact. Signing runs only from "Run workflow" with "sign" ticked; SignPath then
+# waits for a manual approval before it signs.
+#
+# Settings on GitHub (Settings > Secrets and variables > Actions); no token is ever written in this file:
+#   secret   SIGNPATH_API_TOKEN            API token of the SignPath CI user that submits (submitter role only)
+#   variable SIGNPATH_ORGANIZATION_ID      SignPath organization id (a GUID)
+#   variable SIGNPATH_PROJECT_SLUG         e.g. d2r-xl-2012
+#   variable SIGNPATH_SIGNING_POLICY_SLUG  e.g. release-signing
+# The SignPath project's default artifact configuration is launcher/signpath-artifact-configuration.xml.
+#
+# The signed exe goes through tools/sign_launcher.py --signed (same program as the unsigned build, valid timestamped
+# signature, product name and version) and is kept as the artifact D2R-XL-2012-Downloader-signed, with its .sha256 and
+# signing.json, for the D2R-XL 2012 repository's tools/publish_release.py --launcher (docs/launcher.md "Release and
+# signing").
+name: Downloader (build and sign)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: "Submit the build to SignPath for signing (needs a manual approval there)"
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: downloader-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 350  # GitHub-hosted jobs end at 6 h; signing waits for an approval
+    env:
+      EXE: build/launcher/Release/D2R-XL-2012-Downloader.exe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build the downloader (MSVC, x64, Release)
+        shell: pwsh
+        run: |
+          cmake -S launcher -B build/launcher -A x64
+          cmake --build build/launcher --config Release
+          if (-not (Test-Path $env:EXE)) { throw "no $env:EXE" }
+
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          build/launcher/tests/Release/launcher_tests.exe
+          if ($LASTEXITCODE -ne 0) { throw "launcher_tests failed" }
+          python -m unittest discover -s tools -p "test_*.py"
+          if ($LASTEXITCODE -ne 0) { throw "tools tests failed" }
+
+      - name: Check the unsigned build (sha256, version resource)
+        shell: pwsh
+        run: python tools/sign_launcher.py --exe $env:EXE --out dist-unsigned
+
+      - name: Downloader version
+        id: version
+        shell: pwsh
+        run: |
+          $line = Select-String -Path launcher/src/win/app.h -Pattern '^#define MXL_LAUNCHER_VERSION "([0-9.]+)"'
+          "version=$($line.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
+
+      # The artifact SignPath signs: a ZIP with only the exe at its root (launcher/signpath-artifact-configuration.xml).
+      - name: Upload the unsigned build
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: D2R-XL-2012-Downloader-unsigned
+          path: ${{ env.EXE }}
+          if-no-files-found: error
+
+      - name: Submit to SignPath and wait for the signed exe
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 19800  # 5.5 h for the manual approval
+          output-artifact-directory: signed
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+
+      - name: Check the signed exe (same program, valid signature)
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        shell: pwsh
+        run: |
+          $signed = Get-ChildItem signed -Recurse -Filter D2R-XL-2012-Downloader.exe | Select-Object -First 1
+          if (-not $signed) { throw "SignPath returned no D2R-XL-2012-Downloader.exe" }
+          python tools/sign_launcher.py --exe $env:EXE --signed $signed.FullName --out dist-launcher
+          # the unsigned build beside it, so the release PC can repeat the check (docs/launcher.md "Release and signing")
+          New-Item -ItemType Directory -Force dist-launcher/unsigned | Out-Null
+          Copy-Item $env:EXE, "$env:EXE.sha256" dist-launcher/unsigned/
+
+      - name: Upload the signed build
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        uses: actions/upload-artifact@v4
+        with:
+          name: D2R-XL-2012-Downloader-signed
+          path: dist-launcher/
+          if-no-files-found: error

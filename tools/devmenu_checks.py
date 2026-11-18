@@ -372,6 +372,148 @@ def insert_gem(gc, log, row, shots, weapon):
     gc.g.click(0.5, 0.05, move_only=True)
 
 
+SOCK_UNIQUE = "Facebreaker"            # Chain Gloves (Sacred), its row's own `sock 4` (owner report 2026-11-17: "Max Sockets: 4", no sockets)
+SOCK_SET = "Isenhart's Lightbrand"     # Broad Sword, set Isenhart's Armory
+SD_INV = (829, 405, 43.5, 43.6)        # legacy backpack grid at 1600 x 900 (tools/medtab_checks.py)
+
+
+def _catalog_row(cat, name):
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "work" / "mod" / "data" / "mxl2012-devmenu" / "catalog.tsv"
+    for ln in path.read_text("utf-8").splitlines():
+        f = ln.split("\t")
+        if f[0] == "I" and f[1] == cat and (f[6] == name or f[6].startswith(name + " (")):  # a set item's label ends with its set
+            return f[2], int(f[4]), int(f[5])
+    return None
+
+
+def _open_inventory(gc, mode):
+    """The inventory panel open. gc.rc_open_inventory reads HD's panel only, so in legacy graphics `i` is pressed once and the caller
+    keeps it open."""
+    if mode == "sd":
+        gc.g.press("i")
+        time.sleep(1.2)
+    else:
+        gc.rc_open_inventory()
+
+
+def _close_inventory(gc, mode):
+    if mode == "sd":
+        gc.g.press("i")
+        time.sleep(0.8)
+    else:
+        gc.close_right_panel()
+        time.sleep(0.6)
+
+
+def _hover_item(gc, item, mode):
+    fx, fy = gc.rp_inv_xy(item["x"], item["y"], SD_INV if mode == "sd" else gc.RP_INV)
+    gc.g.click(fx, fy, move_only=True)
+    time.sleep(0.9)
+
+
+def _insert(gc, log, item, mode):
+    """A gem picked up in the backpack and clicked onto the item, as a player does (left clicks), in either graphics mode."""
+    _ok, lines = gc.Hl("item %s inv" % GEM, log)
+    made = gc.parse_items(lines)
+    if not made:
+        return None, "no gem made (`item %s inv`)" % GEM
+    gem = next((i for i in gc.rc_items(log) if i["id"] == made[0]["id"]), made[0])
+    grid = SD_INV if mode == "sd" else gc.RP_INV
+    gc.g.click(*gc.rp_inv_xy(gem["x"], gem["y"], grid))
+    time.sleep(0.8)
+    tx, ty = gc.rp_inv_xy(item["x"], item["y"], grid)
+    gc.g.click(tx, ty + 10 / 900.0)
+    time.sleep(1.2)
+    after = gc.rc_items(log)
+    gone = all(i["id"] != gem["id"] for i in after)
+    still = next((i for i in after if i["id"] == item["id"]), None)
+    return gone and still is not None and gc.held_item() is None, "gem id %d %s; item %s; cursor %s" % (
+        gem["id"], "gone from the backpack" if gone else "still in the backpack", still, gc.held_item())
+
+
+def run_sock(gc):
+    """Lane devsock: a unique (Facebreaker) and a set item (Isenhart's Lightbrand) spawned from the menu come identified with their maximum
+    real sockets ("Socketed (N)"), in HD and legacy graphics; a gem clicked onto each goes in. For comparison (not changed): the same rows
+    made by the game's own generator (harness `item <code> unique|set <row>`, the drop path) and their tooltips."""
+    mark = gc.engine_mark()
+    log, shots, rows = [], [], []
+
+    def row(name, ok, note):
+        rows.append((name, ok, note))
+        log.append("ROW %s %s: %s" % (name, "PASS" if ok else ("SKIP" if ok is None else "FAIL"), note))
+
+    gc.enable_debug()
+    gc.goto(1, timeout=60)
+    picks = (("unique", "cat1", "U", SOCK_UNIQUE), ("set", "cat2", "S", SOCK_SET))
+    for mode, graphics in (("hd", "hd"), ("sd", "legacy")):
+        if not gc.set_graphics(graphics):
+            row(mode + " graphics", False, "not reached")
+            continue
+        time.sleep(1.5)
+        for label, button, cat, name in picks:
+            info = _catalog_row(cat, name)
+            if info is None:
+                row("%s %s catalog row" % (mode, label), False, "not in the catalog")
+                continue
+            code, _row, want = info
+            open_menu(gc, log)
+            do(gc, log, "tab0")
+            do(gc, log, button)
+            search(gc, log, name)
+            before = {i["id"] for i in gc.rc_items(log)}
+            ops0 = state(gc, log).get("ops", 0)
+            do(gc, log, "row0")
+            st = wait(gc, log, lambda x: x.get("busy") == 0 and x.get("ops", 0) > ops0, 6.0)
+            shots.append(gc.sh("devsock_%s_%s_status" % (mode, label)))
+            verb(gc, log, "close")
+            wait(gc, log, lambda x: x.get("open") == 0, 3.0)
+            new = [i for i in gc.rc_items(log) if i["id"] not in before and i.get("code") == code and i.get("page") == gc.RC_PAGE_INV]
+            it = new[0] if new else None
+            flags = it.get("flags", 0) if it else 0
+            ok = (it is not None and want > 0 and it.get("sockets") == want and flags & SOCKETED_FLAG != 0 and it.get("identified") == 1
+                  and not st.get("sockfails"))
+            row("%s %s %s: %d real sockets" % (mode, label, name, want), ok, "item %s, flags 0x%x, sockfails %s; %s" % (
+                it, flags, st.get("sockfails"), st.get("status", "")))
+            if it is None:
+                continue
+            _open_inventory(gc, mode)
+            _hover_item(gc, it, mode)
+            shots.append(gc.sh("devsock_%s_%s_tooltip" % (mode, label)))
+            ok, note = _insert(gc, log, it, mode)
+            row("%s %s: gem goes in" % (mode, label), ok, note)
+            _hover_item(gc, it, mode)
+            shots.append(gc.sh("devsock_%s_%s_gem_tooltip" % (mode, label)))
+            gc.g.click(0.5, 0.05, move_only=True)
+            _close_inventory(gc, mode)
+
+    # the drop path, unchanged: the game's generator makes the same rows (identified as the harness asks); reported, not judged
+    gc.set_graphics("hd")
+    time.sleep(1.5)
+    for label, quality, cat, name in (("unique", "unique", "U", SOCK_UNIQUE), ("set", "set", "S", SOCK_SET)):
+        info = _catalog_row(cat, name)
+        if info is None:
+            continue
+        code, nrow, _want = info
+        _ok, lines = gc.Hl("item %s %s %d inv" % (code, quality, nrow), log)
+        made = gc.parse_items(lines)
+        it = next((i for i in gc.rc_items(log) if made and i["id"] == made[0]["id"]), None)
+        flags = it.get("flags", 0) if it else 0
+        log.append("DROP %s %s: %s flags 0x%x socketed %s" % (label, name, it, flags, bool(flags & SOCKETED_FLAG)))
+        row("drop path %s %s (report only)" % (label, name), None, "%s, flags 0x%x" % (it, flags))
+        if it is not None:
+            gc.rc_open_inventory()
+            _hover_item(gc, it, "hd")
+            shots.append(gc.sh("devsock_drop_%s_tooltip" % label))
+            gc.g.click(0.5, 0.05, move_only=True)
+    gc.close_right_panel()
+    st = state(gc, log)
+    log.append("final %s" % st)
+    ok = all(r[1] for r in rows if r[1] is not None) and not st.get("faults")
+    gc.finish("devmenusock", ok, "; ".join("%s %s" % (r[0], "ok" if r[1] else ("skip" if r[1] is None else "FAIL")) for r in rows),
+              mark, shots, log)
+
+
 def run_typing(gc):
     """Real key messages into the search / level box, HD and legacy: bound keys type instead of running their commands, Esc and Ctrl+F12 still
     close the menu, the keys work as before without the box's focus and with the menu closed, and a typed level is applied."""

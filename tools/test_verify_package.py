@@ -14,6 +14,47 @@ import verify_package as vp
 SEVEN = pr.find_7z()
 
 
+# the shipped defaults: health bars only on damaged monsters, Floating Damage on
+EHB_CONFIG = "[bars]\nenabled = true\n# true = every enemy\nshow_full_health = false\nhide_with_side_panels = true\n"
+FD_CONFIG = ("[general]\n# Master switch.\nenabled = true\n\n[appearance]\nlegacy_text_scale = 2.5\n\n"
+             "[diagnostics]\nenabled = false\n")
+
+
+def fake_ehb_build(tmp: Path):
+    """What tools/build_enemyhealthbars.ps1 leaves: build/enemyhealthbars (DLL, licences, notices, source zip) and the patched
+    tree with PATCHES / SOURCE.txt. Returns (dll, tree)."""
+    build = tmp / "enemyhealthbars"
+    for k, rel in pr.EHB_FROM.items():
+        (build / rel).parent.mkdir(parents=True, exist_ok=True)
+        (build / rel).write_bytes(b"MZ " + pr.EHB["version"].encode()
+                                  + b"\0dev_keep_visible_unfocused\0legacy graphics placement\0" if k == "dll"
+                                  else EHB_CONFIG.encode() if k == "config" else k.encode() + b"\n")
+    tree = tmp / "enemyhealthbars-src" / "EnemyHealthBars"
+    tree.mkdir(parents=True)
+    (tree / "PATCHES").write_text("\n".join(pr.ehb_patches()) + "\n", encoding="ascii")
+    (tree / "SOURCE.txt").write_text(f"Upstream: {pr.EHB['repo']} commit {pr.EHB['commit']}\n", encoding="ascii")
+    return build / pr.EHB_FROM["dll"], tree
+
+
+def fake_fd_build(tmp: Path):
+    """What tools/build_floatingdamage.ps1 leaves: build/floatingdamage/Release (DLL, licences, font, config) and the exported
+    source with PINNED_COMMIT / PATCHES and the third-party notices. Returns (dll, src)."""
+    rel = tmp / "floatingdamage" / "Release"
+    rel.mkdir(parents=True)
+    for k, name in pr.FD_FROM.items():
+        (rel / name).write_bytes(b"MZ " + pr.FD["version"].encode() + b"\0ruffneckk-floating-damage-font.ttf\0" if k == "dll"
+                                 else FD_CONFIG.encode() if k == "config" else k.encode() + b"\n")
+    src = tmp / "floatingdamage-src"
+    (src / "third_party" / "notices").mkdir(parents=True)
+    (src / "third_party" / "PluginSDK").mkdir(parents=True)
+    (src / "THIRD_PARTY_NOTICES.md").write_text("# Third-Party Notices\n", encoding="utf-8")
+    (src / "third_party" / "notices" / "IMGUI-LICENSE.txt").write_text("The MIT License (MIT)\n", encoding="utf-8")
+    (src / "third_party" / "PluginSDK" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    (src / "PINNED_COMMIT").write_text(pr.fd_commit(), encoding="ascii")
+    (src / "PATCHES").write_text("\n".join(pr.fd_patches()) + "\n", encoding="ascii")
+    return rel / pr.FD_FROM["dll"], src
+
+
 class VerifyPackageTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -77,6 +118,18 @@ class VerifyPackageTests(unittest.TestCase):
         pins.start()
         self.addCleanup(pins.stop)
         pr.stage_charminv(self.mod, ci)
+        dof = self.tmp / "dof"  # the author's DLL (a fake, pinned for the test)
+        dof.mkdir()
+        (dof / "d2rl-celestialrayone-damage-overflow-fix.dll").write_bytes(b"MZ damage-overflow-fix\0")
+        pins = mock.patch.dict(pr.DOF, {"sha256": pr.sha256(dof / "d2rl-celestialrayone-damage-overflow-fix.dll"),
+                                        "size": (dof / "d2rl-celestialrayone-damage-overflow-fix.dll").stat().st_size})
+        pins.start()
+        self.addCleanup(pins.stop)
+        pr.stage_dof(self.mod, dof)
+        ehb_dll, ehb_src = fake_ehb_build(self.tmp)
+        pr.stage_ehb(self.mod, ehb_dll, ehb_src)
+        fd_dll, fd_src = fake_fd_build(self.tmp)
+        pr.stage_fd(self.mod, fd_dll, fd_src)
 
     def test_invtabs_replaces_charminv_only_when_present(self):
         dll = self.tmp / "invtabs.dll"

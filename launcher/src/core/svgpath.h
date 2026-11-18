@@ -1,4 +1,4 @@
-// The window's link icons are Font Awesome SVGs (launcher/res): one viewBox and one or more <path d="..."> elements.
+// The window's link icon is our own SVG (launcher/res/comment.svg): one viewBox and one or more <path d="..."> elements.
 // This reads that much SVG into absolute moves, lines and cubic curves; the window fills them with GDI+.
 #pragma once
 

@@ -1,4 +1,4 @@
-// The downloader window (docs/launcher.md "Window"): the official Median XL launcher's art, drawn with GDI+.
+// The downloader window (docs/launcher.md "Window"): its own art (launcher/res/ART.md), drawn with GDI+.
 #pragma once
 
 #include "app.h"
