@@ -1,13 +1,12 @@
-// Laughing Ghost explodes where the player clicked (lob_aim.cpp, bug #614, lane ghostaim).
+// Laughing Ghost and Rising Dawn land where the player clicked (lob_aim.cpp, bugs #614 / #618).
 #pragma once
 
 #include <D2RLPlugin/api.h>
 
 #include <cstddef>
 
-// Hooks D2R's server and client missile creates (0x5371a0, 0x1b7760): a lob missile of Laughing Ghost whose target lies past
-// its missile's Range gets the target moved back to that range (lob_aim_logic.h). The report gets one entry. Returns the
-// number of hooks installed (2).
+// Hooks D2R's server and client missile creates (0x5371a0, 0x1b7760): a lob missile of the two skills gets its target as a
+// fixed world point (a monster target becomes its position at the cast), at any distance. Returns the hooks installed (2).
 auto InstallLobAim(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int;
-// Laughing Ghost lob missiles seen since load (both sides), and the targets moved (server, client).
+// Lob missiles of the two skills seen since load (both sides), and the targets set (server, client).
 void LobAimCounts(long* seen, long* server, long* client) noexcept;

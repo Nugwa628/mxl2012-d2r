@@ -7,6 +7,27 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.26 (2026-11-18)
+
+- Laughing Ghost and Rising Dawn now land where you click, as far as the edge of the screen, in HD and legacy graphics at
+  any resolution (Laughing Ghost used to stop at its old distance). Rising Dawn now flies at a steady speed to the click
+  and, by design, flies through monsters on the way and explodes at the click. In legacy graphics Rising Dawn's sun,
+  explosion and shockwave are now drawn at the ground spot, so far casts show their explosion at the click instead of
+  high above it or off the top of the screen. Still as before: on a far cast Rising Dawn's sun climbs high on its way (in
+  the corner of the screen briefly above the top edge) before it comes down at the click. Pyroblast and Balefire are
+  unchanged (bug #618).
+- **Twelve of Median's own maps now look like classic in HD graphics.** Duncraig, Cathedral of Vanity, Ureh,
+  Fauztinville, Tran Athulua, Dimensional Sanctum, Kurast 3000 BA, Vizjun, Rathma Square, Welcome to Toraja, Welcome to
+  Old Bremmtown and Welcome to Khalimgrad are drawn from their classic art, with classic's own light, instead of the D2R
+  maps they borrowed. All other areas are unchanged. Known limits: the light only partly matches classic on some of them
+  (Ureh is darker, Tran Athulua brighter around the player), Cathedral of Vanity has a yellow haze, a few small wall
+  pieces and the animation of animated floors are missing, and the art is soft above 1080p. The download is about 19 MB
+  larger.
+- **Bionetic Slam (Assassin) now looks like Median XL in HD graphics.** The flying orb, the burst and the white star are
+  Median's own animations, upscaled, with the blue light they cast on the ground, instead of look-alike D2R effects. It is
+  the first skill done this way; other skills and legacy graphics are unchanged.
+- No new downloader: downloader 0.1.5 or newer installs this update.
+
 ### 0.1.25 (2026-11-18)
 
 - **Downloader 0.1.6.** Downloader 0.1.5 offers this update when it starts and updates itself: say Yes. Uninstall now

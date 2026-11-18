@@ -1,0 +1,17 @@
+{
+ "about": "Maps that tools/build.py draws all-classic in HD (tools/sprite_scene.py build --classic: Median's own floors, walls, roofs and props, black ground outside the map's floor, the map's own light tuned against classic). A map not listed keeps the default build's scene. Take a map off by deleting its line; an empty list gives the default build byte for byte. docs/maps-hd.md \"Classic maps\"",
+ "maps": [
+  "expansion/morework/epicwhiners.ds1",
+  "act1/cathedrl/inarius.ds1",
+  "expansion/neonmile/downtown.ds1",
+  "expansion/ghetto/cypherpunk.ds1",
+  "expansion/dystopic/desertpeak.ds1",
+  "act2/arcane/belial.ds1",
+  "act3/kurast/excelsior3.ds1",
+  "expansion/glados/glados.ds1",
+  "expansion/redsquare/moskvich.ds1",
+  "expansion/voodoo/macumba.ds1",
+  "expansion/terror/borgir.ds1",
+  "expansion/zakarum/charismatic.ds1"
+ ]
+}

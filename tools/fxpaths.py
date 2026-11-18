@@ -71,13 +71,16 @@ def _listed(path: Path) -> tuple[str, ...]:
 
 # what the build reads through d2r_file(): tools/hd_skill_anims.py (state machines), missile_hd.py, animdata_merge.py,
 # hd_recolour.py (VFX_LIST), maps_hd.py floor_biomes (the biomes of the maps with new floor tiles, and their tile mask),
-# map_tint.py (the day visual data of those biomes; the act palettes for `measure`), rotw_stash_legacy.py (the classic
+# effect_flipbook.py (the two particle templates), map_tint.py (the day visual data of those biomes; the act palettes for `measure`), rotw_stash_legacy.py (the classic
 # font of the stash tab names), hd_translvl.py (the act Pal.pl2 colour tables of the state levels, tools/state_translvl.py)
 CACHED_FILES = ("data/global/animdata.d2", "data/hd/missiles/missiles.json", "data/hd/model_lod_desc.bin",
                 "data/global/items/palette/grey.dat",  # shrine_colours: the 21 D2 item colour transforms
                 *(f"data/hd/character/player/{c}/{c}_state_machine.json" for c in PLAYER_CLASSES),
                 *(f"data/hd/env/biome/{b}.json" for b in ("act3_docktown", "act4_fort", "act4_mesa")),
                 "data/hd/env/tilemasks/tile_masks.json", *_listed(VFX_LIST),
+                # effect_flipbook.py / effects_classic.py: the particle files a flipbook and its point light are made from
+                "data/hd/vfx/particles/missiles/chill_blood_puff/chill_blood_puff.particles",
+                "data/hd/vfx/particles/env/common/generic/vfx_candle_light.particles",
                 *(f"data/hd/env/vis/{v}.json" for v in ("act3_docktown_day", "act4_fort_day", "act4_mesa_day")),
                 *(f"data/global/palette/act{a}/pal.dat" for a in range(1, 6)),
                 *(f"data/global/palette/act{a}/pal.pl2" for a in range(1, 6)),

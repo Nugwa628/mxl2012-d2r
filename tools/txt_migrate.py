@@ -231,12 +231,39 @@ def conversion_calcs(header: list[str], rows: list[list[str]]) -> list[str]:
     return done
 
 
-# skills.txt `lob` on skills whose missile should explode where the player clicked (bug #614, owner request 2026-11-16). Median's
-# Laughing Ghost has `lob` empty, so its missile (laughingghostemerge: Range 12, no CollideType, AlwaysExplode) flies its 12
-# frames and explodes there wherever the click was, as in 1.13c. With `lob` 1 D2R makes the missile on its lob path (D2R's Fire
-# Trauma, Median's Thunderstone): it flies to the target point and explodes there. D2R does not cap that at the missile's
-# Range; the plugin part lobaim (plugin/src/lob_aim.cpp) does, so it cannot reach farther than before.
-LOB_SKILLS = ("Laughing Ghost",)
+# skills.txt `lob` on skills whose missile should land where the player clicked (bugs #614, #618; owner requests 2026-11-16
+# and 2026-11-18). With `lob` 1 D2R makes the missile on its lob path (D2R's Fire Trauma, Median's Thunderstone): its frames
+# are the distance to the target point over its speed, not its Range, so it flies to the click and explodes there. The
+# game puts the clicked point in the world from its own HD or legacy view, so the farthest reach is the edge of the screen.
+# Pyroblast and Balefire stay as Median made them (owner ruling 2026-11-18): they explode on the first monster they hit.
+LOB_SKILLS = ("Laughing Ghost", "Rising Dawn")
+
+# missiles.txt changes for Rising Dawn (Laughing Ghost's laughingghostemerge needs none): no collision on the way, by
+# design (it explodes at the click, AlwaysExplode), and a steady speed (the lob frames assume one; its Accel -250 would end
+# it short of the click). Hit functions, explosion and hit sub-missiles, its trail and the damage are kept. Rising Dawn's sun, its explosion and its
+# shockwave get zoffset 0: Median's -150 / -170 / -190 lift the legacy sprites that many pixels (x 1.5 on screen) above the
+# missile's ground spot, so at the edge and in the corner of the screen they were drawn far above the click or off screen.
+LOB_MISSILES = {
+    "risingdawn": {"Accel": "0", "CollideType": "0", "zoffset": "0"},
+    "risingdawnexplo": {"zoffset": "0"},
+    "risingdawnbuff": {"zoffset": "0"},
+}
+
+
+def lob_missiles(header: list[str], rows: list[list[str]]) -> list[str]:
+    """LOB_MISSILES on the missiles.txt rows; one entry per cell set."""
+    if "Missile" not in header:
+        return []
+    done = []
+    ni = header.index("Missile")
+    for row in rows:
+        for col, value in LOB_MISSILES.get(row[ni], {}).items():
+            if col in header:
+                ci = header.index(col)
+                row.extend([""] * max(0, ci + 1 - len(row)))
+                row[ci] = value
+                done.append(f"{row[ni]}.{col}={value}")
+    return done
 
 
 def lob_skills(header: list[str], rows: list[list[str]], names=LOB_SKILLS) -> list[str]:
@@ -1316,7 +1343,7 @@ class Migrator:
         self.report.append("\nskills srvdofunc / srvprgfunc 51 conversion chance / length into calc1 / calc2 (bugs #487, #527): " + ("; ".join(done) or "none"))
 
     def lob_skills(self) -> None:
-        """skills.txt `lob` 1 on LOB_SKILLS: their missile explodes at the click (bug #614)."""
+        """skills.txt `lob` 1 on LOB_SKILLS: their missile explodes at the click (bug #618)."""
         done: list[str] = []
         for bank in ("base", ""):
             p = OUT / "data" / "global" / "excel" / bank / "skills.txt"
@@ -1327,7 +1354,12 @@ class Migrator:
             write_tsv(p, h, rows)
             if bank == "base":
                 done = lines
-        self.report.append("\nskills lob 1 (missile explodes at the click, bug #614): " + (", ".join(done) or "none"))
+            mp = p.with_name("missiles.txt")
+            if mp.exists():
+                mh, mr = read_tsv(mp)
+                lob_missiles(mh, list(idmap.records(mr)))
+                write_tsv(mp, mh, mr)
+        self.report.append("\nskills lob 1 (missile explodes at the click, bug #618): " + (", ".join(done) or "none"))
 
     def hireling_level_difference(self) -> None:
         """hireling.HiringMaxLevelDifference is D2R's column for a rule 1.13c keeps in code: how far a mercenary's level may

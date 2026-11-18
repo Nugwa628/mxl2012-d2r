@@ -8153,3 +8153,122 @@ Follow-up (2026-11-17), same lane:
   `Microsoft.ArtifactSigning.Client` 1.0.146 (SHA-256 checked) into `work/signing-tools` and found Windows SDK signtool
   10.0.28000 and the .NET 8.0.8 runtime; 1.0.147+ need .NET 10 (`runtimeconfig.json` of 1.0.151: `net10.0`). No signing
   run yet: it needs the owner's account (endpoint, account, certificate profile) and an Azure sign-in.
+
+## Lane ghostaim round 5: Laughing Ghost and Rising Dawn land at the click, Pyroblast and Balefire as before (2026-11-18, slot 3, HD and legacy, background input)
+
+Bug #618 after the owner rulings (Rising Dawn flies through monsters by design; its legacy art at the click; Pyroblast and
+Balefire left as on origin/main). Lane build (`build.py` under `heavy_lock.py build`, validate errors 0; plugin
+`build_plugin.ps1 -Tests`: 76 checks, 0 failed, `lob_aim: all checks passed`) installed on slot 3 with
+`install_mod.py --slot 3`; scratch scripts `mxl2012-runs/ghostaim/session3.py` and `session4.py` (not in git) under
+`heavy_lock.py game`, new Druid, Blood Moor, god mode, skills at level 18-20. Spots: near (0.56, 0.50), the right edge of the
+lit view (HD 0.993, legacy 0.866, the 4:3 view's edge) at the player's row, the top-right corner (same x, 0.08). Pyroblast and
+Balefire: the edge click once with a zombie spawned at player +5 / -6 (on the way) and once without a monster. Round 4 (same
+spots, Median's zoffset, all four skills on `lob`) is the "before" for the Rising Dawn frames.
+
+| Check | HD | legacy | Evidence |
+|-|-|-|-|
+| lobaim target = clicked point (Laughing Ghost, Rising Dawn), server and client | PASS, 6 / 6, edge 5280,6125, corner 5266,6111 | PASS, 6 / 6, edge 5276,6130, corner 5262,6116 | `mxl2012-runs/ghostaim/round5/hd`, `round5/legacy` (`mxl2012-core.log`) |
+| Rising Dawn explosion at the click, near / edge / corner | PASS, frames the same as round 4 | PASS (round 4: high above the click at the edge, off screen in the corner) | `mxl2012-runs/ghostaim/shots/overview3.png` rows 1-4 |
+| Laughing Ghost explosion at the click | PASS | PASS (a faint ring, the same as round 4) | `mxl2012-runs/ghostaim/shots/overview2.png` |
+| Pyroblast and Balefire not aimed | PASS, no lobaim line | PASS, no lobaim line | `round5/mon_hd`, `round5/mon_legacy` (`mxl2012-core.log`) |
+| Pyroblast and Balefire explode on the first monster | PASS, zombie killed; Pyroblast 5272,6133 (zombie 5271,6134), Balefire 5269,6145 (zombie 5268,6140) | PASS, zombie killed; Pyroblast 5272,6134, Balefire 5269,6144 | `overview3.png` rows 5-8, `casts.json` |
+| Pyroblast and Balefire without a monster | own distance: Pyroblast 5272,6131, Balefire 5310,6087 | own distance: Pyroblast 5272,6131, Balefire 5309,6091 | as above |
+
+Rising Dawn's trail missiles (`risingdawnmine`, `risingdawnnova`) have no art, so no fire trail shows. In flight Rising Dawn's
+sun follows D2R's client lob arc (high on far casts, briefly off the top of the screen in the corner) and lands at the click.
+Not covered: other resolutions and Legacy 16:9, the gamepad.
+
+## Lane hdtools-spritewall: a map from its own classic art (2026-11-17, slot 5, HD and legacy, background input)
+
+`tools/sprite_scene.py` draws a map's classic tiles in HD: every upright tile as a cut-out, and with `--classic` the whole
+map: floor tiles as floor art, no model of the base scene, black ground where the map has no floor tile, the map's own
+light. It is a prototype behind a switch: `tools/data/sprite_walls.json` lists no map, the build step then does nothing
+and the default build's output is byte-for-byte the same.
+
+- Unit tests: `py -3 -m unittest tools.tests.test_sprite_scene` (52 tests: tiles, geometry, atlas, merge rule, ground,
+  light, the switch, own LOD records).
+- In game, Fauztinville (`cypherpunk`) and Duncraig (`epicwhiners`) with `--classic` and 2x upscaled art
+  (`checks-20261117-180512-s5`): 0 ERROR / ASSERT lines, 59.7 to 60.0 fps, the installed scenes, biomes, light files and
+  textures hash-equal to the built ones. Against the legacy frames of `checks-20261117-160751-s5`: walls, roofs, props,
+  trees and floors are Median's own art where legacy has them, and the ground outside the map's floor is black.
+- Earlier mode (cut-outs merged into the built scene, `checks-20261117-150823-s5`): a gain on Island of the Sunless Sea
+  (`rockisdead`), none on Fauztinville and Duncraig, a loss on Hole Level 2 (`caveroom4`), whose cave walls are floor
+  tiles and came out flat.
+- A larger window for screenshots: `MXL_CLIENT=2400x1350` (any 16:9 size; the default stays 1600 x 900). Used for the
+  1x / 2x / 4x texture comparison.
+- **Not right yet:** the light (legacy's pool of light and tint are not matched; two maps have one tried light entry
+  each); D2R fades a tall wall in front of the player much wider than legacy does; lower walls and special tiles are not
+  drawn; animated floors show their first frame; the black ground reads 3 to 6 of 255, not 0.
+- **Not covered:** the other 15 maps in game in the `--classic` mode (built only), Duncraig beyond its arrival cave (the
+  harness cannot reach the gate), load time, other quality settings than the slot's.
+
+## Lane ship-maplight: classic maps on by default (2026-11-18, slot 2, HD, background input)
+
+`tools/data/sprite_classic.json` (12 maps, docs/maps-hd.md "Classic maps") is built with `sprite_scene --classic` by
+default.
+
+- Build: full builds of this branch and of its base commit under the host build lock. The whole `work/mod` tree: 6,650
+  files byte-equal, 13 changed (the 12 listed scenes and `model_lod_desc.bin`), 1,366 new; the 5 maps not listed, every D2R
+  scene and every other file are byte-equal to the base build.
+- In game (`checks-20261118-125431-s2` this branch with 13 maps, `checks-20261118-130606-s2` the base build, same session;
+  `wall_maps` in HD at two spots per map): all listed maps, The Proving Grounds (`dungrm6a`) and Blood Moor reached, no
+  assert during play in either build (only D2R's allocator asserts at game exit). 10 s mean fps 59.9-60.0 at every spot of
+  the listed maps in both builds. Island of the Sunless Sea (`rockisdead`) was taken off the list: 32.5 and 38.5 fps
+  against 40.1 and 51.6 for the base build at the same spots (lows 21.9 and 23.1 against 31.9 and 37.4), and one wall is
+  a flat dark slab. The final 12-map build: `checks-20261118-134729-s2` (Welcome to Toraja (`macumba`), whose shared ice
+  cave atlas was re-packed, and the island), no assert during play.
+- **Not covered:** classic frames in the same session (the classic panels of the sheets are lane maplight's runs at the
+  same arrival spots), load time, other quality settings than the slot's.
+
+## Lane ship-bionetic: Bionetic Slam drawn by its classic animations in HD (2026-11-18, slot 5, HD and legacy, background input)
+
+What it is: docs/hd-effects-classic.md. Evidence: `mxl2012-runs/hdtools/ship-bionetic/` (`SHIP.md`, `strips/`, `logs/`).
+
+- Build: `tools/build.py` through `heavy_lock`, exit 0. `effects_classic.py rows` added `bioneticstar` to both table
+  banks; `effects_classic.py build` wrote 22 files (3,964,351 bytes, 690,833 deflated) and pointed 4 rows of
+  `data/hd/missiles/missiles.json` at them; `build_effects.py --check-only` 0 problems.
+- Against the developer install of `main` on the slot: `missiles.json` differs in those 4 rows only, `missiles.txt` in one
+  cell (`bioneticdamage.ExplosionMissile`) and one appended row; `skills.txt`, `monstats.txt`, `states.txt` identical.
+  `tools/effect_chain.py` for Scorpion Blade, Batstrike and Shuriken Flurry: every row draws what it drew
+  (`logs/effect_chain.txt`).
+- Game runs (`game_checks.py fx_card`, 4 casts per mode; "shipped" is the slot's install plus the 25 changed files, put
+  back byte-equal after each run):
+
+| Run | Skill | HD | Legacy |
+|-|-|-|-|
+| `before329` (main) | Bionetic Slam | 4/4 casts, 0 asserts, 61.4 fps | 0 asserts, 61.9 fps |
+| `ship329` (shipped) | Bionetic Slam | 4/4 casts, 0 asserts, 61.5 fps | 0 asserts, 61.9 fps |
+| `before347b` (main) | Shuriken Flurry | 4/4 casts, 0 asserts, 61.5 fps | 0 asserts, 61.9 fps |
+| `ship347` (shipped) | Shuriken Flurry | 4/4 casts, 0 asserts, 61.5 fps | 0 asserts, 62.0 fps |
+
+- Strips: `bionetic_flight.png`, `bionetic_burst.png` (classic, HD before, HD shipped) and
+  `other_skill_shuriken_flurry.png` (the shared `teethexplodeblue` flare and ring look the same before and after).
+- Not usable: Scorpion Blade needs a throwing knife, so the bare test character fired nothing (`before341`); the first
+  Shuriken Flurry start timed out before the main menu while another lane's build was running (`before347`), the retry
+  ran.
+- Tests: `tools/tests` 1855 ok (17 skipped); `tools` 604 with the 2 `test_package_release` failures that plain `main` has
+  too (plugin DLLs not built here).
+
+## Lane rel0126: release 0.1.26 package smoke (2026-11-18, slot 3, HD and legacy, background input)
+
+Package `D2R-XL-2012-0.1.26.7z` (7,991 files, 181,347,886 bytes, sha256
+`45913eb13c68fb1c17abb8c921a1bc22931b4aae1668dc5b3a0c90aa5a6bd311`), `verify_package.py` OK, bundled plugins the same as
+0.1.25. Installed with `release_install.py install --slot 3 --package` (dev DLL of the same PluginVersion for the harness),
+restored after. Driver `mxl2012-runs/rel0126/smoke/` (`smoke.sh`, `relchecks.py` with the extra checks `rel_lob`, `rel_maps`,
+`rel_reload`; not in git). Druid `RelSixDru` (level 120 by `skill_sweep`'s tank for Rising Dawn and Pyroblast), Assassin
+`RelSixAsn`. Runs `checks-20261118-161959-s3` (HD maps, reload), `checks-20261118-162604-s3` (HD casts),
+`checks-20261118-162913-s3` (legacy casts, maps, reload), `checks-20261118-163301-s3` (`fx_card` 329, reload).
+
+| Item | HD | Legacy | Notes |
+|-|-|-|-|
+| Start, character enters | PASS | PASS | |
+| Laughing Ghost at the right screen edge (`rel_lob`) | PASS | PASS | `lobaim` server and client keep the click (HD 4960,4645, legacy 4960,4646); explodes at the edge |
+| Rising Dawn at the right screen edge (`rel_lob`) | PASS | PASS | same target lines; the sun arcs high, then the explosion and shockwave at the edge |
+| Pyroblast with a zombie on the way (`rel_lob`) | PASS | PASS | no `lobaim` line; the zombie is a corpse after the cast |
+| Bionetic Slam (`fx_card` 329, 2 casts) | PASS | PASS | Median's blue orb in both; 0 asserts |
+| Duncraig (`epicwhiners`, map light ON) and Blood Moor (`rel_maps`) | PASS | PASS | Duncraig drawn from its classic art in HD; Blood Moor stock |
+| Save and Exit, then reload (`rel_reload`) | PASS | PASS | same class, level and experience (Druid in both modes, Assassin in HD) |
+
+Asserts: only the known exit pool asserts (`s_StatsPool.IsEmpty()`, `m_allocated == 0` and the other object-pool ones).
+Sheets: `mxl2012-runs/rel0126/shots/` (`lob_hd.png`, `lob_hd_early.png`, `lob_legacy.png`, `bionetic.png`,
+`maps_reload.png`, `reload_asn_hd.png`).

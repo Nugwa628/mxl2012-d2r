@@ -45,6 +45,9 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   missile_release.py after skill_looks: rows another missile makes (not the caster) get their model without D2R's glide from the hand
   skill_looks.py     every skill's chain (missiles, overlays, states) walked in HD: overlays with no picture get the closest D2R overlay that draws; report of every skill;
                      --check fails a skill that shows something in legacy and nothing in HD (docs/hd-effects.md section 11)
+  effects_classic.py rows (before effects_hd) + build (after missile_release): the skills of data/hd-effects-classic.json
+                     drawn in HD by Median's own classic animation as a particle flipbook with the row's light
+                     (docs/hd-effects-classic.md); `rows` adds their private copies of shared missiles.txt rows
   effects_hd.py      every Median missile/overlay row -> exact D2R HD effect, scaled variant or closest stand-in; a
                      recoloured vanilla effect gets a gradient tint (tools/hd_recolour.py, D2R vfx from the shared cache)
                      (also refreshes the committed data/hd-effects-map.tsv); build_effects.py --check-only checks the result
@@ -58,6 +61,11 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
   maps_hd.py build work/mod/data   HD scenes for the maps D2R lacks + Median's tiles with the .ds1 monster ids renumbered
   walls_hd.py build work/mod/data  wall scenes of D2R's own wall models for Median's 17 own maps (docs/maps-hd.md
                      "Walls"; D2R's scenes come from the shared cache, MXL_SLOT=2..5 fills it once)
+  sprite_scene.py build --list tools/data/sprite_walls.json  the listed maps' upright tiles from Median's classic art (none
+                     listed: nothing)
+  sprite_scene.py build --list tools/data/sprite_classic.json --classic  the listed maps all-classic (Median's floors, walls
+                     and roofs, black ground, the map's light tuned against classic; docs/maps-hd.md "Classic maps");
+                     MXL2012_SPRITE_ALBEDO=DIR gives upscaled atlases (--albedo)
   legacy_art.py      Median's classic (legacy-mode, Alt+G) art files -> work/mod/data/global (docs/legacy-graphics.md)
   invtabs_tables.py build, invtabs_hdart.py build, invtabs_art.py build, invtabs_legacy.py button
                      (charm inventory `invtabs`, after legacy_art.py: the classic panel reuses its tiles) the Inventory Tabs
@@ -177,7 +185,9 @@ FLAT_STEPS = [["maps_flat.py", "--lod-base", str(MOD / "data" / "hd" / "model_lo
 ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"], ["art_provenance.py"],
              ["hd_monsters.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],
              ["hd_translvl.py", "build", "--d2r", str(D2R_EXTRACT)],
+             ["effects_classic.py", "rows"],  # before effects_hd: the private rows of data/hd-effects-classic.json exist for every later step
              ["animdata_merge.py"], ["hd_skill_anims.py"], ["missile_hd.py"], ["effects_hd.py"], ["missile_looks.py"], ["skill_looks.py"], ["missile_release.py"],
+             ["effects_classic.py", "build"],  # after missile_release: those rows drawn by their classic animation, whatever the steps above chose
              ["build_effects.py", "--check-only"],
              ["hd_icons.py", "baseline", str(D2R_EXTRACT)], ["hd_icons.py", "build", {"MXL2012_HD_OUT": str(MOD)}],
              ["hd_ui.py", "baseline", str(D2R_EXTRACT)], ["hd_ui.py", "build", {"MXL2012_UI_OUT": str(MOD)}],
@@ -186,6 +196,12 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["maps_hd.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "maps_hd")],
              ["walls_cache.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after maps_hd: replaces its 17 minimal scenes
              *FLAT_STEPS,  # after walls_cache: its scenes are the flat build's input
+             # sprite walls for the maps on sprite_walls.json (none by default: the step does nothing then), merged into their scenes
+             ["sprite_scene.py", "build", "--list", str(ROOT / "tools" / "data" / "sprite_walls.json"), str(MOD / "data")],
+             # the maps on sprite_classic.json all-classic (sprite_scene --classic: Median's own art, black ground, the map's
+             # light tuned against classic); a map not listed keeps its scene. MXL2012_SPRITE_ALBEDO=DIR: upscaled atlases
+             ["sprite_scene.py", "build", "--list", str(ROOT / "tools" / "data" / "sprite_classic.json"), "--classic", str(MOD / "data"),
+              *(["--albedo", os.environ["MXL2012_SPRITE_ALBEDO"]] if os.environ.get("MXL2012_SPRITE_ALBEDO") else [])],
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
              ["shrine_colours.py", "art", str(MOD / "data")],  # needs HD jbscross; preserve the ground/drop art
              ["elixir_colours.py", "art", str(MOD / "data")],

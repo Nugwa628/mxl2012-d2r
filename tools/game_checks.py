@@ -10671,7 +10671,8 @@ def wall_hop(x, y, step=15, hops=40):
 def wall_settle(log, where, mode):
     """MXL_WALL_CLEAR=1: before a wall_maps view, the monsters within MXL_WALL_KILL_RADIUS (default 30) of the player are
     killed, at most MXL_WALL_KILLS (default 150) (clean shots, the frame rate of the scene alone); an HD view is then held
-    MXL_WALL_SETTLE seconds (default 11: the overlay's frame rate is a 10 s mean)."""
+    MXL_WALL_SETTLE seconds (default 11: the overlay's frame rate is a 10 s mean), a classic view MXL_WALL_SETTLE_CLASSIC
+    (default 1; longer lets the arrival's portal effect end before the shot)."""
     if not os.environ.get("MXL_WALL_CLEAR"):
         return
     radius = int(os.environ.get("MXL_WALL_KILL_RADIUS", "30"))
@@ -10680,7 +10681,7 @@ def wall_settle(log, where, mode):
         if not hostiles_near(hstate(), radius) or not H("kill nearest")[0]:
             break
         killed += 1
-    time.sleep(float(os.environ.get("MXL_WALL_SETTLE", "11")) if mode == "hd" else 1.0)
+    time.sleep(float(os.environ.get("MXL_WALL_SETTLE", "11")) if mode == "hd" else float(os.environ.get("MXL_WALL_SETTLE_CLASSIC", "1")))
     left = len(hostiles_near(hstate(), radius))
     log.append("%s: %d monsters killed, %d left within %d" % (where, killed, left, radius))
 
@@ -17654,6 +17655,108 @@ def check_secrets():
 
 
 CHECKS += [("secrets", check_secrets)]
+
+
+# ---------------------------------------------------------------- lane hdtools-effects: a cast, frame by frame
+def check_fx_card():
+    """Lane hdtools-effects: the skill MXL_FXCARD_SKILL (skills.txt Id, default 329 Bionetic Slam; the character must be of
+    its class: MXL_CHAR_CLASS) cast with the right button at a zombie spawned MXL_FXCARD_OFFSET sub-tiles away (default
+    "10,-10": on the character's screen row, to the right), MXL_FXCARD_CASTS times (default 4, a fresh zombie each), in every
+    graphics mode of MXL_FXCARD_MODES (default hd,legacy) in area MXL_FXCARD_AREA (default 2, the Blood Moor). Each cast is
+    one burst of MXL_FXCARD_FRAMES client grabs (default 28) taken as fast as they go and written afterwards:
+    fxcard_<skill>_<mode>_c<cast>_<frame>.png, the time of each frame in the row. Per mode: the client missiles seen, engine
+    asserts (`asserttrace`), the render rate of the drawcap probe while casting (None without MXL_DRAWCAP_PROBE=1 at launch)
+    and the game's private MB. PASS: the skill learnt, every cast clicked, missiles seen, no assert, the game alive; whether HD
+    shows the classic picture is judged by hand on the frames."""
+    import drawcap_stats
+    mark = engine_mark()
+    log, rows, bad, shots = [], [], [], []
+    sid = int(os.environ.get("MXL_FXCARD_SKILL") or 329)
+    area = int(os.environ.get("MXL_FXCARD_AREA") or 2)
+    modes = [m.strip().lower() for m in (os.environ.get("MXL_FXCARD_MODES") or "hd,legacy").split(",") if m.strip()]
+    ox, oy = (int(v) for v in (os.environ.get("MXL_FXCARD_OFFSET") or "10,-10").split(","))
+    casts = int(os.environ.get("MXL_FXCARD_CASTS") or 4)
+    frames = int(os.environ.get("MXL_FXCARD_FRAMES") or 28)
+    _, csv_path = drawcap_files()
+    enable_debug()
+    cheat("god 1")
+    goto(1)
+    Hl("asserttrace on", log)
+    with Tank(), Level(60):
+        got = learn(sid, 1)
+        if not got:
+            bad.append("skill %d not learnt (base level %s): is the character of its class?" % (sid, got))
+        for mode in modes if got else ():
+            goto(1)
+            if graphics_mode() != mode and not set_graphics(mode):
+                bad.append("graphics mode %s not reached" % mode)
+                continue
+            goto(area)
+            time.sleep(2.0)
+            for _ in range(12):
+                if not Hl("kill nearest", log)[0]:
+                    break
+            Hl("skill right %d" % sid, log)
+            Hl("missiles reset", log)
+            a0 = pot_asserts()
+            n0 = len(drawcap_stats.read(csv_path)) if os.path.isfile(csv_path) else None
+            win = g.need_window()
+            clicked = 0
+            for c in range(casts):
+                for s_, v in Tank.STATS:
+                    setstat("player", s_, v << 8)
+                px, py = player_xy()
+                _, sp = Hl("spawn 5 1 %d %d" % (px + ox, py + oy), log)
+                uid = first(sp, r"id=(\d+)")
+                if uid is None:
+                    bad.append("cast %d (%s): no target spawned" % (c, mode))
+                    continue
+                for s_ in (7, 6):
+                    setstat("mon:%s" % uid, s_, 30000 << 8)
+                time.sleep(0.3)
+                grabs = [(0.0, g.grab_client(win))]
+                t0 = time.time()
+                clicked += 1 if click_unit(int(uid), button="right") else 0
+                for _ in range(frames):
+                    img = g.grab_client(win)
+                    grabs.append((time.time() - t0, img))
+                times = []
+                for k, (t, img) in enumerate(grabs):
+                    name = "fxcard_%d_%s_c%d_%02d.png" % (sid, mode, c, k)
+                    img.save(os.path.join(g.current_run(), name))
+                    shots.append(name)
+                    times.append("%.2f" % t)
+                rows.append("cast %d (%s): target %s at %+d,%+d, frame times s %s" % (c, mode, uid, ox, oy, " ".join(times)))
+                H("kill %s" % uid)
+                time.sleep(0.8)
+            _, ms = Hl("missiles", log)
+            seen = missiles_seen(ms)
+            a1 = pot_asserts()
+            n = (a1 - a0) if a0 is not None and a1 is not None else None
+            msgs = pot_assert_lines(n or 0)
+            fps = drawcap_stats.summary(drawcap_stats.read(csv_path)[n0:], mode).get("fps") if n0 is not None else None
+            rows.append("skill %d (area %d, %s): %d of %d casts clicked, client missiles %s, asserts %s%s, render fps %s, private MB %s" % (
+                sid, area, mode, clicked, casts, seen, n if n is not None else "?", " %s" % msgs if msgs else "", fps, game_private_mb()))
+            if clicked < casts:
+                bad.append("%s: %d of %d casts clicked" % (mode, clicked, casts))
+            if not seen:
+                bad.append("%s: no client missile seen" % mode)
+            if n is None or n > 0:
+                bad.append("%s: %s engine asserts" % (mode, n))
+            if not game_alive():
+                bad.append("the game died (%s)" % mode)
+                break
+    if game_alive():
+        goto(1)
+        if graphics_mode() != "hd":
+            set_graphics("hd")
+        cheat("god 0")
+    finish("fx_card", not bad, "; ".join(r for r in rows if r.startswith("skill")) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""),
+           mark, shots, rows + log[-300:], partial="whether HD shows the classic picture is judged by hand on the fxcard_*.png frames")
+
+
+CHECKS += [("fx_card", check_fx_card)]
+
 
 if __name__ == "__main__":
     main()

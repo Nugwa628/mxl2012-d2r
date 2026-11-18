@@ -28,8 +28,8 @@
 //      state list without a skill without their range asserts, as 1.14d does (state_lists.cpp, off word statelist, #50 #52);
 //   +  a state-22 list without a skill (Median's raptured) gets 1.14d's fixed trail, missile 143 with the level of the unit's
 //      skill 173, instead of nothing (melt_trail.cpp, off word melttrail, #52);
-//   +  Laughing Ghost (skills.txt lob 1) explodes where the player clicked, no farther than its missile's range: the target
-//      point of its lob missile is capped in both missile creates (lob_aim.cpp, off word lobaim, #614);
+//   +  Laughing Ghost and Rising Dawn (skills.txt lob 1) land where the player clicked, up to the edge
+//      of the screen: their lob missiles get the clicked point in both missile creates (lob_aim.cpp, off word lobaim, #618);
 //   +  Whirlwind's 1.13c hit rate (srvdofunc 76: Whirlwind, Spin To Win, Danse Macabre, Harvest) instead of D2R 2.4's
 //      (whirlwind.cpp, off word whirlwind, #281);
 //   +  Move Only (srvstfunc 71, the mod's own walk-only skill) never starts a cast: a click on a monster walks to it and
@@ -159,7 +159,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.25";
+constexpr const char* PluginVersion = "0.1.26";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in

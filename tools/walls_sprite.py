@@ -6,12 +6,14 @@ the tile's sprite through D2R's AlphaThresholdMaterial. A cell's sprite lies ove
 curtain is one or two flat pieces: x < 80 runs along the cell's X = 0 edge, x > 80 along its Z = 0 edge. UVs are the sprite's
 own pixels, so the wall shows the classic picture from the game's camera.
 
-  py -3 -I tools/walls_sprite.py build expansion/dystopic/desertpeak.ds1 OUT [--scale 2] [--method lanczos|nearest|esrgan]
+  py -3 -I tools/walls_sprite.py proto expansion/dystopic/desertpeak.ds1 OUT [--scale 2] [--method lanczos|nearest|esrgan]
                                  [--normals sprite|flat] [--esrgan EXE] [--base SCENE.json] [--light floor|wall] [--shadow N] [--relief UNITS]
                                  [--export DIR] [--albedo IMAGE]
+  py -3 tools/walls_sprite.py build MAP [MAP ...] | --all  OUT [...]     any map, merged into its built scene: tools/sprite_scene.py
 
 OUT is a mod `data` folder (hd/env/..., hd/model_lod_desc.bin). Needs D2R's model_lod_desc.bin and the donor's LOD files, read
-like tools/walls_hd.py d2r_bytes (extraction, shared cache, or MXL_SLOT's CASC). Not part of tools/build.py.
+like tools/walls_hd.py d2r_bytes (extraction, shared cache, or MXL_SLOT's CASC). `proto` (the first prototype: a scene of
+sprite walls only, one of the 17 planned maps) is not part of tools/build.py.
 """
 import argparse
 import copy
@@ -68,19 +70,20 @@ def columns(x0: int, x1: int, bottom: float) -> list:
     return sorted(cuts)
 
 
-def tile_mesh(rect, uv_rect, light: str = "floor"):
+def tile_mesh(rect, uv_rect, light: str = "floor", px_height: float = PX_PER_HEIGHT):
     """(vertices, triangles) of the curtain of a tile: vertices are (position, normal, tangent + sign, uv). rect: rect_of();
     uv_rect: (u0, v0, u1, v1) of the sprite in the atlas. Triangles wound as D2R's terrain: (b - a) x (c - a) along the wall's
     normal. light: 'floor' shades the wall with an upward normal, so it gets the light the floor gets (the sprite has its
     shading painted in; true wall normals leave every wall that faces away from the map's key light black), 'wall' with
-    the wall's own normal."""
+    the wall's own normal. px_height: classic pixels per world unit of height (tools/sprite_scene.py passes the measured
+    camera's 9.80)."""
     x0, y0, x1, y1 = rect
     top, bottom = y0 + WALL_Y, y1 + WALL_Y
     u0, v0, u1, v1 = uv_rect
 
     def vertex(x, y, n, t):
         ex, ez = edge_point(x)
-        pos = (ex, (foot(x) - y) / PX_PER_HEIGHT, ez)
+        pos = (ex, (foot(x) - y) / px_height, ez)
         return (pos, n, t, (u0 + (u1 - u0) * (x - x0) / (x1 - x0), v0 + (v1 - v0) * (y - top) / (bottom - top)))
 
     verts, tris = [], []
@@ -149,15 +152,20 @@ def _half(f: float) -> int:
     return struct.unpack("<H", struct.pack("<e", f))[0]
 
 
-def sprite_model(donor: bytes, verts, tris, textures: dict) -> tuple:
-    """A .model: the donor's mesh replaced by (verts, tris), padded to the donor's counts (D2R's LOD index stores them), with
-    identity bone and placement and the textures {'alb' | 'nrm' | 'orm': game path}. -> (bytes, bbMin, bbMax)."""
+def sprite_model(donor: bytes, verts, tris, textures: dict, pad: bool = True) -> tuple:
+    """A .model: the donor's mesh replaced by (verts, tris), padded to the donor's counts, with identity bone and placement
+    and the textures {'alb' | 'nrm' | 'orm': game path}. -> (bytes, bbMin, bbMax). pad=False writes the mesh's own counts
+    (model_lod_desc.bin stores no counts; lane hdtools-spritewall), up to the 65,535 vertices 16-bit indices reach."""
     import d2r_model as dm
     gr2 = dm.Gr2File.read(donor)
     tree = dm.parse_tree(gr2)
     mesh = tree["Meshes"][0]
     vertices, topo = mesh["PrimaryVertexData"]["Vertices"], mesh["PrimaryTopology"]
     nv, ni = len(vertices.obj), len(topo["Indices16"])
+    if not pad:
+        nv, ni = len(verts), len(tris) * 3
+        if nv > 65535 or not nv or not ni:
+            raise ValueError("sprite_model: %d vertices / %d indices: not a mesh 16-bit indices can hold" % (nv, ni))
     if len(verts) > nv or len(tris) * 3 > ni:
         raise ValueError("sprite_model: %d vertices / %d indices do not fit the donor's %d / %d" % (len(verts), len(tris) * 3, nv, ni))
     pts = [v[0] for v in verts]
@@ -662,9 +670,13 @@ class MapSprites:
 
 
 def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["build"]:      # any map, merged into its built scene: tools/sprite_scene.py
+        import sprite_scene
+        return sprite_scene.main(argv)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    b = sub.add_parser("build")
+    b = sub.add_parser("proto")
     b.add_argument("map")
     b.add_argument("out", type=Path)
     b.add_argument("--scale", type=int, default=2)

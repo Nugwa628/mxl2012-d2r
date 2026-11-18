@@ -661,6 +661,35 @@ The scene budget (`cap()`, `MAP_LIMITS`) is our own policy, not this cache: Fauz
 and 7,999,943 bytes. In game it loads with no crash: 59-59.5 fps, private memory 9.7-9.8 GB at Fauztinville in HD (lane
 stairs measured 9.54-9.77 GB with the 5,779-piece scene).
 
+### Classic maps (lane ship-maplight, 2026-11-18)
+
+The maps listed in `tools/data/sprite_classic.json` are drawn in HD from Median's own classic art: every floor, wall, roof,
+prop and tree tile of the map (`tools/sprite_scene.py build --classic`), black ground where the map has no floor tile, and
+the map's own light, derived from levels.txt and tuned per map against classic frames (`CLASSIC_LIGHT`; method and numbers:
+`mxl2012-runs/hdtools/maplight/REPORT.md`, outside the repo). The light belongs to the classic art: it is not used on its
+own. `tools/build.py` runs this step by default, right after the merge-list step (`sprite_walls.json`, empty); no
+environment variable is needed. The atlases are the plain 1x art. For the 12 maps below the step takes about 4.5 minutes
+and adds 1,366 files (1,279 models, one per distinct tile; 63 textures; 24 biome and light files): 105 MB raw, 18.7 MB
+deflated, against a mod of 966 MB raw.
+
+On the list (12): Duncraig (`epicwhiners`), Cathedral of Vanity (`inarius`), Ureh (`downtown`), Fauztinville
+(`cypherpunk`), Tran Athulua (`desertpeak`), Dimensional Sanctum (`belial`), Kurast 3000 BA (`excelsior3`), Vizjun
+(`glados`), Rathma Square (`moskvich`), Welcome to Toraja (`macumba`), Welcome to Old Bremmtown (`borgir`), Welcome to
+Khalimgrad (`charismatic`).
+
+Not on the list (5), built as before: Hole Level 2 (`caveroom4`), The Proving Grounds (`dungrm6a`), Azmodan's Reliquary
+(`temple5`, `temple6`): random levels, only the preset room is Median's map, the other rooms are D2R's own scenes, so the
+classic light cannot show there. Island of the Sunless Sea (`rockisdead`): in game (slot 2, 2026-11-18) the classic scene
+ran at 32.5 and 38.5 fps (10 s means at two spots) against 40.1 and 51.6 for the default build in the same session, and
+one wall is drawn as a flat dark slab.
+
+- **Take one map off:** delete its line from `tools/data/sprite_classic.json` and build. Its scene is then the default
+  build's, byte for byte (the step only writes the listed maps' scenes, biomes, light files and their models).
+- **Take all of it off:** leave `"maps": []`; the step prints "no map listed, nothing to do".
+- **Put a map on:** add its `.ds1` path; `tools/tests/test_sprite_scene.py` requires that it is one of the 17 own maps
+  (`walls_hd.MAPS`), is not also on `sprite_walls.json`, and has a `CLASSIC_LIGHT` entry.
+- Upscaled atlases (for example AI 2x): `MXL2012_SPRITE_ALBEDO=DIR` (`--albedo`), off by default.
+
 ## Edited D2R maps (lane hole2, bug #525, 2026-11-03)
 
 D2R builds a preset from the .ds1 in its own CASC whenever the CASC has that path, not from the mod's copy at the same path

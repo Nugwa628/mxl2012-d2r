@@ -1,0 +1,44 @@
+{
+ "about": "Skills whose HD picture is Median's own classic animation, played as a particle flipbook (tools/effects_classic.py, docs/hd-effects-classic.md). `enabled` false: the build makes none of it and the rows keep their stand-in effects.",
+ "enabled": true,
+ "scale": 2,
+ "method": "lanczos",
+ "skills": ["Bionetic Slam"],
+ "rows": {
+  "bioneticstar": {
+   "copy": "teethexplodeblue",
+   "at": [["bioneticdamage", "ExplosionMissile"]],
+   "why": "Bionetic Slam leaves 16 of these at once; their HD picture is tuned for that pile. The shared row teethexplodeblue keeps its effect for every other missile."
+  }
+ },
+ "missiles": {
+  "bioneticmover": {
+   "name": "mxl_fx_psiorb",
+   "art": "missiles/psiorb",
+   "mode": "loop",
+   "light": {"rgb": [0, 0, 1], "range": 21, "power": 190.0},
+   "parts": [{"lift": 3.52, "ramp": "own", "tint": [1.13, 1.05, 1.43]}]
+  },
+  "bioneticlargeboom": {
+   "name": "mxl_fx_psiorbexplode",
+   "art": "missiles/psiorbexplode",
+   "mode": "once",
+   "light": {"rgb": [0, 0, 1], "range": 6, "power": 250.0},
+   "parts": [
+    {"lift": 3.01, "ramp": "grey", "level": "r", "tint": [0.3, 0.0, 0.0]},
+    {"lift": 3.01, "ramp": "grey", "level": "g", "tint": [0.0, 0.36, 0.0]},
+    {"lift": 3.01, "ramp": "grey", "level": "b", "tint": [0.0, 0.0, 0.8]}
+   ]
+  },
+  "bioneticdamage": {
+   "name": "mxl_fx_light_blue2",
+   "light": {"rgb": [0, 0, 1], "range": 6, "power": 250.0}
+  },
+  "bioneticstar": {
+   "name": "mxl_fx_bioneticstar",
+   "art": "missiles/TeethExplode",
+   "mode": "once",
+   "parts": [{"ramp": "own", "tint": [1.2, 1.45, 2.4]}]
+  }
+ }
+}

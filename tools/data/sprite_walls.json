@@ -1,0 +1,4 @@
+{
+ "about": "Maps whose upright tiles tools/sprite_scene.py draws from Median's classic art in HD (tools/build.py step, after the flat maps). Empty: the build's scenes are unchanged. Example entry: \"expansion/ghetto/cypherpunk.ds1\"",
+ "maps": []
+}

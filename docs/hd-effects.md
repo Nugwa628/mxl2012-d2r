@@ -303,6 +303,7 @@ column makes the overlays appear.
 | `data/hd-effects-map.tsv` | new | the committed mapping table (558 art files) |
 | `data/hd-effects-picks.tsv` | new (lane hdfx2) | hand-picked stand-ins, an input of `effects_hd.py` (section 9) |
 | `tools/hd_particles.py`, `tools/hd_authored.py`, `data/hd-effects-authored.json` | new (lane hd587 round 3) | edits of D2R's particle files and layered effects of our own, docs/hd-effects-authoring.md. Tests `tools/tests/test_hd_particles.py` |
+| `tools/effects_classic.py`, `tools/effect_flipbook.py`, `tools/effect_sheet.py`, `tools/effect_chain.py`, `data/hd-effects-classic.json` | new (lanes hdtools-effects, ship-bionetic) | a skill drawn by its classic animation as a particle flipbook with the row's light (Bionetic Slam), docs/hd-effects-classic.md. Tests `tools/tests/test_effect_flipbook.py`, `tools/tests/test_effects_classic.py` |
 
 Not ported: `missile_hd.py`, `missile_art.py`, `hd_skill_anims.py`, `palshift.py`, `art_fix.py`
 (reasons in section 3).
