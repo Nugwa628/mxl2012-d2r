@@ -205,6 +205,26 @@ class TilesTest(unittest.TestCase):
         self.assertEqual(ss.group_of("Act3\\Kurast\\Walls.dt1", 3), "act3-kurast-walls-a3")
         self.assertNotEqual(ss.group_of("a/b.dt1", 1), ss.group_of("a/b.dt1", 2))
 
+    def test_a_map_with_an_own_group_draws_into_atlases_of_its_own(self):
+        pal = np.zeros((256, 4), np.uint8)
+        own = ss.MapHandle("act3/temple/temple5.ds1", None, [], 3, pal)
+        twin = ss.MapHandle("act3/temple/temple6.ds1", None, [], 3, pal)
+        other = ss.MapHandle("expansion/glados/glados.ds1", None, [], 3, pal)
+        tiles = "act3/kurast/interior.dt1"
+        self.assertEqual(other.group(tiles), ss.group_of(tiles, 3))          # a map not in OWN_GROUP: the shared atlas
+        self.assertEqual(own.group(tiles), ss.group_of(tiles, 3) + "-" + ss.OWN_GROUP["temple5"])
+        self.assertEqual(own.group(tiles), twin.group(tiles))                # the two identical Reliquary maps share theirs
+        for m in ss.OWN_GROUP:                                               # never a map that ships on the shared atlases
+            self.assertNotIn(m, {Path(x).stem for x in ss.listed_maps(ss.CLASSIC_LIST)} - set(ss.OWN_GROUP))
+
+    def test_a_map_on_own_atlas_does_not_share_a_tile_files_atlas(self):
+        ds = FakeDs(8, 8, [{(1, 1): (dword(0, 3), 1)}], [{}])
+        own = ss.MapHandle("Expansion\\IceCave\\RockIsDead.ds1", ds, [("x/walls.dt1", WALLS)], 5, PALETTE)
+        other = ss.MapHandle("Expansion\\Voodoo\\Macumba.ds1", ds, [("x/walls.dt1", WALLS)], 5, PALETTE)
+        self.assertIn("rockisdead", ss.OWN_GROUP)
+        self.assertEqual(other.group("x/walls.dt1"), ss.group_of("x/walls.dt1", 5))
+        self.assertEqual(own.group("x/walls.dt1"), ss.group_of("x/walls.dt1", 5) + "-rockisdead")
+
     def test_cut_black_drops_large_black_patches_only(self):
         px = [(x, y, 9) for x in range(12) for y in range(12)] + [(x, 20, 9) for x in range(5)] + [(x, 30, 5) for x in range(200)]
         out = ss.cut_black(px, PALETTE)
@@ -470,7 +490,7 @@ class MergeTest(unittest.TestCase):
 
 class PlanTest(unittest.TestCase):
     def opts(self, **kw):
-        return SimpleNamespace(**dict(dict(orientations=sorted(ss.CLASS_OF), rule="auto", floors="blocked"), **kw))
+        return SimpleNamespace(**dict(dict(orientations=sorted(ss.DRAWN), rule="auto", floors="blocked"), **kw))
 
     def test_on_a_flat_scene_painted_kinds_stay_painted_and_no_floor_art_is_added(self):
         h = handle()
@@ -491,6 +511,18 @@ class PlanTest(unittest.TestCase):
     def test_elsewhere_every_upright_tile_and_the_blocking_floors(self):
         plan = ss.build_map(handle(), {"entities": []}, "empty", self.opts())
         self.assertEqual((len(plan["walls"]), len(plan["floors"]), plan["skipped"]), (4, 2, 0))
+
+    def test_special_tiles_are_drawn_on_the_door_maps_only(self):
+        tiles = dt1([(11, 0, 0, 1, 0, 5, (70, -220, 90, 180, 5)), (1, 0, 3, 1, 0, 5, (60, -200, 40, 200, 5))])
+        ds = FakeDs(8, 8, [{(2, 2): (dword(0, 0), 11), (3, 3): (dword(0, 3), 1)}], [{}])
+        keys = lambda stem: sorted(v.key for *_r, v in ss.build_map(
+            ss.MapHandle("x/%s.ds1" % stem, ds, [("x/w.dt1", tiles)], 5, PALETTE), {"entities": []}, "empty", self.opts())["walls"])
+        self.assertIn("rockisdead", ss.DOOR_MAPS)
+        self.assertEqual(keys("rockisdead"), [(1, 0, 3), (11, 0, 0)])
+        self.assertEqual(keys("macumba"), [(1, 0, 3)])
+        self.assertNotIn(11, ss.DRAWN)
+        self.assertEqual(ss.tile_name((11, 0, 0)), "wall_11_0_0")
+        self.assertEqual(ss.parse_name("wall_11_0_0"), ((11, 0, 0), 0))
 
 
 class GroundTest(unittest.TestCase):
@@ -571,6 +603,15 @@ class GroundTest(unittest.TestCase):
         v = out["entities"][0]["components"][0]
         self.assertEqual((v["iblIntensity"], v["playerUnitLightPower"], v["playerUnitLightDistanceScaler"]), (2.0, 5000.0, 1.333))
         self.assertEqual((out["name"], ss.key_power(out), ss.key_power(self.vis(0.0))), ("n", 12.0, 0.0))
+        self.assertNotIn("specularContribution", key)                                          # not given: left as it is
+
+    def test_a_maps_spec_sets_only_the_key_lights_specular_share(self):
+        from unittest import mock
+        with mock.patch.dict(ss.CLASSIC_LIGHT, {"caveroom4": {"gain": 0.5, "spec": 0.0}}, clear=True):
+            _n, light, _b, vis, *_r = self.classic_biome("caveroom4", 0.0, (255, 255, 0, 0))
+        self.assertEqual(light["spec"], 0.0)
+        specs = {e["name"]: c.get("specularContribution") for e in vis["entities"] for c in e["components"]}
+        self.assertEqual(specs, {"vis": None, ss.KEY_LIGHT: 0.0, "player_key_light": None})
 
     def classic_biome(self, key, power, ambient=None):
         with tempfile.TemporaryDirectory() as tmp:
@@ -589,7 +630,9 @@ class GroundTest(unittest.TestCase):
                 all((out / (ss.BLACK_GROUND % k)[len("data/"):]).is_file() for k in ("alb", "nrm", "orm"))
 
     def test_a_classic_biome_is_bare_and_black_and_has_the_maps_light(self):
-        name, light, biome, vis, again, textures = self.classic_biome("dungrm6a", 0.0, (212, 255, 81, 128))
+        from unittest import mock
+        with mock.patch.dict(ss.CLASSIC_LIGHT, {}, clear=True):           # the rule alone
+            name, light, biome, vis, again, textures = self.classic_biome("dungrm6a", 0.0, (212, 255, 81, 128))
         self.assertEqual((name, light, again, textures), ("mxl2012_classic_dungrm6a", ss.classic_light((212, 255, 81, 128)), (name, None), True))
         lay = biome["terrainDataUltra"]["terrainLayers"][0]
         self.assertEqual((lay["GrassDensity"], lay["Clutter"], lay["Albedo"]), (0.0, [], ss.BLACK_GROUND % "alb"))

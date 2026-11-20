@@ -545,6 +545,127 @@ class PackageReleaseTests(unittest.TestCase):
                 mock.patch.object(pr.fxpaths.localconfig, "shared_dir", lambda: empty):
             self.assertIsNone(pr.dof_dir())
 
+    def test_md_pins_the_authors_release_and_its_default_config(self):
+        self.assertEqual(pr.MD["dll"], "d2rloader/plugins/d2rl-celestialrayone-monster-display.dll")
+        self.assertEqual((pr.MD["version"], pr.MD["sha256"], pr.MD["commit"]),
+                         ("1.0.18", "bc5fa7d7ed6468981f8c165b8c3bdde49e475f68a8371d93e2f2eba3b566eaed", pr.DOF["commit"]))
+        readme = (pr.MD_OURS / "README.md").read_text("utf-8")
+        for pin in (pr.MD["sha256"], pr.MD["data_sha256"], pr.MD["commit"], pr.MD["repo"]):
+            self.assertIn(pin, readme)
+        self.assertIn("Copyright (c) 2026 Bogdan Bulai", (pr.MD_OURS / "LICENSE").read_text("utf-8"))
+        cfg = (pr.MD_OURS / "celestialrayone.monster-display.toml").read_text("utf-8")
+        self.assertEqual(pr.md_config_problems(cfg), [])
+        self.assertEqual(len(pr.md_config_problems(cfg.replace('mode = "effective"', 'mode = "monster"'))), 1)
+        # Median's 36-39 stay hidden on minions; the author's default list alone is refused
+        self.assertIn("minion_hidden_affixes = [9, 17, 18, 26, 27, 28, 36, 37, 38, 39]", cfg)
+        author = cfg.replace("[9, 17, 18, 26, 27, 28, 36, 37, 38, 39]", "[9, 17, 18, 26, 27, 28]")
+        self.assertEqual(pr.md_config_problems(author),
+                         [f"{pr.MD['config']}: minion_hidden_affixes must hold 36, 37, 38, 39"])
+        # three layouts and 14 frame sprites, each also in its low-end variant
+        self.assertEqual(len(pr.md_package_paths()), 3 + 3 + 28)
+
+    def test_md_staged_into_the_plugins_config_and_data(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        folder, pins = tvp.fake_md_release(self.tmp)
+        pins.start()
+        self.addCleanup(pins.stop)
+        self.assertEqual(pr.check_md(folder), [])
+        pr.stage_md(mod, folder)
+        data = mod / f"{pr.NAME}.mpq" / "data"
+        self.assertEqual((data / "global/ui/layouts/hudmonsterhealthhd.json").read_bytes(), b"hudmonsterhealthhd_pc.json\n")
+        self.assertTrue((data / "hd/global/ui/panel/monsterdisplayframes/boss_mid.lowend.sprite").is_file())
+        self.assertIn("MIT License", (mod / pr.MD["licence"]).read_text("utf-8"))
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, md=True))
+        self.assertIn(pr.MD["config"], m["preserve"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["version"], entry["sha256"]), ("Monster Display", "1.0.18", pr.MD["sha256"]))
+        self.assertEqual(set(entry["files"]), set(pr.md_package_paths()))
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+
+    def test_md_other_bytes_and_a_mod_layout_of_its_own_are_refused(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        folder, pins = tvp.fake_md_release(self.tmp)
+        pins.start()
+        self.addCleanup(pins.stop)
+        sprite = folder / "MonsterDisplay" / "monsterdisplayframes" / "boss_mid.sprite"
+        sprite.write_bytes(b"other art")
+        self.assertIn("files differ", "\n".join(pr.check_md(folder)))
+        sprite.unlink()
+        self.assertIn("lacks boss_mid.sprite", "\n".join(pr.check_md(folder)))
+        with self.assertRaises(SystemExit):
+            pr.stage_md(mod, folder)
+        self.assertFalse((mod / pr.MD["dll"]).exists())
+        sprite.write_bytes(b"boss_mid.sprite\n")
+        self.assertEqual(pr.check_md(folder), [])
+        own = mod / f"{pr.NAME}.mpq" / "data" / "global/ui/layouts/hudmonsterhealthhd.json"
+        own.parent.mkdir(parents=True, exist_ok=True)
+        own.write_text("{}", "utf-8")
+        with self.assertRaisesRegex(SystemExit, "already in the mod's data"):
+            pr.stage_md(mod, folder)
+        empty = self.tmp / "nothing-md"
+        empty.mkdir()
+        with mock.patch.dict(os.environ, {"MXL_MD_DIR": str(empty)}), \
+                mock.patch.object(pr.fxpaths.localconfig, "shared_dir", lambda: empty):
+            self.assertIsNone(pr.md_dir())
+        with mock.patch.dict(os.environ, {"MXL_MD_DIR": str(folder)}):
+            self.assertEqual(pr.md_dir(), folder)
+
+    def test_vsr_is_built_from_the_suite_commit_floating_damage_uses(self):
+        script = (HERE / "build_vendorstockrefresh.ps1").read_text("utf-8")
+        self.assertIn("third_party/RuffnecKk-D2RLoader-Suite", script)
+        self.assertEqual(pr.VSR["repo"], pr.FD["repo"])
+        self.assertEqual(pr.VSR["mpq_sha256"], "0014c677e24979275307fd2194b4d6c31167a46ab8eb9c0f005b6a8cddedc5f6")
+        readme = (pr.VSR_OURS / "README.md").read_text("utf-8")
+        for pin in (pr.VSR["mpq_sha256"], pr.fd_commit(), pr.VSR["hub"]):
+            self.assertIn(pin, readme)
+        self.assertEqual(pr.vsr_config_problems("[plugin]\nenabled = true\n\n[diagnostics]\nenabled = false\n"), [])
+        self.assertEqual(len(pr.vsr_config_problems("[plugin]\nenabled = true\n\n[diagnostics]\nenabled = true\n")), 1)
+
+    def test_vsr_staged_with_its_mpq_licence_and_notices(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        dll, mpq, src, pins = tvp.fake_vsr_build(self.tmp)
+        pins.start()
+        self.addCleanup(pins.stop)
+        self.assertEqual(pr.check_vsr(dll) + pr.check_vsr_mpq(mpq), [])
+        pr.stage_vsr(mod, dll, mpq, src)
+        for k in pr.VSR_FILES:
+            self.assertTrue((mod / pr.VSR[k]).is_file(), k)
+        self.assertIn("===== third_party/PluginSDK/LICENSE =====", (mod / pr.VSR["notices"]).read_text("utf-8"))
+        files = pr.file_list(mod)
+        m = pr.manifest("1.2.3", files, self.fake_7z(mod), True, pr.empty_dirs(mod), pr.preserve_list(mod),
+                        pr.bundled_plugins(False, False, vsr=True))
+        self.assertIn(pr.VSR["config"], m["preserve"])
+        (entry,) = m["bundledPlugins"]
+        self.assertEqual((entry["name"], entry["commit"], entry["mpqSha256"]),
+                         ("Vendor Stock Refresh", pr.fd_commit(), pr.VSR["mpq_sha256"]))
+        self.assertTrue(set(entry["files"]) <= {f["path"] for f in files})
+
+    def test_vsr_other_builds_mpqs_and_settings_are_refused(self):
+        import test_verify_package as tvp
+        mod = self.staged()
+        dll, mpq, src, pins = tvp.fake_vsr_build(self.tmp)
+        pins.start()
+        self.addCleanup(pins.stop)
+        (src / "PINNED_COMMIT").write_text("0" * 40, encoding="ascii")
+        with self.assertRaisesRegex(SystemExit, "is not the pinned commit"):
+            pr.stage_vsr(mod, dll, mpq, src)
+        (src / "PINNED_COMMIT").write_text(pr.fd_commit(), encoding="ascii")
+        (mpq / "d2rl-ruffneckk-vendor-stock-refresh.mpq").write_bytes(b"MPQ\x1a other")
+        with self.assertRaisesRegex(SystemExit, "companion MPQ"):
+            pr.stage_vsr(mod, dll, mpq, src)
+        (mpq / "d2rl-ruffneckk-vendor-stock-refresh.mpq").write_bytes(b"MPQ\x1a vendor-stock-refresh")
+        (dll.parent / pr.VSR_FROM["config"]).write_text("[plugin]\nenabled = true\n\n[diagnostics]\nenabled = true\n", "utf-8")
+        with self.assertRaisesRegex(SystemExit, "diagnostics"):
+            pr.stage_vsr(mod, dll, mpq, src)
+        dll.write_bytes(b"MZ VendorStockRefresh 2.1.6 by RuffnecKk\0")
+        self.assertIn("is not Vendor Stock Refresh 2.1.7", "\n".join(pr.check_vsr(dll)))
+        self.assertFalse((mod / pr.VSR["dll"]).exists())
+
     def test_ehb_is_pinned_with_our_patches(self):
         self.assertEqual((pr.EHB["author"], pr.EHB["licence_id"]), ("Graxy_TV", "GPL-3.0-only"))
         script = (HERE / "build_enemyhealthbars.ps1").read_text("utf-8")
@@ -616,7 +737,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual(len(pr.fd_commit()), 40)
         names = [p.split("  ")[1] for p in pr.fd_patches()]
         self.assertEqual(names, ["0001-mxl2012-legacy-projection.patch", "0002-mxl2012-bundled-font.patch",
-                                 "0003-mxl2012-legacy-dps-counter.patch", "0004-mxl2012-legacy-text-scale.patch"])
+                                 "0003-mxl2012-legacy-dps-counter.patch", "0004-mxl2012-legacy-text-scale.patch",
+                                 "0005-mxl2012-missing-system-font.patch"])
         readme = (pr.FD_OURS / "README.md").read_text("utf-8")
         self.assertIn(pr.fd_commit(), readme)
         self.assertIn("SIL Open Font License 1.1", readme)

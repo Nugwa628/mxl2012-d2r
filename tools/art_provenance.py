@@ -390,7 +390,7 @@ def inventory(side: str, kinds: tuple[str, ...]) -> dict[str, Path]:
     base = MXL if side == "mxl" else VAN
     out = {}
     for k in kinds:
-        for p in (base / k).rglob("*.dcc"):
+        for p in fxpaths.ntfs_order((base / k).rglob("*.dcc"), base / k):  # Windows' order: equal candidates as there
             out[p.relative_to(base).with_suffix("").as_posix().lower()] = p
     return out
 

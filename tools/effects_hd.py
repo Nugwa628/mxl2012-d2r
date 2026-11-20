@@ -176,7 +176,7 @@ def read_tsv(path: Path) -> tuple[list[str], list[list[str]]]:
 
 
 def load_json(p: Path):
-    return json.loads(p.read_text("utf-8-sig"))
+    return json.loads(fxpaths.ci(p).read_text("utf-8-sig"))
 
 
 # ----------------------------------------------------------------------------------------------- classic art

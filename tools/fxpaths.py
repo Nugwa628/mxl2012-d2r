@@ -95,14 +95,79 @@ def palette() -> list[tuple[int, int, int]]:
     return [(d[i * 3 + 2], d[i * 3 + 1], d[i * 3]) for i in range(256)]
 
 
+_LISTINGS: dict = {}
+
+
+def ci(path) -> Path:
+    """`path` as it is when it exists (always on Windows, whose file system ignores case), else the existing file whose
+    path matches it ignoring case, else `path` unchanged. D2R reads its files without regard to case, and our extraction
+    is lower case (tools/casc_extract.py) while the tables name files in mixed case (chainlightningBolt): on a
+    case-sensitive file system (Linux) a lookup by the table's name must find the lower-case file as Windows does.
+    Only the file that is read is resolved; callers keep the name they asked for (for output names and reports)."""
+    p = Path(path)
+    if os.name == "nt" or p.exists():
+        return p
+    cur = Path(p.anchor) if p.anchor else Path(".")
+    for part in p.parts[1:] if p.anchor else p.parts:
+        nxt = cur / part
+        if not nxt.exists():
+            key = str(cur)
+            if key not in _LISTINGS:
+                try:
+                    _LISTINGS[key] = {n.lower(): n for n in os.listdir(cur)}
+                except OSError:
+                    return p
+            hit = _LISTINGS[key].get(part.lower())
+            if hit is None:
+                return p
+            nxt = cur / hit
+        cur = nxt
+    return cur
+
+
+def ntfs_order(paths, base) -> list:
+    """`paths` (under `base`) in the order Path.rglob gives them on NTFS: folder by folder, depth first, each folder's names
+    sorted ignoring case. On ext4 rglob follows the folders' hash order, and a tool that keeps the first of equal
+    candidates (art_provenance: missiles/handofgod vs overlays/holyshockhit for lightningcircles) then picks another
+    one than Windows. Windows: the same order as rglob there."""
+    base = Path(base)
+    def key(p):
+        rel = Path(p).relative_to(base)
+        return tuple(s.upper() for s in rel.parent.parts), rel.name.upper()
+    return sorted(paths, key=key)
+
+
+def ci_dest(path) -> Path:
+    """Where to write `path` so that it lands in the folders that already exist under another case, as on Windows: every
+    leading folder that exists with other letter case is taken as it is (the first writer's spelling, as NTFS keeps it),
+    the rest of the path stays as asked. Windows: `path` unchanged. Not cached: folders appear during a build."""
+    p = Path(path)
+    if os.name == "nt":
+        return p
+    parts = p.parts[1:] if p.anchor else p.parts
+    cur = Path(p.anchor) if p.anchor else Path(".")
+    for i, part in enumerate(parts):
+        nxt = cur / part
+        if not nxt.exists():
+            try:
+                hit = next((n for n in os.listdir(cur) if n.lower() == part.lower()), None)
+            except OSError:
+                hit = None
+            if hit is None:
+                return cur.joinpath(*parts[i:])
+            nxt = cur / hit
+        cur = nxt
+    return cur
+
+
 def d2r_file(rel: str) -> Path:
     """A file of D2R's data (rel = 'data/global/...'): the baseline's copy, else D2R_CACHE (the shared cache that
     tools/lane_setup.py fills, else read once from a game slot's CASC: MXL_SLOT=2|3, tools/d2r_game.py). Nothing is written
     into the baseline folder."""
-    p = D2R / rel
+    p = ci(D2R / rel)
     if p.exists():
         return p
-    cache = D2R_CACHE / rel
+    cache = ci(D2R_CACHE / rel)
     if not cache.exists():
         if not os.environ.get("MXL_SLOT") and not os.environ.get("MXL_D2R_GAME"):
             raise SystemExit(f"{rel} is in neither the D2R extraction ({D2R}) nor the cache ({D2R_CACHE}); "

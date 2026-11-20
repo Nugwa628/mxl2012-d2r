@@ -494,6 +494,8 @@ class Ingest:
                 shutil.copyfile(src, dst)
         for d in man.get("emptyDirs", []):
             top.joinpath(*d.split("/")).mkdir(parents=True, exist_ok=True)
+        for d in [top, *(p for p in top.rglob("*") if p.is_dir() and not p.is_symlink())]:
+            os.chmod(d, 0o755)  # 7-Zip stores Unix modes: folders 0755 whatever the umask (files are objects, 0644)
         out = work / name
         r = subprocess.run([self.sevenzip, *SEVENZ_ARGS, str(out), man["modFolder"]], cwd=tree, capture_output=True, text=True,
                            errors="replace")

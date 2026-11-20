@@ -96,7 +96,7 @@ def place(entity: dict, scale: float, offset) -> dict:
 
 def source_definition(ref: str, hdm: Path, hdo: Path) -> dict:
     kind, _, name = ref.partition(":")
-    p = (hdm / f"{name}.json") if kind == "missile" else (hdo / f"{name}.json") if kind == "overlay" else None
+    p = fxpaths.ci(hdm / f"{name}.json") if kind == "missile" else fxpaths.ci(hdo / f"{name}.json") if kind == "overlay" else None
     if p is None or not p.exists():
         raise SystemExit(f"data/hd-effects-authored.json: no D2R definition {ref!r} (missile:<model> or overlay:<folder/name>)")
     return json.loads(p.read_text("utf-8-sig"))

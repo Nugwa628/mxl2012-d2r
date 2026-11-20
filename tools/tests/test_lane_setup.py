@@ -136,23 +136,28 @@ class LocalConfigTests(unittest.TestCase):
 
     def test_native_dll_candidates_local_build_first(self):
         with mock.patch.dict(os.environ, {"MXL_NATIVE_DIR": str(self.dir / "shared")}):
-            c = localconfig.native_dll_candidates("StormLib")
+            c = localconfig.native_dll_candidates("StormLib", platform="win32")
+            lin = localconfig.native_dll_candidates("StormLib", platform="linux")
+            casc = localconfig.native_dll_candidates("CascLib", platform="linux")
         self.assertEqual(c[0], localconfig.ROOT / "build" / "StormLib" / "Release" / "StormLib.dll")
         self.assertEqual(c[1], self.dir / "shared" / "StormLib" / "Release" / "StormLib.dll")
+        # Linux: the CMake shared libraries (docs/setup.md, "Linux")
+        self.assertEqual(lin, [localconfig.ROOT / "build" / "StormLib" / "libstorm.so", self.dir / "shared" / "StormLib" / "libstorm.so"])
+        self.assertEqual(casc[1], self.dir / "shared" / "CascLib" / "libcasc.so")
 
     def test_find_native_dll_prefers_local_then_shared_then_explains(self):
         shared = self.dir / "shared"
+        rel = localconfig.native_dll_relpath("CascLib")  # this platform's file
         with mock.patch.dict(os.environ, {"MXL_NATIVE_DIR": str(shared)}), mock.patch.object(localconfig, "ROOT", self.dir / "repo"):
             with self.assertRaises(FileNotFoundError) as cm:
                 localconfig.find_native_dll("CascLib")
             self.assertIn("lane_setup.py", str(cm.exception))
-            (shared / "CascLib" / "Release").mkdir(parents=True)
-            (shared / "CascLib" / "Release" / "CascLib.dll").write_bytes(b"x")
-            self.assertEqual(localconfig.find_native_dll("CascLib"), shared / "CascLib" / "Release" / "CascLib.dll")
-            (self.dir / "repo" / "build" / "CascLib" / "Release").mkdir(parents=True)
-            (self.dir / "repo" / "build" / "CascLib" / "Release" / "CascLib.dll").write_bytes(b"y")
-            self.assertEqual(localconfig.find_native_dll("CascLib"),
-                             self.dir / "repo" / "build" / "CascLib" / "Release" / "CascLib.dll")
+            (shared / rel).parent.mkdir(parents=True)
+            (shared / rel).write_bytes(b"x")
+            self.assertEqual(localconfig.find_native_dll("CascLib"), shared / rel)
+            (self.dir / "repo" / "build" / rel).parent.mkdir(parents=True)
+            (self.dir / "repo" / "build" / rel).write_bytes(b"y")
+            self.assertEqual(localconfig.find_native_dll("CascLib"), self.dir / "repo" / "build" / rel)
 
 
 class MissingExtractionFailsLoudlyTests(unittest.TestCase):

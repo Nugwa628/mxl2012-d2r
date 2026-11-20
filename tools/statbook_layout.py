@@ -228,7 +228,9 @@ def font(face: str, pt: float):
         try:
             import fxpaths
             path = fxpaths.d2r_file(FONTS[face])
-            _FONTS[key] = ImageFont.truetype(str(path), round(pt * PX_PER_POINT))
+            # Pillow's BASIC layout on every OS: Linux wheels have raqm (kerning, e.g. "Advanced" 130.3 px at 18 pt against
+            # BASIC's 130), Windows wheels lack fribidi and always fell back to BASIC, so the shipped sizes are BASIC's.
+            _FONTS[key] = ImageFont.truetype(str(path), round(pt * PX_PER_POINT), layout_engine=ImageFont.Layout.BASIC)
         except (SystemExit, OSError, ImportError):
             _FONTS[key] = None
     return _FONTS[key]

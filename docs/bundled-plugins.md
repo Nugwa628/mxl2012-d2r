@@ -1,8 +1,8 @@
 # Third-party D2RLoader plugins planned to ship with D2R-XL 2012
 
 Planned 2026-11-04. Shipped so far: D2R Legacy 16:9 and Buff HUD (0.1.12), Auto Belt Refill (0.1.15), PyreFly's Controller QOL
-Updates (0.1.17), CharmInv by Dimentio (0.1.19), and Damage Overflow Fix by CelestialRayOne, Enemy Health Bars by Graxy_TV and
-Floating Damage by RuffnecKk (next release); add new candidates to
+Updates (0.1.17), CharmInv by Dimentio (0.1.19), Damage Overflow Fix by CelestialRayOne, Enemy Health Bars by Graxy_TV and
+Floating Damage by RuffnecKk (0.1.25), and Monster Display by CelestialRayOne and Vendor Stock Refresh by RuffnecKk (0.1.27); add new candidates to
 the tables below. The compatibility work (which plugins
 need changes for Median XL 2012's data)
 starts after release 0.1.11. Each plugin keeps its author's credit in the release notes, the README credits and this file.
@@ -303,7 +303,7 @@ Research of lane beltrefill (2026-11-05, v0.35.8 / v0.35.9):
   `rvs` / `rvl` are not spawnable in Median. The #541 fix planned in lane beltstack is data only (each non-classic belt
   potion gets its own item type), and the plugin matches item codes, never item types, so it needs no change for it.
 
-## CharmInv by Dimentio (next release)
+## CharmInv by Dimentio (shipped in 0.1.19, replaced by Inventory Tabs in 0.1.20)
 
 Shipped in 0.1.19. From the release after it the package carries our own charm inventory, invtabs, in its place
 (docs/invtabs.md "Packaging: the charm inventory switch"); `--charm-inventory charminv` still builds and packages
@@ -363,7 +363,7 @@ CHANGELOG / release notes, NOTICE.md, `third_party/charm-inv/README.md` and this
   stay on page 6 of the save).
 - **Test runs:** a dev install (`tools/install_mod.py`) removes it; `--charminv` installs it as a release does.
 
-## Damage Overflow Fix by CelestialRayOne (next release)
+## Damage Overflow Fix by CelestialRayOne (shipped from 0.1.25)
 
 [Damage Overflow Fix](https://github.com/CelestialRayOne/d2rloader_plugins) 2.4.0 by **CelestialRayOne (Bogdan Bulai)**,
 `plugins/damage-overflow-fix`, commit `9240725`. D2R does most of its damage math in 32 bits, in 1/256ths of a point, so a hit
@@ -391,7 +391,7 @@ caps it at 8,388,607 instead. Below the limit, every result is bit-identical to 
 - **Console:** `dmgoverflow` lists the sites, and `dmgoverflow hit` shows the last hit's damage types before and after resistances.
 - **Turn it off:** delete the DLL, or set `dry_run = true` (it checks every site and patches none).
 
-## Enemy Health Bars by Graxy_TV (next release)
+## Enemy Health Bars by Graxy_TV (shipped from 0.1.25)
 
 [Enemy Health Bars](https://github.com/graxytv/D2R-Over-the-Head-Health-Bars) 0.2.6 by **Graxy_TV** (graxytv, also on the
 [d2rloader.net hub](https://d2rloader.net/hub/plugins/enemy-health-bars)) draws compact health bars over hostile monsters in
@@ -434,9 +434,11 @@ ImGui (MIT) and RuffnecKk's MapSense OverlayHost API (MIT). Credit: README, CHAN
 - **Screenshots** (lane plug125, background mode, overlay captured and laid over the game capture, docs/testing.md "Lane
   plug125"): HD, legacy, and legacy with Legacy 16:9; a Fallen at full life without a bar next to Fallen at 70/25% and a
   Median normal at 50% with bars, and the same with `show_full_health = true`; Andariel and Uber Izual with boss outlines.
-- **Turn it off:** `enabled = false` in its config, or delete the DLL.
+- **On by default; turn it off:** `enabled = false` under `[bars]` in `enemy-health-bars.toml` (the plugin's own key; shipped
+  `true`), then start the game again. Or delete the DLL. The README and the 0.1.27 notes tell players
+  how, together with Floating Damage's switch.
 
-## Floating Damage by RuffnecKk (next release)
+## Floating Damage by RuffnecKk (shipped from 0.1.25)
 
 [Floating Damage](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/floating-damage) 1.5.6 by
 **RuffnecKk** shows the damage of each hit as a number rising over the monster, plus a small DPS counter. It is based on locbones'
@@ -465,6 +467,12 @@ Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/floating-dama
     sprites. The new key `legacy_text_scale` under `[appearance]` (shipped `2.5`, valid 0.25 to 8) multiplies the numbers'
     size (`text_size`, `critical_hit_size`) while legacy graphics are drawn, with or without Legacy 16:9. HD and the DPS
     counter keep their size. The packaging checks refuse a shipped config without `legacy_text_scale = 2.5`.
+  - `0005-mxl2012-missing-system-font`: **no crash when a Windows font is missing** (lane fdproton, 2026-11-21). The
+    renderer loads 12 fonts from `%WINDIR%\Fonts` before its first frame. Dear ImGui 1.91.5 reports a file it cannot open
+    with an error tooltip, and opening that window outside a frame, with no font yet, crashed the game on the first
+    Present. Proton prefixes have no Segoe UI (the default index 0), so every start under Proton crashed. Missing,
+    unreadable and non-font files now go to the author's fallback (ImGui's built-in font) without that report, and a font
+    that cannot be built leaves the built-in font for every index. With every font present, as on Windows, nothing changes.
 - **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-ruffneckk-floating-damage.dll`,
   `d2rl-ruffneckk-floating-damage-license.txt` (MIT), `d2rl-ruffneckk-floating-damage-third-party.txt` (the suite's
   third-party notices and every licence text they keep: PluginSDK, Dear ImGui, MinHook, D2R Damage Numbers ...),
@@ -476,7 +484,7 @@ Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/floating-dama
   frame. It has no build check. The amount shown is int32 visible life, so one number can show up to about 8.39M (the same
   limit as Damage Overflow Fix's cap).
 - **Console:** `floating-damage status` (HD and legacy projection lines), `floating-damage preview`.
-- **Tests:** the author's config tests and our legacy projection tests run in the build script. In game (lane plug125):
+- **Tests:** the author's config tests and our legacy projection and font loading tests run in the build script. In game (lane plug125):
   numbers over a Fallen and over Andariel in HD, in legacy and in legacy with Legacy 16:9, and DPS 910 / 2.4K / 4.6K in
   legacy; the numbers 2.5 times bigger in legacy 4:3 and Legacy 16:9 with the shipped `legacy_text_scale`.
 - **Bigger or smaller numbers:** `legacy_text_scale` (legacy only) or `text_size` / `critical_hit_size` (both modes) in
@@ -484,6 +492,118 @@ Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/floating-dama
 - **On by default; turn it off:** `enabled = false` under `[general]` in `ruffneckk-floating-damage.toml` (the author's
   master switch; shipped `true`), then start the game again: no renderer or combat hook is loaded. The packaging checks
   refuse a shipped config without `[general] enabled = true`. Or delete the DLL.
+
+## Monster Display by CelestialRayOne (shipped from 0.1.27)
+
+[Monster Display](https://github.com/CelestialRayOne/d2rloader_plugins) 1.0.18 by **CelestialRayOne (Bogdan Bulai)**,
+`plugins/monster-display`, commit `9240725` (the commit Damage Overflow Fix comes from). It redraws D2R's HD hover panel over a
+monster: a wider life bar with exact life and percent, level and type, the unique affixes in the game's own words, a
+resistance row, and the immunity line. Prime evils get a bar twice as wide. **Licence:** MIT, "Copyright (c) 2026 Bogdan
+Bulai". Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/monster-display/README.md` and this file (lane
+plug127).
+
+- **Which build:** the author's repository is the source; Lukaszpg's fork is the same commit, and the other forks (hclhdj,
+  Songyx090818, eoakt) are behind or diverged. The plugin is not on the D2RLoader hub. The release DLL at the commit is
+  1.0.18; the source there is 1.0.19, which only adds a lookup for the author's Summon Enhancements plugin. We ship the
+  tested 1.0.18 DLL unchanged.
+- **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-celestialrayone-monster-display.dll`,
+  `d2rl-celestialrayone-monster-display-license.txt`, the config `mods\mxl2012\d2rloader\config\celestialrayone.monster-display.toml`
+  (the author's default plus Median's 36–39 in `minion_hidden_affixes`, a `preserve` file), and its HD files in `mxl2012.mpq\data`: the three
+  `hudmonsterhealthhd.json` layouts (mouse, controller, controller on PC) and 28 frame sprites in
+  `hd\global\ui\panel\monsterdisplayframes\`. Our data has no hover panel layout of its own; the packager refuses to stage over
+  one.
+- **No binaries in git.** The DLL and the HD files are pinned in `tools/package_release.py` (`MD`: the DLL's size and SHA-256
+  and one SHA-256 over the 31 HD files). They are looked up by `--md DIR` (the author's `release/` folder), `MXL_MD_DIR` or
+  `<runs>/shared/monster-display-1.0.18/`, and other bytes are refused.
+- **How it decides to work:** inline hooks on the hover panel builder (`0x0CEA50`) and the panel update (`0x1F84E0`), each
+  checked against its expected bytes; no build or version check. It reads only the hovered monster (client copy, then
+  the server's values). In legacy graphics it changes nothing.
+- **Median data:** names, levels, types and affix names come from the game's own builders, so Median's strings show as they
+  are. Median's monumod 36 Ghostly, 37 Fanatic, 38 Possessed and 39 Berserk (xfer 1, so minions carry them) are the
+  game's champion types; its affix name builder gives them no name, so they show on neither a boss nor a minion. Our
+  config still adds 36–39 to `minion_hidden_affixes` (a setting of the 1.0.18 DLL, no code change), so minions stay
+  without them if a later build names them, like the author's own list (fire, lightning and cold enchanted,
+  teleportation, spectral hit, stone skin). Resistances: in `effective` mode it applies the hovering player's
+  sunder (`item_pierce_*_immunity`) and −enemy resistance the way D2R's damage code does; our port keeps D2R's resist step
+  and moves Median's own stats off ids 187–193 (docs/id-mapping.md), so it reads the right stats. In game: a Median normal
+  with fire 50 showed 25 with −25 % enemy fire; a fire 100 Fallen kept 100 and "Immune to Fire", as the damage code does.
+  Uber classes 704–709 get no immunity line (the game's own rule; Median's ubers use the same ids). Life goes to 1,958,490
+  (Uber Izual) without trouble.
+- **Next to our plugins:** no clash (mxl2012-core `plugin clashes: none`). Enemy Health Bars and Floating Damage draw in
+  their own layers; Monster Display only changes the hover panel.
+- **Console:** `monsterdisplay` shows the hovered monster's data.
+- **Turn it off:** `enabled = false` in `celestialrayone.monster-display.toml`, or delete the DLL (the layouts then show the
+  game's own panel without the extras).
+
+## Vendor Stock Refresh by RuffnecKk (shipped from 0.1.27)
+
+[Vendor Stock Refresh](https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite/tree/main/plugins/vendor-stock-refresh) 2.1.7 by
+**RuffnecKk**. It adds the gamble screen's refresh button to every vendor's HD trade screen; a click rerolls the vendor's
+normal stock, free and as often as the player likes. Gambling keeps its own refresh. **Licence:** MIT, "Copyright (c) 2026
+RuffnecKk and contributors". Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/vendor-stock-refresh/README.md`
+and this file (lane plug127).
+
+- **Which build:** the author's suite (`RuffDood/RuffnecKk-D2RLoader-Suite`), the same commit `514359f` our submodule pins
+  for Floating Damage; 2.1.7's last change is in it. Lukaszpg's fork and the others are behind with nothing of their own.
+  RuffDood's archived D2RLoader-Community-Pack is not used. The hub's 2.1.7 (2026-11-03, D2R 3.3, D2RLoader 1.3.1) is the
+  same version.
+- **Built from source** by `tools/build_vendorstockrefresh.ps1`, unchanged, from the submodule with the suite's own CMake
+  (MinHook and nlohmann/json fetched at its pins). It runs the author's policy, panel layout and compact layout tests. The
+  build is reproducible: the same bytes on every build of the commit.
+- **Companion MPQ:** the button art is not in the repository; it is the hub release's MPQ, pinned by SHA-256 in
+  `tools/package_release.py` (`VSR`), the same hash the plugin checks before it loads it. It is looked up by `--vsr-mpq DIR`,
+  `MXL_VSR_MPQ_DIR`, a git-ignored copy in `third_party/vendor-stock-refresh/` or `<runs>/shared/vendor-stock-refresh-2.1.7/`.
+- **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-ruffneckk-vendor-stock-refresh.dll` and `.mpq`,
+  `d2rl-ruffneckk-vendor-stock-refresh-license.txt` (MIT), `d2rl-ruffneckk-vendor-stock-refresh-third-party.txt` (the suite's
+  notices), and the config `mods\mxl2012\d2rloader\config\ruffneckk-vendor-stock-refresh.toml` (the author's: on, diagnostics
+  off; a `preserve` file).
+- **How it works:** client hooks on the vendor panel set-up (`0x2411E0`) and the refresh send (`0x10F520`); server hooks on
+  the vendor interaction (`0x502F60`) and the entity action packet (`0x4B0470`, packet `0x38`, action `VSRF`, rewritten to
+  the game's own trade action with the vendor's refresh flag set, so the game rebuilds the stock itself). Every hook checks
+  its expected bytes, and it checks D2RCore's packet relay. No game-version gate of its own.
+- **Median vendors:** the new stock is the game's own (Median's vendor tables, levels and shop rules), only made again. In
+  game: Charsi 33 items → 36 with 16 kept after one refresh. Gambling (Gheed) is left alone. Legacy graphics: the classic
+  panel has no gold anchor the plugin can find, so it shows no button (one log line each time a vendor opens).
+- **Next to our plugins:** no clash (mxl2012-core `plugin clashes: none`).
+- **Console:** `vendor-stock-refresh` shows its state.
+- **Turn it off:** `enabled = false` under `[plugin]` in `ruffneckk-vendor-stock-refresh.toml`, or delete the DLL.
+
+## Building on Linux
+
+`tools/build_thirdparty_linux.py` is the Linux equivalent of the `tools/build_<plugin>.ps1` scripts above (lane
+thirdparty-linux, 2026-11-20). It builds `legacy169`, `buffhud`, `beltrefill`, `controllerqol`, `ehb` (Enemy Health Bars),
+`fd` (Floating Damage) and `vsr` (Vendor Stock Refresh, once its .ps1 is on the branch), all of them by default:
+
+```
+/d2work/venv/mxl2012/bin/python tools/build_thirdparty_linux.py [PLUGIN ...] [--out DIR] [--repos DIR] \
+    [--work CHECKOUT] [--skill-profile FILE] [--no-tests]
+```
+
+- **Same inputs as the .ps1:** the pinned commit of each gitlink (EHB: the pinned commit and both zip hashes), exported
+  with `git archive`, our patches in name order, the same CMake options and targets, the same tests, and `PINNED_COMMIT`,
+  `PATCHES` and `SKILL_PROFILE` written as package_release.py reads them. Sources come from the same `MXL_*_DIR` settings,
+  `--repos` (a folder of clones), the submodule, or else a bare clone of the public repository (network once).
+- **Compiler:** MSVC under wine (msvc-wine in `/d2work/toolchains/msvc`, `WINEPREFIX=/d2work/prefixes/msvc-build`), Ninja,
+  `CMAKE_SYSTEM_NAME=Windows`, embedded debug info (`/Zi` fails under wine, C1902), and `/SUBSYSTEM:CONSOLE` for the DLLs
+  that Windows builds with the Visual Studio generator (Buff HUD's preset is Ninja on Windows too). Tests and
+  Buff HUD's `D2RLCompiler.exe` run under wine. The RuffnecKk suite's CMake requires PowerShell for ctest-only policy
+  scripts the .ps1 never runs; on Linux that variable points at a stub that fails if anything runs it.
+- **Output:** `--out` (default `/d2work/build/thirdparty-linux`) has the layout of the Windows `build\` folder:
+  `legacy169/Release/legacy169.dll` with `legacy169-src/` beside it, and the same for `buffhud`, `beltrefill`,
+  `controllerqol`, `enemyhealthbars` and `floatingdamage`, plus `vendorstockrefresh`. Hand the DLLs to
+  `package_release.py` (`--legacy169`, `--buffhud`, ...) with the `-src` folders in its `build/`.
+- **Inputs from the release build:** Buff HUD's half-size legacy icon sheets come from a built `work/` (`--work`, default
+  this checkout). Controller QOL embeds the skill seed from `--skill-profile` (what `package_release.controllerqol_profile()`
+  writes from the package's skills.txt; the packager refuses another seed).
+- **Compared with the Windows builds (0.1.26 / plug127 bundle):** exports, imports, section names and text strings are the
+  same. The Buff HUD MPQ is byte for byte the same. The code differs slightly, because msvc-wine has MSVC 19.52 and the
+  build PC had 19.51 (sizes differ by up to about 3 %; the newer static CRT also imports `IsProcessorFeaturePresent`). Floating Damage
+  and Vendor Stock Refresh are reproducible (`/Brepro`); the others carry a link time stamp, as on Windows. On the build PC
+  `core.autocrlf=true` made `git archive` / `git apply` write CRLF into legacy169's, Controller QOL's and Enemy Health Bars'
+  configs (in the DLL and as shipped). On Linux they keep the committed bytes. Both parse the same.
+- **Tests under wine:** all pass, except three Controller QOL tests that check its memory guards against the real Windows
+  memory APIs (`qol-guarded-local-read`, `qol-image-header-work`, `qol-current-page-query`). Wine 9 does not answer those
+  APIs as Windows does. The script runs them and reports the result, and they do not stop the build. They pass on Windows.
 
 ## Checks before shipping (after 0.1.11)
 

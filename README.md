@@ -49,7 +49,8 @@ Shipped with the mod: **Enemy Health Bars** by **Graxy_TV** (<https://github.com
 GPL-3.0, used with the author's permission), health bars over damaged monsters in HD and legacy graphics (our patches add
 the legacy placement). Its source as we build it and its licence come with it in `mods\mxl2012\d2rloader\plugins\`
 (`d2rl-enemy-health-bars-source.zip`, `-license.txt`). Bars on every monster: `show_full_health = true` in
-`mods\mxl2012\d2rloader\config\enemy-health-bars.toml`.
+`mods\mxl2012\d2rloader\config\enemy-health-bars.toml`. On by default; turn the bars off with `enabled = false` under
+`[bars]` in the same file.
 
 Shipped with the mod: **Floating Damage** by **RuffnecKk**
 (<https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, `plugins/floating-damage`, MIT; based on locbones' D2RHUD and
@@ -57,6 +58,21 @@ Fr4nsson's D2RDamageNumbers), the damage of each hit rising over the monster and
 patches add the legacy placement). Its numbers use the font **Cinzel Bold** by Natanael Gama / The Cinzel Project Authors
 (SIL Open Font License 1.1). On by default; turn it off with `enabled = false` under `[general]` in
 `mods\mxl2012\d2rloader\config\ruffneckk-floating-damage.toml`.
+
+To turn off the health bars or the damage numbers: open the file named above in Notepad, change `enabled = true` to
+`enabled = false`, save, and start the game again. The downloader's Update and Repair keep your change.
+
+Shipped with the mod: **Monster Display** by **CelestialRayOne (Bogdan Bulai)**
+(<https://github.com/CelestialRayOne/d2rloader_plugins>, `plugins/monster-display`, MIT; licence in
+`mods\mxl2012\d2rloader\plugins\d2rl-celestialrayone-monster-display-license.txt`). In HD graphics the panel over a hovered
+monster shows its exact life, level, affixes, resistances (as your hits meet them) and immunities. Legacy graphics are
+unchanged. Settings: `mods\mxl2012\d2rloader\config\celestialrayone.monster-display.toml`.
+
+Shipped with the mod: **Vendor Stock Refresh** by **RuffnecKk**
+(<https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, `plugins/vendor-stock-refresh`, MIT; licence in
+`mods\mxl2012\d2rloader\plugins\d2rl-ruffneckk-vendor-stock-refresh-license.txt`). In HD graphics every vendor's trade screen
+gets the refresh button, which rerolls the vendor's stock. Turn it off with `enabled = false` under `[plugin]` in
+`mods\mxl2012\d2rloader\config\ruffneckk-vendor-stock-refresh.toml`.
 
 Shipped with the mod: our own plugin **D2R Legacy 16:9** (`legacy169.dll`, <https://github.com/Nugwa628/D2R-Legacy169>, MIT), the
 classic graphics in 16:9 (1066x600 / 853x480). Turn it off with `enabled = false` in

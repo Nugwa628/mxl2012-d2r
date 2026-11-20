@@ -668,20 +668,65 @@ prop and tree tile of the map (`tools/sprite_scene.py build --classic`), black g
 the map's own light, derived from levels.txt and tuned per map against classic frames (`CLASSIC_LIGHT`; method and numbers:
 `mxl2012-runs/hdtools/maplight/REPORT.md`, outside the repo). The light belongs to the classic art: it is not used on its
 own. `tools/build.py` runs this step by default, right after the merge-list step (`sprite_walls.json`, empty); no
-environment variable is needed. The atlases are the plain 1x art. For the 12 maps below the step takes about 4.5 minutes
+environment variable is needed. The atlases are the plain 1x art. For the first 12 maps below the step takes about 4.5 minutes
 and adds 1,366 files (1,279 models, one per distinct tile; 63 textures; 24 biome and light files): 105 MB raw, 18.7 MB
-deflated, against a mod of 966 MB raw.
+deflated, against a mod of 966 MB raw. All 17 (lane maplight-off5, 2026-11-18): about 7.5 minutes on a loaded
+machine and 1,546 files, 117 MB raw and 21.2 MB deflated; the five maps after the first 12 add 12.2 MB raw and 2.5 MB
+deflated (180 files, 5 scenes replaced, 161 entries in `model_lod_desc.bin`).
 
-On the list (12): Duncraig (`epicwhiners`), Cathedral of Vanity (`inarius`), Ureh (`downtown`), Fauztinville
+On the list (17): Duncraig (`epicwhiners`), Cathedral of Vanity (`inarius`), Ureh (`downtown`), Fauztinville
 (`cypherpunk`), Tran Athulua (`desertpeak`), Dimensional Sanctum (`belial`), Kurast 3000 BA (`excelsior3`), Vizjun
-(`glados`), Rathma Square (`moskvich`), Welcome to Toraja (`macumba`), Welcome to Old Bremmtown (`borgir`), Welcome to
-Khalimgrad (`charismatic`).
+(`glados`), Rathma Square (`moskvich`), Island of the Sunless Sea (`rockisdead`), Welcome to Toraja (`macumba`),
+Welcome to Old Bremmtown (`borgir`), Welcome to Khalimgrad (`charismatic`), Hole Level 2 (`caveroom4`), The Proving
+Grounds (`dungrm6a`), Azmodan's Reliquary (`temple5`, `temple6`).
 
-Not on the list (5), built as before: Hole Level 2 (`caveroom4`), The Proving Grounds (`dungrm6a`), Azmodan's Reliquary
-(`temple5`, `temple6`): random levels, only the preset room is Median's map, the other rooms are D2R's own scenes, so the
-classic light cannot show there. Island of the Sunless Sea (`rockisdead`): in game (slot 2, 2026-11-18) the classic scene
-ran at 32.5 and 38.5 fps (10 s means at two spots) against 40.1 and 51.6 for the default build in the same session, and
-one wall is drawn as a flat dark slab.
+**The four edited D2R maps** (lane maplight-offmaps, 2026-11-18). Hole Level 2, The Proving Grounds and Azmodan's
+Reliquary were first left off as "random levels". That was wrong: levels.txt gives all three DrlgType 2 (preset), so the
+whole level is the one .ds1 (Azmodan's Reliquary picks `temple5` or `temple6`, which are identical). They looked wrong
+in the first tests because those tests copied the classic scene to `hd/env/preset/<path>.json`, while these maps are
+Median edits of D2R's own maps and load from `hd/env/preset/mxl2012/<path>.json` ("Edited D2R maps" below). The game
+therefore showed the default scene. `tools/build.py` runs this step before `ds1_paths.py`, so a real build moves the
+classic scene with the map. They differ from the 12 in one way: two of them share tile files with maps already on the
+list (Hole Level 2 shares Duncraig's cave tiles, Azmodan's Reliquary the Kurast interior tiles of Vizjun and Rathma
+Square). Adding their tiles to those shared atlases would re-pack them and change the shipped maps' models, so
+`OWN_GROUP` in `tools/sprite_scene.py` gives all four maps atlas groups of their own (`<group>-hole2`, `-proving`,
+`-reliquary`). The few shared tiles are then stored twice, and the other maps' files stay byte for byte as they were.
+The four add 133 files (118 models, 7 textures, 4 biome and 4 light files): 10.1 MB raw, 1.8 MB deflated. They also add
+118 entries to `model_lod_desc.bin`; its other 16,077 entries are unchanged. The step takes about 20 s longer. Because
+`tools/sprite_scene.py` changed, the next build after this change misses the walls cache once (about an hour). Light
+(`CLASSIC_LIGHT`, same rule and classic frames as the 12): HD/classic brightness at the player, mid and far is
+0.92/0.94/1.05 for Azmodan's Reliquary; the default build's scene measured 0.62/0.68/0.71. Known limit: the light at the
+player is warmer than classic's near-white (the player light takes no colour of its own; the 12 have this too).
+
+*Hole Level 2 and The Proving Grounds, toned down* (owner ruling 2026-11-19: too red). Both had a dark-red sheet over the
+empty area off the floor and a red wash over the art. The cause is the key light. With its power at 0 the area is black
+and the art keeps its own colours. Turning the ground off in the key light's `lightMask` (9 to 1) changed nothing.
+Setting its specular share to 0 (`spec` in `CLASSIC_LIGHT`) makes the area black: the black ground still has a dielectric
+shine, and these two maps had the strongest, most saturated keys of the 17 (Hole Level 2: pure red at power 77.5).
+Classic has no specular light at all. The red wash came from the colour: The Proving Grounds' key (1, 0.21, 0.25) took
+nearly all green and blue from its grey and purple stone, so the walls went dark. The key is now (1, 0.55, 0.85) at
+power 90. Hole Level 2 keeps a red key, because classic's rock really is lit pure red. The key is weaker (power 66) with
+a little green (1, 0.03, 0) and the player light is stronger (pgain 0.77), so the floor near the player reads
+green-brown. Measured against classic in matching crops (mean sRGB; `mxl2012-runs/hdtools/maplight-off/red/REPORT.md`,
+outside the repo):
+- **The Proving Grounds:** walls 26,16,15 against classic's 27,16,15; the floor stays a little brighter than classic's.
+- **Hole Level 2:** far rock 21,5,2 against classic's 21,2,0 (before: 48,3,1). The floor by the player is 68,30,12
+  against classic's 50,37,9 (before: 82,26,8). It stays redder: D2R adds the key light to the player light, while
+  classic's floor near the player shows the player light alone.
+- **Both maps:** the area off the floor is at most 3 of 255 against 33 before.
+- **The 12 shipped maps** and the other three are unchanged: the knob is only written where an entry names it.
+
+Island of the Sunless Sea (`rockisdead`, lane maplight-rockisdead, 2026-11-18):
+- **Doorway tiles** (`DOOR_MAPS`). Wall orientations 10 and 11 are a .dt1's special tiles (doorways, level exits); the
+  step leaves them out by default (`DRAWN`). The island's cave exit between the two torches at the arrival is two
+  orientation-11 tiles (cells 19,2 and 20,2); left out, D2R showed a flat dark slab there. On `DOOR_MAPS` they are drawn
+  as walls, as classic draws them.
+- **Own atlas** (`OWN_GROUP`, as the four above). Welcome to Toraja (`macumba`) draws props of the same tile file
+  (`expansion/icecave/interior.dt1`); a shared atlas would re-pack its textures and models. The island gets the
+  group `group_of(...)-<map>`, so `macumba`'s files stay byte for byte the same whether the island is listed or not.
+- **Frame time.** The first in-game numbers (32.5 / 38.5 fps against 40.1 / 51.6) were machine load, not the scene: in
+  alternating runs at the same spot the default build, the classic scene and the fixed scene overlapped (means 27-29 ms,
+  spread 4-9 ms per build, following the other slot's game and CPU load). The map is CPU-bound (GPU 2-3 ms) in every build.
 
 - **Take one map off:** delete its line from `tools/data/sprite_classic.json` and build. Its scene is then the default
   build's, byte for byte (the step only writes the listed maps' scenes, biomes, light files and their models).

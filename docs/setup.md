@@ -78,6 +78,9 @@ base game files are taken from the D2R install and are never committed or packed
    48 (base) / 89 (rotw) warnings. The 2 errors in `validation.md` were fixed by an earlier commit.
 9. Plugin (CMake on PATH, else Visual Studio's): `tools\build_plugin.ps1 [-Release] [-Tests] [-Sdk DIR]` -> `build\plugin\Release\mxl2012-core.dll`, **mxl2012-core 0.36.0**.
    The PluginSDK folder is `-Sdk`, else `MXL2012_PLUGINSDK_DIR` (environment, else `.mxl-local.json`), else `third_party\PluginSDK`.
+   On Linux the bundled third-party plugins (legacy169, Buff HUD, Auto Belt Refill, Controller QOL, Enemy Health Bars,
+   Floating Damage, Vendor Stock Refresh) build with `tools/build_thirdparty_linux.py` (MSVC under wine), see
+   [bundled-plugins.md](bundled-plugins.md#building-on-linux).
 10. D2RLoader 1.3.1-beta (the pinned version):
     - Download `https://d2rloader.net/download/D2RLoader-1.3.1-beta.zip` (47,652,455 bytes) into an empty folder.
     - SHA-256 must be `9286c6b5bff7f1043658411dbea305faa9698b6a455e6441668fc6d02c22aad7` (the value on the download page).
@@ -214,6 +217,37 @@ No `mxl-manual-backups` folder and no `mxl2012` save folder exist on the game PC
 (only `Backups`, `mods\RMD-MP`, unrelated), OneDrive (empty), Documents or Desktop. They must come from the PC that
 made them, into `Saved Games\Diablo II Resurrected\mods\mxl2012` (the mod's `savepath`).
 
+## Linux
+
+The tools and both unit-test suites run on Linux too (lane linux-tools, 2026-11-20). Plugin builds and game runs remain
+Windows tasks (MSVC, D2RLoader).
+
+- **Python**: a venv with `tools/requirements-ci.txt` plus what the HD tools import (scipy, wgpu, capstone,
+  imageio-ffmpeg). Use the venv's `python -I` wherever the docs say `py -3`.
+- **StormLib / CascLib**: `tools/native.py` loads `<build>/StormLib/libstorm.so` and `<build>/CascLib/libcasc.so` with
+  `ctypes.CDLL`, and `<build>` is this checkout's `build/` or `MXL_NATIVE_DIR`
+  (`localconfig.native_dll_candidates`). Build them from the pinned submodules with CMake:
+  StormLib needs `-DBUILD_SHARED_LIBS=ON -DSTORM_USE_BUNDLED_LIBRARIES=ON`. CascLib needs `-DCASC_BUILD_SHARED_LIB=ON
+  -DCMAKE_CXX_FLAGS=-DLPDWORD=PDWORD`, because the pinned commit uses the Windows-only `LPDWORD` in a Linux code path.
+  If the build folders have other names, point `MXL_NATIVE_DIR` at a folder that holds `StormLib` and `CascLib` symlinks
+  to them.
+- **Types**: on Linux, `ctypes.wintypes.DWORD` is 64-bit, but the libraries' `DWORD` is 32-bit
+  (`StormPort.h` / `CascPort.h`). `native.py` therefore uses `c_uint32`, `c_bool` returns, `MAX_PATH` 1024 and UTF-8
+  paths there. Errors come from `SErrGetLastError` / `GetCascError`, not `ctypes.GetLastError`.
+  `tools/tests/test_native_abi.py` compiles the headers and compares every struct offset. Point `MXL_NATIVE_REF` at a
+  `third_party` folder when the submodules are empty. It also round-trips an MPQ and, when `MXL_TEST_CASC_DIR` names a
+  D2R install, reads its CASC (read-only).
+- **umask**: 7-Zip on Linux stores Unix modes, so `package_release.py` sets staged files to 0644 and folders to 0755 before
+  it packs them. `dl_ingest.py` sets its folders to 0755. A umask of 002 (Linux Mint) then gives the same archive as 022.
+- **Letter case** (lane relpkg, 2026-11-20): D2R and NTFS ignore case, the extraction is lower case and the tables name
+  files in mixed case (`chainlightningBolt`). A tool that reads a D2R file by a table's name goes through
+  `fxpaths.ci(path)` (the file as it is, else the one that matches ignoring case), so it finds what Windows finds; a
+  plain `.exists()` would quietly take another branch (another stand-in model, fewer superuniques placed). A step that
+  writes into a folder another step made in other case uses `fxpaths.ci_dest` (Windows: one folder, the first writer's
+  spelling; Linux without it: two folders, so other paths in the manifest). Both are no-ops on Windows. ext4 here has no
+  case folding (`chattr +F` needs the file system's casefold feature).
+- **Full release build** (`tools/build.py` + `package_release.py`): docs/release.md "Making a release on Linux".
+
 ## CI
 
 CI runs on a private CI server (`<ci-server>`; its address is deliberately not published) with a Forgejo runner scoped to `WyrdGames/mxl2012-d2r`, label `mxl-cross`, a Docker image with clang-cl, lld, xwin and g++, capacity 1, and a cap of 6 CPUs / 8 GB. The runner is not exposed to GitHub: pull requests on GitHub are applied to the forge by maintainers and then run there.
@@ -226,6 +260,7 @@ The unit tests have to pass on Linux, where `ctypes.windll` does not exist and t
 
 - `tools/game_slots.py`, `game_ctl.py` and `game_checks.py` get their Windows DLLs from `tools/winapi.py`, which loads them on first use. They import everywhere, the slot, lock and name logic is testable, `game_slots.processes()` finds no game off Windows, and an actual DLL call raises `OSError: ... only available on Windows`. `tools/test_winapi.py` imports them with `windll` removed from ctypes to keep that true. A new Windows-only call goes through `winapi.Dll`, never `ctypes.windll` at import time.
 - A test that plants private details must plant what the *generic* rules of `check_public.py` flag (a user-home path, an internal host, an IP address), not a machine name from the private-terms file: that file does not exist on the runner, so such a test passes at home and fails in CI (this was the `test_asset_pack` failure).
+- `tools/native.py` loads the Linux builds of StormLib/CascLib (see "Linux" above). The standalone Windows probes (`dump_image.py`, `hang_probe.py`, `launcher_play_stress.py`) stop with "Windows only" off Windows.
 - Tests that need extracted game tables (`test_idmap` integration tests: `MXL2012_MOD_EXCEL`, or `mxl2012-runs/extract-mpq` next to the worktrees) skip when they are not there.
 - To try the Linux conditions on Windows: run the discover with `ctypes.windll`/`WinDLL`/`WINFUNCTYPE` deleted and `MXL_PRIVATE_TERMS` pointing at a missing file.
 

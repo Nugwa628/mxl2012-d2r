@@ -77,7 +77,12 @@ CLASSIC_LIST = ROOT / "tools" / "data" / "sprite_classic.json"   # the maps tool
 S = math.sqrt(1.5)                 # the camera looks along (-S, -1, -S): 30 degrees above the ground (docs/maps-hd-method.md)
 PX_HEIGHT = ws.PX_PER_UNIT * S     # classic pixels per world unit of height: 9.80 (walls_sprite's 9.24 drew walls 6% too tall)
 WALL, PROP, TREE, ROOF = "wall", "prop", "tree", "roof"
-CLASS_OF = {**{o: WALL for o in range(1, 10)}, 12: PROP, 14: TREE, 15: ROOF}   # the file names' first word: walls_hd.tier
+CLASS_OF = {**{o: WALL for o in range(1, 12)}, 12: PROP, 14: TREE, 15: ROOF}   # the file names' first word: walls_hd.tier
+SPECIAL = frozenset((10, 11))      # the .dt1's special wall tiles (doorways, level exits): drawn only on the maps of DOOR_MAPS
+DRAWN = frozenset(CLASS_OF) - SPECIAL   # the orientations drawn by default
+# maps whose special tiles are drawn as walls, as classic draws them: Island of the Sunless Sea's cave exit (two orientation 11
+# tiles between its torches) is otherwise D2R's flat dark plane
+DOOR_MAPS = {"rockisdead"}
 MODEL = "data/hd/env/model/mxl/wallsprite/t/%s/%s_%d_%d_%d.model"      # group, class + variant, orientation, style, sequence
 ATLAS = "data/hd/env/texture/mxl/wallsprite/t/%s_alb.texture"
 CHUNK_MODEL = "data/hd/env/model/mxl/wallsprite/m/%s/rock_%d_%d.model"   # 'rock': walls_hd.tier 2
@@ -122,14 +127,27 @@ LIGHT_RULE = {"key": 250.0, "ibl": 0.0, "player": 3500.0, "reach": 4.5, "attenua
 # the map's frames, far from the player for the key light and at the player for the player's light, gives a gain r ** -1.6
 # (display to linear is 2.2; damped, as each light also reaches the other's zone), applied on the previous gain, rounded.
 # "key" replaces the level's colour where the full colour tints far more than classic does (Vizjun, Tran Athulua): the
-# colour of classic's frames there, gain scaled by the luminance change.
+# colour of classic's frames there, gain scaled by the luminance change. "spec" is the key light's specular share (D2R's 1.0
+# when absent): the black ground still reflects a strong key light, so a map whose key is strong and saturated (Hole Level 2,
+# The Proving Grounds) shows a coloured sheet over the empty area off its floor where classic is black; at 0 that area is
+# black and the art keeps the key's plain (diffuse) light, as classic has no specular light at all.
 CLASSIC_LIGHT = {"macumba": {"gain": 0.06, "pgain": 0.44}, "moskvich": {"gain": 0.7, "pgain": 0.79},
                  "cypherpunk": {"pgain": 0.94, "reach": 2.5}, "desertpeak": {"gain": 3.2, "pgain": 0.49, "key": (1.0, 0.9, 0.35)},
                  "glados": {"gain": 1.3, "pgain": 0.35, "key": (0.85, 1.0, 1.0)}, "epicwhiners": {"pgain": 1.2, "reach": 5.5},
                  "downtown": {"gain": 4.0, "pgain": 0.8}, "charismatic": {"gain": 0.38, "pgain": 0.61}, "borgir": {"gain": 1.4, "pgain": 0.88},
                  "excelsior3": {"gain": 0.13, "pgain": 0.5}, "inarius": {"gain": 0.3, "pgain": 0.4}, "rockisdead": {"gain": 0.39},
-                 "belial": {"gain": 0.52, "pgain": 1.2}}
+                 "belial": {"gain": 0.52, "pgain": 1.2},
+                 "caveroom4": {"gain": 0.264, "pgain": 0.77, "key": (1.0, 0.03, 0.0), "spec": 0.0},
+                 "dungrm6a": {"gain": 0.54, "pgain": 0.21, "key": (1.0, 0.55, 0.85), "spec": 0.0},
+                 "temple5": {"gain": 0.245, "pgain": 0.41, "key": (1.0, 0.43, 0.10)},
+                 "temple6": {"gain": 0.245, "pgain": 0.41, "key": (1.0, 0.43, 0.10)}}
 DEFAULT_LIGHT = {"key": (1.0, 1.0, 1.0), "power": 8.0}    # a map with no level row (a .ds1 file on disk): a plain key light
+# maps whose wall tiles go into atlas groups of their own ('<group>-<suffix>'), so that adding them to sprite_classic.json leaves
+# the atlases and models of the maps already on it byte for byte as they were (Hole Level 2 shares the cave tiles of Duncraig,
+# Azmodan's Reliquary the Kurast interior tiles of Vizjun and Rathma Square, Island of the Sunless Sea the ice cave props of
+# Welcome to Toraja); a few tiles are then stored twice
+OWN_GROUP = {"caveroom4": "hole2", "dungrm6a": "proving", "temple5": "reliquary", "temple6": "reliquary",
+             "rockisdead": "rockisdead"}
 
 
 # ---- tiles -------------------------------------------------------------------------------------------------------------------
@@ -290,7 +308,12 @@ class MapHandle:
             raise SystemExit("sprite_scene: none of the tile files of %s is at hand; name them with --dt1" % path)
         return cls(name or "adhoc/%s.ds1" % Path(path).stem, ds, files, act or min(5, max(1, ds.act + 1)), biome=biome)
 
-    def walls(self, orientations=frozenset(CLASS_OF)) -> list:
+    def group(self, dt1_path: str) -> str:
+        """The atlas group this map draws a tile file's tiles into: group_of, with the map's OWN_GROUP suffix."""
+        own = OWN_GROUP.get(self.stem)
+        return group_of(dt1_path, self.act) + ("-" + own if own else "")
+
+    def walls(self, orientations=DRAWN) -> list:
         """[(x, y, layer, Variant)] of the upright tiles: every wall layer cell of the orientations that has a tile."""
         import ds1_remap
         out = []
@@ -532,7 +555,7 @@ def write_groups(out: Path, handles, needed: dict, models: Models, opts) -> dict
     stats = {}
     tex_base = {"nrm": ws.FLAT_NRM, "orm": ws.FLAT_ORM}
     for group in sorted(needed):
-        h, variants = next((h, t) for h in handles for p, t in h.by_file.items() if group_of(p, h.act) == group)
+        h, variants = next((h, t) for h in handles for p, t in h.by_file.items() if h.group(p) == group)
         tiles = {}
         for key, n in needed[group] | existing_tiles(out, group):
             vs = variants.get(key)
@@ -749,7 +772,7 @@ def classic_light(ambient, rule=None) -> dict:
 
 def classic_vis(vis: dict, name: str, light: dict) -> dict:
     """A copy of a visual data file named `name` with the map's light (classic_light, a CLASSIC_LIGHT entry): the global key
-    light's colour and power, and where given the image based light's intensity, the player's light power, reach and
+    light's colour and power (and its specular share, `spec`), and where given the image based light's intensity, the player's light power, reach and
     fall-off, the grading LUT (`lut`) and the fog densities (`fog`); no screen particles."""
     import copy
     out = copy.deepcopy(vis)
@@ -770,6 +793,8 @@ def classic_vis(vis: dict, name: str, light: dict) -> dict:
             if e.get("name") == KEY_LIGHT and c.get("type") == "DirectionalLightDefinitionComponent":
                 c["color"] = dict(zip("xyz", light["key"]))
                 c["power"] = light["power"]
+                if light.get("spec") is not None:
+                    c["specularContribution"] = light["spec"]
     if light.get("lut"):
         other = out.setdefault("dependencies", {}).setdefault("other", [])
         other[:] = [d for d in other if not str(d.get("path", "")).startswith("data/hd/env/lut/")] + [{"path": light["lut"]}]
@@ -973,7 +998,7 @@ def limits(h: MapHandle) -> tuple:
 
 def build_map(h: MapHandle, scene: dict, source: str, opts) -> dict:
     """The map's plan: which tiles stand where. -> {"walls": [(x, y, layer, Variant)], "floors": [...], "skipped": n}."""
-    walls = h.walls(frozenset(opts.orientations))
+    walls = h.walls(frozenset(opts.orientations) | (SPECIAL if h.stem in DOOR_MAPS else frozenset()))
     flat = is_flat(scene)
     skip = h.flat_keys({v.key for *_r, v in walls}) if flat and opts.rule == "auto" else set()
     floors = [] if flat and opts.floors == "blocked" else h.floors(opts.floors)   # the flat build painted its blocked floors
@@ -992,7 +1017,7 @@ def build(handles: list, out: Path, opts) -> dict:
         scene, source = base_scene(h, opts.base, out, opts.biome)
         plans[h.name] = (scene, build_map(h, scene, source, opts))
         for _x, _y, _n, v in plans[h.name][1]["walls"]:
-            needed.setdefault(group_of(h.source[v.key], h.act), set()).add((v.key, v.n))
+            needed.setdefault(h.group(h.source[v.key]), set()).add((v.key, v.n))
     flat_files = ws.flat_textures(out)
     groups = write_groups(out, handles, needed, models, opts)
     stats = {}
@@ -1001,7 +1026,7 @@ def build(handles: list, out: Path, opts) -> dict:
         ids = count_ids(scene)
         new, per_cell, used = [], {}, {}
         for x, y, n, v in plan["walls"]:
-            group = group_of(h.source[v.key], h.act)
+            group = h.group(h.source[v.key])
             path = MODEL % ((group, tile_name(v.key, v.n).split("_")[0]) + v.key)
             if path not in models.files:
                 continue                                  # a picture all under the floor line: nothing to draw
@@ -1140,7 +1165,7 @@ def main(argv=None) -> int:
     b.add_argument("--ground", choices=("keep", "bare"), default="keep", help="bare: under floor art the scene's biome without grass and clutter, and no biome override")
     b.add_argument("--classic", action="store_true", help="the whole map from its own classic art: --floors all --ground bare --rule all, every model of the base scene dropped, black ground where the map has no floor, and the map's own light")
     b.add_argument("--rule", choices=("auto", "all"), default="auto", help="auto: tiles the flat build painted on the floor are not drawn upright")
-    b.add_argument("--orientations", default=",".join(str(o) for o in sorted(CLASS_OF)), help="wall layer orientations drawn")
+    b.add_argument("--orientations", default=",".join(str(o) for o in sorted(DRAWN)), help="wall layer orientations drawn (10, 11 also on DOOR_MAPS)")
     b.add_argument("--dt1", help="a .ds1 file's tile files, in order (paths below data/global/tiles or files)")
     b.add_argument("--act", type=int, help="a .ds1 file's palette (1-5)")
     b.add_argument("--name", help="a .ds1 file's map name in the game (act1/town/townn1.ds1): where its scene goes, and D2R's scene of that name is its base")

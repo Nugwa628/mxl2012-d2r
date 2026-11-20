@@ -10,8 +10,13 @@
   "act3/kurast/excelsior3.ds1",
   "expansion/glados/glados.ds1",
   "expansion/redsquare/moskvich.ds1",
+  "expansion/icecave/rockisdead.ds1",
   "expansion/voodoo/macumba.ds1",
   "expansion/terror/borgir.ds1",
-  "expansion/zakarum/charismatic.ds1"
+  "expansion/zakarum/charismatic.ds1",
+  "act1/caves/caveroom4.ds1",
+  "act3/jungle/dungrm6a.ds1",
+  "act3/temple/temple5.ds1",
+  "act3/temple/temple6.ds1"
  ]
 }

@@ -1535,7 +1535,7 @@ def d2r_bytes(rel: str):
     None when it is in none of them."""
     import os
     import fxpaths
-    for p in (fxpaths.D2R / rel, fxpaths.D2R_CACHE / rel):
+    for p in (fxpaths.ci(fxpaths.D2R / rel), fxpaths.ci(fxpaths.D2R_CACHE / rel)):  # ci: D2R ignores case (Linux)
         if p.exists():
             return p.read_bytes()
     if not os.environ.get("MXL_SLOT") and not os.environ.get("MXL_D2R_GAME"):

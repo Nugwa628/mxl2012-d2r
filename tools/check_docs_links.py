@@ -66,8 +66,9 @@ def findings(root, path):
             out.append((text.count('\n', 0, match.start()) + 1, reason, target))
     for match in CODE.finditer(text):
         target = match[1]
+        # `data/...` is an ellipsis, not a path (Windows drops trailing dots, so it only showed on Linux)
         if (REPO_PATH.fullmatch(target) and not target.startswith(('data/global/', 'data/hd/', 'data/local/'))
-                and not (root / target).exists()):
+                and not target.endswith('...') and not (root / target).exists()):
             out.append((text.count('\n', 0, match.start()) + 1, 'missing repo path', target))
     return sorted(out)
 

@@ -97,7 +97,7 @@ class Models:
 
     def get(self, model: str) -> dict | None:
         if model not in self.memo:
-            self.memo[model] = next((fx.load_json(d / f"{model}.json") for d in self.dirs if (d / f"{model}.json").exists()), None)
+            self.memo[model] = next((fx.load_json(d / f"{model}.json") for d in self.dirs if fx.fxpaths.ci(d / f"{model}.json").exists()), None)
         return self.memo[model]
 
     def draws(self, model: str | None) -> bool:

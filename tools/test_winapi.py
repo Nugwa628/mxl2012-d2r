@@ -16,11 +16,12 @@ for name in ("windll", "oledll", "WinDLL", "OleDLL", "WINFUNCTYPE", "WinError", 
         delattr(ctypes, name)
 sys.path.insert(0, sys.argv[1])
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
-import winapi, game_slots, game_ctl, game_checks
+import winapi, game_slots, game_ctl, game_checks, input_watch
 assert not winapi.available()
 assert game_slots.processes() == [] and game_slots.slot_processes(game_slots.slot_dir(2)) == []
 assert game_slots.pid_alive(4) is False
-for call in (lambda: game_ctl.user32.GetForegroundWindow(), lambda: game_ctl.kernel32.GetCurrentThreadId()):
+for call in (lambda: game_ctl.user32.GetForegroundWindow(), lambda: game_ctl.kernel32.GetCurrentThreadId(),
+             lambda: input_watch.user32.GetForegroundWindow()):
     try:
         call()
     except OSError as e:

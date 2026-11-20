@@ -18,6 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PROCESS_QUERY_INFORMATION, PROCESS_VM_READ = 0x0400, 0x0010
+if sys.platform != "win32":  # drives the Windows game through the Win32 API
+    raise SystemExit("dump_image.py: Windows only (it drives the D2R game through the Win32 API); nothing was done")
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 psapi = ctypes.WinDLL("psapi", use_last_error=True)
 k32.OpenProcess.restype = wintypes.HANDLE

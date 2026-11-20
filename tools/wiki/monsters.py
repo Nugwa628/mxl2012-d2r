@@ -345,7 +345,8 @@ def superunique_places(data: Data) -> dict:
             if not f or f == "0":
                 continue
             rel = f.replace("\\", "/")
-            path = MXL_TILES / rel if (MXL_TILES / rel).exists() else D2R_TILES / rel
+            # ci: the tables' names ignore case as D2R and Windows do (the trees are not in one case: Linux)
+            path = fxpaths.ci(MXL_TILES / rel) if fxpaths.ci(MXL_TILES / rel).exists() else fxpaths.ci(D2R_TILES / rel)
             if not path.exists():
                 continue
             ds1 = Ds1(path.read_bytes())

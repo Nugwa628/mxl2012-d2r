@@ -67,9 +67,9 @@ def check(work: Path, map_path: Path) -> list[str]:
             continue
         if r["kind"] == "missile":
             model = r["effect"]
-            if not ((work / "data" / "hd" / "missiles" / f"{model}.json").exists() or (e.HDM / f"{model}.json").exists()):
+            if not ((work / "data" / "hd" / "missiles" / f"{model}.json").exists() or fxpaths.ci(e.HDM / f"{model}.json").exists()):
                 bad.append(f"missile {r['art']}: model {model} has no definition")
-        elif not (e.HDO / f"{r['effect']}.json").exists():
+        elif not fxpaths.ci(e.HDO / f"{r['effect']}.json").exists():
             bad.append(f"overlay {r['art']}: D2R has no {r['effect']}")
     # every decided row is keyed in missiles.json / has its overlay file
     for p in (work / "data" / "hd" / "overlays").rglob("*.json"):
@@ -79,7 +79,7 @@ def check(work: Path, map_path: Path) -> list[str]:
     d2r = json.loads((e.HDM / "missiles.json").read_text("utf-8-sig"))
     ours = {v for k, v in mj.items() if d2r.get(k) != v}  # D2R's own map has a dangling entry or two; only ours count
     for model in ours:
-        if model != "null" and not ((work / "data" / "hd" / "missiles" / f"{model}.json").exists() or (e.HDM / f"{model}.json").exists()):
+        if model != "null" and not ((work / "data" / "hd" / "missiles" / f"{model}.json").exists() or fxpaths.ci(e.HDM / f"{model}.json").exists()):
             bad.append(f"missiles.json names model {model}, which has no definition")
     return bad
 

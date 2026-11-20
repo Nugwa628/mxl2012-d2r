@@ -250,6 +250,24 @@ LOB_MISSILES = {
 }
 
 
+def monprop_close_gaps(header: list[str], row: list[str], suffix: str = "") -> None:
+    """Move a monprop row's properties of one difficulty (`suffix` "", " (N)" or " (H)") up over empty places, in order: D2R
+    applies a row's properties only up to the first empty `prop` (bug #620)."""
+    names = ("prop", "chance", "par", "min", "max")
+    slots = []
+    k = 1
+    while f"prop{k}{suffix}" in header:
+        slots.append([header.index(f"{n}{k}{suffix}") if f"{n}{k}{suffix}" in header else None for n in names])
+        k += 1
+    row.extend([""] * max(0, len(header) - len(row)))
+    kept = [[row[i] if i is not None else "" for i in cols] for cols in slots if row[cols[0]]]
+    for n, cols in enumerate(slots):
+        vals = kept[n] if n < len(kept) else [""] * len(names)
+        for i, v in zip(cols, vals):
+            if i is not None:
+                row[i] = v
+
+
 def lob_missiles(header: list[str], rows: list[list[str]]) -> list[str]:
     """LOB_MISSILES on the missiles.txt rows; one entry per cell set."""
     if "Missile" not in header:
@@ -263,6 +281,55 @@ def lob_missiles(header: list[str], rows: list[list[str]]) -> list[str]:
                 row.extend([""] * max(0, ci + 1 - len(row)))
                 row[ci] = value
                 done.append(f"{row[ni]}.{col}={value}")
+    return done
+
+
+# srvdofuncs that read calc4 as "% Damage Dealt as Elemental" in D2R (the vanilla skills.txt rows with that *calc4 desc:
+# Bash 2, Jab 7, Frenzy 9, Charged Strike 11, Zeal 13, Lightning Strike 14, Poison Dagger 32, Dragon Claw 46, Sacrifice 64,
+# Charge 67, Leap Attack 78, Conversion 79, Maul 120, Rabies 121, Smite 150, Cleave 164, Blade Warp 166, Korlic's 170)
+STUN_CALC4_SKIP_DOFUNCS = {"2", "7", "9", "11", "13", "14", "32", "46", "64", "67", "78", "79", "120", "121", "150", "164",
+                           "166", "170"}
+
+
+def stun_calc4(sh: list[str], srows: list[list[str]], mh: list[str], mrows: list[list[str]]) -> list[str]:
+    """calc4 `ln12` (Param1 + Param2 * (lvl - 1)) on the skills whose missiles stun with dParam1 0 (bug #580).
+    missiles.txt pSrvDmgFunc 7 takes a dParam1 of 0 as "stun length from the skill": 1.13c (and 1.14d, 0x5ad3e0) reads the
+    missile's skill Param1 + Param2 * (lvl - 1); D2R (93847, 0x453e30) reads the skill's calc4 when the missile has an owner,
+    as vanilla War Cry and Shock Wave carry (calc4 ln12 "Stun Length"), and an empty calc4 stuns 0 frames (Blink, Bear Claw,
+    Stampede ...). A skill counts when its srvmissile* row, a sub-missile of it (any *SubMissile* column, at any depth) or a
+    missile naming it in `Skill` is such a missile. A calc4 already set and STUN_CALC4_SKIP_DOFUNCS are left alone. Returns
+    the skills written."""
+    need = ("skill", "calc4", "Param1", "Param2")
+    if any(c not in sh for c in need) or any(c not in mh for c in ("Missile", "pSrvDmgFunc", "dParam1")):
+        return []
+    mi = {c: i for i, c in enumerate(mh)}
+    cell = lambda r, i: r[i].strip() if i is not None and i < len(r) else ""  # noqa: E731
+    num = lambda v: int(v) if re.fullmatch(r"-?\d+", v) else 0  # noqa: E731
+    stuns = {cell(r, mi["Missile"]) for r in mrows
+             if cell(r, mi["pSrvDmgFunc"]) == "7" and num(cell(r, mi["dParam1"])) <= 0}
+    subs = [i for c, i in mi.items() if "submissile" in c.lower()]
+    children = {cell(r, mi["Missile"]): {cell(r, i) for i in subs} - {""} for r in mrows}
+
+    def reaches(m: str, seen: set[str]) -> bool:
+        if m in stuns:
+            return True
+        seen.add(m)
+        return any(reaches(c, seen) for c in children.get(m, ()) if c not in seen)
+
+    by_skill = {cell(r, mi.get("Skill")) for r in mrows if cell(r, mi["Missile"]) in stuns} - {""}
+    si = {c: i for i, c in enumerate(sh)}
+    srv = [i for c, i in si.items() if re.fullmatch(r"srvmissile[abc]?", c)]
+    done = []
+    for r in srows:
+        name = cell(r, si["skill"])
+        if not name or cell(r, si["calc4"]) or cell(r, si.get("srvdofunc")) in STUN_CALC4_SKIP_DOFUNCS:
+            continue
+        if not (num(cell(r, si["Param1"])) or num(cell(r, si["Param2"]))):
+            continue
+        if name in by_skill or any(reaches(cell(r, i), set()) for i in srv if cell(r, i)):
+            r.extend([""] * max(0, si["calc4"] + 1 - len(r)))
+            r[si["calc4"]] = "ln12"
+            done.append(name)
     return done
 
 
@@ -1457,12 +1524,30 @@ class Migrator:
     EVENT_STATS = {"item_skillonattack", "item_skillonkill", "item_skillondeath", "item_skillonhit", "item_skillonlevelup",
                    "item_skillongethit"}
 
+    def stun_calcs(self) -> None:
+        """skills.txt calc4 ln12 on the skills whose missiles stun "from the skill" (stun_calc4, bug #580)."""
+        done: list[str] = []
+        for bank in ("base", ""):
+            d = OUT / "data" / "global" / "excel" / bank
+            if not (d / "skills.txt").exists() or not (d / "missiles.txt").exists():
+                continue
+            sh, srows = read_tsv(d / "skills.txt")
+            mh, mrows = read_tsv(d / "missiles.txt")
+            lines = stun_calc4(sh, list(idmap.records(srows)), mh, list(idmap.records(mrows)))
+            write_tsv(d / "skills.txt", sh, srows)
+            if bank == "base":
+                done = lines
+        self.report.append("\nskills calc4 ln12, stun length from the skill (bug #580): " + (", ".join(done) or "none"))
+
     def monprop_event_skills(self) -> None:
         """A monprop event property (hit-skill, kill-skill, death-skill, att-skill, gethit-skill, levelup-skill) whose skill has
         no `ItemEffect` makes D2R assert `ptSkill->nItemEffect != 0` (D2Game SkillItemEffect.cpp:136) when the event fires
         (bug #32: `hornedgods` death-skill 524 Living Flame; also elite_goatpriest5 Widowmaker, dark_master1 AngirisChosen,
         dragoncompanions Dragon Firebolt Wave). 1.13c runs no item effect for such a row, so the property did nothing in Median;
-        it is emptied (monsters show no property text). The same case on items (tooltips) is left alone: bug #40."""
+        it is removed (monsters show no property text). The same case on items (tooltips) is left alone: bug #40.
+        The properties after it move up one place (bug #620): D2R reads a monprop row's properties of a difficulty only up to
+        the first empty one, so a gap left Imperius' and Malthael's aura and death skill (the Crystalline Flame Medallion's
+        30-second counter) and those of four other rows unapplied (seen in game, docs/bugs.md #620)."""
         dropped: list[str] = []
         for bank in ("base", ""):
             d = OUT / "data" / "global" / "excel" / bank
@@ -1479,6 +1564,7 @@ class Migrator:
                     no_effect |= {r[sid] if sid is not None else str(n), r[sname].lower()}
             mh, mrows = read_tsv(d / "monprop.txt")
             for r in idmap.records(mrows):
+                gaps: set[str] = set()
                 for i, c in enumerate(mh):
                     m = re.fullmatch(r"prop(\d)( \([NH]\))?", c)
                     if not m or r[i] not in events:
@@ -1490,6 +1576,9 @@ class Migrator:
                         dropped.append(f"{r[0]} {c} {r[i]} {r[par]}")
                     for name in ("prop", "chance", "par", "min", "max"):
                         r[mh.index(f"{name}{m[1]}{m[2] or ''}")] = ""
+                    gaps.add(m[2] or "")
+                for suffix in gaps:
+                    monprop_close_gaps(mh, r, suffix)
             write_tsv(d / "monprop.txt", mh, mrows)
         self.report.append(f"\nmonprop event properties on skills without ItemEffect (bug #32), emptied: {len(dropped)}: "
                            + (", ".join(dropped) or "none"))
@@ -2438,6 +2527,7 @@ def main() -> int:
     m.belt_columns()
     m.conversion_calcs()
     m.lob_skills()
+    m.stun_calcs()
     m.cube_unresolved_inputs()
     m.fill_skilldesc()
     m.blank_item_skilldesc()

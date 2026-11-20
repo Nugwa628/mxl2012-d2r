@@ -7,6 +7,42 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.27 (2026-11-21)
+
+- **The Crystalline Flame Medallion can now be upgraded:** kill Imperius and Malthael on Destruction within 30 seconds
+  of each other, then cube the medallion on its own (+3 to all skills, +50 to all attributes). The Avatars had also lost
+  their aura and their counter on death in the port; three other monsters (Dark Convert, its old form and a goat priest)
+  get back the properties they lost the same way.
+- **Blink stuns again, and so do Bear Claw, Stampede, Rocket Bolt, Sunspear and Cherub Strike:** their stun length
+  grows with the skill level as in Median 2012 (Blink: 0.6 s at level 1, 1 s at level 3). In the port they did not stun
+  at all.
+- **Damage numbers (Floating Damage) no longer crash the game under Proton / Linux:** when a Windows font is missing it
+  uses its built-in font.
+- **Four more of Median's own areas now look like classic in HD graphics:** Hole Level 2, The Proving Grounds,
+  Azmodan's Reliquary and Island of the Sunless Sea are drawn from their classic art, with classic's light, instead of
+  the D2R maps they borrowed. Hole Level 2 and The Proving Grounds are toned down to classic's colours: the area
+  beside the floor is black as in classic, and the walls of The Proving Grounds stand out as they do there. Known
+  limit: the light around the player is warmer than classic's near-white. The download is about 2.5 MB larger.
+- **New bundled plugin: Monster Display** by CelestialRayOne (Bogdan Bulai,
+  <https://github.com/CelestialRayOne/d2rloader_plugins>, MIT). In HD graphics, hovering a monster shows a wider life bar
+  with its exact life, its level and type, its affixes, a row with its six resistances as your hits meet them (your
+  −enemy resistance applied), and its immunities. Prime evils get a bar twice as wide. Legacy graphics are unchanged.
+  Settings in `mods\mxl2012\d2rloader\config\celestialrayone.monster-display.toml`.
+- **New bundled plugin: Vendor Stock Refresh** by RuffnecKk (<https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, MIT).
+  In HD graphics every vendor's trade screen has a refresh button under the gold, as the gamble screen does: a click
+  rerolls the vendor's stock, free of charge. Gambling keeps its own refresh. Legacy graphics show no button. Turn it off
+  with `enabled = false` under `[plugin]` in `mods\mxl2012\d2rloader\config\ruffneckk-vendor-stock-refresh.toml`.
+  Known issue: on a new character's first trade, the refresh button may not reroll the stock; it works from the next
+  visit. While a vendor's first-meeting greeting is still playing (Charsi: "Oh, by the way..."), the button is missing
+  and the trade screen closes when the greeting ends. Let the greeting finish before you choose Trade.
+- **Don't want the health bars or the damage numbers?** Both are on by default and each has its own switch. Open the
+  file in Notepad, change the line, save, and start the game again; Update and Repair in the downloader keep your change.
+  - Health bars over monsters (Enemy Health Bars): in `mods\mxl2012\d2rloader\config\enemy-health-bars.toml`, under
+    `[bars]`, set `enabled = false`.
+  - Damage numbers over monsters and the DPS counter (Floating Damage): in
+    `mods\mxl2012\d2rloader\config\ruffneckk-floating-damage.toml`, under `[general]`, set `enabled = false`.
+- No new downloader: downloader 0.1.5 or newer installs this update.
+
 ### 0.1.26 (2026-11-18)
 
 - Laughing Ghost and Rising Dawn now land where you click, as far as the edge of the screen, in HD and legacy graphics at

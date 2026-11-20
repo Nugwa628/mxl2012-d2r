@@ -495,7 +495,7 @@ def copy_plan(plan: Plan, out: Path, remap: dict | None = None, pal: list | None
     units palette `pal`, remap_dc6); -> files written."""
     n = 0
     for e in plan.shipped():
-        dest = out / e.rel
+        dest = fxpaths.ci_dest(out / e.rel)  # into a token folder another step made in other case (Linux; Windows merges)
         data = e.src.read_bytes()
         if e.pink and remap:
             data = remap_dc6(data, remap, pal)

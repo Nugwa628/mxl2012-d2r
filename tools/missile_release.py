@@ -99,7 +99,7 @@ def main() -> int:
 
     def get(model: str):
         if model not in memo:
-            p = next((d / f"{model}.json" for d in (mdir, fx.HDM) if (d / f"{model}.json").exists()), None)
+            p = next((fx.fxpaths.ci(d / f"{model}.json") for d in (mdir, fx.HDM) if fx.fxpaths.ci(d / f"{model}.json").exists()), None)
             memo[model] = fx.load_json(p) if p else None
         return memo[model]
 

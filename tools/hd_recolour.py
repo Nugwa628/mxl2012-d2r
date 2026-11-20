@@ -59,8 +59,8 @@ def casc_read(path: str) -> bytes:
     MXL_D2R_GAME is set (fxpaths.d2r_file caches it). b'' when it is nowhere."""
     ASKED.add(path)
     for base in (D2R, fxpaths.D2R_CACHE):
-        if (base / path).exists():
-            return (base / path).read_bytes()
+        if fxpaths.ci(base / path).exists():
+            return fxpaths.ci(base / path).read_bytes()
     if os.environ.get("MXL_SLOT") or os.environ.get("MXL_D2R_GAME"):
         try:
             return fxpaths.d2r_file(path).read_bytes()
@@ -340,7 +340,7 @@ def plan_missile(hdm: Path):
     """recolour(c, shift, m_art, c_art, art) -> spec when the D2R missile row c's effect can be recoloured, else None
     (art: Median's art name, for TINT_OVERRIDES)."""
     def plan(c, shift, m_art, c_art, art=""):
-        src = hdm / f"{c.model}.json"
+        src = fxpaths.ci(hdm / f"{c.model}.json")
         d = json.loads(src.read_text("utf-8-sig"))
         spec = with_override(spec_of(shift, m_art, c_art), c.model, art)
         return spec if fits(src, d, spec, recolour_name(d.get("name") or c.model, spec)) else None
@@ -349,7 +349,7 @@ def plan_missile(hdm: Path):
 
 def plan_overlay(hdo: Path, norm_key):
     def plan(c, shift, m_art, c_art, art=""):
-        src = hdo / c.folder / f"{norm_key(c.name)}.json"
+        src = fxpaths.ci(hdo / c.folder / f"{norm_key(c.name)}.json")
         d = json.loads(src.read_text("utf-8-sig"))
         spec = with_override(spec_of(shift, m_art, c_art), d.get("name", ""), art)
         return spec if fits(src, d, spec, d.get("name", "")) else None
@@ -360,7 +360,7 @@ def plan_pick_missile(hdm: Path):
     """pick(model, tint) -> spec when the hand-picked D2R missile effect `model` can be tinted by the pick's `tint` cell
     (and its copy is no larger than D2R's), else None."""
     def plan(model, tint):
-        src = hdm / f"{model}.json"
+        src = fxpaths.ci(hdm / f"{model}.json")
         d = json.loads(src.read_text("utf-8-sig"))
         spec = pick_spec(tint, _defs_particles(d))
         return spec if spec and fits(src, d, spec, recolour_name(d.get("name") or model, spec)) else None
@@ -370,7 +370,7 @@ def plan_pick_missile(hdm: Path):
 def plan_pick_overlay(hdo: Path):
     """pick(effect 'folder/name', tint) -> spec for a hand-picked overlay definition, else None."""
     def plan(effect, tint):
-        src = hdo / f"{effect}.json"
+        src = fxpaths.ci(hdo / f"{effect}.json")
         d = json.loads(src.read_text("utf-8-sig"))
         spec = pick_spec(tint, _defs_particles(d))
         return spec if spec and fits(src, d, spec, d.get("name", "")) else None
@@ -380,7 +380,7 @@ def plan_pick_overlay(hdo: Path):
 def recolour_missile(out: Path, model: str, spec: dict, hdm: Path | None = None) -> dict:
     """The recoloured copy of D2R's missile definition `model` (its "name" is the new model name)."""
     hdm = hdm or D2R / "data" / "hd" / "missiles"
-    d = json.loads((hdm / f"{model}.json").read_text("utf-8-sig"))
+    d = json.loads(fxpaths.ci(hdm / f"{model}.json").read_text("utf-8-sig"))
     nd = recolour_def(out, d, spec, recolour_name(d.get("name") or model, spec))
     if nd is None:
         raise ValueError(f"{model}: nothing to recolour")
@@ -399,7 +399,7 @@ def sizes(out: Path) -> tuple[int, list[str]]:
     for new, src in sorted(WRITTEN.items()):
         n = (out / new.split("/", 1)[1]).stat().st_size
         total += n
-        o = D2R / src if (D2R / src).exists() else fxpaths.D2R_CACHE / src
+        o = fxpaths.ci(D2R / src) if fxpaths.ci(D2R / src).exists() else fxpaths.ci(fxpaths.D2R_CACHE / src)
         if o.exists() and n > o.stat().st_size:
             larger.append(new)
     return total, larger

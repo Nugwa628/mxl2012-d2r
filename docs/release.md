@@ -300,6 +300,36 @@ not tested in game: no other D2RLoader image is installed here; the decision is 
       --forge --commit <full sha of the forge's own commit> [--downloader <exe>]` (token: ~/.mxl2012-d2r/forge_token or MXL_FORGE_TOKEN). The forge's history is not scrubbed,
       so its commit ids differ from GitHub's.
 
+### Making a release on Linux (lane relpkg, 2026-11-20, release 0.1.27)
+
+The same steps with the venv's Python instead of `py -3`, MSVC under wine for the DLLs and no PowerShell:
+
+1. Our plugins: `/d2work/toolchains/scripts/build_plugins_linux.sh <worktree> <build>` (core dev + release, drawcap, invtabs,
+   statbook, unit tests under wine). Ninja puts each DLL in `<build>/<x>/`, not `<x>/Release/`: copy them to the
+   checkout's `build/<x>/Release/` (plugin, plugin-release, drawcap, invtabs, statbook), where `install_mod.py`,
+   `package_release.py` and `test_package_release.py` look.
+2. Inputs (`.mxl-local.json` or the environment): `MXL_D2R_EXTRACT`, `MXL_D2R_CACHE`, `MXL_NATIVE_DIR`, `MXL2012_RUNS` (a
+   folder with `assetpack/pack`, `extract-mpq`, `extract-merged/data/local.zip` for the clear legacy fonts, `shared/` with
+   the author DLL folders `charm-inv-*`, `damage-overflow-fix-*`, `monster-display-*`, `vendor-stock-refresh-*`, and
+   `buildcache/walls_hd`); `MXL_REFERENCE` (the reference checkout: hd_monsters and effects_hd read the prior mapping
+   from its `work/` and `assets/median`); a slot for the CASC reads: `MXL_SLOT=N`, `MXL_SLOTN_DIR=<folder>` and
+   `MXL_D2R_GAME=<the same folder>` (read only).
+3. `python tools/build.py`. The walls cache key holds the tools' sources and the `MXL*` settings, so the first Linux build
+   (and every build after a tool change) regenerates the walls (about 45 min on one core).
+4. Third-party plugins: `tools/build_thirdparty_linux.py` (docs/bundled-plugins.md "Building on Linux"); Buff HUD and
+   Controller QOL again after the build (`--work <checkout> --skill-profile build/controllerqol-profile/mxl2012.overrides.toml`,
+   the file `package_release.controllerqol_profile()` writes). Link its `<x>/` and `<x>-src/` folders into `build/`.
+5. `python tools/package_release.py --version X --launcher-min Y --out DIR --plugin build/plugin-release/Release/mxl2012-core.dll`
+   with `--legacy169 --buffhud --beltrefill --controllerqol --ehb --fd --vsr` naming those DLLs (it cannot run the .ps1
+   builds), then `python tools/verify_package.py DIR/D2R-XL-2012-X.7z --scratch DIR2` and, from `tools/`,
+   `python -m unittest test_package_release test_verify_package`.
+
+What differs from a Windows package with the same content: text files are LF (Python writes `\n`; on Windows text mode
+writes CRLF), the DLLs come from another compiler build, and the 7z bytes differ (7-Zip version, threads). Every reader
+of the shipped configs and JSON takes LF (owner, 2026-11-20). `tools/statbook_layout.py` measures D2R's font with
+Pillow's BASIC layout on every OS (lane relsmoke): Linux Pillow wheels have raqm, whose kerning made "Advanced" 0.3 px wider
+than its 130 px side tab at 18 pt (side tabs at 17 pt); Windows wheels have no fribidi and always used BASIC.
+
 CI (`.forgejo/workflows/release.yml`, runner `mxl-cross`, manual dispatch or tag `v*`): no game files on the
 server, so it cannot run tools/build.py. It cross-builds the release DLL, runs the packager's unit tests and
 `package_release.py --no-data`, and keeps `dist/` as the artifact `mxl2012-d2r-release` (`D2R-XL-2012-<v>-nodata.7z`,

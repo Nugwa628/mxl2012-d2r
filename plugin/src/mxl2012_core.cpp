@@ -30,6 +30,8 @@
 //      skill 173, instead of nothing (melt_trail.cpp, off word melttrail, #52);
 //   +  Laughing Ghost and Rising Dawn (skills.txt lob 1) land where the player clicked, up to the edge
 //      of the screen: their lob missiles get the clicked point in both missile creates (lob_aim.cpp, off word lobaim, #618);
+//   +  Leap Attack, Cherub Strike and Level 90 Cherub stun for Median's Param1 + Param2 * (lvl - 1) (D2R reads their
+//      calc4, which is elemental damage for them): after D2R's server damage function 7 (stun_len.cpp, off word stunlen, #580);
 //   +  Whirlwind's 1.13c hit rate (srvdofunc 76: Whirlwind, Spin To Win, Danse Macabre, Harvest) instead of D2R 2.4's
 //      (whirlwind.cpp, off word whirlwind, #281);
 //   +  Move Only (srvstfunc 71, the mod's own walk-only skill) never starts a cast: a click on a monster walks to it and
@@ -113,6 +115,7 @@
 #include "map_reveal.h"
 #include "melt_trail.h"
 #include "lob_aim.h"
+#include "stun_len.h"
 #include "missile_stubs.h"
 #include "orig_asserts.h"
 #include "reassign_guard.h"
@@ -159,7 +162,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.26";
+constexpr const char* PluginVersion = "0.1.27";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -225,7 +228,7 @@ char g_otherImage[256] = "";  // the message for a player on another game image,
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim stunlen whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -490,6 +493,7 @@ char g_dodgeListReport[160] = "";
 char g_stateListReport[160] = "";
 char g_meltTrailReport[160] = "";
 char g_lobAimReport[160] = "";
+char g_stunLenReport[200] = "";
 char g_whirlwindReport[160] = "";
 char g_moveOnlyReport[96] = "";
 char g_charmLengthReport[160] = "";
@@ -559,7 +563,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 		const char* report;
 	} parts[] = {{"cltdo22", g_cltDoReport}, {"cltnomis", g_noMissileReport}, {"itemeffect", g_itemEffectReport},
 	             {"skillremove", g_skillRemoveReport}, {"rangedesc", g_rangedDescReport}, {"dodgelist", g_dodgeListReport}, {"statelist", g_stateListReport},
-	             {"melttrail", g_meltTrailReport}, {"lobaim", g_lobAimReport}, {"whirlwind", g_whirlwindReport}, {"moveonly", g_moveOnlyReport}, {"charmlen", g_charmLengthReport}, {"cubedupe", g_cubeDupeReport},
+	             {"melttrail", g_meltTrailReport}, {"lobaim", g_lobAimReport}, {"stunlen", g_stunLenReport}, {"whirlwind", g_whirlwindReport}, {"moveonly", g_moveOnlyReport}, {"charmlen", g_charmLengthReport}, {"cubedupe", g_cubeDupeReport},
 	             {"ilvl", g_itemLevelReport}, {"runeletter", g_runeLetterReport}, {"skilltext", g_skillTextReport},
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
@@ -728,6 +732,10 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	LobAimCounts(&lobSeen, &lobServer, &lobClient);
 	std::snprintf(line, sizeof(line), "%s; missiles seen %ld, targets capped: server %ld, client %ld", g_lobAimReport, lobSeen, lobServer, lobClient);
 	SayPart(command, "lobaim", line);
+	long stunCalls = 0, stunWritten = 0;
+	StunLenCounts(&stunCalls, &stunWritten);
+	std::snprintf(line, sizeof(line), "%s; stun hits %ld, lengths written %ld", g_stunLenReport, stunCalls, stunWritten);
+	SayPart(command, "stunlen", line);
 	long wwCalls = 0, wwD2R = 0, wwDelay = 0;
 	WhirlwindStats(&wwCalls, &wwD2R, &wwDelay);
 	std::snprintf(line, sizeof(line), "%s; hit delays answered %ld (last: D2R %ld frames -> %ld)", g_whirlwindReport, wwCalls, wwD2R, wwDelay);
@@ -1022,6 +1030,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("lobaim")) {
 		InstallLobAim(context, g_lobAimReport, sizeof(g_lobAimReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_lobAimReport);
+		context->LogInfo(line);
+	}
+	if (!Off("stunlen")) {
+		InstallStunLen(context, g_stunLenReport, sizeof(g_stunLenReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_stunLenReport);
 		context->LogInfo(line);
 	}
 	for (size_t i = 0; i < orig_asserts::BlockCount; ++i) {

@@ -1,9 +1,14 @@
-// Unit tests of the D2R-XL 2012 additions to Floating Damage (legacy_projection.hpp, patch 0001). Built and run by
-// tools/build_floatingdamage.ps1 (target floating_damage_mxl_tests).
+// Unit tests of the D2R-XL 2012 additions to Floating Damage (legacy_projection.hpp, patch 0001; font_loading.hpp, patch
+// 0005). Built and run by tools/build_floatingdamage.ps1 and tools/build_thirdparty_linux.py (target
+// floating_damage_mxl_tests).
+#include "font_loading.hpp"
 #include "legacy_projection.hpp"
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
 namespace {
 int failures = 0;
@@ -94,6 +99,94 @@ void Rip() {
     Expect(FloatingDamageMxl::RipTarget(0xb9bc3, 0x021e71a5) == 0x22a0d68, "rip target forward");
     Expect(FloatingDamageMxl::RipTarget(0x1000, -0x10) == 0xff0, "rip target backward");
 }
+// A fresh ImGui context per test: the renderer loads its fonts right after creating its context, outside any frame.
+struct Context {
+    ImGuiContext* ctx = ImGui::CreateContext();
+    Context() { ImGui::GetIO().IniFilename = nullptr; }  // as the renderer: no imgui.ini
+    ~Context() { ImGui::DestroyContext(ctx); }
+};
+
+// head: the first bytes, then zeros up to size
+std::string TempFile(const char* name, std::string head, std::size_t size) {
+    const auto path = std::filesystem::temp_directory_path() / name;
+    head.resize(size, '\0');
+    std::ofstream(path, std::ios::binary | std::ios::trunc).write(head.data(), static_cast<std::streamsize>(head.size()));
+    return path.string();
+}
+
+void MissingFont() {
+    // Proton has no segoeui.ttf: Dear ImGui's AddFontFromFileTTF would open its error tooltip (ImGui::Begin) outside a
+    // frame with no font and crash; AddFontFileIfPresent returns nullptr and touches nothing
+    Context c;
+    ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    const auto missing = (std::filesystem::temp_directory_path() / "fd-mxl-no-such-font.ttf").string();
+    std::filesystem::remove(missing);
+    ImFontConfig config{};
+    Expect(FloatingDamageMxl::AddFontFileIfPresent(atlas, missing.c_str(), 24.0f, &config, nullptr) == nullptr,
+           "missing font file -> nullptr");
+    Expect(atlas->Fonts.Size == 0 && atlas->ConfigData.Size == 0, "missing font file adds nothing to the atlas");
+    Expect(c.ctx->Windows.Size == 0, "missing font file opens no window (no error tooltip)");
+    Expect(c.ctx->ErrorFirst, "missing font file reports no ImGui error");
+    Expect(FloatingDamageMxl::AddFontFileIfPresent(atlas, "", 24.0f, &config, nullptr) == nullptr, "empty path -> nullptr");
+    Expect(FloatingDamageMxl::AddFontFileIfPresent(nullptr, missing.c_str(), 24.0f, &config, nullptr) == nullptr,
+           "no atlas -> nullptr");
+    // the renderer's fallback for that index: ImGui's built-in font, then a normal frame
+    Expect(atlas->AddFontDefault() != nullptr, "built-in font added");
+    bool fellBack = true;
+    Expect(FloatingDamageMxl::BuildFontAtlasOrDefault(atlas, fellBack) && !fellBack, "built-in font builds");
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(800.0f, 600.0f);
+    io.DeltaTime = 1.0f / 60.0f;
+    ImGui::NewFrame();
+    Expect(ImGui::GetFont() == atlas->Fonts[0], "frame uses the built-in font");
+    ImGui::Render();
+}
+
+void NotAFont() {
+    // a file that is no font (stb_truetype would read it out of bounds): refused like a missing file
+    Context c;
+    ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    const auto junk = TempFile("fd-mxl-not-a-font.ttf", "<html>not a font</html>", 4096);
+    const auto tiny = TempFile("fd-mxl-tiny-font.ttf", std::string("\0\1\0\0", 4), 64);
+    ImFontConfig config{};
+    Expect(FloatingDamageMxl::AddFontFileIfPresent(atlas, junk.c_str(), 32.0f, &config, nullptr) == nullptr,
+           "file that is no font -> nullptr");
+    Expect(FloatingDamageMxl::AddFontFileIfPresent(atlas, tiny.c_str(), 32.0f, &config, nullptr) == nullptr,
+           "font signature but 100 bytes or less -> nullptr");
+    Expect(atlas->Fonts.Size == 0 && c.ctx->Windows.Size == 0, "nothing added, no window");
+    const unsigned char ttf[101] = {0, 1, 0, 0};
+    const unsigned char otf[101] = {'O', 'T', 'T', 'O'};
+    const unsigned char ttc[101] = {'t', 't', 'c', 'f'};
+    const unsigned char apple[101] = {'t', 'r', 'u', 'e'};
+    Expect(FloatingDamageMxl::IsFontData(ttf, sizeof ttf) && FloatingDamageMxl::IsFontData(otf, sizeof otf)
+               && FloatingDamageMxl::IsFontData(ttc, sizeof ttc) && FloatingDamageMxl::IsFontData(apple, sizeof apple),
+           "TrueType, OpenType, collection and Apple signatures are fonts");
+    Expect(!FloatingDamageMxl::IsFontData(ttf, 100) && !FloatingDamageMxl::IsFontData(nullptr, 4096), "short or no data");
+    std::filesystem::remove(junk);
+    std::filesystem::remove(tiny);
+}
+
+void UnbuildableFont() {
+    // a font file with no tables: added (as AddFontFromFileTTF would), the build fails, the atlas falls back to ImGui's
+    // built-in font only and is built
+    Context c;
+    ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    const auto empty = TempFile("fd-mxl-no-tables.ttf", std::string("\0\1\0\0", 4), 4096);
+    ImFontConfig config{};
+    ImFont* font = FloatingDamageMxl::AddFontFileIfPresent(atlas, empty.c_str(), 32.0f, &config, nullptr);
+    Expect(font != nullptr && atlas->Fonts.Size == 1, "readable font file is added");
+    Expect(font != nullptr && std::string(font->ConfigData->Name) == "fd-mxl-no-tables.ttf, 32px",
+           "unnamed font gets the file name and size, as AddFontFromFileTTF names it");
+    bool fellBack = false;
+    Expect(FloatingDamageMxl::BuildFontAtlasOrDefault(atlas, fellBack), "atlas built after the fallback");
+    Expect(fellBack, "fallback reported");
+    Expect(atlas->Fonts.Size == 1 && atlas->Fonts[0]->IsLoaded() && atlas->IsBuilt(), "only the built-in font, loaded");
+    unsigned char* pixels = nullptr;
+    int w = 0, h = 0;
+    atlas->GetTexDataAsRGBA32(&pixels, &w, &h);
+    Expect(pixels != nullptr && w > 0 && h > 0, "texture data for the backend");
+    std::filesystem::remove(empty);
+}
 }  // namespace
 
 int main() {
@@ -102,6 +195,9 @@ int main() {
     DpsCounter();
     NumberSize();
     Rip();
+    MissingFont();
+    NotAFont();
+    UnbuildableFont();
     if (failures) {
         std::printf("%d failure(s)\n", failures);
         return 1;

@@ -183,6 +183,8 @@ class HdArt(unittest.TestCase):
         self.assertEqual(out.crop((0, sr.SPLICE_END, 1162, 1507)).tobytes(), src.crop((0, sr.SPLICE_END, 1162, 1507)).tobytes())
 
 
+# Median's invchar6.dc6 comes from fxpaths.MXL_ROOT (MXL_EXTRACT, assets/median or <MXL2012_RUNS>/extract-mpq)
+@unittest.skipUnless(HAVE_D2R and MEDIAN_INVCHAR.is_file(), "needs D2R's extraction and Median's invchar6.dc6")
 class Build(unittest.TestCase):
     def test_build_writes_everything(self):
         import shutil

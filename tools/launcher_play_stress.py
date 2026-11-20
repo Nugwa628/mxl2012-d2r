@@ -32,6 +32,8 @@ BUILD_INFO = ("Branch!STRING:0|Active!DEC:1|Build Key!HEX:16|CDN Key!HEX:16|Inst
               "Last Activated!STRING:0|Version!STRING:0|KeyRing!HEX:16|Product!STRING:0\n"
               "us|1|0|0|0|0|||||||3.3.93847||osi\n")
 
+if sys.platform != "win32":  # drives the Windows game through the Win32 API
+    raise SystemExit("launcher_play_stress.py: Windows only (it drives the D2R game through the Win32 API); nothing was done")
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 EnumProc = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
 results = []

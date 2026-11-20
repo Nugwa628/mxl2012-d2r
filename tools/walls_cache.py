@@ -7,6 +7,7 @@ Paths below the checkout are relative so independent lanes can share entries.
 """
 import ast
 import contextlib
+import errno
 import hashlib
 import importlib.metadata
 import json
@@ -215,8 +216,11 @@ def store(cache, cache_key, manifest, outputs):
         (temp / 'entry.json').write_text(json.dumps({'inputs': manifest, 'outputs': hashes}, sort_keys=True), 'utf-8')
         try:
             temp.rename(cache / cache_key)
-        except FileExistsError:
-            pass  # Another build published the same complete entry.
+        except OSError as exc:
+            # Another build published the same complete entry. Windows raises FileExistsError; POSIX rename(2) of a
+            # directory onto a non-empty one fails with ENOTEMPTY (or EEXIST). Either way the existing entry stays.
+            if exc.errno not in (errno.EEXIST, errno.ENOTEMPTY) and not isinstance(exc, FileExistsError):
+                raise
     finally:
         if temp.exists():
             shutil.rmtree(temp)

@@ -6,6 +6,8 @@ import struct
 import sys
 import time
 
+if sys.platform != "win32":  # drives the Windows game through the Win32 API
+    raise SystemExit("hang_probe.py: Windows only (it drives the D2R game through the Win32 API); nothing was done")
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 psapi = ctypes.WinDLL("psapi", use_last_error=True)
 k32.OpenProcess.restype = wt.HANDLE

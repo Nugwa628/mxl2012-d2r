@@ -1,0 +1,139 @@
+diff --git a/plugins/floating-damage/CMakeLists.txt b/plugins/floating-damage/CMakeLists.txt
+index 308b45d..5a0ee98 100644
+--- a/plugins/floating-damage/CMakeLists.txt
++++ b/plugins/floating-damage/CMakeLists.txt
+@@ -128,9 +128,10 @@ if(BUILD_TESTING)
+         COMMAND ruffneckk_floating_damage_tests "${FLOATING_DAMAGE_CONFIG}"
+     )
+ 
+-    # D2R-XL 2012: the pure logic of our additions (legacy_projection.hpp)
++    # D2R-XL 2012: the pure logic of our additions (legacy_projection.hpp, font_loading.hpp)
+     add_executable(floating_damage_mxl_tests tests/floating_damage_mxl_tests.cpp)
+     target_include_directories(floating_damage_mxl_tests PRIVATE src)
++    target_link_libraries(floating_damage_mxl_tests PRIVATE ruffneckk_floating_damage_imgui)
+     target_compile_features(floating_damage_mxl_tests PRIVATE cxx_std_20)
+     add_test(NAME mxl2012.floating-damage.legacy COMMAND floating_damage_mxl_tests)
+ 
+diff --git a/plugins/floating-damage/src/d3d12_renderer.cpp b/plugins/floating-damage/src/d3d12_renderer.cpp
+index aba60ee..ef9cc5c 100644
+--- a/plugins/floating-damage/src/d3d12_renderer.cpp
++++ b/plugins/floating-damage/src/d3d12_renderer.cpp
+@@ -5,6 +5,7 @@
+ // modified, and redistributed with locbones' permission obtained 2026-08-16.
+ 
+ #include "floating_damage.hpp"
++#include "font_loading.hpp"
+ 
+ #include <MinHook.h>
+ #include <d3d12.h>
+@@ -333,7 +334,10 @@ bool LoadFonts() noexcept {
+         if (hasWindowsDirectory) {
+             const std::string path = std::string(windowsDirectory.data())
+                 + "\\Fonts\\" + SystemFontFiles[index];
+-            FloatingFonts[index] = io.Fonts->AddFontFromFileTTF(
++            // D2R-XL 2012: a missing file returns nullptr (the fallback below) instead of Dear ImGui's error
++            // tooltip, which crashes outside a frame (font_loading.hpp)
++            FloatingFonts[index] = FloatingDamageMxl::AddFontFileIfPresent(
++                io.Fonts,
+                 path.c_str(),
+                 rasterSize,
+                 &config,
+@@ -455,6 +459,18 @@ bool InitializeRenderer(IDXGISwapChain3* swapChain) noexcept {
+     if (!LoadFonts())
+         return FailRendererInitialization(
+             14, "FloatingDamage overlay: renderer initialization failed while loading fonts.");
++    // D2R-XL 2012: build the atlas before the backend uploads it; a font Dear ImGui cannot build leaves ImGui's
++    // built-in font for every index instead of an unbuilt atlas (font_loading.hpp)
++    bool atlasFellBack{};
++    if (!FloatingDamageMxl::BuildFontAtlasOrDefault(io.Fonts, atlasFellBack))
++        return FailRendererInitialization(
++            14, "FloatingDamage overlay: renderer initialization failed while building the font atlas.");
++    if (atlasFellBack) {
++        FloatingFonts.fill(io.Fonts->Fonts[0]);
++        if (const auto logger = DiagnosticLogger.load(std::memory_order_acquire)) {
++            logger("FloatingDamage overlay: the font atlas could not be built with the configured fonts; ImGui's built-in font is used for every font index.");
++        }
++    }
+     if (!ImGui_ImplDX12_CreateDeviceObjects())
+         return FailRendererInitialization(
+             15, "FloatingDamage overlay: renderer initialization failed while creating ImGui device objects.");
+diff --git a/plugins/floating-damage/src/font_loading.hpp b/plugins/floating-damage/src/font_loading.hpp
+new file mode 100644
+index 0000000..0b0f79d
+--- /dev/null
++++ b/plugins/floating-damage/src/font_loading.hpp
+@@ -0,0 +1,74 @@
++#pragma once
++
++// D2R-XL 2012 addition (third_party/floating-damage-mxl2012 in the D2R-XL 2012 repository, MIT like this plugin):
++// loading the overlay's fonts without crashing when a Windows font is missing (Proton / Wine prefixes, trimmed Windows
++// installs).
++//
++// Dear ImGui 1.91.5 reports a font file it cannot open (ImFontAtlas::AddFontFromFileTTF) as a recoverable user error:
++// ErrorLog shows it in an error tooltip, which calls ImGui::Begin. The renderer loads its fonts right after creating its
++// ImGui context, outside any frame and before any font is built, so that Begin reads a null g.Font and the game's Present
++// fails with an access violation. A Proton prefix has no segoeui.ttf (index 0), so the first hooked Present crashed there.
++// AddFontFileIfPresent reads the file the same way but returns nullptr instead, and the caller's fallback (ImGui's
++// built-in font) takes over; it also refuses a file that does not start like a font (stb_truetype reads such data out of
++// bounds in a release build). BuildFontAtlasOrDefault builds the atlas before the backend uploads it; when Dear ImGui
++// cannot build it (a font file without the tables it needs), the atlas keeps ImGui's built-in font only.
++
++#include <imgui.h>
++#include <imgui_internal.h>
++
++#include <cstddef>
++#include <cstring>
++
++namespace FloatingDamageMxl {
++
++// The signatures stb_truetype accepts (stbtt__isfont: TrueType 1, Type 1, OpenType CFF, TrueType 1.0, Apple "true") and a
++// TrueType collection. AddFontFromMemoryTTF also wants more than 100 bytes.
++inline bool IsFontData(const unsigned char* data, std::size_t size) noexcept {
++    if (data == nullptr || size <= 100) return false;
++    const auto tag = [data](char a, char b, char c, char d) {
++        return data[0] == static_cast<unsigned char>(a) && data[1] == static_cast<unsigned char>(b)
++            && data[2] == static_cast<unsigned char>(c) && data[3] == static_cast<unsigned char>(d);
++    };
++    return tag('1', 0, 0, 0) || tag('t', 'y', 'p', '1') || tag('O', 'T', 'T', 'O') || tag(0, 1, 0, 0)
++        || tag('t', 'r', 'u', 'e') || tag('t', 't', 'c', 'f');
++}
++
++// ImFontAtlas::AddFontFromFileTTF without the user-error report: nullptr when the file cannot be read or is no font,
++// otherwise the same font from the same bytes (the atlas owns them; the font gets the file name and size as its name when
++// it has none).
++inline ImFont* AddFontFileIfPresent(
++        ImFontAtlas* atlas,
++        const char* path,
++        float sizePixels,
++        const ImFontConfig* configTemplate,
++        const ImWchar* glyphRanges) noexcept {
++    if (atlas == nullptr || path == nullptr || path[0] == '\0') return nullptr;
++    std::size_t size = 0;
++    void* const data = ImFileLoadToMemory(path, "rb", &size, 0);
++    if (data == nullptr) return nullptr;
++    if (!IsFontData(static_cast<const unsigned char*>(data), size)) {
++        IM_FREE(data);
++        return nullptr;
++    }
++    ImFontConfig config = configTemplate != nullptr ? *configTemplate : ImFontConfig();
++    if (config.Name[0] == '\0') {
++        const char* name = path + std::strlen(path);
++        while (name > path && name[-1] != '/' && name[-1] != '\\') --name;
++        ImFormatString(config.Name, IM_ARRAYSIZE(config.Name), "%s, %.0fpx", name, sizePixels);
++    }
++    return atlas->AddFontFromMemoryTTF(data, static_cast<int>(size), sizePixels, &config, glyphRanges);
++}
++
++// Builds the atlas now (what the backend's texture upload would do). When that fails, the atlas is cleared, gets ImGui's
++// built-in font and is built again; fellBack tells the caller that every font it added is gone. False only when even
++// the built-in font cannot be built.
++inline bool BuildFontAtlasOrDefault(ImFontAtlas* atlas, bool& fellBack) noexcept {
++    fellBack = false;
++    if (atlas == nullptr) return false;
++    if (atlas->Build()) return true;
++    fellBack = true;
++    atlas->Clear();
++    return atlas->AddFontDefault() != nullptr && atlas->Build();
++}
++
++} // namespace FloatingDamageMxl

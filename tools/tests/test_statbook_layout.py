@@ -73,6 +73,15 @@ class Pages(unittest.TestCase):
             self.skipTest("D2R's fonts not available (fxpaths.d2r_file)")
         self.assertEqual(L.fit_problems(BOOK, L.PC) + L.fit_problems(BOOK, L.PADG), [])
 
+    def test_same_measure_on_every_os(self):
+        # BASIC layout pinned: with raqm (Linux wheels) "Advanced" is 130.3 px at 18 pt and the side tabs fell to 17 pt
+        if L.font("", 18) is None:
+            self.skipTest("D2R's fonts not available (fxpaths.d2r_file)")
+        from PIL import ImageFont
+        self.assertEqual(L.font("", 18).layout_engine, ImageFont.Layout.BASIC)
+        self.assertEqual(L.text_w("Advanced", "", 18), 130.0)
+        self.assertEqual(L.tab_point_size([t for t, _ in L.tabs(BOOK)], L.SIDE), 18)
+
     def test_page_lines(self):
         sec, half, full = ["section", "Head"], ["row", "a", "1", "%d", "w", "h"], ["row", "b", "2", "%d", "w", ""]
         lines = L.page_lines([sec, half, half, half, full, sec, half])
@@ -121,6 +130,8 @@ class Plain(unittest.TestCase):
     own sprites, every name the host fills."""
 
     def test_header_is_current(self):
+        if L.font("Formal", 20) is None:  # the tab point size is measured with D2R's fonts (tab_point_size)
+            self.skipTest("D2R's fonts not available (fxpaths.d2r_file)")
         self.assertEqual(L.PLAIN_HEADER.read_text("utf-8"), L.plain_header_text(),
                          "statbook/src/statbook_plain_layout.h is out of date: py -3 -I tools/statbook_layout.py plain")
 
@@ -183,7 +194,7 @@ class Plain(unittest.TestCase):
                     self.assertIn(art, L.PLAIN_OWN_ART, w["name"])
                     self.assertIn(L._compact(w), rows, w["name"])
                 elif ui.is_dir():
-                    self.assertTrue((ui / (fn.replace("\\", "/") + ".sprite")).is_file(), fn)
+                    self.assertTrue(fxpaths.ci(ui / (fn.replace("\\", "/") + ".sprite")).is_file(), fn)  # D2R ignores case
         # the cell art is there: plain rows have their boxes as on the mod
         arts = {w["fields"]["filename"][len(L.ART):] for w in widgets(L.plain_side_layout(book)) if w.get("fields", {}).get("filename", "").startswith(L.ART)}
         self.assertLessEqual({"SideHalfCell", "SideFullCell", "SideAllCell", "SideRule", "SideAllRule"}, arts)

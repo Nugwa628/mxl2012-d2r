@@ -37,6 +37,14 @@ here unless --plugin is given) it writes into dist/:
                                    d2rloader/plugins/d2rl-ruffneckk-floating-damage.dll + licences, notices, font,
                                    d2rloader/config/ruffneckk-floating-damage.toml (Floating Damage by RuffnecKk at the
                                    pinned commit + our patches, tools/build_floatingdamage.ps1 unless --fd is given)
+                                   d2rloader/plugins/d2rl-celestialrayone-monster-display.dll + licence,
+                                   d2rloader/config/celestialrayone.monster-display.toml and its HD layouts and frames in
+                                   mxl2012.mpq/data (Monster Display 1.0.18 by CelestialRayOne, the author's files checked
+                                   by sha256: --md DIR or md_dir())
+                                   d2rloader/plugins/d2rl-ruffneckk-vendor-stock-refresh.dll + .mpq, licence, notices,
+                                   d2rloader/config/ruffneckk-vendor-stock-refresh.toml (Vendor Stock Refresh 2.1.7 by
+                                   RuffnecKk at the pinned commit, tools/build_vendorstockrefresh.ps1 unless --vsr is
+                                   given; the author's hub MPQ checked by sha256: --vsr-mpq DIR or vsr_mpq_dir())
                                  The manual download for players, and where tools/publish_release.py reads the file bytes
                                  from. There is no zip (owner decision 2026-10-26). Needs 7-Zip: the run stops without it.
   release-manifest.json          schemaVersion 2: version, required D2R build, required D2RLoader + sha256, every file of
@@ -51,7 +59,7 @@ files: D2R reads those from its own install). Without a baseline that check cann
 The release plugin is built by tools/build_plugin.ps1 -Release (CMake on PATH or Visual Studio's, the PluginSDK of
 .mxl-local.json; nothing is downloaded). tools/verify_package.py checks the finished 7z; tools/cut_alpha.ps1 runs it all.
 
-  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--drawcap DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--charminv DIR] [--dof DIR] [--ehb DLL] [--fd DLL] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
+  py -3 tools/package_release.py [--version 0.70.0] [--plugin DLL] [--drawcap DLL] [--legacy169 DLL] [--buffhud DLL] [--beltrefill DLL] [--controllerqol DLL] [--charminv DIR] [--dof DIR] [--ehb DLL] [--fd DLL] [--md DIR] [--vsr DLL] [--vsr-mpq DIR] [--data-from DIR] [--game DIR] [--out dist] [--notes MD]
   py -3 tools/package_release.py --no-data --plugin build/mxl2012-core.dll   (CI: no game files there; plugin + config only)
 Version: PluginVersion of plugin/src/mxl2012_core.cpp; --version must equal it (only --no-data builds may differ).
 """
@@ -188,6 +196,32 @@ DOF = {"name": "Damage Overflow Fix", "version": "2.4.0", "author": "CelestialRa
        "sha256": "cfc95e328230c86d4659f04d223552afd90f3fd4990f3fd62c48e9770f144a58", "size": 111616}
 DOF_OURS = ROOT / "third_party" / "damage-overflow-fix"  # README, LICENSE, our config (and a git-ignored local copy of the DLL)
 DOF_FILES = ("dll", "licence", "config")
+# Monster Display by CelestialRayOne (Bogdan Bulai), MIT, docs/bundled-plugins.md and third_party/monster-display/README.md:
+# the author's release DLL and its HD files (release/MonsterDisplay: three hudmonsterhealthhd layouts and the frame sprites)
+# as committed at the pinned commit, checked by sha256, not in git; md_dir() finds the release folder. The layouts and
+# sprites go into mxl2012.mpq/data where the author's Readme puts them. Its MIT licence goes next to the DLL, and its
+# config (the author's default, unchanged) is a `preserve` file, as legacy169's.
+MD = {"name": "Monster Display", "version": "1.0.18", "author": "CelestialRayOne (Bogdan Bulai)",
+      "repo": DOF["repo"], "commit": DOF["commit"], "path": "release/d2rl-celestialrayone-monster-display.dll",
+      "dll": "d2rloader/plugins/d2rl-celestialrayone-monster-display.dll",
+      "licence": "d2rloader/plugins/d2rl-celestialrayone-monster-display-license.txt",
+      "config": "d2rloader/config/celestialrayone.monster-display.toml",
+      "sha256": "bc5fa7d7ed6468981f8c165b8c3bdde49e475f68a8371d93e2f2eba3b566eaed", "size": 119296,
+      # sha256 of the "<sha256>  <path>" lines (sorted, LF) of release/MonsterDisplay's .json and .sprite files
+      "data_sha256": "afcf2de29d6edb09667efa59f36a0acfc3769715a481079bc3d09bea37f5a264"}
+MD_OURS = ROOT / "third_party" / "monster-display"  # README, LICENSE, the config
+MD_FILES = ("dll", "licence", "config")
+MD_LAYOUTS = {"hudmonsterhealthhd_pc.json": "global/ui/layouts/hudmonsterhealthhd.json",
+              "hudmonsterhealthhd_controller.json": "global/ui/layouts/controller/hudmonsterhealthhd.json",
+              "hudmonsterhealthhd_controller_pc.json": "global/ui/layouts/controller/pc/hudmonsterhealthhd.json"}
+# Median's monumod.txt 36-39 (ghostly, fanatic, possessed, berserk): xfer 1, so they reach minions, where Monster
+# Display must leave them out (our config adds them to the author's minion_hidden_affixes).
+MD_MINION_HIDDEN = ("36", "37", "38", "39")
+MD_FRAMES = "hd/global/ui/panel/monsterdisplayframes"  # the folder the layouts name (PANEL/MonsterDisplayFrames/...)
+MD_SPRITES = tuple(f"{part}{low}.sprite" for part in
+                   ("boss_left", "boss_mid", "boss_right", "normal_left", "normal_mid", "normal_right",
+                    "resist_bar_center", "resist_bar_left", "resist_bar_mid", "resist_bar_right",
+                    "unique_left", "unique_mid", "unique_right", "unique_skull") for low in ("", ".lowend"))
 # Enemy Health Bars by Graxy_TV, GPL-3.0-only, docs/bundled-plugins.md and third_party/enemy-health-bars-mxl2012/README.md:
 # built from the author's source (the source zip inside the release zip of the pinned commit) with our patches
 # (tools/build_enemyhealthbars.ps1, which records them in build/enemyhealthbars-src/EnemyHealthBars/PATCHES). The GPL wants
@@ -218,6 +252,27 @@ FD = {"name": "Floating Damage", "version": "1.5.6", "author": "RuffnecKk",
       "font": "d2rloader/plugins/ruffneckk-floating-damage-font.ttf",
       "font_licence": "d2rloader/plugins/ruffneckk-floating-damage-font-license.txt",
       "config": "d2rloader/config/ruffneckk-floating-damage.toml"}
+# Vendor Stock Refresh by RuffnecKk, MIT, docs/bundled-plugins.md and third_party/vendor-stock-refresh/README.md: built
+# unchanged from the gitlink third_party/RuffnecKk-D2RLoader-Suite (the commit Floating Damage comes from) by
+# tools/build_vendorstockrefresh.ps1. Its companion MPQ (the button art) is not in the author's repository: it is the file
+# of the author's hub release of the same version, checked by sha256 (the hash the source itself checks,
+# src/companion_hash.hpp), not in git; vsr_mpq_dir() finds it. Next to them: the suite's MIT licence and one third-party
+# file, as Floating Damage's. Its config (the author's) is a `preserve` file.
+VSR = {"name": "Vendor Stock Refresh", "version": "2.1.7", "author": "RuffnecKk",
+       "repo": "https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite", "path": "plugins/vendor-stock-refresh",
+       "hub": "https://d2rloader.net/hub/plugins/vendor-stock-refresh",
+       "dll": "d2rloader/plugins/d2rl-ruffneckk-vendor-stock-refresh.dll",
+       "mpq": "d2rloader/plugins/d2rl-ruffneckk-vendor-stock-refresh.mpq",
+       "licence": "d2rloader/plugins/d2rl-ruffneckk-vendor-stock-refresh-license.txt",
+       "notices": "d2rloader/plugins/d2rl-ruffneckk-vendor-stock-refresh-third-party.txt",
+       "config": "d2rloader/config/ruffneckk-vendor-stock-refresh.toml",
+       "mpq_sha256": "0014c677e24979275307fd2194b4d6c31167a46ab8eb9c0f005b6a8cddedc5f6", "mpq_size": 5651640}
+VSR_BUILD = ROOT / "build" / "vendorstockrefresh"
+VSR_SRC = ROOT / "build" / "vendorstockrefresh-src"
+VSR_OURS = ROOT / "third_party" / "vendor-stock-refresh"  # README (and a git-ignored local copy of the MPQ)
+VSR_FILES = ("dll", "mpq", "licence", "notices", "config")
+VSR_FROM = {"dll": "d2rl-ruffneckk-vendor-stock-refresh.dll", "licence": "LICENSE-vendor-stock-refresh.txt",
+            "config": "ruffneckk-vendor-stock-refresh.toml"}  # in build/vendorstockrefresh/Release
 FD_BUILD = ROOT / "build" / "floatingdamage"
 FD_SRC = ROOT / "build" / "floatingdamage-src"
 FD_OURS = ROOT / "third_party" / "floating-damage-mxl2012"  # the patches, our tests, the font
@@ -518,6 +573,118 @@ def dof_config_problems(text: str) -> list:
     return [f"{DOF['config']}: {k} must be {v}" for k, v in want.items() if got.get(k) != v]
 
 
+def md_data(folder: Path) -> dict:
+    """Monster Display's HD files in a release folder (`folder`/MonsterDisplay/...) -> their paths in mxl2012.mpq/data."""
+    src = folder / "MonsterDisplay"
+    out = {src / name: rel for name, rel in MD_LAYOUTS.items()}
+    out.update({src / "monsterdisplayframes" / s: f"{MD_FRAMES}/{s}" for s in MD_SPRITES})
+    return out
+
+
+def md_package_paths() -> list:
+    """Every file Monster Display adds to the package (its DLL, licence, config and HD files)."""
+    return [MD[k] for k in MD_FILES] + [f"{NAME}.mpq/data/{rel}" for rel in md_data(Path(".")).values()]
+
+
+def md_data_digest(folder: Path) -> str:
+    """MD["data_sha256"] of a release folder: sha256 of its MonsterDisplay .json and .sprite files' "<sha256>  <path>"
+    lines, sorted."""
+    src = folder / "MonsterDisplay"
+    files = sorted(p for p in src.rglob("*") if p.is_file() and p.suffix in (".json", ".sprite"))
+    lines = "".join(f"{sha256(p)}  {p.relative_to(src).as_posix()}\n" for p in files)
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
+
+
+def md_dir(given: Path = None) -> Path:
+    """The folder with Monster Display's DLL and its MonsterDisplay/ files (the author's release/ folder): `given` (--md)
+    as it is, else MXL_MD_DIR, else <MXL2012_RUNS>/shared/monster-display-<version>. None when none of them has it."""
+    if given is not None:
+        return given
+    name = Path(MD["dll"]).name
+    env = os.environ.get("MXL_MD_DIR")
+    for d in (Path(env) if env else None, fxpaths.localconfig.shared_dir() / f"monster-display-{MD['version']}"):
+        if d is not None and (d / name).is_file() and (d / "MonsterDisplay").is_dir():
+            return d
+    return None
+
+
+def check_md(folder: Path) -> list:
+    """Problems of Monster Display in `folder` (the author's release folder): the pinned DLL and the pinned HD files."""
+    f = folder / Path(MD["dll"]).name
+    if not f.is_file():
+        return [f"no {f.name} in {folder}"]
+    if f.stat().st_size != MD["size"] or sha256(f) != MD["sha256"]:
+        return [f"{f} is not Monster Display {MD['version']} (sha256 {sha256(f)[:16]}..., want {MD['sha256'][:16]}...)"]
+    missing = [p.name for p in md_data(folder) if not p.is_file()]
+    if missing:
+        return [f"{folder / 'MonsterDisplay'} lacks " + ", ".join(missing)]
+    if md_data_digest(folder) != MD["data_sha256"]:
+        return [f"{folder / 'MonsterDisplay'} is not Monster Display {MD['version']}'s (its .json / .sprite files differ)"]
+    return []
+
+
+def md_config_problems(text: str) -> list:
+    """The package's Monster Display config: on, resistances as the hovering player's hits meet them, and Median's
+    minion affixes 36-39 (ghostly, fanatic, possessed, berserk) hidden on minions."""
+    values = toml_values(text)
+    want = {"enabled": "true", "resistances.mode": '"effective"'}
+    problems = [f"{MD['config']}: {k} must be {v}" for k, v in want.items() if values.get(k) != v]
+    hidden = values.get("text.minion_hidden_affixes", "").strip("[]").replace(" ", "").split(",")
+    missing = [i for i in MD_MINION_HIDDEN if i not in hidden]
+    if missing:
+        problems.append(f"{MD['config']}: minion_hidden_affixes must hold {', '.join(missing)}")
+    return problems
+
+
+def vsr_mpq_dir(given: Path = None) -> Path:
+    """The folder with Vendor Stock Refresh's companion MPQ: `given` (--vsr-mpq) as it is, else MXL_VSR_MPQ_DIR, else
+    third_party/vendor-stock-refresh when it holds it, else <MXL2012_RUNS>/shared/vendor-stock-refresh-<version>."""
+    if given is not None:
+        return given
+    name = Path(VSR["mpq"]).name
+    env = os.environ.get("MXL_VSR_MPQ_DIR")
+    for d in (Path(env) if env else None, VSR_OURS,
+              fxpaths.localconfig.shared_dir() / f"vendor-stock-refresh-{VSR['version']}"):
+        if d is not None and (d / name).is_file():
+            return d
+    return None
+
+
+def check_vsr_mpq(folder: Path) -> list:
+    f = folder / Path(VSR["mpq"]).name
+    if not f.is_file():
+        return [f"no {f.name} in {folder}"]
+    if f.stat().st_size != VSR["mpq_size"] or sha256(f) != VSR["mpq_sha256"]:
+        return [f"{f} is not Vendor Stock Refresh {VSR['version']}'s companion MPQ (sha256 {sha256(f)[:16]}..., want "
+                f"{VSR['mpq_sha256'][:16]}...)"]
+    return []
+
+
+def vsr_config_problems(text: str) -> list:
+    """The package's Vendor Stock Refresh config: on, and no diagnostics log."""
+    values = toml_values(text)
+    want = {"plugin.enabled": "true", "diagnostics.enabled": "false"}
+    return [f"{VSR['config']}: [{k.split('.')[0]}] {k.split('.')[1]} must be {v}" for k, v in want.items()
+            if values.get(k) != v]
+
+
+def build_vsr() -> Path:
+    """tools/build_vendorstockrefresh.ps1: d2rl-ruffneckk-vendor-stock-refresh.dll from the pinned commit."""
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if not pwsh:
+        raise SystemExit("no PowerShell to run tools/build_vendorstockrefresh.ps1: build it there and pass --vsr DLL")
+    subprocess.check_call([pwsh, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                           str(ROOT / "tools" / "build_vendorstockrefresh.ps1")], cwd=ROOT)
+    return VSR_BUILD / "Release" / VSR_FROM["dll"]
+
+
+def check_vsr(dll: Path) -> list:
+    """Problems of a Vendor Stock Refresh DLL: the author's version."""
+    if f"VendorStockRefresh {VSR['version']} by RuffnecKk".encode() not in dll.read_bytes():
+        return [f"{dll} is not Vendor Stock Refresh {VSR['version']}: build it with tools/build_vendorstockrefresh.ps1"]
+    return []
+
+
 def toml_values(text: str) -> dict:
     """"section.key" -> value (the raw text, comments cut) of a flat TOML file."""
     out, section = {}, ""
@@ -708,7 +875,8 @@ def sha256(path: Path) -> str:
 def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = None, no_data: bool = False,
           legacy169: Path = None, buffhud: Path = None, beltrefill: Path = None, controllerqol: Path = None,
           profile: Path = None, drawcap: Path = None, charminv: Path = None, invtabs: Path = None,
-          statbook: Path = None, dof: Path = None, ehb: Path = None, fd: Path = None) -> None:
+          statbook: Path = None, dof: Path = None, ehb: Path = None, fd: Path = None, md: Path = None,
+          vsr: Path = None, vsr_mpq: Path = None) -> None:
     if invtabs is not None and charminv is not None:
         raise SystemExit("invtabs and CharmInv cannot be staged together")
     if data_from is not None:
@@ -743,6 +911,10 @@ def stage(mod: Path, version: str, plugin: Path, game: Path, data_from: Path = N
         stage_ehb(mod, ehb)
     if fd is not None:
         stage_fd(mod, fd)
+    if md is not None:
+        stage_md(mod, md)
+    if vsr is not None:
+        stage_vsr(mod, vsr, vsr_mpq)
     # the data must be built for the charm inventory the package ships (tools/build.py --charm-inventory): invtabs' files and
     # classic Charms button only with invtabs, CharmInv's tables never with it
     wrong = [] if no_data else charm_inventory.data_problems(data, "invtabs" if invtabs is not None else "charminv")
@@ -869,15 +1041,61 @@ def stage_dof(mod: Path, folder: Path, ours: Path = DOF_OURS) -> None:
         shutil.copy2(source, mod / DOF[k])
 
 
+def stage_md(mod: Path, folder: Path, ours: Path = MD_OURS) -> None:
+    """Monster Display's DLL (the author's bytes, checked) and its MIT licence into d2rloader/plugins/ (mod-scoped), its
+    config into d2rloader/config/, and its layouts and frame sprites into mxl2012.mpq/data. The mod's own data must not
+    hold any of those files: the plugin's layouts replace the game's whole hover panel."""
+    problems = check_md(folder) + md_config_problems((ours / Path(MD["config"]).name).read_text("utf-8"))
+    data = mod / f"{NAME}.mpq" / "data"
+    problems += [f"{NAME}.mpq/data/{rel} is already in the mod's data" for rel in md_data(folder).values()
+                 if (data / rel).exists()]
+    if problems:
+        raise SystemExit("; ".join(problems))
+    for k, source in (("dll", folder / Path(MD["dll"]).name), ("licence", ours / "LICENSE"),
+                      ("config", ours / Path(MD["config"]).name)):
+        (mod / MD[k]).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, mod / MD[k])
+    for source, rel in md_data(folder).items():
+        (data / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, data / rel)
+
+
+def stage_vsr(mod: Path, dll: Path, mpq_dir: Path, src: Path = VSR_SRC) -> None:
+    """Vendor Stock Refresh's DLL, companion MPQ (checked), licence and third-party notices into d2rloader/plugins/
+    (mod-scoped) and its config into d2rloader/config/. The build must come from the pinned commit
+    (tools/build_vendorstockrefresh.ps1 records it in build/vendorstockrefresh-src)."""
+    pinned = (src / "PINNED_COMMIT").read_text("ascii").strip() if (src / "PINNED_COMMIT").is_file() else ""
+    if pinned != fd_commit():
+        raise SystemExit(f"{src} is not the pinned commit {fd_commit()[:9]} (it is {pinned}): run "
+                         "tools/build_vendorstockrefresh.ps1")
+    problems = check_vsr(dll) + check_vsr_mpq(mpq_dir)
+    cfg = dll.parent / VSR_FROM["config"]
+    problems += vsr_config_problems(cfg.read_text("utf-8")) if cfg.is_file() else [f"no {cfg}"]
+    if problems:
+        raise SystemExit("; ".join(problems))
+    for k in VSR_FILES:
+        target = mod / VSR[k]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if k == "notices":
+            target.write_text(fd_notices(src), encoding="utf-8", newline="\n")
+            continue
+        source = mpq_dir / Path(VSR["mpq"]).name if k == "mpq" else dll if k == "dll" else dll.parent / VSR_FROM[k]
+        if not source.is_file():
+            raise SystemExit(f"no {source} (Vendor Stock Refresh {k}): run tools/build_vendorstockrefresh.ps1")
+        shutil.copy2(source, target)
+
+
 def preserve_list(mod: Path) -> list:
     """PRESERVE plus the bundled plugins' configs the package holds."""
     return PRESERVE + [c for c in (DRAWCAP["config"], STATBOOK["config"], INVTABS["config"], LEGACY169["config"], BUFFHUD["config"], BELTREFILL["config"], CONTROLLERQOL["config"],
-                                   CHARMINV["config"], DOF["config"], EHB["config"], FD["config"])
+                                   CHARMINV["config"], DOF["config"], EHB["config"], FD["config"],
+                                   MD["config"], VSR["config"])
                        if (mod / c).is_file()]
 
 
 def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, controllerqol: bool = False,
-                    charminv: bool = False, dof: bool = False, ehb: bool = False, fd: bool = False) -> list:
+                    charminv: bool = False, dof: bool = False, ehb: bool = False, fd: bool = False,
+                    md: bool = False, vsr: bool = False) -> list:
     """The manifest's bundledPlugins: name, version, repository, source commit and files of each plugin the package holds."""
     out = []
     if legacy169:
@@ -911,6 +1129,14 @@ def bundled_plugins(legacy169: bool, buffhud: bool, beltrefill: bool = False, co
         out.append({"name": FD["name"], "version": FD["version"], "repo": FD["repo"], "path": FD["path"],
                     "author": FD["author"], "commit": fd_commit(), "patches": fd_patches(),
                     "files": [FD[k] for k in FD_FILES]})
+    if md:
+        out.append({"name": MD["name"], "version": MD["version"], "repo": MD["repo"], "path": MD["path"],
+                    "author": MD["author"], "commit": MD["commit"], "sha256": MD["sha256"],
+                    "files": md_package_paths()})
+    if vsr:
+        out.append({"name": VSR["name"], "version": VSR["version"], "repo": VSR["repo"], "path": VSR["path"],
+                    "author": VSR["author"], "commit": fd_commit(), "hub": VSR["hub"],
+                    "mpqSha256": VSR["mpq_sha256"], "files": [VSR[k] for k in VSR_FILES]})
     return out
 
 
@@ -980,6 +1206,12 @@ def fix_mtimes(mod: Path) -> None:
     t = time.mktime(STAMP + (0, 0, -1))
     for p in [mod, *mod.rglob("*")]:
         os.utime(p, (t, t))
+    if os.name != "nt":
+        # 7-Zip on Linux stores the Unix mode of every entry, so the umask would change the archive's bytes: files 0644
+        # and folders 0755, the modes tools/dl_ingest.py rebuilds the server's copy with (Windows has no such bits)
+        for p in [mod, *mod.rglob("*")]:
+            if not p.is_symlink():
+                os.chmod(p, 0o755 if p.is_dir() else 0o644)
 
 
 def write_7z(mod: Path, out: Path, sevenzip=None) -> None:
@@ -1125,8 +1357,17 @@ def main() -> int:
     ap.add_argument("--fd", type=Path, help="a release d2rl-ruffneckk-floating-damage.dll of the pinned commit with our patches, "
                     "its licences, font and config next to it (default: build it with tools/build_floatingdamage.ps1; "
                     "--no-data builds leave it out unless given)")
+    ap.add_argument("--md", type=Path, help="the author's release folder of Monster Display: its "
+                    "d2rl-celestialrayone-monster-display.dll and MonsterDisplay/ (checked by sha256; default: md_dir(); "
+                    "--no-data builds leave it out)")
+    ap.add_argument("--vsr", type=Path, help="a release d2rl-ruffneckk-vendor-stock-refresh.dll of the pinned commit, its "
+                    "licence and config next to it (default: build it with tools/build_vendorstockrefresh.ps1; --no-data "
+                    "builds leave it out unless given)")
+    ap.add_argument("--vsr-mpq", type=Path, help="a folder holding Vendor Stock Refresh's companion "
+                    "d2rl-ruffneckk-vendor-stock-refresh.mpq (checked by sha256; default: vsr_mpq_dir())")
     ap.add_argument("--no-bundled", action="store_true", help="leave out legacy169, Buff HUD, Auto Belt Refill, Controller "
-                    "QOL, CharmInv, Damage Overflow Fix, Enemy Health Bars and Floating Damage unless given "
+                    "QOL, CharmInv, Damage Overflow Fix, Enemy Health Bars, Floating Damage, Monster Display and Vendor "
+                    "Stock Refresh unless given "
                     "(unit tests; "
                     "tools/verify_package.py refuses such a package)")
     ap.add_argument("--data-from", type=Path, help="copy this finished mxl2012.mpq/data instead of building it")
@@ -1233,6 +1474,20 @@ def main() -> int:
     fd = a.fd or (None if a.no_data or a.no_bundled else build_fd())
     if fd is not None:
         problems += check_fd(fd) if fd.is_file() else [f"no d2rl-ruffneckk-floating-damage.dll at {fd}"]
+    # Monster Display's files go into the data, so a package without data has none of it
+    md = None if a.no_data else (md_dir(a.md) if a.md or not a.no_bundled else None)
+    if not (a.no_data or a.no_bundled) and md is None:
+        problems.append("Monster Display's release folder not found: pass --md DIR (third_party/monster-display/README.md)")
+    if md is not None:
+        problems += check_md(md)
+    vsr = a.vsr or (None if a.no_data or a.no_bundled else build_vsr())
+    vsr_mpq = None
+    if vsr is not None:
+        problems += check_vsr(vsr) if vsr.is_file() else [f"no d2rl-ruffneckk-vendor-stock-refresh.dll at {vsr}"]
+        vsr_mpq = vsr_mpq_dir(a.vsr_mpq)
+        problems += (check_vsr_mpq(vsr_mpq) if vsr_mpq is not None else
+                     ["Vendor Stock Refresh's companion MPQ not found: pass --vsr-mpq DIR "
+                      "(third_party/vendor-stock-refresh/README.md)"])
     if problems:
         print("\n".join(problems))
         return 1
@@ -1240,7 +1495,7 @@ def main() -> int:
     a.out.mkdir(parents=True, exist_ok=True)
     mod = a.out / "stage" / NAME
     stage(mod, version, plugin, a.game, a.data_from, a.no_data, legacy169, buffhud, beltrefill, controllerqol, profile, drawcap, charminv, a.invtabs,
-          statbook, dof, ehb, fd)
+          statbook, dof, ehb, fd, md, vsr, vsr_mpq)
     dropped = drop_blizzard_copies(mod)
     if dropped:
         print(f"left out {dropped} files that are byte copies of D2R's own (extract/d2r/{install_mod.D2R_BUILD})")
@@ -1267,7 +1522,8 @@ def main() -> int:
     files = file_list(mod)
     man_path = a.out / "release-manifest.json"
     bundled = bundled_plugins(legacy169 is not None, buffhud is not None, beltrefill is not None, controllerqol is not None,
-                              charminv is not None, dof is not None, ehb is not None, fd is not None)
+                              charminv is not None, dof is not None, ehb is not None, fd is not None,
+                              md is not None, vsr is not None)
     if a.invtabs is not None:
         bundled.append(invtabs_entry())
     man = manifest(version, files, seven_path, not a.no_data, empty_dirs(mod), preserve_list(mod), bundled)

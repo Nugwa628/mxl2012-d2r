@@ -116,6 +116,21 @@ Authors, <https://github.com/NDISCOVER/Cinzel>), unmodified, under the SIL Open 
 (`ruffneckk-floating-damage-font-license.txt`). It is credited to RuffnecKk in the README, the release notes and
 docs/bundled-plugins.md.
 
+The release package also ships **Monster Display** 1.0.18 by CelestialRayOne (Bogdan Bulai)
+(<https://github.com/CelestialRayOne/d2rloader_plugins>, `plugins/monster-display`, commit `9240725`, MIT, "Copyright (c)
+2026 Bogdan Bulai"): the author's release DLL and its HD layouts and frame sprites from that commit, unchanged and not kept in
+this repository (pinned by SHA-256, `third_party/monster-display/README.md`). The DLL and its licence text are in
+`mods\mxl2012\d2rloader\plugins\`, the layouts and sprites in `mods\mxl2012\mxl2012.mpq\data\`. It is credited to the
+author in the README, the release notes and docs/bundled-plugins.md.
+
+The release package also ships **Vendor Stock Refresh** 2.1.7 by RuffnecKk
+(<https://github.com/RuffDood/RuffnecKk-D2RLoader-Suite>, `plugins/vendor-stock-refresh`, MIT, "Copyright (c) 2026 RuffnecKk
+and contributors"). It is built unchanged from the author's source (the submodule `third_party/RuffnecKk-D2RLoader-Suite`,
+the commit Floating Damage comes from). Its companion MPQ (the button art) is the file of the author's hub release 2.1.7
+(<https://d2rloader.net/hub/plugins/vendor-stock-refresh>), pinned by SHA-256 (`third_party/vendor-stock-refresh/README.md`).
+The suite's licence and third-party notices are next to the DLL in `mods\mxl2012\d2rloader\plugins\`. It is credited to
+RuffnecKk in the README, the release notes and docs/bundled-plugins.md.
+
 **invtabs** (`invtabs/`, the inventory tabs plugin; in the package when `CHARM_INVENTORY = "invtabs"` in
 `tools/charm_inventory.py`, the default, instead of CharmInv) is built from wild-healer's Player Page Host 1.0.2
 and Wild Healer's Charm Inventory (<https://github.com/wild-healer/D2R-Tools>, commit `6722cc5`,

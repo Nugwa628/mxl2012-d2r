@@ -9,7 +9,8 @@ the same file for the PluginSDK folder.
 
   MXL_D2R_EXTRACT        D2R 93847's extraction (tools/casc_extract.py output: data/global/excel/{,base/}*.txt, filelist.txt)
   MXL_D2R_CACHE          the shared read-only cache of D2R files the extraction lacks (fxpaths.d2r_file)
-  MXL_NATIVE_DIR         folder holding StormLib/Release/StormLib.dll and CascLib/Release/CascLib.dll (tools/native.py)
+  MXL_NATIVE_DIR         folder holding StormLib/Release/StormLib.dll and CascLib/Release/CascLib.dll (tools/native.py);
+                         on Linux StormLib/libstorm.so and CascLib/libcasc.so (docs/setup.md, "Linux")
   MXL2012_PLUGINSDK_DIR  the D2RLoader PluginSDK source (tools/build_plugin.ps1)
   MXL2012_SRC            Median XL 2012's extracted data/global/excel (tools/build.py)
   MXL2012_RUNS           the runs folder (default: mxl2012-runs beside the main checkout / two levels above a lane worktree)
@@ -31,6 +32,7 @@ The slot tools refuse to run while a SLOT_SAFETY_KEYS key is missing (require_ma
 """
 import json
 import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -181,10 +183,24 @@ def require_d2r_extract(path: Path, tool: str = "tool") -> Path:
                          f"Looked in:\n  {tried}\nSet MXL_D2R_EXTRACT or {SETUP_HINT}")
     return Path(path)
 
-def native_dll_candidates(name: str) -> list[Path]:
-    """Where tools/native.py looks for <name>.dll (StormLib, CascLib): this checkout's build/, then the shared build."""
+# the library file each native build makes: the MSVC build (tools/build_native.ps1) on Windows, the CMake shared library
+# (lib<name>.so, cmake -DBUILD_SHARED_LIBS / StormLib's -DSTORM_USE_BUNDLED_LIBRARIES=ON) elsewhere
+NATIVE_SO_NAMES = {"StormLib": "libstorm.so", "CascLib": "libcasc.so"}
+
+
+def native_dll_relpath(name: str, platform: str | None = None) -> Path:
+    """<name>'s library inside a build folder: <name>/Release/<name>.dll on Windows, <name>/lib<x>.so elsewhere."""
+    platform = sys.platform if platform is None else platform
+    if platform == "win32":
+        return Path(name) / "Release" / f"{name}.dll"
+    return Path(name) / NATIVE_SO_NAMES.get(name, f"lib{name.lower()}.so")
+
+
+def native_dll_candidates(name: str, platform: str | None = None) -> list[Path]:
+    """Where tools/native.py looks for <name>'s library (StormLib, CascLib): this checkout's build/, then the shared build."""
     shared = Path(os.environ["MXL_NATIVE_DIR"]) if os.environ.get("MXL_NATIVE_DIR") else shared_dir() / "native" / "build"
-    return [ROOT / "build" / name / "Release" / f"{name}.dll", shared / name / "Release" / f"{name}.dll"]
+    rel = native_dll_relpath(name, platform)
+    return [ROOT / "build" / rel, shared / rel]
 
 
 def find_native_dll(name: str) -> Path:
@@ -192,6 +208,6 @@ def find_native_dll(name: str) -> Path:
         if p.exists():
             return p
     looked = "; ".join(str(p) for p in native_dll_candidates(name))
-    raise FileNotFoundError(f"{name}.dll not found (looked in {looked}); {SETUP_HINT}")
+    raise FileNotFoundError(f"{name} library not found (looked in {looked}); {SETUP_HINT}")
 
 apply()

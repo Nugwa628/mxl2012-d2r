@@ -8120,6 +8120,46 @@ Page 1 tight (owner, 2026-11-17; slot 2, after the merge of ff094a7 and a full t
   hovers the first cell at its new place (y 117): the charm's tooltip shows, so the grid widget matches the art. Page 2,
   the wrapping and HD are as before.
 
+## Lane plug127: Monster Display, Vendor Stock Refresh (2026-11-18, slot 4, HD and legacy, background input)
+
+Runner and logs in `mxl2012-runs/plug127/` (`run_plug127.py`, `run*.out`): `MXL_SLOT=4 MXL_RUN=plug127 MXL_CHAR=Plug127b
+VSR_CFG=<runs>/plug127/vsr-diag.toml py -3 <runs>/plug127/run_plug127.py`. The runner places Monster Display (the author's
+release DLL, layouts and frames), Vendor Stock Refresh (this lane's build and the hub MPQ, diagnostics on) and the 0.1.26
+bundled plugin set after the slot lock, and removes every file the run created before it is released. Monsters are spawned in
+the Rogue Encampment (`spawn`) and their resistances set with `stat`: a Fallen at fire 100, lightning −20, cold 50, poison 75,
+magic 10, physical 30, and a Median normal (class 160) at fire 50; Andariel and Uber Izual as they are.
+
+| Check | Run | Result |
+|-|-|-|
+| Both load next to the bundled set | `checks-20261118-234817-s4` | PASS: both `[mod]`, `MonsterDisplay 1.0.18 active`, `VendorStockRefresh 2.1.7 ... active`, mxl2012-core `plugin clashes: none`, 12 plugins |
+| MD HD panel | same run | PASS: `md_hd_fallen.png` life 65 / 65 (100 %), "Level 3 Demon", resist row 100 −20 50 75 10 30, "Immune to Fire"; `md_hd_andariel.png` the double-width boss bar; `md_hd_uberizual.png` 1958490 life, Level 110, Extra Fast and Cold Enchanted, cold 175 and no immunity line (the game's own rule for classes 704–709) |
+| MD −enemy resistance | same run | PASS: player stat 333 (−enemy fire) 25: `md_hd_median160_pierce25.png` fire 50 → 25; `md_hd_fallen_pierce25.png` fire 100 stays 100 and immune, as the damage code does |
+| MD legacy | same run | PASS: `md_legacy_*.png` the classic hover text, unchanged |
+| VSR HD button | same run | PASS: `vsr_charsi_open.png` the refresh button under the gold (Charsi, Akara, Gheed's gamble screen) |
+| VSR refresh (the plugin's packet 0x38 `VSRF`) | `checks-20261118-233053-s4`, `checks-20261118-234817-s4` | PASS: Charsi 28 → 31 items with 14 kept, 31 → 43 with 15 kept; 33 → 36 with 16 kept (`vsr_charsi_legacy_pkt1.png`); log `normal refresh armed` |
+| VSR refresh by a click on the button | same run | NOT SHOWN: a background click (`game_ctl` virtual cursor) reaches neither this button nor D2R's own gamble refresh (no `client normal refresh sent` line, stock unchanged). Needs a real mouse click |
+| VSR legacy | same run | Legacy panel without a button; log `dynamic placement failed (gold anchor was not found)` once per opening |
+
+MD with our config (`minion_hidden_affixes` plus Median's 36–39), 2026-11-19, slot 4: for the test only, superunique row 0
+(Snotspill, Cold Plains) got mods 6 36 37 (run A) and 38 39 7 (run B) in the slot's `superuniques.txt`; the file was backed
+up first and put back byte for byte after each run (also on failure). The runner finds the boss by walking the level's
+rooms, hovers three minions, kills them, then hovers the boss alone.
+
+| Check | Run | Result |
+|-|-|-|
+| Config read | `checks-20261119-012737-s4` | PASS: `MonsterDisplay 1.0.18 active`, no config problem line (ids up to 44 are accepted) |
+| Mods 6 36 37 | same run | PASS: boss `md_minions_snotspill_a_boss0_id55.png` "Snotspill", 1488 life, "Extra Fast" and resist 80 (the mods are on it); minions `..._minion*.png` "Fallen One", "Extra Fast" only |
+| Mods 38 39 7 | `checks-20261119-013126-s4` | PASS: boss "Snotspill", 744 life, "Cursed"; minions "Cursed" only |
+| Names of 36–39 | both runs | The boss, which shows every affix the game names, shows none of 36–39: they are the game's champion types and its affix name builder (`0x1DFAE0`) has no name for them. So the setting changes nothing visible today; it keeps them off minions if a later build names them |
+
+- Native tests: the author's VSR policy, panel layout and compact layout tests, run by `tools/build_vendorstockrefresh.ps1`.
+- Packaging tests: `tools/test_package_release.py` (MD and VSR pins, staging, manifest entries, refusal of other bytes,
+  configs and a layout of the mod's own) and `tools/test_verify_package.py` (the fixture stages both).
+- Both runs wrote one D2RLoader last-resort report (a first-chance access violation, the same module offset as a report of
+  2026-11-15 from before these plugins; the game kept running) and the game's object pool asserts at exit, as in lane plug125.
+- Run 1 (`checks-20261118-233053-s4`) was cut by the lane's own 590 s timeout while walking to Akara; its placed files were
+  removed by hand under the slot lock. Later runs spawn the vendors next to the player.
+
 ## Lane signpath: downloader ready for SignPath Foundation code signing (2026-11-17, no game slot)
 
 Static and downloader-only work; no game was started.
@@ -8272,3 +8312,308 @@ restored after. Driver `mxl2012-runs/rel0126/smoke/` (`smoke.sh`, `relchecks.py`
 Asserts: only the known exit pool asserts (`s_StatsPool.IsEmpty()`, `m_allocated == 0` and the other object-pool ones).
 Sheets: `mxl2012-runs/rel0126/shots/` (`lob_hd.png`, `lob_hd_early.png`, `lob_legacy.png`, `bionetic.png`,
 `maps_reload.png`, `reload_asn_hd.png`).
+
+## Lane maplight-offmaps: the four edited D2R maps on the classic list (2026-11-18, slot 5, HD, background input)
+
+Hole Level 2 (`caveroom4`), The Proving Grounds (`dungrm6a`) and Azmodan's Reliquary (`temple5`, `temple6`) added to
+`tools/data/sprite_classic.json` (docs/maps-hd.md "Classic maps", "The four edited D2R maps").
+
+- Build: a full build of this branch under the host build lock (81.6 min, with the one walls-cache miss caused by the
+  `tools/sprite_scene.py` change), compared file by file (sha256) with the 12-map build of `lane/ship-maplight` (c328827).
+  8,024 files are byte-equal. 5 changed: the four maps' scenes under `hd/env/preset/mxl2012/` and `model_lod_desc.bin`,
+  whose 16,077 old entries are equal in content (only offsets moved) and which gains 118. 133 are new: 118 models in the
+  new atlas groups, 7 textures, 4 biome and 4 light files. No file is gone. The 12 shipped maps' scenes, models,
+  atlases, biomes and light files are unchanged.
+- In game (`checks-20261118-181241-s5` and `checks-20261118-182013-s5` the default scenes, `checks-20261118-181627-s5`
+  and `checks-20261118-182354-s5` this branch, alternating in one session; `wall_maps` in HD at the three arrival views per
+  map): all three levels were reached in every run and showed Median's own layout. There was no assert during play
+  (only D2R's allocator asserts at game exit). The 10 s mean was 59.9-60.0 fps at 34 of the 36 spots. The other two were one
+  CPU stall each, one per build: The Proving Grounds view 0 in the first default run (58.0) and view 2 in the second
+  branch run (55.0, an 876 ms CPU frame). The repeat of each spot read 60.0.
+- Light against the classic frames of lane maplight (HD/classic brightness at the player, mid, far): Hole Level 2
+  0.97/0.99/1.03, The Proving Grounds 0.93/0.78/0.91, Azmodan's Reliquary 0.92/0.94/1.05. The default scenes measured
+  1.17/1.14/1.01, 1.45/1.33/1.31 and 0.62/0.68/0.71.
+- Tests: `py -3 -m unittest discover -s tools/tests` (1,895, OK) and `-s tools -p "test_*.py"` (604, OK).
+- **Not covered:** classic frames in the same session, load time, other quality settings than the slot's, `temple6` in
+  game (Azmodan's Reliquary picked `temple5`; the two files are identical).
+
+## Lane maplight-rockisdead: Island of the Sunless Sea on the classic list (2026-11-18, slots 2 and 5, HD, background input)
+
+Island of the Sunless Sea (`rockisdead`) is back on `tools/data/sprite_classic.json`, with its doorway tiles drawn and an
+atlas of its own (docs/maps-hd.md "Classic maps").
+
+- Build: a full build of this branch under the host build lock against the 12-map build of its base. The whole
+  `work/mod` tree: 8,027 files byte-equal, 2 changed (the island's scene and `model_lod_desc.bin`, 43 new LOD rows of 88
+  bytes), 47 new (43 models, 2 textures, biome and light file), all the island's. Every file of the 12 listed maps,
+  Welcome to Toraja's (`macumba`) shared ice cave tiles included, is byte-equal.
+- In game: `checks-20261118-201520-s5` and `-202137-s5` (this branch), `checks-20261118-201802-s5` (base build, same
+  session), `wall_maps` in HD at the arrival (10103,8843) and 12 cells off: reached, no assert during play (D2R's
+  allocator asserts at game exit only). Between the two torches of the arrival the cave exit's wall frame is drawn
+  where the classic scene without the fix showed a flat dark slab.
+- Frame time: alternating runs of the default build, the classic scene without the fix and the fixed scene at the same
+  spot (sessions s4/s5, 4 x 10 s each) overlap: 29.2 / 28.7 / 27.1 ms mean, spread 4.5 to 8.8 ms, following the other
+  slot's game and the CPU load; no scene cost shows. With nothing else running the fixed scene holds 59-60 fps.
+- **Not covered:** classic frames in the same session (the classic panels are lane maplight's run
+  `checks-20261117-234130-s2` at the same spot), the island beyond its arrival, load time, other quality settings.
+
+## Lane maplight-off5: the five maps that were off, combined on the classic list (2026-11-18, slots 5 and 2, HD, background input)
+
+The changes of lanes maplight-offmaps (Hole Level 2 (`caveroom4`), The Proving Grounds (`dungrm6a`), Azmodan's Reliquary
+(`temple5`, `temple6`)) and maplight-rockisdead (Island of the Sunless Sea (`rockisdead`)) together on origin/main 6742ac4:
+all 17 of Median's own maps are on `tools/data/sprite_classic.json`. Each map keeps its own atlas group and light values as
+its lane set them; the island's own atlas is an `OWN_GROUP` entry (`"rockisdead": "rockisdead"`, the same group name as
+before). Evidence: `mxl2012-runs/hdtools/maplight-off/combined/` (`REPORT.md`, outside the repo).
+
+- Build: a full build under the host build lock (83.5 min, 60.6 of them the one walls-cache miss caused by the
+  `tools/sprite_scene.py` change; classic step 459 s for 17 maps against 311 s for 12 in a build of plain 6742ac4 the same
+  evening, both on a loaded machine). Against that build of plain 6742ac4, the whole `work/mod` tree: 8,046 files
+  byte-equal, 6 changed (the five maps' scenes and `model_lod_desc.bin`, whose 16,077 entries are equal in content and
+  which gains 161), 180 new (161 models, 9 textures, 5 biome and 5 light files), none gone. All 2,931 files of the 12 maps
+  already on the list and every other file are byte-equal. The five maps' files are byte-equal to each lane's own build.
+- Scene paths: for each of the 17 maps, the lvlprest File cell, the .ds1 the game reads (no CASC copy at that path) and
+  the HD scene for that path (`preset/<path>.json`; `preset/mxl2012/<path>.json` for the four edited D2R maps) are the
+  classic step's output, with the classic biome.
+- In game (slot 5): `checks-20261118-222829-s5`, the four levels at the three arrival views; `checks-20261118-224035-s5`,
+  the 12 maps at the arrival. Every level reached and drawn from its classic art, no assert during play (only D2R's
+  allocator asserts at game exit). The 10 s mean was 59.9-60.0 fps at all 12 maps and at the views of Hole Level 2, The
+  Proving Grounds and Azmodan's Reliquary.
+- Island of the Sunless Sea's arrival (view 0, the cave exit) is CPU-bound and follows the machine's load in both builds
+  (slot 2, alternating sessions; `checks-20261118-230330-s2`, `-230958-s2`, `-234856-s2`, `-235445-s2`): this branch
+  23.8-48.3 ms (CPU 34-90 %), the default scene 23.5-32.0 ms (CPU 29-77 %); the best reading of each was the same
+  (24.0 and 23.5 ms). View 1: this branch 16.9-41.6 ms, the default scene 17.3-27.4 ms.
+- Tests: `py -3 -m unittest discover -s tools/tests` (1,922, OK) and `-s tools -p "test_*.py"` (604, OK) after the build;
+  `check_public.py` 0 hits, `check_docs_links.py` 0 findings.
+- **Not covered:** classic frames in the same session (the agents' classic frames are reused), `temple6` itself in game
+  (the file is identical to `temple5`'s), the island on a quiet machine, load time, other quality settings.
+
+### Hole Level 2 and The Proving Grounds toned down (lane maplight-off5, 2026-11-19)
+
+- Owner ruling: both too red against classic. Light variants were written into the two maps' vis files of a built tree and
+  run on slot 2 or 5. Key light power 0: the dark-red area off the floor went black, so the key light is the source.
+  `lightMask` 9 to 1 (ground off) changed nothing. Specular share 0 made the area black. Then key colour and power and
+  the player light were tuned against classic crops (floor, walls, and every pixel black in classic).
+- `CLASSIC_LIGHT` gets the key option `spec` (0 for both maps). Hole Level 2: gain 0.264, pgain 0.77, key (1, 0.03, 0).
+  The Proving Grounds: gain 0.54, key (1, 0.55, 0.85).
+- Full build: against the combined build, 8,230 of 8,232 files are byte-equal; only the two maps' vis files changed.
+  Island of the Sunless Sea, Azmodan's Reliquary and the 12 shipped maps are unchanged.
+- In game (slot 2, `checks-20261119-034042-s2`, three arrival views each): both levels reached; 16.67 ms in all 18
+  windows of 10 s; no assert during play (only D2R's allocator asserts at game exit). The off-floor area measures at
+  most 5 of 255 where it was up to 33. The Proving Grounds' walls match classic's colour and brightness within 2.
+- Tests: `py -3 -m unittest discover -s tools/tests` (1,923, OK) and `-s tools -p "test_*.py"` (604, OK);
+  `check_public.py` 0 hits, `check_docs_links.py` 0 findings.
+- **Not covered:** Hole Level 2's floor near the player stays redder than classic (D2R adds the key light to the
+  player light); views other than the three arrival views; other quality settings.
+
+## Lane linux-tools: the tools and tests on Linux (2026-11-20, no game run)
+
+Linux Mint, Python 3.12 venv, StormLib/CascLib built as `.so` from the pinned submodules (docs/setup.md, "Linux").
+
+| Suite | Before (origin/main 6742ac4) | After |
+|-|-|-|
+| `-I -m unittest discover -s tools/tests` | 1898 run, 23 errors | 1902 run, 1 error (`test_stash_retire`: `from tools import d2save`, another lane's baseline) |
+| `cd tools && -I -m unittest discover -p "test_*.py"` | 596 run, 7 failures, 14 errors | 604 run, 3 failures, 2 errors (no D2R extraction / work/mod build / plugin DLLs on this PC) |
+| `tools/check_docs_links.py` | 1 finding (`data/...`) | 0 |
+| `tools/check_public.py` | 0 hits | 0 hits |
+
+Fixes: `native.py` gets a Linux loader and a 32-bit type shim, with `test_native_abi.py` checking the struct offsets
+against the headers, an MPQ round trip and a CASC read of the 3.4.95032 install. `walls_cache.store` treats ENOTEMPTY
+like FileExistsError, which is the POSIX rename onto a published entry. `game_slots.under` uses `os.sep`.
+`input_watch.py` uses `winapi.Dll`. The 7z Unix modes are made independent of the umask. Three Windows-only probes stop
+with a message. Tests that need D2R's fonts, a game slot or Median's `invchar6.dc6` now skip when those are missing, and
+the docs-link checker ignores an ellipsis.
+
+## Lane relfinal: release 0.1.27 final package and smoke on Linux (2026-11-21, slot 5, HD and legacy, private display)
+
+lane/rel0127 with lane bugs127 merged (`10dc552`, `stunlen` logs each stun once). Evidence in `/d2work/runs/relfinal/` (`build.log`,
+`plugins2.log`, `thirdparty1.log`, `thirdparty2.log`, `package.log`, `verify.log`, `pkgtests.log`, `cmp-*.json`, `smoke.sh`,
+`relchecks127.py`, runs in `runs/`). Steps as in docs/release.md "Making a release on Linux".
+
+- **Build:** `build_plugins_linux.sh` (core dev + release with `stunlen`, drawcap, invtabs, statbook): 63 test executables pass
+  under wine (`stun_len: all checks passed`). `tools/build_thirdparty_linux.py` (all 7; Floating Damage with patch 0005, DLL
+  sha256 `554d4dc3...`, the same as lane fdproton's; Controller QOL skill seed `e352e107...`, unchanged; its 3 Windows-memory-API
+  tests fail under wine only, as before). `tools/build.py` needs `MXL_REFERENCE` (here `/d2work/runs/relpkg/runsroot/reference`;
+  without it `hd_monsters` stops): validate 0 errors (plugin 172, warnings 13), wikipanel 538 monsters, 6,622,381 bytes.
+- **Package** `D2R-XL-2012-0.1.27.7z`: 8,210 files, 1,097 MB unpacked, 189 MB. `verify_package.py` OK (its `--scratch` must be
+  inside the checkout); `test_package_release` + `test_verify_package` 72 OK.
+  - Against lane fdproton's package: 14 files differ. The 4 tables of #620 / #580 (`monprop.txt`, `skills.txt`, both banks) and
+    `mxl2012-core.dll` (stunlen) are new. 8 DLLs differ only in their link time stamp (Buff HUD also in one anonymous-namespace
+    symbol hash), and the Enemy Health Bars source zip has the same members. Floating Damage, Vendor Stock Refresh, Monster
+    Display, Damage Overflow Fix and the Buff HUD MPQ are byte-equal.
+  - Against relsmoke's package: the same, plus the Floating Damage DLL (patch 0005).
+  - Against the published 0.1.26: 219 added, 0 removed, 56 changed (relsmoke's 52 and the 4 tables).
+- **Tests:** `discover -s tools/tests` 1,942 run, OK (19 skipped); `-s tools -p "test_*.py"` 615 OK (6 skipped);
+  `check_docs_links` 0, `check_public` 0.
+- **Smoke:** the package installed with `release_install.py install --package` on slot 5. The harness DLL is rel0127 HEAD plus the
+  Wine harness commits f3eb646, 246be0a and a57de52 (only `mxl2012-core.dll` swapped). The slot tools are lane/vramcap's: seat and
+  lock with `lock 5 relfinal` (pid 0), graphics profile test, VRAM cap 3072 MB (`dxgi.maxDeviceMemory`). Vendor Stock Refresh
+  diagnostics were on (`[diagnostics] enabled = true`) for every run. Slot restored and verified byte-equal after every launch;
+  install undone, lock and seat released at the end.
+
+| Check | Result | Run |
+|-|-|-|
+| Package install, new character (`RfnA`), later load | PASS | `checks-20261121-054422-s5`, `-060504-s5` |
+| `mxl2012` (56 lines, the `stunlen` line with its hook 0x453e30, not FAILED), `clickmap` | PASS | `-054422-s5`, `-060504-s5` |
+| All 10 bundled DLLs loaded, plugin clashes none, MD / VSR "active" | PASS | `-054422-s5`, `-060504-s5` |
+| Monster Display panel (Fallen One 61 / 61, Level 3 Demon, resist row) | PASS (by eye) | `-054422-s5` `md_hover_0.png` |
+| Enemy Health Bars and Floating Damage: bar and numbers over a hit zombie | PASS (by eye) | `-054422-s5`, `-060504-s5` `combat_*.png` |
+| `fd_numbers`: numbers in HD (17, 8) and in legacy (18, 16, bigger), 123 more attacks for 152 s after the first hit, the game answers | PASS (by eye) | `-054422-s5` `fd_hd_*.png`, `fd_legacy_*.png` |
+| Vendor Stock Refresh on a visit after the first (37 to 35, 36 to 31 items, none kept) | PASS | `-054422-s5`, `-060504-s5` |
+| Vendor Stock Refresh on a new character's first trade, Trade picked during Charsi's greeting | FAIL (known issue) | `-054422-s5` (`RfnA`), `-055435-s5` (`RfnB`, 30 s wait) |
+| Vendor Stock Refresh on a new character's first trade, greeting left to end first (38 to 36, then 36 to 30) | PASS | `-055825-s5` (`RfnC`) |
+| The 16 wall maps in HD, among them the four levels of 0.1.27's five maps (15 `caveroom4`, 90 `dungrm6a`, 96 `temple5` this time: the level loads `temple5` or `temple6`, 116 `rockisdead`), no assert | PASS (by eye; the check says FAIL because `MXL_WALL_MODES=hd` skips classic) | `-060504-s5` |
+
+**Vendor Stock Refresh on the first trade** (lane fdproton's FAIL): real, but not the plugin's reroll. The harness's first `interact`
+with Charsi on a new character plays the first-meeting greeting with no menu. The next one opens the menu while the "Oh, by the way,
+I'm Charsi" line plays. Trade opened then shows no refresh button under the gold. VSR logged its placement, but no "client
+normal refresh sent" came from the click. The game closes the trade screen when the greeting ends, with no click (`RfnB`:
+`vsr_after_wait.png`). When the greeting ends before Trade is chosen, the first trade rerolls: sent, armed, 0 rejected. Written as
+a known issue in the 0.1.27 notes; a fix would be in D2R's NPC chat / trade panel interplay, not small.
+
+## Lane fdproton: Floating Damage under Proton (2026-11-21, slot 5, private display)
+
+Floating Damage crashed D2R under Proton on its first hooked Present (lane relsmoke below). Evidence in
+`/d2work/runs/fdproton/` (`smoke.sh`, `relchecks127.py` with the new `fd_numbers` check, runs in `runs/`).
+
+- **Cause:** the renderer loads 12 fonts from `%WINDIR%\Fonts` right after creating its ImGui context, before any frame.
+  The Proton prefix has no `segoeui.ttf` (index 0, the default) and six others. Dear ImGui 1.91.5 reports a font file it
+  cannot open (`AddFontFromFileTTF`) through its new error recovery: `ErrorLog` opens an error tooltip (`##Tooltip_Error`,
+  `ImGui::Begin`), and outside a frame with no font yet that reads a null `g.Font` (+0x32171, inlined `SetCurrentWindow`).
+  The access violation goes up through Present, and D2R asserts "Present failed". Found with a diagnostic build whose
+  `IM_ASSERT` logs a stack (`checks-20261121-001406-s5`, `fd-diag.log`): `Begin` <- error tooltip <- `ErrorLog` ("Could not
+  load font file!") <- `AddFontFromFileTTF` <- `LoadFonts` <- `InitializeRenderer`, on the first Present. It was not the
+  `AddFontDefault` fallback, the symlinked Proton fonts, vkd3d or the hook. Windows has every font, so this never ran there.
+- **Fix:** patch `0005-mxl2012-missing-system-font` (`third_party/floating-damage-mxl2012/README.md`): a missing, unreadable
+  or non-font file now goes to the author's fallback (ImGui's built-in font) without that report, and the atlas is built
+  before the DirectX 12 backend uploads it, falling back to the built-in font for every index when a font cannot be
+  built. With every font present the fonts and the atlas are the same as before, so Windows is unchanged.
+  `floating_damage_mxl_tests` covers it (it now links the plugin's ImGui library). Both build scripts pick the patch up by
+  name. DLL sha256 `554d4dc3...` (Linux build).
+- **Package:** `/d2work/runs/fdproton/dist/D2R-XL-2012-0.1.27.7z` (relpkg's data and DLLs, this FD DLL): against relsmoke's
+  package only `d2rl-ruffneckk-floating-damage.dll` differs. `verify_package.py` OK; `test_package_release` +
+  `test_verify_package` 72 OK.
+- **Owner focus kept and slot restored byte-equal in all 9 runs.**
+
+| Check | Result | Run |
+|-|-|-|
+| Crash reproduced with a diagnostic build, cause found (see above) | done | `checks-20261121-001252-s5`, `-001406-s5` |
+| Fixed DLL, diagnostics on: renderer initialized, first ImGui frame submitted, numbers in HD | PASS (by eye) | `-001912-s5` `combat_01.png` |
+| Package install, new character (`FdRelA`), later load | PASS | `-003048-s5`, `-003852-s5` |
+| `mxl2012`, `clickmap` | PASS | `-003048-s5` |
+| All 10 bundled DLLs loaded, plugin clashes none, MD / VSR "active" | PASS | `-003048-s5`, `-003852-s5` |
+| Monster Display panel (Fallen One 74 / 74, Level 3 Demon, resist row) | PASS (by eye) | `-003048-s5` `md_hover_0.png` |
+| Enemy Health Bars and Floating Damage (bar and number over a hit zombie) | PASS (by eye) | `-003048-s5` `combat_01.png` |
+| `fd_numbers`: numbers over a zombie hit by normal attacks in HD (16) and in legacy with Legacy 16:9 (16, 18, 2.5x size), DPS counter; 120+ more attacks in legacy for 153 s after the first hit (about 4 min in game), the game still answers | PASS (by eye) | `-003048-s5` `fd_hd_02.png`, `fd_legacy_01.png`; also `-002201-s5` |
+| Vendor Stock Refresh: a click on the button rerolls the stock (35 to 35 new items) | PASS | `-003852-s5` |
+| Vendor Stock Refresh on a character's first trade | FAIL, not FD | `-003048-s5`, and `-004303-s5` with FD off (`[general] enabled = false`): the click hits the button (its tooltip shows) and the stock stays |
+| The wall maps in HD (all 16 visited, no assert) | PASS (by eye) | `-004801-s5` (`MXL_WALL_MODES=hd`) |
+
+Every run has one handled first-chance access violation at `+0x15599` of a module loaded near `0x6FFFFB520000`. It is in
+relsmoke's FD-out runs too (`checks-20261120-160548-s5` ... `-160950-s5`), so it is not Floating Damage.
+
+## Lane relsmoke: release 0.1.27 Stat Book measure and in-game smoke on Linux (2026-11-20, slot 5, HD, private display)
+
+- **Stat Book side tabs on Linux**: `tools/statbook_layout.py` measured D2R's font with Pillow's default layout, which is
+  raqm on Linux wheels (kerning: "Advanced" 130.3 px at 18 pt) and BASIC on Windows wheels (no fribidi: 130.0 px), so a
+  Linux build put the side tab labels at 17 pt. The font is now opened with `ImageFont.Layout.BASIC` on every OS
+  (`test_statbook_layout.test_same_measure_on_every_os`). Rebuilt package (`/d2work/runs/relsmoke/dist/`): the 14 Stat
+  Book files equal 0.1.26 (13 byte-equal, `sidepanelhd.json` line ends only); 52 changed files left, all of relpkg's
+  expected kinds.
+- **Smoke** (`/d2work/runs/relsmoke/`: `smoke.sh`, `relchecks127.py`, runs in `runs/`): lane/linfix's Linux tools, the
+  package installed with `release_install.py install --package` on slot 5. The harness DLL is rel0127 plus the Wine
+  harness commits (f3eb646, 246be0a, a57de52, only `mxl2012-core.dll` swapped): rel0127's own dev DLL has no harness
+  input under Wine. Owner focus kept and slot restored byte-equal in all 15 runs.
+
+| Check | Result | Run |
+|-|-|-|
+| Start, new character (`RelSvn`), later load | PASS | `checks-20261120-161322-s5`, `-161804-s5` |
+| `mxl2012` (bundled DLLs of the manifest allowed in its plugin list) | PASS | `-161322-s5` |
+| `clickmap` | PASS | `-161322-s5` |
+| All 10 bundled DLLs loaded, plugin clashes none, MD / VSR "active" | PASS | `-161804-s5` |
+| Monster Display panel (Fallen One 59 / 59, Level 3 Demon, resist row) | PASS (by eye) | `-161804-s5` `md_hover_0.png` |
+| Enemy Health Bars (bar over a hit zombie) | PASS (by eye) | `-161804-s5` `combat_01.png` |
+| Vendor Stock Refresh: button under Charsi's gold, a click rerolls the stock (34 to 38 items) | PASS | `-161322-s5`, `-161804-s5` |
+| The four levels of the five classic maps (116, 15, 90, 96) in HD, no assert | PASS (by eye) | `-162114-s5` |
+| **Floating Damage under Proton** | **FAIL** (fixed by lane fdproton above) | `-160920-s5`, `-161234-s5`, `-162352-s5` |
+
+Floating Damage crashes the game under Proton on its first hooked Present: an access violation in
+`d2rl-ruffneckk-floating-damage.dll` +0x32171 (Dear ImGui `SetCurrentWindow` with a null font, `g.Font->FontSize`), then
+D2R's `Present failed` assert (D2Prism.cpp:2112) and exit, during table loading, before any window resize. Found by
+taking the bundled DLLs out one by one: with only FD's DLL in it crashes, with every other DLL and FD out (or FD's
+`[general] enabled = false`) it runs. 0.1.26's FD DLL crashes the same way, so this is not new in 0.1.27 and not the
+Linux build. Not tested: a Proton game on a real display (runs on the owner's desktop are not allowed), legacy graphics.
+
+## Lane relpkg: release 0.1.27 built and packaged on Linux (2026-11-20, no game run)
+
+Linux Mint, venv Python 3.12, MSVC under wine. Steps as in docs/release.md "Making a release on Linux"; evidence in
+`/d2work/runs/relpkg/` (`build.log`, `package.log`, `verify.log`, `cmp-0126-0127.json`, `changed-classified.txt`).
+
+- Plugins: `build_plugins_linux.sh` (core dev + release, drawcap, invtabs, statbook), 62 test executables pass under wine.
+  Third-party: `tools/build_thirdparty_linux.py`, Buff HUD and Controller QOL from this build (skill seed sha256
+  `e352e107...`, the same as 0.1.25's; Buff HUD MPQ byte-equal to 0.1.26's); 3 Controller QOL memory-API tests fail under
+  wine only (owner: run and report).
+- `tools/build.py` from a clean `work/mod`: validate 0 errors (plugin 172, warnings 13), wikipanel 538 monsters, 65 of 83
+  superuniques placed, 6,622,381 bytes (the same numbers as the 0.1.26 build on Windows). 14 min with the walls cache hit;
+  about 50 min when the walls are made again.
+- Linux-only faults found by comparing with 0.1.26 and fixed (all no-ops on Windows): lookups by a table's mixed-case
+  name in the lower-case extraction (`fxpaths.ci`: a missile stand-in, 44 superunique placements); token folders in two
+  cases (`fxpaths.ci_dest`: 68 files under `$g` and `$G`); ext4 listing order deciding equal art_provenance candidates
+  (`fxpaths.ntfs_order`: lightningcircles, and with it shockquakeexplozor's model). A Linux `work/art_provenance` made before
+  that fix keeps the old result (its cache key holds no order): move `result_effects.pkl` away once.
+- Package `D2R-XL-2012-0.1.27.7z`: 8,210 files, 1,097 MB unpacked, 189 MB. `verify_package.py` OK;
+  `test_package_release` + `test_verify_package` 72 OK with the real DLLs.
+- Against 0.1.26 (the published manifest and 7z): 7,926 files byte-equal, 219 added (180 map files of maplight-off5, 34
+  Monster Display files, 5 Vendor Stock Refresh files), none removed, 65 changed: 33 text files only in line ends (LF on
+  Linux), 11 DLLs and the EHB source zip (rebuilt), `metadata.json` (version), the 5 off5 scenes and `model_lod_desc.bin`
+  (161 new rows), and 14 statbook files: `tools/statbook_layout.py` measures "Advanced" 0.3 px wider than its 130 px side
+  tab at 18 pt with this Pillow / FreeType, so the side panel's tab labels are 17 pt and its rule sprites are redrawn.
+  Modes 0644 / 0755 as on the server's 7z.
+- Tests: `discover -s tools/tests` 1,919 run, 1 error (`test_stash_retire`, baseline), 1 failure
+  (`test_statbook_layout.test_header_is_current`, the same 18 / 17 pt measurement); `-s tools -p "test_*.py"` 615 OK;
+  `check_docs_links` 0, `check_public` 0.
+- **Not covered:** the in-game smoke test (game input under Wine is not ready), publishing.
+
+## Lane bugs127: player bugs #578, #580, #610, #620 for 0.1.27 (2026-11-21, slot 2, HD and legacy, private display)
+
+Slot 2 with the 0.1.27 package (`release_install.py install --package`, relsmoke's harness DLL), Floating Damage off for the runs
+(`[general] enabled = false`), lane/linfix's slot tools; kit `/d2work/runs/bugs127/` (`smoke.sh`, `bugchecks.py`, runs in `runs/`).
+Slot restored and verified byte-equal after every launch; the install undone and the lock released at the end. Game runs
+stopped early for lane slotcap (owner order).
+
+| Bug | What was run | Result | Run |
+|-|-|-|-|
+| #580 Blink | 3 Blinks into 6 zombies, stunned state polled 3 s | Median's data: 0 stunned (blinkcenter + 64 blinknova per cast); `blinknova` dParam1 25 patched in: 4-5 of 6 stunned per cast | `checks-20261121-003804-s2`, `-004117-s2` |
+| #620 Medallion | Hell by save edit; Imperius and Malthael spawned, killed by damage; counter, states, properties read; cube | counter 0, no state; hit-skill on the Avatars, aura and death skill missing (monprop gap) | `checks-20261121-005623-s2` ... `-010534-s2` |
+| #610 Tremor | real right-click casts, 14 shots 0.08 s apart, HD and legacy; Blink as the control | no cast dust in either mode; Blink's cast overlay shows | `checks-20261121-012103-s2` |
+| #578 stance feathers | Lion Stance, shots 0.5-14 s and a 20-shot burst, before / after the looping pick | legacy: feathers the whole time; HD: none visible either way (dark ground at night) | `checks-20261121-012427-s2`, `-012727-s2`, `-013033-s2` |
+
+Rebuilt data (`tools/build.py`, validate 0 errors): monprop has no gaps, barb_1..4 on the looping copy (`blinknova` stays at Median's dParam1 0, owner ruling).
+Tests: `discover -s tools/tests` 1,927 run, 1 error (`test_stash_retire`, baseline), skips 4 (`test_native_abi.test_layouts`: no
+submodules in this worktree). 
+
+Round 2 (2026-11-21, slot 2, seat taken by hand): #578 with the looping pick in the Rogue Encampment, HD shows no feather before (`checks-20261121-015259-s2`) or after (`checks-20261121-022530-s2`), legacy shows them throughout; #620 on the rebuilt monprop: counter 3, 998, +3 all skills, 0 after 32 s (`checks-20261121-022847-s2`). #580 on the rebuilt data not run (games paused for lane vramcap); the package's Blink cells equal the rebuilt ones.
+
+Round 3 (2026-11-21, desk only, no game run): #580 reopened. 1.14d's and D2R 93847's server damage function 7 disassembled
+(docs/bugs.md #580): D2R takes a dParam1-0 stun from the skill's calc4 when the missile has an owner, and Median's rows have none.
+`txt_migrate.py stun_calcs` writes calc4 `ln12` on the 9 affected skills; unit tests `test_txt_migrate_stuns.py` (6); `discover -s
+tools/tests` 1,944 run, OK (20 skipped). Still to run (MC's go): Blink at levels 1 and 3 into zombies, stunned state 21 held 15 / 25
+frames.
+Round 4 (2026-11-21, desk only): plugin part `stunlen` (#580: Leap Attack, Cherub Strike, Level 90 Cherub; hook on D2R's
+function 7 at 0x453e30, dispatcher 0x45bed5 checked: (game, missile, target, damage block)). Linux build
+`/d2work/toolchains/scripts/build_plugins_linux.sh` (core dev + release, drawcap, invtabs, statbook): 63 test executables
+passed under wine, 0 failed (`stun_len: all checks passed`); `discover -s tools/tests` 1,944 run, OK.
+
+Round 5 (2026-11-21, slot 2, seat 1 taken by hand, pid=0, removed at the end): #580 stun lengths, check `b580s` (kit
+`bugchecks.py`): 0.1.27 package with this lane's skills.txt (both banks: only the 9 calc4 cells differ) and core DLL; Floating
+Damage off; slot restored and verified byte-equal after every launch, install undone, lock and seat released.
+
+| Skill | Level | `stunlen` log (frames) | Zombies | Run |
+|-|-|-|-|-|
+| Blink (blinknova 1209) | 1 / 3 | 15 / 25 (D2R's, calc4 ln12) | stunned | `checks-20261121-045757-s2` |
+| Cherub Strike (deathrockbolt 1308; stat event_hit2 1) | 1 / 3 | 0 -> 10 / 0 -> 20 (`stunlen`) | stunned on each bolt | `checks-20261121-050150-s2` |
+| Bear Claw (bearbolt 1371; throwing axe) | 1 / 2 | 50 / 55 (D2R's, calc4) | stunned | `checks-20261121-050150-s2` |
+| Stampede (stambolt 1372) | 1 | 25 (Param2 0) | stunned | `checks-20261121-050150-s2` |
+| Leap Attack (143) | 1 / 2 | no function-7 hit (the leap creates no `leapattack` missile; no class, monster or item has the skill) | not stunned | both |
+
+War Cry and Shock Wave are not in Median's skills.txt. Earlier launches in this round: lane/bugs127's own harness DLL closed at the
+intro (`checks-20261121-044922-s2`, `-045044-s2`, and with `stunlen` off `-045153-s2`); lane relsmoke's harness DLL entered the game
+(`-045251-s2`, Blink L3 stunned), so the test DLL was built with relsmoke's Linux `testharness.cpp` (harness only).

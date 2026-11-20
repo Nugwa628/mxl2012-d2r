@@ -230,7 +230,7 @@ def processes(names=ALL_IMAGES):
 
 def under(path, folder):
     p, f = os.path.normcase(os.path.abspath(path)), os.path.normcase(os.path.abspath(folder))
-    return p.startswith(f.rstrip("\\") + "\\")
+    return p.startswith(f.rstrip(os.sep) + os.sep)  # os.sep: "\\" on Windows (normcase made every "/" one), "/" on Linux
 
 
 def slot_processes(game, names=ALL_IMAGES):

@@ -18,6 +18,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
+import fxpaths  # noqa: E402  (ci: the pack's names ignore case, as Windows does)
 import mpq_extract  # noqa: E402
 
 ROOT = TOOLS.parent
@@ -48,7 +49,7 @@ class MedianTree(unittest.TestCase):
 
     def test_every_file_of_the_extraction_is_there(self):
         missing = [rel for rel, f in self.manifest["files"].items()
-                   if not (MEDIAN / rel).is_file() or (MEDIAN / rel).stat().st_size != f["size"]]
+                   if not fxpaths.ci(MEDIAN / rel).is_file() or fxpaths.ci(MEDIAN / rel).stat().st_size != f["size"]]
         self.assertEqual(missing, [])
 
     def test_strings_read(self):

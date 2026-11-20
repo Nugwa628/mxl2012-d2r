@@ -55,6 +55,47 @@ def fake_fd_build(tmp: Path):
     return rel / pr.FD_FROM["dll"], src
 
 
+VSR_CONFIG = "[plugin]\nenabled = true\n\n[diagnostics]\nenabled = false\n\n[d2rl]\nmatch = true\n"
+
+
+def fake_md_release(tmp: Path):
+    """The author's release folder of Monster Display (fakes): the DLL and MonsterDisplay/ with its layouts and frames.
+    Returns (folder, pins): pins patches package_release.MD to these bytes (start it in the test)."""
+    folder = tmp / "md-release"
+    (folder / "MonsterDisplay" / "monsterdisplayframes").mkdir(parents=True)
+    dll = folder / "d2rl-celestialrayone-monster-display.dll"
+    dll.write_bytes(b"MZ monster-display\0 1.0.18")
+    for source in pr.md_data(folder):
+        source.write_bytes(source.name.encode() + b"\n")
+    pins = mock.patch.dict(pr.MD, {"sha256": pr.sha256(dll), "size": dll.stat().st_size,
+                                   "data_sha256": pr.md_data_digest(folder)})
+    return folder, pins
+
+
+def fake_vsr_build(tmp: Path):
+    """What tools/build_vendorstockrefresh.ps1 leaves (build/vendorstockrefresh/Release: DLL, licence, config; the exported
+    source with PINNED_COMMIT and the notices) and the hub MPQ in a folder. Returns (dll, mpq_dir, src, pins): pins patches
+    package_release.VSR's MPQ hash to the fake (start it in the test)."""
+    rel = tmp / "vendorstockrefresh" / "Release"
+    rel.mkdir(parents=True)
+    for k, name in pr.VSR_FROM.items():
+        (rel / name).write_bytes(b"MZ VendorStockRefresh " + pr.VSR["version"].encode() + b" by RuffnecKk active\0"
+                                 if k == "dll" else VSR_CONFIG.encode() if k == "config" else b"MIT License\n")
+    mpq = tmp / "vsr-mpq"
+    mpq.mkdir()
+    f = mpq / "d2rl-ruffneckk-vendor-stock-refresh.mpq"
+    f.write_bytes(b"MPQ\x1a vendor-stock-refresh")
+    src = tmp / "vendorstockrefresh-src"
+    (src / "third_party" / "notices").mkdir(parents=True)
+    (src / "third_party" / "PluginSDK").mkdir(parents=True)
+    (src / "THIRD_PARTY_NOTICES.md").write_text("# Third-Party Notices\n", encoding="utf-8")
+    (src / "third_party" / "notices" / "MINHOOK-LICENSE.txt").write_text("MinHook\n", encoding="utf-8")
+    (src / "third_party" / "PluginSDK" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    (src / "PINNED_COMMIT").write_text(pr.fd_commit(), encoding="ascii")
+    pins = mock.patch.dict(pr.VSR, {"mpq_sha256": pr.sha256(f), "mpq_size": f.stat().st_size})
+    return rel / pr.VSR_FROM["dll"], mpq, src, pins
+
+
 class VerifyPackageTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -130,6 +171,14 @@ class VerifyPackageTests(unittest.TestCase):
         pr.stage_ehb(self.mod, ehb_dll, ehb_src)
         fd_dll, fd_src = fake_fd_build(self.tmp)
         pr.stage_fd(self.mod, fd_dll, fd_src)
+        md, pins = fake_md_release(self.tmp)
+        pins.start()
+        self.addCleanup(pins.stop)
+        pr.stage_md(self.mod, md)
+        vsr_dll, vsr_mpq, vsr_src, pins = fake_vsr_build(self.tmp)
+        pins.start()
+        self.addCleanup(pins.stop)
+        pr.stage_vsr(self.mod, vsr_dll, vsr_mpq, vsr_src)
 
     def test_invtabs_replaces_charminv_only_when_present(self):
         dll = self.tmp / "invtabs.dll"

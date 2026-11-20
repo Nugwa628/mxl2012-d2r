@@ -51,7 +51,8 @@ DIFFERS_BY_DESIGN = {"d2rloader/plugins/mxl2012-core.dll", "d2rloader/metadata.j
 BUNDLED = ({pr.LEGACY169["dll"], pr.LEGACY169["config"]} | {pr.BUFFHUD[k] for k in pr.BUFFHUD_FILES}
            | {pr.BELTREFILL[k] for k in pr.BELTREFILL_FILES} | {pr.CONTROLLERQOL[k] for k in pr.CONTROLLERQOL_FILES}
            | {pr.CHARMINV[k] for k in pr.CHARMINV_FILES} | {pr.DOF[k] for k in pr.DOF_FILES}
-           | {pr.EHB[k] for k in pr.EHB_FILES} | {pr.FD[k] for k in pr.FD_FILES})
+           | {pr.EHB[k] for k in pr.EHB_FILES} | {pr.FD[k] for k in pr.FD_FILES}
+           | set(pr.md_package_paths()) | {pr.VSR[k] for k in pr.VSR_FILES})
 OPTIONAL = {pr.INVTABS["dll"], pr.INVTABS["config"]}
 STRING_FILES = ("strings/%s/median.json", "strings/%s/overrides.json", "strings-legacy/%s/median.json")
 
@@ -194,6 +195,26 @@ def check_mod_folder(mod: Path, version: str) -> list:
             problems.append(f"{pr.FD[k]} is missing")
     if (mod / pr.FD["config"]).is_file():
         problems += pr.fd_config_problems((mod / pr.FD["config"]).read_text("utf-8"))
+    data = mod / f"{NAME}.mpq" / "data"
+    if data.is_dir():  # Monster Display's HD files go into the data: a --no-data package has none of it
+        dll = mod / pr.MD["dll"]
+        if not dll.is_file() or dll.stat().st_size != pr.MD["size"] or pr.sha256(dll) != pr.MD["sha256"]:
+            problems.append(f"{pr.MD['dll']} is missing or not Monster Display {pr.MD['version']}")
+        for rel in pr.md_package_paths():
+            if not (mod / rel).is_file():
+                problems.append(f"{rel} is missing")
+        if (mod / pr.MD["config"]).is_file():
+            problems += pr.md_config_problems((mod / pr.MD["config"]).read_text("utf-8"))
+    vsr = mod / pr.VSR["dll"]
+    if vsr.is_file():
+        problems += pr.check_vsr(vsr)
+    for k in pr.VSR_FILES:
+        if not (mod / pr.VSR[k]).is_file():
+            problems.append(f"{pr.VSR[k]} is missing")
+    if (mod / pr.VSR["mpq"]).is_file():
+        problems += pr.check_vsr_mpq(mod / Path(pr.VSR["mpq"]).parent)
+    if (mod / pr.VSR["config"]).is_file():
+        problems += pr.vsr_config_problems((mod / pr.VSR["config"]).read_text("utf-8"))
     if not (mod / "d2rloader" / "patches").is_dir():
         problems.append("d2rloader/patches/ is missing")
     data = mod / f"{NAME}.mpq" / "data"

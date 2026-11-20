@@ -310,7 +310,8 @@ def build_data(data: Path, game: Path) -> None:
         for p in (MXL_GLOBAL / sub).rglob("*"):
             rel = p.relative_to(MXL_GLOBAL.parent.parent).as_posix().lower()  # data/global/...
             if p.is_file() and f"data:{rel}" not in d2r_files:
-                dest = data / "global" / p.relative_to(MXL_GLOBAL)
+                # ci_dest: into the token folder work/mod has in other case ($G from palshift.dat), as NTFS merges them
+                dest = fxpaths.ci_dest(data / "global" / p.relative_to(MXL_GLOBAL))
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(p, dest)
 

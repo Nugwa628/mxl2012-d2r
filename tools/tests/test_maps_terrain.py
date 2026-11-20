@@ -107,7 +107,7 @@ class ModelTest(unittest.TestCase):
         path = mt.donor(60, 60)
         try:
             template = walls_hd.d2r_bytes(mt.lod0(path))
-        except Exception as e:                                          # no game data on this machine
+        except (Exception, SystemExit) as e:                            # no game data / no game slot on this machine
             self.skipTest("no D2R data: %s" % e)
         pos, tris, normals = mt.split_faces(*mt.lift_quads(mt.stair(100, 200, 120, 240, 8.0, 0.0, 4)), crease=0.9)
         data, lo, hi = mt.model(template, pos, tris, normals)

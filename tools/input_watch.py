@@ -25,9 +25,11 @@ import sys
 import threading
 import time
 
-user32 = ctypes.windll.user32
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game_slots  # noqa: E402
+import winapi  # noqa: E402  (loads user32 on first use; off Windows a call raises a clear OSError, the import works)
+
+user32 = winapi.Dll("user32")
 
 
 def _game_windows(pids):
