@@ -3,7 +3,7 @@
  "enabled": true,
  "scale": 2,
  "method": "lanczos",
- "skills": ["Bionetic Slam"],
+ "skills": ["Bionetic Slam", "Phalanx New"],
  "rows": {
   "bioneticstar": {
    "copy": "teethexplodeblue",
@@ -39,6 +39,61 @@
    "art": "missiles/TeethExplode",
    "mode": "once",
    "parts": [{"ramp": "own", "tint": [1.2, 1.45, 2.4]}]
+  },
+  "legiontile": {
+   "name": "mxl_fx_legiontile",
+   "art": "missiles/LegionTile",
+   "mode": "loop",
+   "shared": "Phalanx's archers (bug #570): every skill and monster that makes legionmaker, and so legiontile (Phalanx New, Phalanx, Mon Bowless Phalanx), draws the same golden archer in legacy, so HD gets it for all of them.",
+   "opaque": "The archer is opaque in legacy (Trans 0). In HD it is three additive colour layers that add up to the picture, so it reads as a bright golden spirit archer; the dark armour shows less than in legacy.",
+   "light": {"rgb": [1, 1, 0.25], "range": 9, "power": 250.0},
+   "parts": [
+    {"ramp": "grey", "level": "r", "tint": [1.0, 0.0, 0.0]},
+    {"ramp": "grey", "level": "g", "tint": [0.0, 1.0, 0.0]},
+    {"ramp": "grey", "level": "b", "tint": [0.0, 0.0, 1.0]}
+   ]
   }
+ },
+  "overlays": {
+  "barb_1": {
+    "name": "mxl_fx_barb_1",
+    "art": "overlays/vdfeathers",
+    "texture": "mxl_fx_vdfeathers",
+    "mode": "loop",
+    "shared": "The Barbarian stances' feathers (bug #578): every state that shows barb_1 draws Median's vdfeathers round the unit in legacy, so HD gets them for all of them.",
+    "opaque": "Classic draws the dark feathers with Trans 5 (the normal draw); the HD flipbook is alpha-blended (`blend` alpha), so they stay dark as in classic, with a faint yellow tint of the stance's light.",
+    "light": {"rgb": [1, 1, 0.5], "range": 4, "power": 120.0},
+    "parts": [{"blend": "alpha", "tint": [0.34, 0.32, 0.24]}]
+   },
+   "barb_2": {
+    "name": "mxl_fx_barb_2",
+    "art": "overlays/vdfeathers",
+    "texture": "mxl_fx_vdfeathers",
+    "mode": "loop",
+    "shared": "The Barbarian stances' feathers (bug #578): every state that shows barb_2 draws Median's vdfeathers round the unit in legacy, so HD gets them for all of them.",
+    "opaque": "Classic draws the dark feathers with Trans 5 (the normal draw); the HD flipbook is alpha-blended (`blend` alpha), so they stay dark as in classic, with a faint red tint of the stance's light.",
+    "light": {"rgb": [1, 0.5, 0.5], "range": 4, "power": 120.0},
+    "parts": [{"blend": "alpha", "tint": [0.36, 0.26, 0.24]}]
+   },
+   "barb_3": {
+    "name": "mxl_fx_barb_3",
+    "art": "overlays/vdfeathers",
+    "texture": "mxl_fx_vdfeathers",
+    "mode": "loop",
+    "shared": "The Barbarian stances' feathers (bug #578): every state that shows barb_3 draws Median's vdfeathers round the unit in legacy, so HD gets them for all of them.",
+    "opaque": "Classic draws the dark feathers with Trans 5 (the normal draw); the HD flipbook is alpha-blended (`blend` alpha), so they stay dark as in classic, with a faint green tint of the stance's light.",
+    "light": {"rgb": [0.5, 1, 0.5], "range": 4, "power": 120.0},
+    "parts": [{"blend": "alpha", "tint": [0.26, 0.34, 0.24]}]
+   },
+   "barb_4": {
+    "name": "mxl_fx_barb_4",
+    "art": "overlays/vdfeathers",
+    "texture": "mxl_fx_vdfeathers",
+    "mode": "loop",
+    "shared": "The Barbarian stances' feathers (bug #578): every state that shows barb_4 draws Median's vdfeathers round the unit in legacy, so HD gets them for all of them.",
+    "opaque": "Classic draws the dark feathers with Trans 5 (the normal draw); the HD flipbook is alpha-blended (`blend` alpha), so they stay dark as in classic, with a faint orange tint of the stance's light.",
+    "light": {"rgb": [1, 0.5, 0], "range": 4, "power": 120.0},
+    "parts": [{"blend": "alpha", "tint": [0.36, 0.29, 0.22]}]
+   }
  }
 }

@@ -7,6 +7,31 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.28 (2026-11-21)
+
+- **The Barbarian stances show their feathers in HD graphics:** Lion, Bear, Snake, Eagle and the other stances now have
+  Median's dark swirling feathers round the barbarian for as long as the stance is on, as in legacy graphics, with a
+  faint tint of the stance's colour. Before, HD showed nothing.
+
+- **Stat points are no longer spent by clicks on a Stat Book page:** while a page other than Character is open, the four
+  + buttons under it take no clicks (HD and legacy graphics); on the Character tab they work as before.
+
+- **Vendor Stock Refresh in legacy graphics:** the refresh button now also shows on the classic trade screen (G key), on
+  the stone left of Buy in a gold-edged square like the other buttons, with or without Legacy 16:9. Gambling keeps its
+  own refresh button.
+
+- **A vendor's first greeting no longer closes the trade screen:** on a new character, picking Trade or Gamble while the
+  vendor was still talking ("Oh, by the way...") opened the screen, but it shut when the greeting ended, and the Refresh
+  button seemed to do nothing. The screen now stays open. A click while the vendor talks still only ends the greeting,
+  as before; the next click on Refresh rerolls the stock.
+
+- **Phalanx's golden archers show in HD graphics:** HD drew only small gold glows where legacy draws the lines of
+  archers. They now play Median's own archer animation, as a bright golden spirit (also for the old Phalanx and the
+  monsters that cast it).
+
+- **Legacy graphics: the + buttons on the character sheet work again,** so stat points can be spent without switching
+  to HD. The Stat Book's All Stats search box moved right of the + buttons.
+
 ### 0.1.27 (2026-11-21)
 
 - **The Crystalline Flame Medallion can now be upgraded:** kill Imperius and Malthael on Destruction within 30 seconds

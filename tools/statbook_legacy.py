@@ -62,9 +62,12 @@ VALUE_PAD = 4                           # a value's room from its bar's ends (ri
 HALF = (104, 50)
 HALF_GAP = LINE_W - 2 * sum(HALF)
 ALL_Y, ALL_ROWS = 93, 21
-SEARCH = (LINE_X, LINE_Y, LINE_W, CELL_H)
 SEARCH_LABEL_W = 44
-SEARCH_SLOT = (LINE_X + SEARCH_LABEL_W + 4, 190)  # x, width
+# The search box right of D2R's stat point buttons (the Strength + at 125-147, 76-98 is under the All Stats row): D2R hit-tests
+# the hidden All Stats page's input box too, and over the + it took the Strength + clicks on the Character tab. The count left.
+PLUS_RIGHT = 150
+SEARCH_SLOT = (PLUS_RIGHT, LINE_X + LINE_W - PLUS_RIGHT)  # x, width
+SEARCH = (SEARCH_SLOT[0], LINE_Y, SEARCH_SLOT[1], CELL_H)   # the click that types into the box (sheet_host SearchBox)
 GO = 13                                 # the All Stats row's arrow (square)
 TOGGLE = 14
 TOGGLE_XY = (CLASS_BOX[0] + CLASS_BOX[1] + 4, NAME_Y)   # right of the class box
@@ -223,7 +226,7 @@ def short_fill(fill):
 
 
 def all_widgets(book: dict, show: bool, query: str) -> list[dict]:
-    kids = [text("SbSearchLabel", LINE_X, LINE_Y, SEARCH_LABEL_W, CELL_H, "SEARCH", GOLD, align="left"),
+    kids = [text("SbSearchLabel", SEARCH_SLOT[0] - 4 - SEARCH_LABEL_W, LINE_Y, SEARCH_LABEL_W, CELL_H, "SEARCH", GOLD, align="right"),
             image("SbSearchSlot", SEARCH_SLOT[0], LINE_Y, "Cells", CELL_FRAMES["Slot"]),
             {"type": "InputTextBoxWidget", "name": "SbSearchInput",
              "fields": {"rect": r(SEARCH_SLOT[0] + 3, LINE_Y + 1, SEARCH_SLOT[1] - 6, CELL_H - 2), "fontType": LABEL_FONT,
@@ -232,8 +235,8 @@ def all_widgets(book: dict, show: bool, query: str) -> list[dict]:
     shown = sl.search(texts, query) if show else []
     rows = sum(1 for h, _t in texts if not h)
     kept = sum(1 for i, _a in shown if not texts[i][0])
-    cx = SEARCH_SLOT[0] + SEARCH_SLOT[1] + 6
-    kids.append(text("SbSearchCount", cx, LINE_Y, LINE_X + LINE_W - cx, CELL_H, f"{kept}/{rows}" if show else "", NOTE, align="right"))
+    cw = SEARCH_SLOT[0] - 8 - SEARCH_LABEL_W - LINE_X
+    kids.append(text("SbSearchCount", LINE_X + 2, LINE_Y, cw, CELL_H, f"{kept}/{rows}" if show else "", NOTE, align="left"))
     kids.append(text("SbPreviewQuery", SEARCH_SLOT[0] + 4, LINE_Y, SEARCH_SLOT[1] - 8, CELL_H, query if show else "", align="left",
                      visible=bool(show and query)))
     tw = LINE_W - 4 - GO - 6
@@ -342,14 +345,25 @@ def strip(lay: dict) -> dict:
     return lay
 
 
+def without_catcher(body: dict) -> dict:
+    """The sheet's page body without its ClickCatcher. D2R hit-tests the widgets of a hidden group too (a ClickCatcher, and
+    buttons as well: seen in game, check statbook_legacy_points), so the page body's ClickCatcher took every click on D2R's
+    stat point buttons (LevelUpInfo, drawn under it) on the Character tab: no stat point could be spent in legacy graphics
+    (player report, 2026-11-21). As in HD (its page body has none) and the plain D2R panel. D2R shows LevelUpInfo every
+    frame, so it stays under the page stone; on a page a click where a + sits still reaches it, as in HD."""
+    return {**body, "children": [c for c in body["children"] if c["type"] != "ClickCatcherWidget"]}
+
+
 def legacy_sheet(lay: dict, book: dict, boxes, preview: int | None = None, query: str = "") -> dict:
     lay = name_row(strip(lay))
     kids = lay["children"]
     i = next((k + 1 for k, c in enumerate(kids) if c.get("name") == "background"), 0)
     kids[i:i] = [head_widget()]
     i = next((k for k, c in enumerate(kids) if c.get("name") == "CloseButton"), len(kids))
-    # the arrow after the book: D2R hit-tests the hidden page body's ClickCatcher too, which ate the arrow's clicks
-    kids[i:i] = book_widgets(book, boxes, False, preview, query) + [advanced_button()]
+    # the arrow after the book: D2R hit-tests the hidden page body's ClickCatcher too, which ate the arrow's clicks (the page
+    # body has none any more, without_catcher; the arrow stays after the book)
+    book_kids = [without_catcher(w) if w["name"] == "SbPageBody" else w for w in book_widgets(book, boxes, False, preview, query)]
+    kids[i:i] = book_kids + [advanced_button()]
     if preview:
         for c in kids:
             if c.get("name") in hidden_on_pages(lay):

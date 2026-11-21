@@ -45,9 +45,10 @@ It is a `preserve` file, so a player's changes survive Update and Repair. `tools
 
 It hooks the vendor panel set-up and the client refresh send, and on the server the vendor interaction and the entity
 action packet (`0x38`, action `VSRF`, rewritten to the game's own trade action). Every hook checks the expected bytes
-first, and it checks the D2RCore packet relay; it has no game-version gate of its own. In legacy graphics it finds no
-gold anchor on the classic panel and leaves the button out (it logs that once per panel). In game (lane plug127)
-mxl2012-core reported no plugin clashes.
+first, and it checks the D2RCore packet relay; it has no game-version gate of its own. In legacy graphics it places the
+button by named rects of the classic trade panel (its "legacy-frame" route), which D2R's own panel does not have; the
+mod's classic `vendorpanellayout.json` adds them (`tools/ui_layouts.py` `vendor_classic`, from 0.1.28): the button sits
+on the stone left of Buy. In game (lane plug127) mxl2012-core reported no plugin clashes.
 
 To move to a new version, move the gitlink (with Floating Damage), update `VSR` (version, MPQ hash) in
 `tools/package_release.py` and this README, and run the in-game check (docs/testing.md "Lane plug127").

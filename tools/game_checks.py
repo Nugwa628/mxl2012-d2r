@@ -17100,6 +17100,16 @@ def check_statbook_legacy():
 
 CHECKS += [("statbook_legacy", check_statbook_legacy)]
 
+
+def check_statbook_legacy_points():
+    """The stat point buttons on the mod's legacy sheet: each + spends a point, also after a Stat Book page was open (player
+    report "unable to add stats in legacy"; tools/statbook_checks.py run_legacy_points)."""
+    import statbook_checks
+    statbook_checks.run_legacy_points(sys.modules[__name__])
+
+
+CHECKS += [("statbook_legacy_points", check_statbook_legacy_points)]
+
 # lane hdcombat: player report "damage, hits and chance-to-cast procs work less well in HD than in legacy graphics". The same
 # Barbarian, sword and zombie in each graphics mode: HC_ATTACKS left clicks without procs (hits = clicks after which the zombie
 # lost life, damage = its life lost), then HC_ATTACKS clicks with Addertongue (25 % Venomous Spirit 841 on attack; procs = the

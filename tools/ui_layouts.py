@@ -19,7 +19,8 @@ Classic (G key, `....json`, no scaling): the mod's own invchar6.dc6 / supertrans
 The HD panels' title text is written out as a literal (docs/bugs.md #30): `"text": "@strpanel4"` / `"@box"` draw "Missing string"
   in the mod's HD inventory and cube layouts (checked in game, with another key too), a literal text draws. The inventory has
   none (the head slot of the mod's picture sits where the title would be), the cube reads "Horadric Cube".
-The stash (10 x 10), trade, vendor and hireling layouts and every other panel stay D2R's, but for the RotW stash pages' cube
+The stash (10 x 10), trade, HD vendor and hireling layouts and every other panel stay D2R's (the classic vendor panel gets the
+rects Vendor Stock Refresh places its button by, `vendor_classic`), but for the RotW stash pages' cube
 window (`stash_hd`, bug #515: Median's 10 x 8 cube small on 10 x 8 cells of its own). The HD skill tree layout stays D2R's too
 (3 tabs; the tab titles come from strings, tools/skill_tree_art.py). The classic one (`skillstreepanel.json`) draws no tab title
 for any class (docs/bugs.md #33, coordinator decision): the mod's skltree_*_back.dc6 art has its own labels on the tabs and D2R's
@@ -375,7 +376,10 @@ LITERALS = {"@StrSklTree1 @StrSklTree2 @StrSklTree3": "Skill Choices Remaining",
             "@StrSklTreeb": "Skill Tab 2", "@StrSklTreec": "Skill Tab 3", "@strClose": "Close", "@strGoldDrop": "Drop Gold",
             "@strUiMenu2": "Transmute", "@SkillCategoryWa1": "Demon", "@SkillCategoryWa2": "Eldritch", "@SkillCategoryWa3": "Chaos",
             "@CfgQuestLog": "Quest Log", "@strlvlup": "New Stats", "@strnewskl": "New Skill", "@panelmini": "Open Mini Panel",
-            "@panelcmini": "Close Mini Panel", "@SkillAndStatLevelUp": "New Stats and Skills"}
+            "@panelcmini": "Close Mini Panel", "@SkillAndStatLevelUp": "New Stats and Skills",
+            "@strBSArmor": "Armor", "@strBSWeapons": "Weapons", "@strBSMisc": "Misc", "@NPCPurchaseItems": "Buy",
+            "@NPCSellItems": "Sell", "@NPCRepairItems": "Repair", "@refresh": "Refresh",
+            "@strThisShouldBeIn104": "Repair all equipment: %d", "@stash": "Stash"}
 AT_KEY = re.compile(r'"(@[^"\n]*)"')
 
 
@@ -420,6 +424,99 @@ def skilltree_classic(warlock_code: int | None = None) -> str:
         import warlock_tree
         warlock_code = warlock_tree.cancel_code(warlock_tree.load()[0])
     return literalize(warlock_cancel_position(out, warlock_code), "skillstreepanel.json")
+
+
+# Vendor Stock Refresh (the bundled plugin, docs/bundled-plugins.md) in legacy graphics: D2R's classic trade panel has a
+# refresh button (gambling's, on the repair square) but none of the named rects the plugin places it by, so it left the button
+# out. The plugin's "legacy-frame" route needs `vendor_refresh_frame`, `vendor_refresh_slot` (the button is centred in it) and
+# `vendor_refresh_gold_anchor` (where the gold goes), and `StashWidget` / `gold_icon` / `gold_amount` with a real size (it moves
+# the three by the anchor's offset; here the anchor is the gold box itself, so the gold stays). The button goes on the stone
+# left of Buy, in the row of the other four squares (classic pixels of the 320 x 432 panel; the refresh art is a 32 x 32
+# bevelled square like theirs). Gambling (and a game without the plugin) keep D2R's button on the repair square; the added
+# widgets are bare `Widget`s and draw nothing.
+VSR_SLOT = (62, 383, 36, 36)        # the bottom row: Buy 116, Sell 168, Repair 220, Close 272 (52 apart), less the ring's 2 px
+VSR_GOLD = (14, 356, 188, 20)       # the gold box (label "Stash" at 21, amount at 78, width 120)
+VSR_GOLD_LABEL = (21, 358, 54, 14)  # `gold_icon`: the classic panel has no coin, the label's box stands for it
+VSR_GOLD_AMOUNT = (78, 358, 120, 14)
+VSR_BUTTON = (218, 383, 36, 36)     # D2R's refresh button on the repair square (gambling), its rect given the art's size
+# The other squares' gold edge is the panel art's (PANEL\buysell frame 2: a gold line 1 px round each 32 x 32 button, a light
+# bevel and a shadow beyond it); the stone left of Buy has none. So the refresh button gets its own art, VSR_ART: 36 x 36, Buy's
+# inset cut from the panel art with D2R's refresh button (PANEL\refreshbtn, normal and pressed) inside. On the repair square
+# (gambling) its ring lies on the panel's own, pixel for pixel. Owner request 2026-11-21: "the same gold outline as the other
+# buttons".
+VSR_ART = "mxlrefreshbtn"
+VSR_INSET_FROM = (114, 383 - 256)   # Buy's inset in buysell.dc6 frame 2 (the bottom-left 256 x 176 tile): its button at 116,385
+
+
+def _widget(indent: str, name: str, box: tuple[int, int, int, int]) -> str:
+    return (f'{indent}{{\n{indent}    "type": "Widget", "name": "{name}",\n'
+            f'{indent}    "fields": {{ "rect": {rect(*box)} }}\n{indent}}},\n')
+
+
+def vendor_classic() -> str:
+    """D2R's classic vendor panel with the rects Vendor Stock Refresh places its button by (see VSR_SLOT)."""
+    t = baseline("vendorpanellayout.json")
+    t = set_rect(t, "button_refresh", rect(*VSR_BUTTON))
+    s, e = block_span(t, '"name": "button_refresh"')
+    t = t[:s] + t[s:e].replace('"PANEL\\\\refreshbtn"', f'"PANEL\\\\{VSR_ART}"', 1) + t[e:]
+    t = set_rect(t, "gold_amount", rect(*VSR_GOLD_AMOUNT))
+    indent = " " * 8
+    added = "".join(_widget(indent, n, b) for n, b in (("StashWidget", VSR_GOLD), ("gold_icon", VSR_GOLD_LABEL),
+                                                         ("vendor_refresh_frame", VSR_SLOT), ("vendor_refresh_slot", VSR_SLOT),
+                                                         ("vendor_refresh_gold_anchor", VSR_GOLD)))
+    s, e = block_span(t, '"name": "gold_amount"')
+    if not t[s:e].endswith(","):
+        added = "," + added
+    nl = t.find("\n", e)
+    at = nl + 1 if nl >= 0 and t[e:nl].strip() == "" else e
+    return t[:at] + added + t[at:]
+
+
+def dc6_indices(w: int, h: int, block: bytes):
+    """A DC6 frame block as an (h, w) array of palette indices, 0 = transparent (dc6.py's encoding, rows bottom-up)."""
+    import numpy as np
+    a = np.zeros((h, w), np.uint8)
+    x, y, i = 0, h - 1, 0
+    while i < len(block) and y >= 0:
+        b = block[i]
+        i += 1
+        if b == 0x80:
+            x, y = 0, y - 1
+        elif b & 0x80:
+            x += b & 0x7F
+        else:
+            run = list(block[i:i + b])[:max(0, w - x)]       # as dc6.decode_frame: pixels past the right edge are dropped
+            a[y, x:x + len(run)] = run
+            i += b
+            x += b
+    return a
+
+
+def vendor_refresh_art(out_data: Path) -> list[str]:
+    """VSR_ART (see VSR_BUTTON) as a classic DC6 under out_data/global/ui/panel: frames normal and pressed, D2R's own
+    palette indices (buysell.dc6 and refreshbtn.dc6 of the D2R extraction, nothing requantised)."""
+    import dc6
+    import fxpaths
+    import numpy as np
+    from rotw_stash_legacy import dc6_bytes
+    w, h, _ox, _oy, block = dc6.read_dc6(fxpaths.d2r_file("data/global/ui/panel/buysell.dc6"))[2]
+    panel = dc6_indices(w, h, block)
+    x, y = VSR_INSET_FROM
+    inset = panel[y:y + 36, x:x + 36].copy()
+    if (inset == 0).any():
+        raise SystemExit("vendor_refresh_art: Buy's inset in buysell.dc6 has transparent pixels; the cut is off")
+    frames = []
+    for w, h, _ox, _oy, block in dc6.read_dc6(fxpaths.d2r_file("data/global/ui/panel/refreshbtn.dc6"))[:2]:
+        btn = dc6_indices(w, h, block)
+        if (w, h) != (32, 32):
+            raise SystemExit(f"vendor_refresh_art: refreshbtn.dc6 frame is {w} x {h}, not 32 x 32")
+        f = inset.copy()
+        f[2:34, 2:34] = np.where(btn > 0, btn, inset[2:34, 2:34])
+        frames.append(f)
+    d = Path(out_data) / "global" / "ui" / "panel"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{VSR_ART}.dc6").write_bytes(dc6_bytes(frames))
+    return [f"vendor refresh button: {VSR_ART}.dc6 36x36 x {len(frames)} (Buy's gold inset round D2R's refresh button)"]
 
 
 # Auto Belt Refill's potion counts (patches 0006 / 0007, docs/bugs.md #613): empty text boxes in D2R's HUD by the belt, which the
@@ -540,7 +637,8 @@ def build(out: Path = LAYOUT_OUT, table: Path = EXCEL / "inventory.txt") -> list
              "skillstreepanel.json": skilltree_classic(),
              "hudpanelhd.json": hud_hd(),
              "controller/hudpanelhd.json": hud_controller(),
-             "hudpanel.json": hud_classic()}
+             "hudpanel.json": hud_classic(),
+             "vendorpanellayout.json": vendor_classic()}
     for name, text in files.items():
         (out / name).parent.mkdir(parents=True, exist_ok=True)
         (out / name).write_text(literalize(text, name), "utf-8", newline="")

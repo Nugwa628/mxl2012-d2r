@@ -206,6 +206,63 @@ class Layouts(unittest.TestCase):
         for n in ("SbPageBody", "StatBookPage", "StatBookAll"):    # after (over) the hidden page body's ClickCatcher
             self.assertLess(top.index(n), top.index(SL.ADVANCED_NAME))
 
+    def test_no_click_catcher_over_the_sheets_buttons(self):
+        # player report: the + buttons did nothing in legacy. D2R hit-tests a hidden ClickCatcher too, so no ClickCatcher may
+        # come after (over) a button of the sheet that it covers: D2R's stat point buttons, the arrow, close.
+        def flat(ws, ox, oy):
+            for w in ws:
+                rr = w.get("fields", {}).get("rect", {})
+                x = ox + (rr["x"] if isinstance(rr.get("x"), int) else 0)     # D2R's own $Profile places count as 0
+                y = oy + (rr["y"] if isinstance(rr.get("y"), int) else 0)
+                yield w, x, y, rr
+                yield from flat(w.get("children", []), x, y)
+        order = list(flat(self.lay["children"], 0, 0))
+        catchers = [(k, x, y, rr) for k, (w, x, y, rr) in enumerate(order)
+                    if w["type"] == "ClickCatcherWidget" and isinstance(rr.get("width"), int)]
+        names = []
+        for k, (w, x, y, _rr) in enumerate(order):
+            if "Button" not in w["type"]:
+                continue
+            names.append(w.get("name"))
+            for ck, cx, cy, cr in catchers:
+                if cx <= x < cx + cr["width"] and cy <= y < cy + cr["height"]:
+                    self.assertGreater(k, ck, w.get("name"))
+        for n in ("StrengthPointButton", "DexPointButton", "VitalityPointButton", "EnergyPointButton", SL.ADVANCED_NAME, "CloseButton"):
+            self.assertIn(n, names)
+
+    def test_nothing_interactive_over_the_plus_buttons(self):
+        # D2R hit-tests the widgets of a hidden group too: no button, input box or ClickCatcher of the book may overlap D2R's
+        # stat point buttons (PANEL\\level, 22 x 22), whatever page shows (the All Stats search box once covered Strength's)
+        def flat(ws, ox, oy):
+            for w in ws:
+                rr = w.get("fields", {}).get("rect", {})
+                x = ox + (rr["x"] if isinstance(rr.get("x"), int) else 0)
+                y = oy + (rr["y"] if isinstance(rr.get("y"), int) else 0)
+                yield w, x, y, rr
+                yield from flat(w.get("children", []), x, y)
+        order = list(flat(self.lay["children"], 0, 0))
+        plus = [(x, y, 22, 22) for w, x, y, _rr in order if w["type"] == "CharacterStatLevelUpButtonWidget"]
+        self.assertEqual(len(plus), 4)
+        sizes = {"ButtonWidget": None, "InputTextBoxWidget": None, "ClickCatcherWidget": None}
+        for w, x, y, rr in order:
+            n = str(w.get("name", ""))
+            if w["type"] not in sizes or not n.startswith(L.STATBOOK_PREFIXES):
+                continue
+            ww, hh = rr.get("width"), rr.get("height")
+            if not isinstance(ww, int):          # a button sized by its art: the largest classic Stat Book button
+                ww, hh = 60, 20
+            for px, py, pw, ph in plus:
+                self.assertFalse(x < px + pw and px < x + ww and y < py + ph and py < y + hh, (n, x, y, ww, hh, px, py))
+
+    def test_stat_buttons_under_the_page_stone(self):
+        # D2R shows LevelUpInfo every frame, on the pages too: it stays under the page body (as in HD), which has no ClickCatcher
+        top = {c.get("name"): c for c in self.lay["children"]}
+        names = list(top)
+        self.assertLess(names.index("LevelUpInfo"), names.index("SbPageBody"))
+        body = top["SbPageBody"]["children"]
+        self.assertFalse([c for c in body if c["type"] == "ClickCatcherWidget"])
+        self.assertEqual([c["type"] for c in body], ["ImageWidget"] * len(SL.body_tiles()))
+
     def test_normal_build_shows_no_page(self):
         top = {c.get("name"): c for c in self.lay["children"]}
         for n in ("StatBookPage", "StatBookAll", "SbPageBody"):

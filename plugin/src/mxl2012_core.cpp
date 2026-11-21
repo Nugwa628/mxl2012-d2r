@@ -80,6 +80,8 @@
 //      platform the build floors with D2R's Arcane walkways (void_floor.cpp, off word void65, docs/maps-hd.md item 12);
 //   +  D2R's HD model cache starts at 8250 models instead of 2750, so the maps that draw Median's wall tiles as models do
 //      not fill it and assert (model_cache.cpp, off word modelcache, docs/maps-hd.md "Model cache");
+//   +  a vendor's first-meeting greeting that ends while Trade or Gamble is open keeps the panel open instead of closing it
+//      (npc_greet.cpp, off word npcgreet);
 //   +  a Barbarian spirit (Guardian, Defender, Protector) farther than 20 sub-tiles from its owner is warped to it by D2R's pet
 //      warp, unless it is fighting a target in reach within 40 (spirit_warp.cpp, off word spiritwarp, #534);
 //   (personal stash page 2, stash_pages.cpp, is not registered: D2RLoader's one custom player page, item page 6, belongs
@@ -112,6 +114,7 @@
 #include "item_effect.h"
 #include "item_level.h"
 #include "lvlup_ui.h"
+#include "npc_greet.h"
 #include "map_reveal.h"
 #include "melt_trail.h"
 #include "lob_aim.h"
@@ -162,7 +165,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.27";
+constexpr const char* PluginVersion = "0.1.28";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -228,7 +231,7 @@ char g_otherImage[256] = "";  // the message for a player on another game image,
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim stunlen whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim stunlen whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache npcgreet), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 
 void ReadOffList() noexcept {
@@ -521,6 +524,7 @@ char g_stashTipReport[192] = "";
 char g_tabFlashReport[192] = "";
 char g_voidFloorReport[160] = "";
 char g_modelCacheReport[192] = "";
+char g_npcGreetReport[192] = "";
 char g_devMenuReport[320] = "";
 char g_wikiReport[320] = "";
 char g_stashPageReport[192] = "";
@@ -568,7 +572,7 @@ void FindHookClashes(char* out, size_t n) noexcept {
 	             {"mercequip", g_mercEquipReport}, {"dursync", g_durSyncReport}, {"soundguard", g_soundGuardReport},
 	             {"spiritsound", g_spiritSoundReport}, {"transguard", g_transGuardReport}, {"lvlupui", g_lvlUpUiReport},
 	             {"petspread", g_petSpreadReport}, {"spiritwarp", g_spiritWarpReport}, {"appleuse", g_appleUseReport}, {"charmdup", g_charmDupReport}, {"vochat", g_voChatReport},
-	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"rotwwarn", g_rotwWarnReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport}, {"modelcache", g_modelCacheReport},
+	             {"reassign", g_reassignReport}, {"rotwstash", g_rotwStashReport}, {"rotwwarn", g_rotwWarnReport}, {"medtab", g_medTabReport}, {"stashtip", g_stashTipReport}, {"tabflash", g_tabFlashReport}, {"void65", g_voidFloorReport}, {"modelcache", g_modelCacheReport}, {"npcgreet", g_npcGreetReport},
 	             {"arealvl", g_areaLevelReport}, {"clearfonts", g_clearFontsReport}, {"cltdostub", g_stubReport}};
 	for (const auto& p : parts) {
 		words[count] = p.word;
@@ -863,6 +867,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	}
 	Say(command, Off("void65") ? "void65 off: left out by mxl2012-core-off.txt" : g_voidFloorReport);
 	Say(command, Off("modelcache") ? "modelcache off: left out by mxl2012-core-off.txt" : g_modelCacheReport);
+	if (Off("npcgreet")) {
+		Say(command, "npcgreet off: left out by mxl2012-core-off.txt");
+	} else {
+		std::snprintf(line, sizeof(line), "%s; greetings ended with a vendor panel kept %ld", g_npcGreetReport, NpcGreetKept());
+		SayPart(command, "npcgreet", line);
+	}
 	{
 		char status[256];
 		StashPagesStatus(status, sizeof(status));
@@ -1171,6 +1181,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("modelcache")) {
 		InstallModelCache(context, g_modelCacheReport, sizeof(g_modelCacheReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_modelCacheReport);
+		context->LogInfo(line);
+	}
+	if (!Off("npcgreet")) {
+		InstallNpcGreet(context, g_npcGreetReport, sizeof(g_npcGreetReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_npcGreetReport);
 		context->LogInfo(line);
 	}
 	// Personal stash page 2 is not registered: D2RLoader gives a mod ONE custom player page (item page 6) and it belongs to

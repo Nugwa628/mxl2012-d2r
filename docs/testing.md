@@ -4,6 +4,53 @@ Changes that are built and installed but not yet confirmed in the game. Restart 
 "Confirmed" (or into docs/bugs.md) once tested. Console command `mxl` shows the plugin version and how many skill
 functions it installed.
 
+## Lane rel0128: release 0.1.28 built, packaged and smoked on Linux (2026-11-21, slot 7, HD and legacy, private display)
+
+main `745084c` (lane/bugs128 merged with lane/legacystat's `790192d` cherry-picked, the 0.1.28 version, the gold-edged legacy
+refresh button), built in the worktree `/d2work/wt/rel0128` (rel0127's `work/` as the cache). Evidence in `/d2work/runs/rel0128/`
+(`plugins.log`, `build.log`, `thirdparty.log`, `package.log`, `verify.log`, `tests-*.log`, `smoke128.sh`, `smoke*.log`, runs in
+`runs/`). Steps as in docs/release.md "Making a release on Linux".
+
+- **Build:** `build_plugins_linux.sh` (core dev + release, drawcap, invtabs, statbook): 64 test executables pass under wine.
+  `tools/build.py` (MXL_REFERENCE as relfinal; walls regenerated once, the tools changed): validate 0 errors (plugin 172,
+  warnings 13). Third party: Buff HUD rebuilt against this `work/` (`d2rl-buff-panel.dll` sha256 `9e3a6c3a...`); Controller QOL's
+  skill profile is byte-equal to 0.1.27's, so its DLL and the other five (pins unchanged) are relfinal's.
+- **Package** `D2R-XL-2012-0.1.28.7z`: 8,233 files, 1,106 MB unpacked, 189 MB (sha256 `16b7a025...`), 46 D2R byte copies left
+  out. `verify_package.py` OK.
+- **Tests (built checkout):** `discover -s tools/tests` 1,952 OK (18 skipped); `-s tools -p "test_*.py"` 615 OK (5 skipped;
+  `test_package_release`, `test_verify_package`, `test_game_checks_unporteda` need the built checkout); `check_docs_links` 0,
+  `check_public` 0.
+- **Smoke:** the package installed with `release_install.py install --package` on slot 7, the dev DLL rel0128 HEAD plus the
+  Wine harness commits f3eb646, 246be0a, a57de52 (`harness.diff`); lock held by the script's pid, slot restored and lock
+  released after every step.
+
+| Check | Result | Run |
+|-|-|-|
+| `mxl2012` (57 lines, 0.1.28, FAILED none), `clickmap` | PASS | `checks-20261121-205203-s7` |
+| All 10 bundled DLLs loaded (`rel_plugins`) | PASS | `-205203-s7` |
+| Monster Display, Enemy Health Bars, Floating Damage in HD and legacy, VSR in HD (by eye) | PASS | `-205203-s7` |
+| #578 dark stance feathers, HD and legacy (`t578`, by eye) | PASS | `-210010-s7` |
+| VSR in legacy graphics: gold-edged button left of Buy, reroll (36 items, none kept) | PASS | `-210226-s7` |
+| Stat Book + buttons (`statbook_legacy_points`, legacy and HD, every judged row; `MXL_LEGACY_SCREEN_W=1066`) | PASS | `-211208-s7` (the first try, `-210623-s7`, clicked for an 800-wide classic screen: the package has Legacy 16:9) |
+
+## Lane bugs128: the 0.1.28 bugs (2026-11-21, Linux slot 2 and 5, HD and legacy, private display)
+
+Based on main 5637191 with the Linux tools of lane linux-integration (a3a4040): `game_checks.py` on Proton with a private
+Xvfb display, the slot restored byte-equal after each run. Runs, checks and scratch harness: `/d2work/runs/bugs128`
+(`run.sh SLOT TAG CHAR CLASS CHECK...`, checks in `checks128.py`). Casts are real right-clicks (`skill right N`, then a
+right click): the harness `cast` word starts the skill on the server only, so client effects (cast overlays, Phalanx's
+archers) do not show. Short effects need the 25 fps recording the checks make (`rec_*.mp4`): a screenshot takes about
+0.5 s on Linux, longer than Tremor's puff.
+
+| Bug | Check | Result |
+|-|-|-|
+| #610 Tremor's cast dust | `t610`, a Druid casting Tremor in HD and legacy | Not a bug: the dust (`castoverlay`) draws in both modes as in 1.13c (`checks-20261121-171541-s2`) |
+| #570 Phalanx's archers in HD | `t570`, an Amazon casting Phalanx New (bow and quiver) in HD and legacy | Fixed: HD draws the golden archers like legacy (after `checks-20261121-172927-s2`, `phalanx_after.png`; before `checks-20261121-172912-s5`, `phalanx_before.png`, HD only gold glows) |
+| VSR first trade (#621) | `v_first`, a new Amazon's first trade with Charsi picked during her greeting; `V_CLICK_EARLY=0` no click, VSR off for the control | Fixed: the trade stays open past the greeting and Refresh rerolls (`-175245-s6`, `-175602-s6`); before it closed at the greeting's end with or without VSR (`-173604-s6`, `-174015-s6`). A click during the greeting only ends the greeting, as in D2R |
+| VSR refresh in legacy graphics (new) | `v_legacy`: G, Charsi's trade, the button hovered and clicked (`V_LEG_BTN`), then Gheed's gamble; the layout laid into the slot, VSR's diagnostics on | Works: VSR takes its "legacy-frame" route (slot 64,385, gold anchor 14,356), the button shows on the stone left of Buy with its Refresh tooltip, and a click rerolls: 1600x900 with Legacy 16:9 (`-181332-s6`, 34 to 37, none kept), 1920x1080 without it (`-182528-s6`, 39, none kept), 2560x1440 with it (`-183656-s6`, 35 to 36, none kept). Gambling keeps D2R's refresh on the repair square. The click spot moves with the view: (240,692), (440,692) without Legacy 16:9, (272,691) at 1440p, in 1600x900 terms The two untested combos (lane bugs128, 0.1.27 package on slot 6 with the same layout and VSR build): 1920x1080 with Legacy 16:9 (`-193928-s6`, 39 to 35, none kept; click at (283,692)) and 2560x1440 without it (`-193346-s6`, 38 to 33, none kept; (440,692)): the button shows on the stone left of Buy with its tooltip and rerolls. A first try at 1080p clicked (256,692), beside the button (`-192851-s6`, unchanged) Gold edge (owner request, same day): the button's own art `PANEL\mxlrefreshbtn` (Buy's gold inset of the panel art round D2R's refresh button, `ui_layouts.vendor_refresh_art`, slot 62,383 36 x 36): the button now has the same gold outline as Buy, Sell, Repair and Close; trade rerolls at 900p with Legacy 16:9 (`/d2work/runs/bugs128/runs/checks-20261121-203753-s6`, 33 to 32, none kept) and 1440p without (`-204251-s6`, 40 to 31); gambling keeps it on the repair square, its ring on the panel's own |
+| #578 stance feathers in HD | `t578`, a Barbarian in the Rogue Encampment puts Lion, Bear, Snake and Eagle Stance on the right hand, HD then legacy, shots at 1, 3 and 6 s and 3 s at 25 fps | Fixed: HD shows Median's dark feathers swirling round him for every stance, as legacy (alpha-blended flipbook, `checks-20261121-192138-s2`). The first stand-in glowed in the stance colours (additive, `-184711-s2`); alpha blend with the white mask drew nothing (`-191248-s2`), with the coverage mask pale at gain 1.5 (`-191722-s2`), dark at 0.3 to 0.02 (`-191954-s2`, HD only) |
+| Stat Book + buttons under a page | `statbook_legacy_points` (tools/statbook_checks.py, run through `checks128.py sbpoints` with the cherry-picked legacy layout and this lane's statbook.dll laid into slot 5), legacy then HD: each + on the Character tab, clicks where the Vitality and Strength + sit on the Offense and All Stats pages, back on Character, then with 0 points and with points again | Fixed: on both pages in both modes the clicks spend nothing (the host reports "+ buttons off", 0 fails), every + on the Character tab spends a point before and after, and with no points left a click spends nothing; the pages show no + (`/d2work/runs/bugs128/runs/checks-20261121-191925-s5`, every judged row ok). Before (lane legacystat): a click there spent a point, in HD too |
+
 ## Lane devsock: developer menu uniques and set items with their maximum sockets (2026-11-17, slots 5 and 2, HD and legacy, background input)
 
 Owner report 2026-11-17: Facebreaker (Chain Gloves (Sacred)) from the developer menu showed "Max Sockets: 4" and took nothing; a Cap

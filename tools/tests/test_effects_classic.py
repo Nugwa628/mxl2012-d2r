@@ -75,6 +75,45 @@ class Confined(unittest.TestCase):
         bad = ecl.confined(spec, SKILLS, dicts(table()), [], [], [])
         self.assertEqual(bad, ["missile other.ExplosionMissile -> shared"])
 
+    def test_a_row_marked_shared_may_be_reached_by_anything(self):
+        spec = {"skills": ["My Skill"], "missiles": {"mymover": {}, "mydamage": {}, "shared": {"shared": "same art for all"}}}
+        rows = table()
+        self.assertEqual(ecl.confined(spec, SKILLS + [{"skill": "Thief", "srvmissile": "shared"}], dicts(rows),
+                                      [{"Id": "zombie", "MissA1": "shared"}], [], []), [])
+
+    def test_opaque_art_needs_the_spec_to_say_so(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            excel = Path(tmp)
+            (excel / "missiles.txt").write_text("Missile\tCelFile\tTrans\narcher\tLegionTile\t0\n", "utf-8")
+            spec = {"skills": [], "missiles": {"archer": {"art": "missiles/LegionTile"}}}
+            self.assertTrue(any("Trans is '0'" in b for b in ecl.problems(spec, excel)))
+            spec["missiles"]["archer"]["opaque"] = "drawn as colour layers"
+            self.assertEqual(ecl.problems(spec, excel), [])
+
+    def test_an_overlay_must_be_shared_and_match_its_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            excel = Path(tmp)
+            (excel / "missiles.txt").write_text("Missile\tCelFile\tTrans\n", "utf-8")
+            (excel / "overlay.txt").write_text("overlay\tFilename\tCharacter\tTrans\nbarb_1\tvdfeathers\tmonster\t5\n", "utf-8")
+            spec = {"skills": [], "missiles": {}, "overlays": {"barb_1": {"art": "overlays/vdfeathers"}}}
+            bad = ecl.problems(spec, excel)
+            self.assertTrue(any("`shared`" in b for b in bad), bad)          # every state that shows it gets the look
+            self.assertTrue(any("Trans is '5'" in b for b in bad), bad)
+            spec["overlays"]["barb_1"].update(shared="the stances", opaque="lifted, tinted")
+            self.assertEqual(ecl.problems(spec, excel), [])
+            spec["overlays"]["barb_1"]["art"] = "overlays/other"
+            self.assertTrue(any("Filename is 'vdfeathers'" in b for b in ecl.problems(spec, excel)))
+            spec["overlays"] = {"nope": {"art": "overlays/vdfeathers", "shared": "x"}}
+            self.assertIn("no overlay.txt row nope", ecl.problems(spec, excel))
+            self.assertEqual(ecl.overlay_folder(excel, "BARB_1"), "monster")
+
+    def test_an_overlay_definition_has_no_unit_root(self):
+        unit = ef.definition("mxl_fx_x", [{"particle": "data/p.particles", "texture": "data/t.texture", "pos": (0, 1, 0)}], True)
+        d = ecl.overlay_definition("Barb_1", unit)
+        self.assertEqual((d["type"], d["name"]), ("OverlayDefinition", "barb_1"))
+        self.assertEqual([e["name"] for e in d["entities"]], ["entity_vfx1"])
+        self.assertEqual(d["dependencies"], unit["dependencies"])
+
     def test_other_skills_monsters_states_and_items_are_seen(self):
         rows = table()
         ecl.add_rows(HEADER, rows, WANTED)
@@ -111,7 +150,20 @@ class CommittedSpec(unittest.TestCase):
             mj.parent.mkdir(parents=True)
             before = {"teethexplodeblue": "teethexplode", "firebolt": "fire_bolt", "bioneticmover": "psi_orb"}
             mj.write_text(json.dumps(before), "utf-8")
+            excel = out / "global" / "excel"
+            excel.mkdir(parents=True)
+            (excel / "overlay.txt").write_text("overlay\tFilename\tCharacter\tTrans\n" + "".join(
+                "%s\t%s\tmonster\t5\n" % (o, how["art"].split("/")[-1]) for o, how in self.spec["overlays"].items()), "utf-8")
             facts = ecl.build(self.spec, out, templates)
+            for row, how in self.spec["overlays"].items():
+                d = json.loads((out / "hd" / "overlays" / "monster" / (row + ".json")).read_text("utf-8"))
+                self.assertEqual((d["type"], d["name"]), ("OverlayDefinition", row))
+                for kind in ("particles", "textures"):
+                    for q in d["dependencies"][kind]:
+                        self.assertTrue((out / q["path"][len("data/"):]).is_file(), q["path"])
+                self.assertIsNone(facts["overlay:" + row]["was"])          # none there before in this test
+                if any(q.get("blend") == "alpha" for q in how.get("parts", [])):   # the coverage atlas goes with it
+                    self.assertTrue(any(q["path"].endswith("_alpha.texture") for q in d["dependencies"]["textures"]), d["dependencies"])
             after = json.loads(mj.read_text("utf-8"))
             for row, how in self.spec["missiles"].items():
                 self.assertEqual(after[row], how["name"])
@@ -124,7 +176,8 @@ class CommittedSpec(unittest.TestCase):
             self.assertEqual({k: v for k, v in after.items() if k not in self.spec["missiles"]},
                              {"teethexplodeblue": "teethexplode", "firebolt": "fire_bolt"})
             self.assertEqual(facts["bioneticmover"]["was"], "psi_orb")
-            self.assertLess(sum(f["deflated"] for f in facts.values()), 1_000_000)
+            # the feathers (#578) are a colour and a coverage atlas (alpha-blended), about 0.27 MB of the total
+            self.assertLess(sum(f["deflated"] for f in facts.values()), 1_250_000)
 
 
 if __name__ == "__main__":

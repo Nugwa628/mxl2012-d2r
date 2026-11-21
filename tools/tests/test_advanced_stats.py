@@ -77,14 +77,19 @@ class ListFile(unittest.TestCase):
 
     @unittest.skipUnless(LAZ.exists(), "needs the v005 MPQ extraction (plugy/statsinterface.txt)")
     def test_every_stat_of_laz_pages_is_listed(self):
-        lines = LAZ.read_bytes().decode("latin-1").splitlines()[1:]
-        named = [r[0] for r in read(NAMED)[1]] if NAMED.exists() else None
-        for line in lines:
+        # The stat id (column 8) is what PlugY reads; the first column is only Laz's comment and can differ from the stat's
+        # name (id 210 says item_healonstrikingmelee, the stat is skill_healonstrikingmelee). Names by id from the built
+        # mod's itemstatcost, else from the source's (a checkout without a build).
+        table = NAMED if NAMED.exists() else SRC / "itemstatcost.txt"
+        if not table.exists():
+            self.skipTest(f"needs {NAMED} or {table} for the stat names by id")
+        head, rows_ = read(table)
+        col = head.index("ID")
+        named = {r[col]: r[0] for r in rows_ if len(r) > col}
+        for line in LAZ.read_bytes().decode("latin-1").splitlines()[1:]:
             f = line.split("\t")
-            name = f[0]
-            if named is not None:
-                name = named[int(f[7])]  # the stat id is what PlugY reads; its *desc is only a comment
-            self.assertIn(name, self.wanted, line)
+            self.assertIn(f[7], named, line)
+            self.assertIn(named[f[7]], self.wanted, line)
 
 
 @unittest.skipUnless((BUILT / "itemstatcost.txt").exists() and NAMED.exists(), "needs a built mod")

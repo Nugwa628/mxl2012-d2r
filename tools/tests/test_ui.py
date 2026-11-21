@@ -344,6 +344,67 @@ class LayoutTests(unittest.TestCase):
             self.assertEqual(sum(n.startswith("MxlBeltCount") for n in flat), 8, name)
             self.assertEqual(sum(n.startswith("MxlBeltReserve") for n in flat), 4, name)
 
+    def test_classic_vendor_panel_gives_vendor_stock_refresh_its_rects(self):
+        """Item for 0.1.28: the plugin's "legacy-frame" route needs these named rects with a real size, or it leaves the
+        refresh button out of the legacy trade panel."""
+        import pad_ui
+        if not (ui_layouts.BASE_UI / "layouts" / "vendorpanellayout.json").exists():
+            self.skipTest("vendorpanellayout.json not in the D2R baseline (hd_ui.py baseline)")
+        t = ui_layouts.literalize(ui_layouts.vendor_classic(), "vendorpanellayout.json")
+        self.assertIsNone(ui_layouts.AT_KEY.search(t))             # a @key in a mod layout draws "Missing string"
+        d = pad_ui.load(t)
+        w = {c["name"]: c for c in d["children"]}
+        box = {n: (lambda r: (r.get("x", 0), r.get("y", 0), r.get("width", 0), r.get("height", 0)))(c["fields"].get("rect", {}))
+               for n, c in w.items()}
+        for n in ("vendor_refresh_frame", "vendor_refresh_slot", "vendor_refresh_gold_anchor", "StashWidget", "gold_icon",
+                  "gold_amount"):
+            self.assertGreater(box[n][2] * box[n][3], 0, n)
+        for n in ("vendor_refresh_frame", "vendor_refresh_slot", "vendor_refresh_gold_anchor", "StashWidget", "gold_icon"):
+            self.assertEqual(w[n]["type"], "Widget", n)               # bare: draws nothing without the plugin
+        self.assertEqual(box["vendor_refresh_gold_anchor"], box["StashWidget"])  # the gold stays where it is
+        slot = box["vendor_refresh_slot"]
+        self.assertEqual(slot[2:], (36, 36))                         # VSR_ART's size: the refresh button in its gold inset
+        self.assertEqual(box["button_refresh"][2:], (36, 36))
+        self.assertEqual(w["button_refresh"]["fields"]["filename"], "PANEL\\" + ui_layouts.VSR_ART)
+        self.assertEqual(slot[1] + 2, box["button_buy"][1])          # in the row of the other squares, less the ring
+        self.assertEqual(box["button_refresh"][:2], (box["button_repair"][0] - 2, box["button_repair"][1] - 2))  # gambling
+        panel = d["fields"]["rect"]
+
+        def apart(a, b):
+            return a[0] + a[2] <= b[0] or b[0] + b[2] <= a[0] or a[1] + a[3] <= b[1] or b[1] + b[3] <= a[1]
+        self.assertTrue(0 <= slot[0] and slot[0] + 36 <= panel["width"] and slot[1] + 36 <= panel["height"])
+        for n in ("button_buy", "button_sell", "button_repair", "button_close", "gold_label", "gold_amount"):
+            self.assertTrue(apart(slot, box[n] if box[n][2] else box[n][:2] + (32, 32)), n)
+        grid = box["grid"][:2] + (10 * 29, 10 * 29)                  # the vendor grid, 10 x 10 cells of 29
+        self.assertTrue(apart(slot, grid))
+        self.assertTrue(apart(box["StashWidget"], grid))
+
+    def test_classic_refresh_button_art_has_the_gold_inset(self):
+        """Owner request 2026-11-21: the legacy refresh button has the same gold outline as the other buttons. VSR_ART is
+        Buy's inset of the panel art (gold ring 1 px round the button) with D2R's refresh button inside, normal and pressed."""
+        import fxpaths
+        import numpy as np
+        try:
+            panel = dc6.read_dc6(fxpaths.d2r_file("data/global/ui/panel/buysell.dc6"))[2]
+            btn = dc6.read_dc6(fxpaths.d2r_file("data/global/ui/panel/refreshbtn.dc6"))
+        except SystemExit:
+            self.skipTest("no D2R extraction")
+        with tempfile.TemporaryDirectory() as tmp:
+            ui_layouts.vendor_refresh_art(Path(tmp))
+            frames = dc6.read_dc6(Path(tmp) / "global" / "ui" / "panel" / (ui_layouts.VSR_ART + ".dc6"))
+        self.assertEqual([(f[0], f[1]) for f in frames], [(36, 36), (36, 36)])
+        inset = ui_layouts.dc6_indices(*panel[:2], panel[4])
+        x, y = ui_layouts.VSR_INSET_FROM
+        inset = inset[y:y + 36, x:x + 36]
+        for f, b in zip(frames, btn):
+            got = ui_layouts.dc6_indices(f[0], f[1], f[4])
+            self.assertTrue((got > 0).all())                                  # opaque: nothing of the stone shows through
+            ring = np.ones((36, 36), bool)
+            ring[2:34, 2:34] = False
+            self.assertTrue((got[ring] == inset[ring]).all())                 # the panel's own gold ring, bevel and shadow
+            inner = ui_layouts.dc6_indices(b[0], b[1], b[4])
+            self.assertTrue((got[2:34, 2:34][inner > 0] == inner[inner > 0]).all())  # D2R's button inside
+
     def test_classic_skilltree_tab_titles_emptied_for_all_eight(self):
         classes = ("Am", "So", "Ne", "Pa", "Ba", "Dr", "As", "Wa")
         lists = ",\n".join(f'"textTab{i}": [ ' + ", ".join(f'"@SkillCategory{c}{i + 1}"' for c in classes) + " ]" for i in range(3))

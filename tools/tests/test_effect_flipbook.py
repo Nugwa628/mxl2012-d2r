@@ -2,6 +2,7 @@
 the two tests that edit D2R's own particle files skip when the extraction is not there).
 Run: py -3 -I -m unittest discover -s tools/tests -p "test_effect_flipbook.py" """
 import sys
+import struct
 import unittest
 from pathlib import Path
 
@@ -117,6 +118,27 @@ class GameFiles(unittest.TestCase):
                                 gradient="data/hd/vfx/textures/gradient/mxl_fb_x.texture")
             self.assertIn(b"mxl/flipbook/x.texture", data)
             self.assertGreater(len(hp.ParticleFile(data).objects), 50)
+
+
+    def test_alpha_blend_reads_the_coverage_as_alpha(self):
+        """`blend` alpha (dark art over the scene, bug #578): Transparent.Type AlphaBlend (2) and the coverage atlas as the
+        AlphaMask with AlphaOnly, as D2R's own raven feathers; additive keeps the template's defaults."""
+        tpl = d2r(ef.TEMPLATE)
+        if tpl is None:
+            self.skipTest("no D2R extraction")
+        tex, mask = "data/hd/vfx/textures/mxl/flipbook/x.texture", "data/hd/vfx/textures/mxl/flipbook/x_alpha.texture"
+        pf = hp.ParticleFile(ef.particles(tpl, tex, (4, 3), 11, "loop", 4.0, blend="alpha", alpha_mask=mask))
+        for r in pf.renderers():
+            self.assertEqual(r.props["Transparent.Type"].value, struct.pack("<4i", 2, 2, 2, 2))
+            self.assertEqual(r.props["AlphaMask.AlphaOnly"].value, hp.ON)
+            self.assertEqual(pf.prop_string(r.props["AlphaMask.Mask"]), mask)
+            self.assertEqual(r.props["GradientRemap"].value, hp.OFF)
+        pf = hp.ParticleFile(ef.particles(tpl, tex, (4, 3), 11, "loop", 4.0))
+        for r in pf.renderers():
+            self.assertIsNone(r.props["Transparent.Type"].value)
+            self.assertEqual(pf.prop_string(r.props["AlphaMask.Mask"]), ef.T_WHITE)
+        with self.assertRaises(ValueError):
+            ef.particles(tpl, tex, (4, 3), 11, "loop", 4.0, blend="multiply")
 
 
 class Chain(unittest.TestCase):

@@ -168,6 +168,8 @@ void* g_panel = nullptr;
 bool g_isPad = false;
 bool g_wasOpen = false;
 int g_appliedTab = -1;
+int g_plusOn = -1;  // D2R's stat point buttons as last set: 1 on, 0 off (a Stat Book page), -1 not yet (PlusButtonsOn)
+std::atomic<long> g_plusSets{0}, g_plusFails{0};
 std::string g_query, g_appliedQuery;
 // the bound search box changed (G rebinds, a side opening, top / side): the query is read from it again, so the list
 // matches the box shown (WidgetService cannot write a box's text)
@@ -477,6 +479,7 @@ void NewPanel(void* panel, void* sheet) {
 	g_d2r.clear();
 	g_d2rHidden = false;
 	g_appliedTab = -1;
+	g_plusOn = -1;
 	g_sheetTitle = g_plain ? panel_shared::NativeChild(sheet, "StatsPanelTitle") : nullptr;
 	g_isPad = panel_shared::NativeChild(panel, "SbPadPrevLB") != nullptr;
 	const bool legacy = panel_shared::NativeChild(panel, LegacyMarker) != nullptr;
@@ -713,6 +716,44 @@ void D2RWidgets(bool sheet, bool force) {
 		}
 		g_d2rHidden = false;
 	}
+}
+
+// D2R's stat point buttons on (Character tab) or off (a Stat Book page: D2R hit-tests hidden widgets, so a + under the page body
+// would spend a point). Off is set on every tick (cheap, and nothing D2R does turns it on in between); on once per change.
+void PlusButtonsOn(bool on, bool force) {
+	if (g_plain) {  // the plugin's own panel: D2R's sheet and its buttons are D2R's
+		return;
+	}
+	if (!on || force || g_plusOn != 1) {
+		for (const char* n : PlusButtons) {
+			const std::string key = std::string("LevelUpInfo/") + n;
+			D2RL::Widgets::WidgetHandle h = D2RL::Widgets::InvalidHandle;
+			const auto known = g_handles.find(key);
+			if (known != g_handles.end()) {
+				h = known->second;
+			} else {
+				D2RL::Widgets::WidgetHandle group = D2RL::Widgets::InvalidHandle;
+				const auto g = g_handles.find("LevelUpInfo");
+				if (g != g_handles.end()) {
+					group = g->second;
+				} else if (g_panelHandle != D2RL::Widgets::InvalidHandle &&
+				           g_widgets->findWidget(g_context, g_panelHandle, "LevelUpInfo", &group) == D2RL::Widgets::Result::Success) {
+					g_handles.emplace("LevelUpInfo", group);
+				}
+				if (group == D2RL::Widgets::InvalidHandle || g_widgets->findWidget(g_context, group, n, &h) != D2RL::Widgets::Result::Success) {
+					g_plusFails.fetch_add(1, std::memory_order_relaxed);
+					continue;
+				}
+				g_handles.emplace(key, h);
+			}
+			if (g_widgets->setWidgetEnabled(g_context, h, on) == D2RL::Widgets::Result::Success) {
+				g_plusSets.fetch_add(1, std::memory_order_relaxed);
+			} else {
+				g_plusFails.fetch_add(1, std::memory_order_relaxed);
+			}
+		}
+	}
+	g_plusOn = on ? 1 : 0;
 }
 
 // ---- input ---------------------------------------------------------------------------------------------------------------
@@ -1085,6 +1126,7 @@ void TickInner() {
 		Vis("StatBookAll", false, force);
 		Vis("SbTabsToggle", false, force);
 		D2RWidgets(true, force);
+		PlusButtonsOn(PlusButtonsEnabled(ps, true, g_plain), force);
 		if (!g_plain) {
 			Text("StatsPanelTitle", Str("minipanelchar", "Character"), force);
 		} else if (g_sheetTitle != nullptr && IsVisible(g_sheetTitle) != 1) {  // plain D2R: the sheet's own title, hidden under the tabs
@@ -1109,6 +1151,7 @@ void TickInner() {
 	FillLines(player, ps.page, force);
 	FillAll(player, ps.all, force);
 	D2RWidgets(ps.sheet, force);
+	PlusButtonsOn(PlusButtonsEnabled(ps, false, g_plain), force);
 	if (g_sheetTitle != nullptr && IsVisible(g_sheetTitle) == 1) {  // D2R shows it on every opening
 		SetVisibleRaw(g_sheetTitle, false);
 	}
@@ -1392,11 +1435,12 @@ void SheetHostStatus(char* out, size_t outSize) noexcept {
 	std::snprintf(out, outSize,
 	              "bound %d (%s), tab %d of %d, query \"%s\"; %s, sheet open %d; ticks %ld, opens %ld, tab changes %ld, clicks %ld (missed %ld), arrows %ld, typed reads %ld, "
 	              "box clicked %d focus %d; names missing %ld, handles %zu (fails %ld), visibility sets %ld (fails %ld), D2R re-shown %ld, texts %ld (fails %ld), stat lines %ld (D2R's fails %ld), "
-	              "faults %ld; all rows %zu; plain panel %s (opens %ld, fails %ld); tabs %s (side %s, panel %s, opens %ld, fails %ld, toggles %ld)",
+	              "faults %ld; + buttons %s (sets %ld, fails %ld); all rows %zu; plain panel %s (opens %ld, fails %ld); tabs %s (side %s, panel %s, opens %ld, fails %ld, toggles %ld)",
 	              g_bound.load() ? 1 : 0, g_isPad ? "gamepad" : g_legacyNow.load() ? "legacy" : "PC", g_tabNow.load(), g_tabs.Count(), g_query.c_str(), g_calib, g_wasOpen ? 1 : 0, g_ticks.load(), g_opens.load(),
 	              g_tabChanges.load(), g_clicks.load(), g_clickMisses.load(), g_arrows.load(), g_typedReads.load(), g_client.boxClicked.load() ? 1 : 0,
 	              g_client.boxFocus.load() ? 1 : 0, g_missing.load(), g_handles.size(), g_handleFails.load(), g_visSets.load(), g_visFails.load(), g_reshown.load(), g_client.textsSet.load(), g_client.textFails.load(),
-	              g_statLines.load(), g_statLineFails.load(), g_faults.load(), RowCount(g_all), g_plain ? (g_plainOpen ? "open" : g_plainPadSheet ? "closed (gamepad sheet: D2R's own)" : "closed") : "no", g_plainOpens.load(),
+	              g_statLines.load(), g_statLineFails.load(), g_faults.load(), g_plusOn == 1 ? "on" : g_plusOn == 0 ? "off" : "unset",
+	              g_plusSets.load(), g_plusFails.load(), RowCount(g_all), g_plain ? (g_plainOpen ? "open" : g_plainPadSheet ? "closed (gamepad sheet: D2R's own)" : "closed") : "no", g_plainOpens.load(),
 	              g_plainFails.load(), g_sideWanted.load() ? "side" : "top", g_sideOn.load() ? "showing" : "off", !g_sideReady ? "none" : g_sideOpen ? "open" : "closed",
 	              g_sideOpens.load(), g_sideFails.load(), g_toggles.load());
 }

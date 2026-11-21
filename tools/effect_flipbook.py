@@ -14,7 +14,10 @@ life. This tool builds the same thing from a classic DCC:
   particles   D2R's smallest atlas effect (TEMPLATE: one billboard that follows the emitter) with its scripts and constants
               edited: one particle, a fixed size, no rotation, the frame number computed from the particle's age (`loop`:
               frac(age * fps / frames) * frames; `once`: age * fps, the particle dies after the last frame). The blend is
-              additive, as classic `Trans` 1. The ramp is stored so that the screen gets the classic colour (RESPONSE)
+              additive, as classic `Trans` 1. The ramp is stored so that the screen gets the classic colour (RESPONSE).
+              `blend` alpha (dark art drawn normally, classic `Trans` 5): Transparent.Type AlphaBlend, the art's own
+              colours (BC3, times the part's `tint` as the particle colour) and a second atlas of the drawn pixels as the
+              AlphaMask (AlphaOnly), as D2R's own raven feathers (vfx_druidraven_spawn) do
   light       missiles.txt `Light` / `Red` `Green` `Blue` as a point light that follows the missile (LIGHT_TEMPLATE)
   definition  a UnitDefinition with one effect entity per layer (and the light), lifted so the picture stands where the
               classic one does (box centre and `zoffset`)
@@ -65,6 +68,7 @@ MULTI_HUE = 2.0                 # ramp_error (rms, 0..255) above which one ramp 
 LIGHT_REACH = 3.0               # world units of light reach per missiles.txt `Light` unit (fits classic's light on the ground)
 UPSCALE_PAD = 8                 # black pixels round a frame given to a scaler (its filter needs a neighbourhood)
 MARGIN = 2                      # black classic pixels round the art in a cell (no neighbour bleeds in when filtered)
+BLENDS = {"additive": 0, "alpha": 2}  # Transparent.Type of Diablo_Uber billboards (D2R's own: 2 on 1644 smoke-like ones)
 LAYER, FIELD, INPUT = "CLayerCompileCache", "CLayerCompileCacheField", "CLayerCompileCacheRendererParticleInput"
 
 
@@ -73,7 +77,8 @@ def additive_frames(art: str, act: int = 1) -> dict:
     """Direction 0 of a classic animation on black. -> {'frames': [(h, w, 3) uint8], 'box': (x0, y0, w, h), 'dirs': n}."""
     a = effect_sheet.load(art, act)
     frames = [f[..., :3] * (f[..., 3:] > 0) for f in a["dirs"][0]]
-    return {"frames": frames, "box": a["box"], "dirs": len(a["dirs"]), "bytes": a["bytes"], "raw": Path(a["path"]).read_bytes()}
+    cover = [np.repeat((f[..., 3:] > 0).astype(np.uint8) * 255, 3, axis=2) for f in a["dirs"][0]]
+    return {"frames": frames, "cover": cover, "box": a["box"], "dirs": len(a["dirs"]), "bytes": a["bytes"], "raw": Path(a["path"]).read_bytes()}
 
 
 def upscale(frames: list, scale: int, method: str, esrgan: dict | None = None, inner=None) -> list:
@@ -269,8 +274,14 @@ def _script(s: cb.Script, head: list[str], consts: list[str], code: list[str]) -
 def particles(template: bytes, texture: str, grid: tuple[int, int], frames: int, mode: str, size: float,
               intensity: float = 1.0, gain=(1.0, 1.0, 1.0, 1.0), fps: float = FPS, loop_life: float = LOOP_LIFE,
               gradient: str | None = None, alpha_remap: bool = False, cursor=(0.0, 0.0),
-              alpha_cursor=None, dissolve: bool | None = None) -> bytes:
-    """TEMPLATE as a flipbook of `frames` cells of `texture` (`grid` columns x rows): see the module text."""
+              alpha_cursor=None, dissolve: bool | None = None, blend: str = "additive", alpha_mask: str | None = None) -> bytes:
+    """TEMPLATE as a flipbook of `frames` cells of `texture` (`grid` columns x rows): see the module text. `blend`
+    "alpha": the renderer's Transparent.Type is AlphaBlend (2) instead of the template's default Additive (0), so the
+    texture's alpha covers the scene and dark art draws dark (classic `Trans` 5, the normal draw). `alpha_mask`: the atlas of
+    the coverage, read as the alpha (AlphaMask with AlphaOnly, as D2R's own alpha-blended raven feathers,
+    vfx_druidraven_spawn: colour atlas + alpha atlas)."""
+    if blend not in BLENDS:
+        raise ValueError("no blend %r (%s)" % (blend, ", ".join(BLENDS)))
     pf = hp.ParticleFile(template)
     scripts = {s.obj: s for s in cb.scripts(pf)}
     new: dict[int, bytes] = {}
@@ -287,8 +298,10 @@ def particles(template: bytes, texture: str, grid: tuple[int, int], frames: int,
         r = next(x for x in pf.renderers() if x.obj == rends[0] - 1)
         # the renderer: our atlas as the colour, no mask, gradient or alpha remap, the grid, the flipbook switch
         pf.set_texture(r, "Blend.TextureBase", texture)
-        pf.set_texture(r, "AlphaMask.Mask", T_WHITE)
+        pf.set_texture(r, "AlphaMask.Mask", alpha_mask or T_WHITE)
         pf.set_property(r, "AlphaMask.AtlasAlphaOnly", False)
+        if alpha_mask:
+            new[r.props["AlphaMask.AlphaOnly"].obj] = _with_value(pf, r.props["AlphaMask.AlphaOnly"], hp.ON)
         for switch, on in (("GradientRemap", gradient is not None), ("AlphaRemap", alpha_remap)):
             sw = r.props[switch]
             pf.raw[sw.value_at:sw.value_at + 16] = hp.ON if on else hp.OFF
@@ -301,6 +314,9 @@ def particles(template: bytes, texture: str, grid: tuple[int, int], frames: int,
         sub = r.props["Atlas.SubDiv"]
         pf.raw[sub.value_at:sub.value_at + 16] = struct.pack("<4i", grid[0], grid[1], 1, 1)
         new[r.props["Atlas.Flipbook"].obj] = _with_value(pf, r.props["Atlas.Flipbook"], hp.ON)
+        if blend != "additive":
+            new[r.props["Transparent.Type"].obj] = _with_value(pf, r.props["Transparent.Type"],
+                                                                struct.pack("<4i", *[BLENDS[blend]] * 4))
         # constants: life, base UV scale and offset, physical intensity
         _set_const(pf, li, 0, (1.0,) * 4, (1.0 / life,) * 4)
         _set_const(pf, li, 1, (0.7, 0.7, 0.0, 0.0), (1.0, 1.0, 0.0, 0.0))
@@ -445,7 +461,7 @@ def definition(name: str, parts: list[dict], hard_kill: bool, hd_height: bool = 
              "position": {"x": round(x, 3), "y": round(y, 3), "z": round(z, 3)},
              "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}, "scale": {"x": 1.0, "y": 1.0, "z": 1.0},
              "inheritOnlyPosition": False}]})
-    uniq = lambda key: [{"path": v} for v in dict.fromkeys(q[key] for q in parts if q.get(key))]  # noqa: E731
+    uniq = lambda key: [{"path": v} for v in dict.fromkeys(t for q in parts for t in [q.get(key)] + q.get("more_" + key, []) if t)]  # noqa: E731
     return {"dependencies": {"particles": uniq("particle"), "models": [], "skeletons": [], "animations": [],
                              "textures": uniq("texture"), "physics": [], "json": [], "variantdata": [],
                              "objecteffects": [], "other": []},
@@ -463,18 +479,30 @@ def build(out: Path, name: str, art: str, mode: str, scale: int = 2, method: str
           template: bytes | None = None, cache: Path | None = None, loop_life: float = LOOP_LIFE,
           kind: str = "rgb", colour=None, ramp: str | np.ndarray | None = None, alpha_remap: bool = False,
           cursor=(0.0, 0.0), alpha_cursor=None, dissolve: bool | None = None, response=RESPONSE,
-          level: str = "mean", tint=(1.0, 1.0, 1.0), write_definition: bool = True) -> dict:
+          level: str = "mean", tint=(1.0, 1.0, 1.0), write_definition: bool = True, texture_key: str | None = None,
+          blend: str = "additive") -> dict:
     """Writes the texture, the particle file and the definition of ONE layer of an animation under `out` (`effect` makes
-    a whole one). -> facts (sizes, bytes)."""
+    a whole one). `texture_key`: the atlas's file name when layers of the same art share it (default: the layer's).
+    -> facts (sizes, bytes)."""
     src = additive_frames(art, act)
     x0, y0, w, h = src["box"]
     big = upscale_cached(src["frames"], scale, method, esrgan, cache, src["raw"])
     pixels, grid, cell = atlas(big, scale)
+    if blend == "alpha":
+        # the drawn pixels' coverage (Lanczos, as the colour) is the alpha; the colour is the art's own times `tint`
+        cover, _g, _c = atlas(upscale_cached(src["cover"], scale, "lanczos", None, cache, src["raw"] + b"|cover"), scale)
+        pixels[..., 3] = cover[..., 0]
+        kind, ramp = "rgb", None
+        mask_tex = TEX_DIR + (texture_key or name.lower()).lower() + "_alpha.texture"
+        (out / mask_tex[len("data/"):]).parent.mkdir(parents=True, exist_ok=True)
+        d2r_texture.write_bc3(out / mask_tex[len("data/"):], np.dstack([cover[..., 0]] * 4), 1, linear=True)
+        colour = colour or tuple(float(v) for v in tint) + (1.0,)   # the particle's colour: an atlas stays shareable
     key = name.lower()
-    texture, particle = TEX_DIR + key + ".texture", PARTICLE_DIR + key + ".particles"
+    texture, particle = TEX_DIR + (texture_key or key).lower() + ".texture", PARTICLE_DIR + key + ".particles"
     dest = out / texture[len("data/"):]
     dest.parent.mkdir(parents=True, exist_ok=True)
     gradient = None
+    mask_tex = mask_tex if blend == "alpha" else None
     value = levels(pixels, level)
     if kind == "rgb":
         d2r_texture.write_bc3(dest, pixels, 1)
@@ -499,7 +527,8 @@ def build(out: Path, name: str, art: str, mode: str, scale: int = 2, method: str
     up = -(y0 + h / 2.0) / PX_PER_HEIGHT if lift is None else lift   # the box centre's height over the anchor
     data = particles(template or fxpaths.d2r_file(TEMPLATE).read_bytes(), texture, grid, len(big), mode, half, intensity,
                      colour or (gain, gain, gain, 1.0), loop_life=loop_life, gradient=gradient, alpha_remap=alpha_remap,
-                     cursor=cursor, alpha_cursor=alpha_cursor, dissolve=dissolve)
+                     cursor=cursor, alpha_cursor=alpha_cursor, dissolve=dissolve, blend=blend,
+                     alpha_mask=mask_tex)
     dest_p = out / particle[len("data/"):]
     dest_p.parent.mkdir(parents=True, exist_ok=True)
     dest_p.write_bytes(data)
@@ -514,9 +543,9 @@ def build(out: Path, name: str, art: str, mode: str, scale: int = 2, method: str
             "half_size_world": round(half, 4), "lift_world": round(up, 3), "intensity": intensity, "gain": gain,
             "classic_dcc_bytes": src["bytes"], "texture_bytes": len(raw), "texture_deflated": len(zlib.compress(raw, 9)),
             "particles_bytes": len(data), "particles_deflated": len(zlib.compress(data, 9)),
-            "kind": kind, "gradient": gradient,
+            "kind": kind, "gradient": gradient, "blend": blend,
             "files": [texture, particle] + (["data/hd/missiles/%s.json" % name] if write_definition else [])
-            + ([gradient] if gradient else [])}
+            + ([gradient] if gradient else []) + ([mask_tex] if mask_tex else [])}
 
 
 def hue_spread(frames: list) -> float:

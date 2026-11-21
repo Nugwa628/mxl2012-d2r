@@ -906,3 +906,154 @@ def run_legacy(gc):
     ok = bool(judged) and all(r[1] for r in judged)
     gc.finish("statbook_legacy", ok, "; ".join("%s %s" % (r[0], "ok" if r[1] else ("info" if r[1] is None else "FAIL")) for r in rows), mark, shots, log,
               partial="the pages are judged from the shots")
+
+
+# D2R's classic stat point buttons (CharacterStatLevelUpButtonWidget, PANEL\level, about 22 x 22) on the mod's legacy sheet
+LEGACY_PLUS = {"strength": (125 + 11, 76 + 11), "dexterity": (125 + 11, 138 + 11), "vitality": (125 + 11, 224 + 11),
+               "energy": (125 + 11, 286 + 11)}
+# the HD sheet's (characterstatspanelhd.json, rect at the button's top left; the button about 70 units square)
+HD_PLUS = {"strength": (436 + 35, 381 + 35), "dexterity": (436 + 35, 638 + 35), "vitality": (436 + 35, 895 + 35),
+           "energy": (436 + 35, 1056 + 35)}
+STAT_IDS = {"strength": 0, "energy": 1, "dexterity": 2, "vitality": 3}
+STAT_POINTS = 4  # statpts
+
+
+def run_legacy_points(gc):
+    """Check `statbook_legacy_points` (player report: "unable to add vitality (or any stats) on level up in legacy, works in
+    HD"): in legacy graphics, then in HD, a click on each + on the Character tab spends a stat point on its stat; on a Stat Book
+    page (Offense, All Stats) a click where the Vitality and Strength + sit spends nothing (the host disables D2R's four +
+    buttons on the pages: D2R hit-tests hidden widgets, so before, a click there spent a point under the page); back on the
+    Character tab the + works again, also after the points ran out and came back (shots statbook_legacy_points_*).
+    MXL_SBPOINTS_MODES=legacy,hd picks the modes; on a release install (Legacy 16:9) MXL_LEGACY_SCREEN_W=1066."""
+    mark = gc.engine_mark()
+    log, shots, rows = [], [], []
+
+    def row(name, ok, note):
+        rows.append((name, ok, note))
+        log.append("ROW %s %s: %s" % (name, "PASS" if ok else ("INFO" if ok is None else "FAIL"), note))
+
+    def shot(name, wait=0.8):
+        time.sleep(wait)
+        shots.append(gc.sh("statbook_legacy_points_" + name))
+
+    def away():
+        gc.g.click(0.99, 0.5, move_only=True)
+
+    def stats():
+        out = {n: gc.rd("player", i) for n, i in STAT_IDS.items()}
+        out["points"] = gc.rd("player", STAT_POINTS)
+        log.append("stats %s" % out)
+        return out
+
+    def sheet_to(want, wait=1.5):
+        st = {}
+        for _ in range(3):
+            st = tabs_state(gc, log)
+            if st.get("open") == (1 if want else 0):
+                return st
+            gc.g.press("c")
+            time.sleep(wait)
+        return tabs_state(gc, log)
+
+    def plus_state():
+        out = gc.g.console_text("statbook host", settle=1.0)
+        m = re.search(r"\+ buttons (\w+) \(sets (\d+), fails (\d+)\)", out)
+        return m.group(0) if m else "no + buttons field (an older statbook.dll)"
+
+    import json
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rel = os.path.join("data", "hd", "global", "ui", "panel", "statbook", "statbook-layout.json")
+    geo = None
+    for geo_file in (os.path.join(root, "work", "mod", rel), os.path.join(gc.g.GAME_DIR, "mods", "mxl2012", "mxl2012.mpq", rel)):
+        if os.path.isfile(geo_file):
+            with open(geo_file, encoding="utf-8") as f:
+                geo = json.load(f)
+            log.append("geometry %s" % geo_file)
+            break
+    gc.enable_debug()
+    if not gc.be_class(0):
+        row("Amazon", False, "could not play an Amazon")
+    else:
+        gc.goto(1, timeout=60)
+        for mode in os.environ.get("MXL_SBPOINTS_MODES", "legacy,hd").split(","):
+            legacy = mode == "legacy"
+            lay = None if geo is None else geo["legacy"] if legacy else geo["pc"]
+            row("%s graphics" % mode, gc.set_graphics(mode), "G")
+            gc.close_right_panel()
+            gc.setstat("player", STAT_POINTS, 8)
+            time.sleep(1.0)
+
+            def xy(name):
+                return legacy_xy(gc, *LEGACY_PLUS[name], (0, 0)) if legacy else sheet_xy(*HD_PLUS[name])
+
+            def plus(name, wait=1.0):
+                gc.g.click(*xy(name))
+                time.sleep(wait)
+                away()
+                time.sleep(0.3)
+
+            def tab(k):
+                x, y, w, h = lay["tabs"][k]
+                gc.g.click(*(legacy_xy(gc, x + w / 2, y + h / 2, lay["origin"]) if legacy else sheet_xy(x + w / 2, y + h / 2)))
+                time.sleep(1.0)
+                away()
+                return tabs_state(gc, log)
+
+            sheet_to(True)
+            time.sleep(1.0)
+            log.append(gc.g.console_text("statbook tab 0", settle=1.0))   # the book keeps its tab over a close and G
+            st = tabs_state(gc, log)
+            row("%s: bound, Character tab" % mode, st.get("bound") == 1 and st.get("layout") == ("legacy" if legacy else "PC") and st.get("tab") == 0,
+                "%s" % st)
+            shot(mode + "_character")
+            for name in ("vitality", "strength", "dexterity", "energy"):
+                a = stats()
+                plus(name)
+                b = stats()
+                row("%s: + %s spends a point" % (mode, name), b[name] == a[name] + 1 and b["points"] == a["points"] - 1,
+                    "%s %d -> %d, points %d -> %d" % (name, a[name], b[name], a["points"], b["points"]))
+            shot(mode + "_after_plus")
+            if lay is not None:
+                for k, page in ((1, "Offense"), (len(lay["tabs"]) - 1, "All Stats")):
+                    st = tab(k)
+                    row("%s: %s page open" % (mode, page), st.get("tab") == k, "%s" % st)
+                    shot("%s_page%d" % (mode, k))
+                    a = stats()
+                    for name in ("vitality", "strength"):
+                        plus(name)
+                    b = stats()
+                    row("%s: on the %s page a click where the + sits spends nothing" % (mode, page), b == a,
+                        "%s -> %s; %s" % (a, b, plus_state()))
+                    shot("%s_page%d_after_click" % (mode, k))
+                st = tab(0)
+                row("%s: back on the Character tab" % mode, st.get("tab") == 0, "%s; %s" % (st, plus_state()))
+            else:
+                row("Stat Book geometry", None, "no statbook-layout.json in work/mod or the slot: page clicks not checked")
+            a = stats()
+            plus("vitality")
+            b = stats()
+            row("%s: + vitality again" % mode, b["vitality"] == a["vitality"] + 1 and b["points"] == a["points"] - 1, "%s -> %s" % (a, b))
+            shot(mode + "_character_again")
+            if lay is not None:
+                gc.setstat("player", STAT_POINTS, 0)
+                time.sleep(1.0)
+                tab(1)
+                tab(0)
+                a = stats()
+                plus("vitality")
+                b = stats()
+                row("%s: no points left: the + spends nothing after a page" % mode, b == a, "%s -> %s; %s" % (a, b, plus_state()))
+                gc.setstat("player", STAT_POINTS, 2)
+                time.sleep(1.5)
+                a = stats()
+                plus("vitality")
+                b = stats()
+                row("%s: points again: the + spends" % mode, b["vitality"] == a["vitality"] + 1, "%s -> %s" % (a, b))
+                shot(mode + "_points_again")
+            sheet_to(False)
+        gc.set_graphics("hd")
+
+    judged = [r for r in rows if r[1] is not None]
+    ok = bool(judged) and all(r[1] for r in judged)
+    gc.finish("statbook_legacy_points", ok, "; ".join("%s %s" % (r[0], "ok" if r[1] else ("info" if r[1] is None else "FAIL")) for r in rows),
+              mark, shots, log, partial="the pages are judged from the shots")

@@ -562,8 +562,13 @@ and this file (lane plug127).
   the game's own trade action with the vendor's refresh flag set, so the game rebuilds the stock itself). Every hook checks
   its expected bytes, and it checks D2RCore's packet relay. No game-version gate of its own.
 - **Median vendors:** the new stock is the game's own (Median's vendor tables, levels and shop rules), only made again. In
-  game: Charsi 33 items → 36 with 16 kept after one refresh. Gambling (Gheed) is left alone. Legacy graphics: the classic
-  panel has no gold anchor the plugin can find, so it shows no button (one log line each time a vendor opens).
+  game: Charsi 33 items → 36 with 16 kept after one refresh. Gambling (Gheed) is left alone. Legacy graphics (from 0.1.28):
+  the mod's classic trade panel layout gives the plugin the named rects of its "legacy-frame" route (`tools/ui_layouts.py`
+  `vendor_classic`), so the button shows on the stone left of Buy; gambling keeps D2R's own refresh on the repair square.
+  Before, the classic panel had no gold anchor the plugin could find and it showed no button.
+- **First trade with a vendor:** a trade picked while the vendor's first-meeting greeting plays used to close when the
+  greeting ended (D2R reopens the NPC menu; the same without the plugin). mxl2012-core's part `npcgreet` keeps it open
+  (docs/bugs.md #621). A click during the greeting only ends the greeting; the next one refreshes.
 - **Next to our plugins:** no clash (mxl2012-core `plugin clashes: none`).
 - **Console:** `vendor-stock-refresh` shows its state.
 - **Turn it off:** `enabled = false` under `[plugin]` in `ruffneckk-vendor-stock-refresh.toml`, or delete the DLL.

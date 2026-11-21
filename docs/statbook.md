@@ -193,6 +193,21 @@ size (RVA 0x22a0d68 / 0x22a0d6c, 800 x 600 when unreadable) scaled to fit the cl
   classic sheet does not pass D2R's ToggleAdvancedStats message on) found by its rect `advanced`. It comes after the book's
   groups in the layout: D2R hit-tests the hidden page body's ClickCatcher too, and with the arrow before it the arrow got no
   click (runs `checks-20261116-005509-s3`, `-011439-s3`; after the move `-013808-s3`).
+- D2R's stat point buttons (`LevelUpInfo`, the four + buttons, drawn under the page body) must get their clicks on the
+  Character tab. D2R hit-tests the widgets of a hidden group (ClickCatchers and buttons alike, seen in game), so nothing of
+  the book that takes clicks may lie over them: the sheet's page body has no ClickCatcher (as in HD and the plain panel;
+  `without_catcher` in the tool), and the All Stats search box sits right of the + column (`PLUS_RIGHT`; the count is at the
+  row's left). Before, the page body's ClickCatcher took every + click and the hidden search box the Strength +: stat points
+  could not be spent in legacy graphics (player report, 2026-11-21). Tried and dropped: `LevelUpInfo` over the book (D2R shows
+  it every frame, so the + buttons were drawn over the pages) and the stone as message-less buttons (hit-tested while hidden
+  too). On a Stat Book page (any tab but Character) the host disables the four + buttons (`PlusButtonsEnabled` in
+  sheet_host_logic.h, WidgetService `setWidgetEnabled` on `LevelUpInfo/<name>PointButton`), in HD and legacy: D2R runs a
+  disabled widget's Update no more, so they stay off until the Character tab enables them again (then D2R's Update greys them
+  if no points are left). Before, a click on a page where a + sat under it spent a point, in HD too (run
+  `/d2work/runs/bugs128/runs/checks-20261121-191925-s5`; `statbook host` shows `+ buttons on|off (sets, fails)`). Check `statbook_legacy_points` (runs in `/d2work/runs/legacystat/runs`: the
+  bug `checks-20261121-161501-s5`, the fix with `statbook_legacy` `checks-20261121-163252-s5`); layout tests
+  `test_no_click_catcher_over_the_sheets_buttons`, `test_nothing_interactive_over_the_plus_buttons`,
+  `test_stat_buttons_under_the_page_stone`.
 - Side tabs: the book as its own panel in the classic right panel area (D2R's right panel anchor), its tabs along its top;
   the toggle sits right of the class box on the sheet and of the title on the side panel. It covers the inventory when both
   are open (a 4:3 screen has no other room).
@@ -288,6 +303,7 @@ step the tabs 0, 1, 2, 1, LT / RT page the menu away and back, LB / RB glyphs; `
 
 | What | Where | Run, shots |
 |-|-|-|
+| Legacy sheet: the four stat point buttons spend a point (the bug reproduced first), also after a page was open; all of `statbook_legacy` again with the moved search box | slot 5 (Linux), D2R-XL 2012 | `/d2work/runs/legacystat/runs/checks-20261121-161501-s5` (bug), `checks-20261121-163252-s5` (fix: `statbook_legacy` every row ok, `statbook_legacy_points` every judged row ok; only the known legacy-mode engine assert) |
 | Book data, values (Chance to Block = GetBlockRate), `statbook` console, sheetres / advstats | slot 3, D2R-XL 2012 | `checks-20261115-002522-s3` (checks `statbook`, `advgroups`) |
 | Sheet host, HD PC sheet: tabs, pages, All Stats search with orange match, row arrows, Advanced Stats arrow, reopen, 900p / 1080p / 1440p, legacy unbound | slot 3, D2R-XL 2012 | `checks-20261115-041533-s3`, cp5 `statbook_*` |
 | Typing with mxl2012-core's developer menu opened first (both window subclasses) | slot 3 | `checks-20261115-041533-s3`, `statbook_devmenu_open` |

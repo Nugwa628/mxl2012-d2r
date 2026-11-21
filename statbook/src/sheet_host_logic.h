@@ -108,6 +108,17 @@ struct PageShow {
 	bool sheet = true, body = false, page = false, all = false;
 };
 
+// D2R's four stat point buttons (CharacterStatLevelUpButtonWidget, children of LevelUpInfo in the mod's PC and legacy sheets).
+inline constexpr const char* PlusButtons[] = {"StrengthPointButton", "DexPointButton", "VitalityPointButton", "EnergyPointButton"};
+
+// Whether the + buttons take clicks: only where D2R's sheet is shown (the Character tab, or the side host, which shows D2R's page 1).
+// D2R hit-tests hidden widgets too, so on a Stat Book page a + under the page body would spend a point: there they are disabled
+// (D2R's widget tree runs a disabled widget's Update no more, so it stays disabled until the host enables it again). The plain D2R
+// panel is the plugin's own panel over D2R's sheet: its buttons are left to D2R.
+constexpr auto PlusButtonsEnabled(const PageShow& ps, bool sideShowing, bool plain) noexcept -> bool {
+	return plain || sideShowing || ps.sheet;
+}
+
 inline auto ShowForTab(const statbook::Tabs& t) -> PageShow {
 	PageShow s;
 	s.sheet = t.IsSheet();

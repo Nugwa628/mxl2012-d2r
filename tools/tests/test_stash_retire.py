@@ -9,7 +9,7 @@ import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
-from tools import d2save
+import d2save  # noqa: E402  (tools/ is on sys.path; `from tools import` breaks a run from tools/)
 ROOT=Path(__file__).resolve().parents[2]
 EXE=ROOT/'build/plugin/tests/Release/stash_retire_codec.exe'
 T=d2save.Tables.from_excel() if Path(d2save.EXCEL).exists() else None

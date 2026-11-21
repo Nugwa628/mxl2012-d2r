@@ -63,6 +63,14 @@ void TestShow() {
 	t.Select(t.AllStats());
 	s = ShowForTab(t);
 	Check(!s.sheet && s.body && !s.page && s.all, "All Stats");
+	Check(!PlusButtonsEnabled(s, false, false), "the + buttons take no click on All Stats");
+	Check(PlusButtonsEnabled(s, true, false), "the side host shows D2R's sheet: + buttons on");
+	Check(PlusButtonsEnabled(s, false, true), "plain D2R: the + buttons are D2R's");
+	t.Select(3);
+	Check(!PlusButtonsEnabled(ShowForTab(t), false, false), "the + buttons take no click on a themed page");
+	t.Select(0);
+	Check(PlusButtonsEnabled(ShowForTab(t), false, false), "the + buttons take clicks on the Character tab");
+	t.Select(t.AllStats());
 	statbook::Line l;
 	LineShow ls = ShowFor(l);
 	Check(!ls.heading && !ls.full && !ls.left && !ls.right, "an empty line shows nothing");

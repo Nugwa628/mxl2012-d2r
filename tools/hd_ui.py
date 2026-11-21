@@ -22,7 +22,8 @@ CHECK_LAYOUTS = ("bankexpansionlayouthd", "tradelayouthd", "vendorpanellayouthd"
 CONTROLLER_LAYOUTS = ("horadriccubelayouthd", "bankexpansionlayouthd",  # layouts/controller: ui_layouts (gamepad UI)
                       "skillstreepanelhd",                              # pad_skill_trees reads its geometry
                       "hudpanelhd")                                     # the belt count boxes (bug #613)
-CLASSIC_LAYOUTS = ("skillstreepanel",)  # classic only (ui_layouts.skilltree_classic, bug #33)
+CLASSIC_LAYOUTS = ("skillstreepanel",    # classic only (ui_layouts.skilltree_classic, bug #33)
+                   "vendorpanellayout")  # Vendor Stock Refresh's rects (ui_layouts.vendor_classic)
 CLASS_PREFIXES = ("am", "so", "ne", "pa", "ba", "dr", "as")
 STASH_ART_DIR = Path("panel") / "stash" / "additionalstash"
 STASH_ART = ("panel_additionalstash_consumables",)  # D2R's Materials page: the base of the Gems / Runes pages (median_stash)
@@ -96,6 +97,9 @@ def build() -> int:
     import send_stash
     from ui_paths import OUT_DATA
     for line in send_stash.art(OUT_DATA):
+        print(line)
+    print("== vendor refresh button (classic)")
+    for line in ui_layouts.vendor_refresh_art(OUT_DATA):
         print(line)
     print("== check")
     return rc | ui_check.main()
