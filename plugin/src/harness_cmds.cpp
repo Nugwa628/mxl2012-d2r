@@ -32,6 +32,7 @@
 #include "send_stash.h"
 #include "clear_fonts.h"
 #include "map_reveal.h"
+#include "overlay_keys.h"
 #include "panel_shared.h"
 
 #include <D2RLPlugin/api.h>
@@ -3312,6 +3313,22 @@ auto CmdMapReveal(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `overlaykeys [bars | damage]` (UI thread): the health bar and damage number keys' state; `bars` / `damage` does what a press
+// of that key does, at once (the real keys go through D2RLoader's InputService).
+auto CmdOverlayKeys(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	const int which = t.n < 2 ? -1 : hcmd::LowerEq(t.tok[1], "bars") ? 0 : hcmd::LowerEq(t.tok[1], "damage") ? 1 : 2;
+	if (which == 2) {
+		return Fail(c, "usage: overlaykeys [bars | damage]");
+	}
+	if (which >= 0 && !OverlayKeysPress(which)) {
+		return Fail(c, "overlaykeys: the part is off");
+	}
+	char status[512];
+	OverlayKeysStatus(status, sizeof(status));
+	Out("overlaykeys %s%s", status, which >= 0 ? " (pressed)" : "");
+	return true;
+}
+
 // `clearfonts [on | off | toggle]` (UI thread): the clear legacy fonts setting and the fonts' state; `toggle` does what the key
 // does, `on` / `off` set it; each writes mxl2012-core.toml as the key does.
 auto CmdClearFonts(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
@@ -3532,7 +3549,7 @@ const Verb Verbs[] = {
     {"states", CmdStates, false},     {"cstates", CmdClientStates, true}, {"cistat", CmdClientIstat, true}, {"cstat", CmdClientStat, true}, {"durwatch", CmdDurWatch, true}, {"asserttrace", CmdAssertTrace, true},
     {"merc", CmdMerc, false},         {"mercprice", CmdMercPrice, false}, {"hire", CmdHire, false},
     {"stashpage", CmdStashPage, true}, {"sendstash", CmdSendStash, true}, {"devmenu", CmdDevMenu, true}, {"wiki", CmdWiki, true},
-    {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true}, {"padui", CmdPadUi, true},
+    {"mapreveal", CmdMapReveal, true}, {"overlaykeys", CmdOverlayKeys, true}, {"clearfonts", CmdClearFonts, true}, {"padui", CmdPadUi, true},
     {"pad", CmdPad, true},
     {"block", CmdBlock, false},       {"cblock", CmdClientBlock, true},  {"sbperf", CmdSbPerf, true},
     {"facing", CmdFacing, true},

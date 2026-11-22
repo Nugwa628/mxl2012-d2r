@@ -1,0 +1,328 @@
+diff --git a/plugins/floating-damage/config/ruffneckk-floating-damage.toml b/plugins/floating-damage/config/ruffneckk-floating-damage.toml
+index f52f795..f143794 100644
+--- a/plugins/floating-damage/config/ruffneckk-floating-damage.toml
++++ b/plugins/floating-damage/config/ruffneckk-floating-damage.toml
+@@ -6,6 +6,11 @@
+ # Master switch. Set to false and restart D2R to load no renderer or combat hook.
+ enabled = true
+ 
++# D2R-XL 2012: false hides the numbers and the DPS counter (the hooks stay loaded).
++# The Controls action "Floating Damage Numbers" (Options > Controls > D2R-XL 2012)
++# turns them on and off in game and saves the choice here.
++show_numbers = true
++
+ # Safety limit for active and queued numbers. Valid range: 1 to 4096.
+ max_numbers_on_screen = 160
+ 
+diff --git a/plugins/floating-damage/src/config_parser.cpp b/plugins/floating-damage/src/config_parser.cpp
+index 9258e36..df26373 100644
+--- a/plugins/floating-damage/src/config_parser.cpp
++++ b/plugins/floating-damage/src/config_parser.cpp
+@@ -152,6 +152,7 @@ bool ApplySetting(
+ 
+     if (table == "general") {
+         if (key == "enabled") return boolean(config.enabled);
++        if (key == "show_numbers") return boolean(config.showNumbers);  // D2R-XL 2012 (patch 0006)
+         if (key == "max_numbers_on_screen")
+             return integer(1, 4096, config.maxNumbersOnScreen);
+         if (key == "font_index")
+diff --git a/plugins/floating-damage/src/floating_damage.cpp b/plugins/floating-damage/src/floating_damage.cpp
+index f1f7ae9..42a5924 100644
+--- a/plugins/floating-damage/src/floating_damage.cpp
++++ b/plugins/floating-damage/src/floating_damage.cpp
+@@ -112,6 +112,7 @@ struct DpsSample {
+ 
+ Config g_config;
+ std::atomic_bool g_enabled = true;
++std::atomic_bool g_shown = true;  // D2R-XL 2012 (patch 0006): show_numbers
+ std::atomic_bool g_gameplayActive = false;
+ std::vector<DamageNumber> g_numbers;
+ std::vector<DamageEvent> g_pendingEvents;
+@@ -822,7 +823,20 @@ Config& GetConfig()
+ 
+ bool IsEnabled() noexcept
+ {
+-    return g_enabled.load(std::memory_order_acquire);
++    return g_enabled.load(std::memory_order_acquire) && g_shown.load(std::memory_order_acquire);
++}
++
++bool IsShown() noexcept
++{
++    return g_shown.load(std::memory_order_acquire);
++}
++
++void SetShown(bool shown)
++{
++    g_config.showNumbers = shown;
++    g_shown.store(shown, std::memory_order_release);
++    if (!shown)
++        g_clearDisplayRequested.store(true, std::memory_order_release);
+ }
+ 
+ void SetEnabled(bool enabled)
+@@ -871,9 +885,11 @@ void SetTargetScreenPositionProvider(TargetScreenPositionProvider provider) noex
+ 
+ void ResetToDefaults()
+ {
+-    const bool wasEnabled = IsEnabled();
++    const bool wasEnabled = g_enabled.load(std::memory_order_acquire);
++    const bool wasShown = IsShown();
+     g_config = Config{};
+     g_config.enabled = wasEnabled;
++    g_config.showNumbers = wasShown;
+ }
+ 
+ void QueueGameDamage(int amount, uint32_t unitType, uint32_t unitId, Kind kind, Element element)
+@@ -976,7 +992,13 @@ bool HasDisplayActivity()
+ void Update(float dt)
+ {
+     if (g_toggleRequested.exchange(false, std::memory_order_acq_rel))
+-        SetEnabled(!IsEnabled());
++    {
++        // D2R-XL 2012 (patch 0006): numbers hidden by show_numbers come back with the author's toggle too
++        const bool show = !IsEnabled();
++        SetEnabled(show);
++        if (show)
++            SetShown(true);
++    }
+ 
+     if (g_clearDisplayRequested.exchange(false, std::memory_order_acq_rel))
+     {
+diff --git a/plugins/floating-damage/src/floating_damage.hpp b/plugins/floating-damage/src/floating_damage.hpp
+index 90765fc..9e0f635 100644
+--- a/plugins/floating-damage/src/floating_damage.hpp
++++ b/plugins/floating-damage/src/floating_damage.hpp
+@@ -26,6 +26,8 @@ enum class Element {
+ 
+ struct Config {
+     bool enabled = true;
++    // D2R-XL 2012 (patch 0006): [general] show_numbers, set by the mod's Controls action "Floating Damage Numbers"
++    bool showNumbers = true;
+     bool diagnosticsEnabled = false;
+ 
+     float textSize = 38.0f;
+@@ -93,6 +95,9 @@ struct Config {
+ Config& GetConfig();
+ bool IsEnabled() noexcept;
+ void SetEnabled(bool enabled);
++// D2R-XL 2012 (patch 0006): numbers and DPS counter shown (show_numbers); IsEnabled() is enabled and shown
++bool IsShown() noexcept;
++void SetShown(bool shown);
+ bool IsGameplayActive() noexcept;
+ void SetGameplayActive(bool active) noexcept;
+ void RequestToggle() noexcept;
+diff --git a/plugins/floating-damage/src/general_key.hpp b/plugins/floating-damage/src/general_key.hpp
+new file mode 100644
+index 0000000..8e38912
+--- /dev/null
++++ b/plugins/floating-damage/src/general_key.hpp
+@@ -0,0 +1,63 @@
++#pragma once
++// D2R-XL 2012 (patch 0006): sets one boolean key of the [general] table in the plugin's TOML text, as the author's
++// SaveEnabled does for `enabled`, and keeps everything else (comments, order, line ends). A key the file does not have yet
++// (show_numbers in a file from before D2R-XL 2012 0.1.30) is added on the line after the [general] header. False when the
++// text has no [general] table.
++
++#include <cstddef>
++#include <string>
++#include <string_view>
++
++namespace FloatingDamageMxl {
++
++inline bool SetGeneralBool(std::string& text, std::string_view key, bool value) {
++    const char* word = value ? "true" : "false";
++    const auto isSpace = [](char c) { return c == ' ' || c == '\t'; };
++    std::string section;
++    std::size_t headerEnd = std::string::npos;
++    bool headerCrlf = false;
++    for (std::size_t pos = 0; pos < text.size();) {
++        std::size_t end = text.find('\n', pos);
++        const std::size_t next = end == std::string::npos ? text.size() : end + 1;
++        if (end == std::string::npos) end = text.size();
++        std::size_t lineEnd = end;
++        const bool crlf = lineEnd > pos && text[lineEnd - 1] == '\r';
++        if (crlf) --lineEnd;
++        std::size_t a = pos;
++        while (a < lineEnd && isSpace(text[a])) ++a;
++        if (a < lineEnd && text[a] == '[') {
++            std::size_t b = text.find('#', a);
++            if (b == std::string::npos || b > lineEnd) b = lineEnd;
++            while (b > a && isSpace(text[b - 1])) --b;
++            section = text.substr(a, b - a);
++            if (section == "[general]" && headerEnd == std::string::npos) {
++                headerEnd = next;
++                headerCrlf = crlf;
++            }
++        } else if (section == "[general]" && a < lineEnd && text[a] != '#') {
++            const std::size_t eq = text.find('=', a);
++            if (eq != std::string::npos && eq < lineEnd) {
++                std::size_t k = eq;
++                while (k > a && isSpace(text[k - 1])) --k;
++                if (std::string_view(text).substr(a, k - a) == key) {
++                    std::size_t v = eq + 1;
++                    while (v < lineEnd && isSpace(text[v])) ++v;
++                    std::size_t ve = text.find('#', v);
++                    if (ve == std::string::npos || ve > lineEnd) ve = lineEnd;
++                    while (ve > v && isSpace(text[ve - 1])) --ve;
++                    text.replace(v, ve - v, word);
++                    return true;
++                }
++            }
++        }
++        pos = next;
++    }
++    if (headerEnd == std::string::npos) return false;
++    const char* eol = headerCrlf ? "\r\n" : "\n";
++    std::string line = std::string(key) + " = " + word + eol;
++    if (headerEnd > 0 && text[headerEnd - 1] != '\n') line = eol + line;
++    text.insert(headerEnd, line);
++    return true;
++}
++
++}  // namespace FloatingDamageMxl
+diff --git a/plugins/floating-damage/src/plugin.cpp b/plugins/floating-damage/src/plugin.cpp
+index c0f620e..ed864ed 100644
+--- a/plugins/floating-damage/src/plugin.cpp
++++ b/plugins/floating-damage/src/plugin.cpp
+@@ -10,6 +10,7 @@
+ #include "d3d12_renderer.hpp"
+ #include "default_config.hpp"
+ #include "floating_damage.hpp"
++#include "general_key.hpp"
+ #include "legacy_projection.hpp"
+ #include <RuffnecKk/native_stat_compat.hpp>
+ #include <RuffnecKk/maps_stat_compat.hpp>
+@@ -271,6 +272,7 @@ bool LoadConfig() {
+ 
+     FloatingDamage::GetConfig() = parsed;
+     FloatingDamage::SetEnabled(parsed.enabled);
++    FloatingDamage::SetShown(parsed.showNumbers);
+     D3D12::SetDiagnosticLogCallback(
+         parsed.diagnosticsEnabled ? LogOverlayDiagnostic : nullptr);
+     return true;
+@@ -454,6 +456,30 @@ bool RegisterLifecycleListeners() noexcept {
+     return true;
+ }
+ 
++// D2R-XL 2012 (patch 0006): one [general] boolean saved in the player's file (general_key.hpp); the result is parsed again
++// before it is written, as SaveEnabled does.
++bool SaveGeneralBool(std::string_view key, bool value) {
++    constexpr std::size_t MaximumConfigBytes = 65'536;
++    std::array<char, MaximumConfigBytes> buffer{};
++    std::uint32_t required{};
++    if (!Context->ReadConfig(
++            buffer.data(),
++            static_cast<std::uint32_t>(buffer.size()),
++            &required)) {
++        return false;
++    }
++    std::string text(buffer.data());
++    if (!FloatingDamageMxl::SetGeneralBool(text, key, value)) return false;
++    FloatingDamage::Config updated{};
++    std::string error;
++    if (!FloatingDamage::ParseConfigToml(text, updated, error)) return false;
++    if ((key == "show_numbers" && updated.showNumbers != value)
++            || (key == "enabled" && updated.enabled != value)) {
++        return false;
++    }
++    return Context->WriteConfig(text.c_str());
++}
++
+ bool SaveEnabled(bool enabled) {
+     constexpr std::size_t MaximumConfigBytes = 65'536;
+     std::array<char, MaximumConfigBytes> buffer{};
+@@ -1807,8 +1833,9 @@ auto ConsoleCommand(
+         std::snprintf(
+             message,
+             sizeof(message),
+-        "FloatingDamage 1.5.6: enabled=%s; runtime=%s; diagnostics=%s; in_game=%s; input_action=%s; renderer_role=%s; overlay_hooks=%s; presents=%llu; queues=%llu; imgui_attempts=%llu; imgui_failures=%llu; init_stage=%u; overlay_frames=%llu; camera_frames=%llu; context_misses=%llu; captured=%llu; direct=%llu; periodic=%llu; queued=%llu; projected=%llu; rejected=%llu; forced=%llu; missed=%llu; request_drops=%llu; active=%zu; pending=%zu; font=%d; display=%.0fx%.0f; scale=%.3f.",
++        "FloatingDamage 1.5.6: enabled=%s; show_numbers=%s; runtime=%s; diagnostics=%s; in_game=%s; input_action=%s; renderer_role=%s; overlay_hooks=%s; presents=%llu; queues=%llu; imgui_attempts=%llu; imgui_failures=%llu; init_stage=%u; overlay_frames=%llu; camera_frames=%llu; context_misses=%llu; captured=%llu; direct=%llu; periodic=%llu; queued=%llu; projected=%llu; rejected=%llu; forced=%llu; missed=%llu; request_drops=%llu; active=%zu; pending=%zu; font=%d; display=%.0fx%.0f; scale=%.3f.",
+             enabled ? "true" : "false",
++            FloatingDamage::IsShown() ? "true" : "false",
+             RuntimeActive.load(std::memory_order_acquire) ? "active" : "not installed",
+             config.diagnosticsEnabled ? "true" : "false",
+             FloatingDamage::IsGameplayActive() ? "true" : "false",
+@@ -1869,6 +1896,12 @@ auto ConsoleCommand(
+         if (!SaveEnabled(requestedEnabled))
+             return D2RL::ConsoleCommandResult::Failed;
+         FloatingDamage::SetEnabled(requestedEnabled);
++        // D2R-XL 2012 (patch 0006): `on` also shows numbers hidden by show_numbers
++        if (requestedEnabled && !FloatingDamage::IsShown()) {
++            if (!SaveGeneralBool("show_numbers", true))
++                return D2RL::ConsoleCommandResult::Failed;
++            FloatingDamage::SetShown(true);
++        }
+         if (requestedEnabled
+                 && !RuntimeActive.load(std::memory_order_acquire)) {
+             command->plugin->WriteConsoleMessage(
+@@ -1939,6 +1972,41 @@ extern "C" void __fastcall FloatingDamagePeriodicCommit(
+     HookPeriodicHitpointsCommit(target, statId, newFixed, layer);
+ }
+ 
++// D2R-XL 2012 (patch 0006): the mod's Controls action "Floating Damage Numbers" (mxl2012-core, overlay_keys.cpp) reads and
++// sets whether numbers show. Shown: 1 shown, 0 hidden, -1 not running (not loaded, or [general] enabled = false at the
++// start: no hooks). SetShown applies it at once and saves show_numbers (and enabled = true when it shows them); it returns
++// 1 applied and saved, 0 applied but not saved, -1 refused (not running).
++extern "C" __declspec(dllexport) int __cdecl Mxl2012FloatingDamageShownV1() noexcept {
++    if (Context == nullptr || !RuntimeActive.load(std::memory_order_acquire)) return -1;
++    return FloatingDamage::IsEnabled() ? 1 : 0;
++}
++
++extern "C" __declspec(dllexport) int __cdecl Mxl2012FloatingDamageSetShownV1(int shown) noexcept {
++    if (Context == nullptr || !RuntimeActive.load(std::memory_order_acquire)) return -1;
++    try {
++        const bool show = shown != 0;
++        if (show) FloatingDamage::SetEnabled(true);
++        FloatingDamage::SetShown(show);
++        bool saved = SaveGeneralBool("show_numbers", show);
++        if (saved && show) {
++            FloatingDamage::Config current{};
++            std::array<char, 65'536> buffer{};
++            std::uint32_t required{};
++            std::string error;
++            saved = Context->ReadConfig(buffer.data(), static_cast<std::uint32_t>(buffer.size()), &required)
++                && FloatingDamage::ParseConfigToml(std::string_view(buffer.data()), current, error)
++                && (current.enabled || SaveGeneralBool("enabled", true));
++        }
++        char message[128]{};
++        std::snprintf(message, sizeof(message), "FloatingDamage: show_numbers=%s set by D2R-XL 2012's Controls action%s.",
++            show ? "true" : "false", saved ? " and saved" : ", not saved");
++        Context->LogInfo(message);
++        return saved ? 1 : 0;
++    } catch (...) {
++        return 0;
++    }
++}
++
+ extern "C" __declspec(dllexport)
+ const RuffnecKk::FloatingDamageOverlay::ExternalOverlayApiV1* __cdecl
+ RuffnecKkFloatingDamageGetOverlayApi(
+diff --git a/plugins/floating-damage/tests/config_tests.cpp b/plugins/floating-damage/tests/config_tests.cpp
+index 09e5aa0..356feea 100644
+--- a/plugins/floating-damage/tests/config_tests.cpp
++++ b/plugins/floating-damage/tests/config_tests.cpp
+@@ -166,6 +166,7 @@ int main(int argc, char** argv) {
+     ok &= Expect(Same(config.textSize, 38.0f), "text_size mismatch");
+     ok &= Expect(Same(config.criticalHitSize, 48.0f), "critical size mismatch");
+     ok &= Expect(Same(config.legacyTextScale, 2.5f), "legacy_text_scale mismatch");
++    ok &= Expect(config.showNumbers, "show_numbers mismatch");  // D2R-XL 2012 (patch 0006): shipped true
+     ok &= Expect(config.textOutlineWidth == 1, "outline mismatch");
+     ok &= Expect(Same(config.shadowLeftRightOffset, 0.0f)
+         && Same(config.shadowUpDownOffset, 0.0f), "shadow offsets mismatch");
+@@ -217,6 +218,16 @@ int main(int argc, char** argv) {
+     ok &= Expect(RejectWithoutMutation("[unknown]\nx = 1\n"), "unknown table accepted");
+     ok &= Expect(RejectWithoutMutation("[general]\nwat = true\n"), "unknown key accepted");
+     ok &= Expect(RejectWithoutMutation("[appearance]\nlegacy_text_scale = 0.1\n"), "legacy_text_scale below range accepted");
++    ok &= Expect(RejectWithoutMutation("[general]\nshow_numbers = maybe\n"), "show_numbers not a boolean accepted");
++    {
++        FloatingDamage::Config hidden{};
++        std::string hiddenError;
++        ok &= Expect(FloatingDamage::ParseConfigToml("[general]\nshow_numbers = false\n", hidden, hiddenError)
++            && !hidden.showNumbers && hidden.enabled, "show_numbers = false rejected");
++        FloatingDamage::Config absent{};
++        ok &= Expect(FloatingDamage::ParseConfigToml("[general]\nenabled = true\n", absent, hiddenError)
++            && absent.showNumbers, "a file without show_numbers does not show numbers");
++    }
+     ok &= Expect(RejectWithoutMutation("[appearance]\nlegacy_text_scale = 9.0\n"), "legacy_text_scale above range accepted");
+     {
+         FloatingDamage::Config scaled{};

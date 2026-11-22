@@ -1,7 +1,8 @@
 // Unit tests of the D2R-XL 2012 additions to Floating Damage (legacy_projection.hpp, patch 0001; font_loading.hpp, patch
-// 0005). Built and run by tools/build_floatingdamage.ps1 and tools/build_thirdparty_linux.py (target
+// 0005; general_key.hpp, patch 0006). Built and run by tools/build_floatingdamage.ps1 and tools/build_thirdparty_linux.py (target
 // floating_damage_mxl_tests).
 #include "font_loading.hpp"
+#include "general_key.hpp"
 #include "legacy_projection.hpp"
 
 #include <cmath>
@@ -189,7 +190,31 @@ void UnbuildableFont() {
 }
 }  // namespace
 
+void GeneralKey() {
+    using FloatingDamageMxl::SetGeneralBool;
+    // the shipped file: the value is replaced in place, comments and the other tables untouched
+    std::string text = "# c\n[general]\n# Master switch.\nenabled = true\n\nshow_numbers = true # x\n\n[appearance]\nshow_numbers = true\n";
+    Expect(SetGeneralBool(text, "show_numbers", false), "show_numbers set");
+    Expect(text == "# c\n[general]\n# Master switch.\nenabled = true\n\nshow_numbers = false # x\n\n[appearance]\nshow_numbers = true\n",
+        "show_numbers replaced in [general] only");
+    // a file from before 0.1.30 (no show_numbers): added after the header, with the file's line ends
+    std::string old = "[general]\r\nenabled = true\r\n[animation]\r\n";
+    Expect(SetGeneralBool(old, "show_numbers", false) && old == "[general]\r\nshow_numbers = false\r\nenabled = true\r\n[animation]\r\n",
+        "show_numbers added to an old file");
+    Expect(SetGeneralBool(old, "show_numbers", true) && old == "[general]\r\nshow_numbers = true\r\nenabled = true\r\n[animation]\r\n",
+        "show_numbers turned back on");
+    Expect(SetGeneralBool(old, "enabled", false) && old.find("enabled = false\r\n") != std::string::npos, "enabled set");
+    std::string commented = "[general]\n# show_numbers = true\nshow_numbers_x = 1\n";
+    Expect(SetGeneralBool(commented, "show_numbers", false) && commented == "[general]\nshow_numbers = false\n# show_numbers = true\nshow_numbers_x = 1\n",
+        "comments and longer keys are not the key");
+    std::string last = "[general]";
+    Expect(SetGeneralBool(last, "show_numbers", true) && last == "[general]\nshow_numbers = true\n", "header on the last line");
+    std::string none = "[appearance]\ntext_size = 38\n";
+    Expect(!SetGeneralBool(none, "show_numbers", true) && none == "[appearance]\ntext_size = 38\n", "no [general]: refused");
+}
+
 int main() {
+    GeneralKey();
     ClassicPoint();
     Compose();
     DpsCounter();

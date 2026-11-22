@@ -7,6 +7,25 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.30 (2026-11-23)
+
+- **Enemy Health Bars no longer slows the game:** the bars' overlay redrew the whole screen on every frame, even with no
+  bar shown and with the bars turned off. It now only updates where bars are, and does nothing while none show. This
+  matters most at high resolutions: at 4K the game ran at about 36 FPS in town with the bars and 85 without them; at
+  1600x900 each frame cost about 10 ms of extra processor time. Now the bars cost about as much as having no bars.
+
+- **Two new keys for the health bars and the damage numbers:** in the game, open Options > Controls, find the category
+  **D2R-XL 2012** and give a key to **Enemy Health Bars Mode** and **Floating Damage Numbers** (they have no key until you
+  set one).
+  - Each press of Enemy Health Bars Mode moves to the next of five modes: off; always, all monsters; always,
+    uniques/bosses; when damaged, all monsters (the default); when damaged, uniques/bosses. "Uniques/bosses" are the
+    monsters with an orange outline: unique, super unique and boss monsters, not champions.
+  - Each press of Floating Damage Numbers turns the damage numbers (and the DPS counter) on or off.
+  - A yellow line in the message area (bottom left in HD, top left in legacy graphics) says what you chose, for example
+    "Health bars: when damaged, uniques/bosses". No line is shown while an NPC is talking to you, so the NPC's speech
+    is never stopped.
+  - Your choice works at once and is saved, so it is kept after a restart and after the downloader's Update and Repair.
+
 ### 0.1.29 (2026-11-22)
 
 - **Twelve of Median's own areas get much sharper art in HD graphics:** Fauztinville, Tran Athulua, Duncraig, Cathedral

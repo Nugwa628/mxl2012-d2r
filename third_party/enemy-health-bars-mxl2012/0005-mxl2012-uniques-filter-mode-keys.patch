@@ -1,0 +1,245 @@
+diff --git a/enemy-health-bars.toml b/enemy-health-bars.toml
+index 96258ac..896281b 100644
+--- a/enemy-health-bars.toml
++++ b/enemy-health-bars.toml
+@@ -30,6 +30,11 @@ opacity = 1.0
+ # false (the default) = only show enemies currently below full health.
+ # true = show health bars on every enemy, undamaged ones included.
+ show_full_health = false
++# true = bars only on unique, super unique and boss monsters (the orange outline);
++# champions and normal monsters get none. In D2R-XL 2012, the Controls action
++# "Enemy Health Bars Mode" (Options > Controls > D2R-XL 2012) cycles enabled,
++# show_full_health and this key, applies them at once and saves them here.
++uniques_bosses_only = false
+ # Hide bars while a character/inventory/stash/skill side panel is open.
+ hide_with_side_panels = true
+ 
+diff --git a/src/mode_config.h b/src/mode_config.h
+new file mode 100644
+index 0000000..7c26197
+--- /dev/null
++++ b/src/mode_config.h
+@@ -0,0 +1,64 @@
++// SPDX-License-Identifier: GPL-3.0-only
++// mxl2012 0005: the bars' mode as D2R-XL 2012's Controls action "Enemy Health Bars Mode" (mxl2012-core) sets it, through the
++// exports Mxl2012EnemyBarsModeV1 / Mxl2012EnemyBarsSetModeV1 of plugin.cpp. The mode is three keys of [bars]: enabled,
++// show_full_health and uniques_bosses_only. setKey rewrites one of them in the player's file and keeps everything else
++// (comments, order, line ends); a key the file does not have yet (uniques_bosses_only in a file from before 0.1.30) is
++// added on the line after the [bars] header.
++#pragma once
++#include <cstddef>
++#include <cstdint>
++#include <string>
++namespace bars::mode {
++inline constexpr uint32_t Valid = 0x80000000u, Enabled = 1, Full = 2, UniquesOnly = 4;
++inline uint32_t pack(bool enabled, bool full, bool uniquesOnly) {
++    return Valid | (enabled ? Enabled : 0) | (full ? Full : 0) | (uniquesOnly ? UniquesOnly : 0);
++}
++inline bool setKey(std::string& text, const std::string& key, bool value) {
++    const char* word = value ? "true" : "false";
++    auto isSpace = [](char c) { return c == ' ' || c == '\t'; };
++    std::string section;
++    size_t barsLineEnd = std::string::npos;  // the end of the [bars] header line, newline included
++    bool barsCrlf = false;
++    for (size_t pos = 0; pos < text.size();) {
++        size_t end = text.find('\n', pos);
++        const size_t next = end == std::string::npos ? text.size() : end + 1;
++        if (end == std::string::npos) end = text.size();
++        size_t lineEnd = end;
++        const bool crlf = lineEnd > pos && text[lineEnd - 1] == '\r';
++        if (crlf) --lineEnd;
++        size_t a = pos;
++        while (a < lineEnd && isSpace(text[a])) ++a;
++        if (a < lineEnd && text[a] == '[') {
++            size_t b = lineEnd;
++            while (b > a && isSpace(text[b - 1])) --b;
++            section = text.substr(a, b - a);
++            if (section == "[bars]" && barsLineEnd == std::string::npos) { barsLineEnd = next; barsCrlf = crlf; }
++        } else if (section == "[bars]" && a < lineEnd && text[a] != '#') {
++            const size_t eq = text.find('=', a);
++            if (eq != std::string::npos && eq < lineEnd) {
++                size_t k = eq;
++                while (k > a && isSpace(text[k - 1])) --k;
++                if (text.compare(a, k - a, key) == 0 && k - a == key.size()) {
++                    size_t v = eq + 1;
++                    while (v < lineEnd && isSpace(text[v])) ++v;
++                    size_t ve = text.find('#', v);
++                    if (ve == std::string::npos || ve > lineEnd) ve = lineEnd;
++                    while (ve > v && isSpace(text[ve - 1])) --ve;
++                    text.replace(v, ve - v, word);
++                    return true;
++                }
++            }
++        }
++        pos = next;
++    }
++    if (barsLineEnd == std::string::npos) return false;
++    std::string line = key + " = " + word + (barsCrlf ? "\r\n" : "\n");
++    if (barsLineEnd > 0 && text[barsLineEnd - 1] != '\n') line = (barsCrlf ? "\r\n" : "\n") + line;  // header on the last line
++    text.insert(barsLineEnd, line);
++    return true;
++}
++inline bool setMode(std::string& text, uint32_t mode) {
++    return setKey(text, "enabled", (mode & Enabled) != 0) && setKey(text, "show_full_health", (mode & Full) != 0)
++        && setKey(text, "uniques_bosses_only", (mode & UniquesOnly) != 0);
++}
++}
+diff --git a/src/plugin.cpp b/src/plugin.cpp
+index 5d641ad..f99de6d 100644
+--- a/src/plugin.cpp
++++ b/src/plugin.cpp
+@@ -14,6 +14,7 @@
+ #include "standalone_overlay.h"
+ #include "overlay_host_api.hpp"
+ #include "legacy_projection.h"
++#include "mode_config.h"
+ #include <imgui.h>
+ #include <array>
+ #include <atomic>
+@@ -63,6 +64,7 @@ std::mutex guard;
+ struct Config {
+     // full: bars on monsters at full life too (show_full_health); off by default, so only damaged monsters get one
+     bool enabled=true, full=false, hidePanels=true, hdFrame=true, rarityOutline=true, aboveHeads=true;
++    bool uniquesOnly=false;  // mxl2012 0005: uniques_bosses_only, bars only on uniques, super uniques and bosses
+     bool devKeepVisibleUnfocused=false;  // dev only: test captures of a game window that is not focused
+     float width=64.6f, height=6, offset=-16, border=1, outlineWidth=2, red=.3f, yellow=.6f, opacity=1;
+     Color green{0,.933f,0,1}, amber{1,.8f,0,1}, low{.933f,.188f,.188f,1};
+@@ -256,6 +258,7 @@ bool loadConfig(const D2RL::PluginContext* ctx) {
+             else if(key=="rarity_outline")c.rarityOutline=boolean();
+             else if(key=="outline_width")c.outlineWidth=number();
+             else if(key=="show_full_health")c.full=boolean();
++            else if(key=="uniques_bosses_only")c.uniquesOnly=boolean();
+             else if(key=="hide_with_side_panels")c.hidePanels=boolean();
+             else if(key=="width")c.width=number(); else if(key=="height")c.height=number();
+             else if(key=="offset_y")c.offset=number(); else if(key=="border")c.border=number();
+@@ -320,7 +323,13 @@ void collectImpl(const D2RL::PluginContext* ctx) {
+                             const float ratio=bars::lifeRatio(hp); float point[2]{};
+                             uint32_t classId{}; read(ptr+4,classId);
+                             bool placed=false;
+-                            if(bars::shown(c.full,ratio)) {
++                            // mxl2012 0005: the rarity first, for uniques_bosses_only
++                            uintptr_t monsterData{};uint16_t kind{};uint8_t bank{};bool boss=false;
++                            if(read(ptr+0x10,monsterData)&&monsterData)read(monsterData+0x1a,kind);
++                            read(ptr+0x1bd,bank);
++                            if(bank<4&&classId<4096){std::lock_guard lock(guard);boss=bossRows[bank][classId];}
++                            const auto rarity=bars::rarity(kind,boss);
++                            if(bars::shownFor(c.full,c.uniquesOnly,ratio,rarity)) {
+                                 if(legacy) {
+                                     // the classic draw position, raised by the monster type's classic height
+                                     const auto p=bars::legacy::classicUnitPoint(unitPixelX(u),unitPixelY(u),viewX,viewY,
+@@ -333,11 +342,7 @@ void collectImpl(const D2RL::PluginContext* ctx) {
+                             }
+                             if(placed && std::isfinite(point[0])&&std::isfinite(point[1])
+                                && point[0]>=0&&point[0]<=next.width&&point[1]>=0&&point[1]<=next.height) {
+-                                uintptr_t monsterData{};uint16_t kind{};uint8_t bank{};bool boss=false;
+-                                if(read(ptr+0x10,monsterData)&&monsterData)read(monsterData+0x1a,kind);
+-                                read(ptr+0x1bd,bank);
+-                                if(bank<4&&classId<4096){std::lock_guard lock(guard);boss=bossRows[bank][classId];}
+-                                next.bars[next.count++]={point[0],point[1],ratio,bars::rarity(kind,boss),
++                                next.bars[next.count++]={point[0],point[1],ratio,rarity,
+                                     !legacy&&c.aboveHeads&&classId<headCorrections.size()?headCorrections[classId]:0};
+                             }
+                         }
+@@ -472,7 +477,7 @@ D2RL::ConsoleCommandResult command(D2R::Game::Client*,const D2RL::ConsoleCommand
+             if(!loadConfig(cmd->plugin)){cmd->plugin->WriteConsoleError("Invalid enemy-health-bars.toml; previous settings retained.");return D2RL::ConsoleCommandResult::Failed;}
+             cmd->plugin->WriteConsoleMessage("Enemy health bar settings reloaded.");
+         } else if(args=="on"||args=="off") {std::lock_guard lock(guard);config.enabled=args=="on";bars::standalone::setEnabled(config.enabled);}
+-        else {char text[220];std::lock_guard lock(guard);std::snprintf(text,sizeof(text),"Enemy bars: %s; enemies=%zu; frames=%u UI=%u; native fault %s; renderer=%s. Commands: enemybars on | off | reload",config.enabled?"on":"off",snapshot.count,frames.load(),collections.load(),faulted?"yes":"no",hosted?"MapSense":"standalone");cmd->plugin->WriteConsoleMessage(text);}
++        else {char text[220];std::lock_guard lock(guard);std::snprintf(text,sizeof(text),"Enemy bars: %s; enemies=%zu; frames=%u UI=%u; native fault %s; renderer=%s. Commands: enemybars on | off | reload",config.enabled?(config.uniquesOnly?(config.full?"on, uniques/bosses, full life too":"on, uniques/bosses"):(config.full?"on, full life too":"on")):"off",snapshot.count,frames.load(),collections.load(),faulted?"yes":"no",hosted?"MapSense":"standalone");cmd->plugin->WriteConsoleMessage(text);}
+         return D2RL::ConsoleCommandResult::Handled;
+     }catch(...){return D2RL::ConsoleCommandResult::Failed;}
+ }
+@@ -510,6 +515,33 @@ D2RL_PLUGIN_EXPORT bool D2RLoaderLoadPlugin(const D2RL::PluginContext* ctx) noex
+         return true;
+     }catch(...) {ctx->LogError("Enemy bars failed to initialize.");return false;}
+ }
++// mxl2012 0005: D2R-XL 2012's Controls action "Enemy Health Bars Mode" (mxl2012-core, overlay_keys.cpp) reads the mode and
++// sets it here. Set applies it at once (as `enemybars on/off`) and saves enabled, show_full_health and uniques_bosses_only
++// in enemy-health-bars.toml (mode_config.h). Mode bits: bars::mode (Valid, Enabled, Full, UniquesOnly); 0 = not loaded.
++// Set returns 1 applied and saved, 0 applied but not saved, -1 refused.
++D2RL_PLUGIN_EXPORT uint32_t __cdecl Mxl2012EnemyBarsModeV1() noexcept {
++    if(!pluginContext||stopped)return 0;
++    std::lock_guard lock(guard);return bars::mode::pack(config.enabled,config.full,config.uniquesOnly);
++}
++D2RL_PLUGIN_EXPORT int __cdecl Mxl2012EnemyBarsSetModeV1(uint32_t mode) noexcept {
++    if(!pluginContext||stopped||!(mode&bars::mode::Valid))return -1;
++    try {
++        {
++            std::lock_guard lock(guard);
++            config.enabled=(mode&bars::mode::Enabled)!=0;config.full=(mode&bars::mode::Full)!=0;
++            config.uniquesOnly=(mode&bars::mode::UniquesOnly)!=0;
++            bars::standalone::setEnabled(config.enabled);
++        }
++        std::array<char,16384> buffer{};
++        if(!pluginContext->ReadConfig(buffer.data(),static_cast<uint32_t>(buffer.size())))return 0;
++        std::string text(buffer.data());
++        if(!bars::mode::setMode(text,mode)||!pluginContext->WriteConfig(text.c_str()))return 0;
++        char msg[160];std::snprintf(msg,sizeof(msg),"Enemy bars: mode set and saved (enabled=%d show_full_health=%d uniques_bosses_only=%d).",
++            (mode&bars::mode::Enabled)?1:0,(mode&bars::mode::Full)?1:0,(mode&bars::mode::UniquesOnly)?1:0);
++        pluginContext->LogInfo(msg);
++        return 1;
++    }catch(...){return 0;}
++}
+ D2RL_PLUGIN_EXPORT void D2RLoaderUnloadPlugin() noexcept {
+     stopped=true;
+     bars::standalone::stop();
+diff --git a/src/policy.h b/src/policy.h
+index 6f0b7f4..f646181 100644
+--- a/src/policy.h
++++ b/src/policy.h
+@@ -30,6 +30,11 @@ inline bool eligible(uint32_t type, uint32_t mode, uint32_t flags, bool hostile,
+ inline bool shown(bool fullHealth, float ratio) {
+     return fullHealth || ratio < 1.0f;
+ }
++// mxl2012 0005: uniques_bosses_only = true keeps bars only on uniques, super uniques and bosses (the monsters with the
++// orange outline, Rarity::Unique); normal monsters, champions and the minions of a unique get none.
++inline bool shownFor(bool fullHealth, bool uniquesOnly, float ratio, Rarity kind) {
++    return shown(fullHealth, ratio) && (!uniquesOnly || kind == Rarity::Unique);
++}
+ inline float lifeRatio(int clientLife) {
+     // Client monster stat 6 is a normalized 0..32768 value, not absolute HP.
+     return std::clamp(clientLife / 32768.0f, 0.0f, 1.0f);
+diff --git a/src/policy_tests.cpp b/src/policy_tests.cpp
+index cb19b86..72d9e4c 100644
+--- a/src/policy_tests.cpp
++++ b/src/policy_tests.cpp
+@@ -3,6 +3,8 @@
+ #include "raster.h"
+ #include "legacy_projection.h"
+ #include "present_plan.h"
++#include "mode_config.h"
++#include <string>
+ #include <vector>
+ #include <sstream>
+ #include <cstdlib>
+@@ -62,6 +64,30 @@ int main() {
+     // show_full_health: off shows damaged monsters only
+     check(!shown(false,1.f) && shown(false,lifeRatio(32767)) && shown(false,.5f));
+     check(shown(true,1.f) && shown(true,.25f));
++    // mxl2012 0005: uniques_bosses_only keeps bars on uniques, super uniques and bosses only (not champions or minions)
++    check(shownFor(false,false,.5f,Rarity::Normal) && shownFor(false,false,.5f,Rarity::Champion));
++    check(!shownFor(false,true,.5f,Rarity::Normal) && !shownFor(false,true,.5f,Rarity::Champion));
++    check(shownFor(false,true,.5f,Rarity::Unique) && !shownFor(false,true,1.f,Rarity::Unique));
++    check(shownFor(true,true,1.f,Rarity::Unique) && !shownFor(true,true,1.f,Rarity::Champion) && shownFor(true,false,1.f,Rarity::Normal));
++    check(shownFor(true,true,1.f,rarity(0x02)) && shownFor(true,true,1.f,rarity(0x08)) && shownFor(true,true,1.f,rarity(0,true)));
++    check(!shownFor(true,true,1.f,rarity(0x04|0x08)) && !shownFor(true,true,1.f,rarity(0x10|0x08)));
++    // mxl2012 0005: the mode keys rewritten in the player's file (mode_config.h)
++    {
++        using namespace bars::mode;
++        check(pack(false,false,false)==Valid && pack(true,true,true)==(Valid|Enabled|Full|UniquesOnly));
++        std::string t="# c\r\n[bars]\r\nenabled = true # on\r\nwidth = 64.6\r\nshow_full_health = false\r\n";
++        check(setMode(t,pack(false,true,true)));
++        check(t=="# c\r\n[bars]\r\nuniques_bosses_only = true\r\nenabled = false # on\r\nwidth = 64.6\r\nshow_full_health = true\r\n");
++        check(setMode(t,pack(true,false,false)));
++        check(t=="# c\r\n[bars]\r\nuniques_bosses_only = false\r\nenabled = true # on\r\nwidth = 64.6\r\nshow_full_health = false\r\n");
++        std::string u="[bars]\n# enabled = false\nenabled=true\n[other]\nshow_full_health = true\n";
++        check(setMode(u,pack(true,true,false)));
++        check(u=="[bars]\nuniques_bosses_only = false\nshow_full_health = true\n# enabled = false\nenabled=true\n[other]\nshow_full_health = true\n");
++        std::string last="[bars]";
++        check(setKey(last,"enabled",false) && last=="[bars]\nenabled = false\n");
++        std::string none="width = 3\n";
++        check(!setMode(none,pack(true,false,false)) && none=="width = 3\n");
++    }
+     // legacy graphics placement (legacy_projection.h)
+     {
+         using namespace bars::legacy;

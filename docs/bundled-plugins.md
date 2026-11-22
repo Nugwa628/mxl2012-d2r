@@ -401,7 +401,7 @@ ImGui (MIT) and RuffnecKk's MapSense OverlayHost API (MIT). Credit: README, CHAN
 `third_party/enemy-health-bars-mxl2012/README.md` and this file (lane plug125).
 
 - **Built from source** by `tools/build_enemyhealthbars.ps1`, from the author's source zip in commit `e6b929b` (both zips
-  checked by sha256), with our three patches in `third_party/enemy-health-bars-mxl2012/`:
+  checked by sha256), with our five patches in `third_party/enemy-health-bars-mxl2012/`:
   - `0001-no-build-fingerprint`: removes the check of Game.exe's time stamp and size, which refused every build but one (owner
     rule: never tie a plugin to a build). Its nine byte signatures stay, so on code it does not know it turns itself off
     with its own log line. This also sets the version to `0.2.6+mxl2012`.
@@ -413,10 +413,20 @@ ImGui (MIT) and RuffnecKk's MapSense OverlayHost API (MIT). Credit: README, CHAN
     1066x600 with Legacy 16:9) fitted to the window height and centred. Everything it reads is found at load by expected
     bytes; if they don't match, legacy stays without bars (log line) and HD is unchanged. It also makes **bars only on
     damaged monsters** the default (owner, 2026-11-16): `show_full_health` now defaults to `false` in the plugin and its config.
-- **Setting, bars on all monsters:** `show_full_health = true` under `[bars]` in
+  - `0004-dirty-rect-idle-hidden` (0.1.30): **the bars no longer slow the game.** The author's renderer sent its whole
+    window (33 MB at 4K) to the screen on every pass, even with no bar shown and with the bars off: at 4K under Proton the
+    game ran at about 36 instead of 85 FPS (lane fpstown). Now the window is made with the first bar, hidden with nothing
+    sent while no bar shows, and only the changed area is sent while bars show; with the bars off nothing runs. Details
+    in `third_party/enemy-health-bars-mxl2012/README.md`; measurements in lane rel0130's report.
+  - `0005-mxl2012-uniques-filter-mode-keys` (0.1.30): **bars only on uniques and bosses**, the key `uniques_bosses_only`
+    under `[bars]` (shipped `false`): `true` keeps bars only on the monsters with the orange outline (unique, super unique
+    and boss monsters; not champions or a unique's minions). It also adds the two exports the Controls action
+    "Enemy Health Bars Mode" uses (next section): they read the mode and set it at once, saved in the player's file.
+- **Settings, which monsters:** `show_full_health = true` under `[bars]` in
   `mods\mxl2012\d2rloader\config\enemy-health-bars.toml` (the plugin's own key) also shows bars on monsters at full life;
-  `false` (shipped) shows them only once a monster is below full life. `enemybars reload` in the D2RLoader console applies it
-  without a restart.
+  `false` (shipped) shows them only once a monster is below full life. `uniques_bosses_only = true` (patch 0005; shipped
+  `false`) keeps them on uniques and bosses only. `enemybars reload` in the D2RLoader console applies them without a
+  restart; the Controls action "Enemy Health Bars Mode" (next section) sets them in game.
 - **In the package (GPL: the binary comes with its source):** `mods\mxl2012\d2rloader\plugins\d2rl-enemy-health-bars.dll`,
   `d2rl-enemy-health-bars-license.txt` (GPL-3.0), `-third-party.txt` with the ImGui, MapSense API and PluginSDK licences
   (`-imgui-license.txt`, `-mapsense-api-license.txt`, `-pluginsdk-license.txt`), and `d2rl-enemy-health-bars-source.zip`.
@@ -424,11 +434,12 @@ ImGui (MIT) and RuffnecKk's MapSense OverlayHost API (MIT). Credit: README, CHAN
   `bundledPlugins` names the repository, commit, licence and patch hashes. Its config
   `mods\mxl2012\d2rloader\config\enemy-health-bars.toml` (the patched source's, `show_full_health = false`) is a `preserve`
   file, so a player's choice survives Update and Repair. `tools/package_release.py` and `tools/verify_package.py` refuse a
-  config that is not on, shows full-life monsters, or has the test-only key on.
+  config that is not on, shows full-life monsters, is set to uniques and bosses only, or has the test-only key on, and a
+  DLL without patch 0005's export.
 - **How it works:** it reads game memory only, with no hooks or byte patches. Life comes from the client's normalized life
   stat, so Median's huge monster life (Uber Izual about 1.96M) cannot overflow it. The boss outline comes from MonStats
   flags. Head heights come from the mod's `monstats` / `monstats2` (1839 monster types). It draws in its own transparent
-  window over the game, which hides while the game is not focused.
+  window over the game, which hides while the game is not focused and while no bar shows (patch 0004).
 - **Tests:** the author's `policy_tests` plus ours (damaged-only visibility, the legacy placement maths for 800x600,
   1066x600 and 640x480) run in the build script; the packaging tests check the shipped config.
 - **Screenshots** (lane plug125, background mode, overlay captured and laid over the game capture, docs/testing.md "Lane
@@ -473,6 +484,11 @@ Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/floating-dama
     Present. Proton prefixes have no Segoe UI (the default index 0), so every start under Proton crashed. Missing,
     unreadable and non-font files now go to the author's fallback (ImGui's built-in font) without that report, and a font
     that cannot be built leaves the built-in font for every index. With every font present, as on Windows, nothing changes.
+  - `0006-mxl2012-show-numbers-key` (0.1.30): **the numbers on and off in game, saved.** The key `show_numbers` under
+    `[general]` (shipped `true`): `false` hides the numbers and the DPS counter but keeps the hooks loaded, so they come back
+    without a restart (the author's master switch `enabled` still loads nothing when it is `false` at the start). It adds
+    the two exports the Controls action "Floating Damage Numbers" uses (next section). The author's own action "Toggle
+    Floating Damage" (category RuffnecKk Suite, Shift+Z) still toggles the numbers for the session only, without saving.
 - **In the package:** `mods\mxl2012\d2rloader\plugins\d2rl-ruffneckk-floating-damage.dll`,
   `d2rl-ruffneckk-floating-damage-license.txt` (MIT), `d2rl-ruffneckk-floating-damage-third-party.txt` (the suite's
   third-party notices and every licence text they keep: PluginSDK, Dear ImGui, MinHook, D2R Damage Numbers ...),
@@ -483,15 +499,58 @@ Credit: README, CHANGELOG / release notes, NOTICE.md, `third_party/floating-dama
   checked against its expected bytes. It also hooks DXGI Present for its own D3D12 ImGui renderer, which draws into the game's
   frame. It has no build check. The amount shown is int32 visible life, so one number can show up to about 8.39M (the same
   limit as Damage Overflow Fix's cap).
-- **Console:** `floating-damage status` (HD and legacy projection lines), `floating-damage preview`.
+- **Console:** `floating-damage status` (HD and legacy projection lines, `show_numbers=`), `floating-damage preview`.
 - **Tests:** the author's config tests and our legacy projection and font loading tests run in the build script. In game (lane plug125):
   numbers over a Fallen and over Andariel in HD, in legacy and in legacy with Legacy 16:9, and DPS 910 / 2.4K / 4.6K in
   legacy; the numbers 2.5 times bigger in legacy 4:3 and Legacy 16:9 with the shipped `legacy_text_scale`.
 - **Bigger or smaller numbers:** `legacy_text_scale` (legacy only) or `text_size` / `critical_hit_size` (both modes) in
   `ruffneckk-floating-damage.toml`.
 - **On by default; turn it off:** `enabled = false` under `[general]` in `ruffneckk-floating-damage.toml` (the author's
-  master switch; shipped `true`), then start the game again: no renderer or combat hook is loaded. The packaging checks
-  refuse a shipped config without `[general] enabled = true`. Or delete the DLL.
+  master switch; shipped `true`), then start the game again: no renderer or combat hook is loaded. To hide the numbers
+  without a restart: the Controls action "Floating Damage Numbers" (next section) or `show_numbers = false`. The packaging
+  checks refuse a shipped config without `[general] enabled = true` and `show_numbers = true`, and a DLL without patch
+  0006's export. Or delete the DLL.
+
+## Keys for the health bars and damage numbers (mxl2012-core, from 0.1.30)
+
+Owner's request (2026-11-22): two keys to change the bundled Enemy Health Bars and Floating Damage in game. Lane rel0130b.
+
+- **Where:** Options > Controls, category **D2R-XL 2012**: **Enemy Health Bars Mode** (`mxl2012-core/mxl_health_bars_mode`)
+  and **Floating Damage Numbers** (`mxl2012-core/mxl_damage_numbers`). Rebindable like every D2RLoader action (stored in
+  `<game>\d2rloader\config\input-bindings.toml`); **no default key** (owner), so a player binds them first.
+- **Enemy Health Bars Mode:** each press goes to the next of five modes: Off -> Always, all monsters -> Always,
+  uniques/bosses -> When damaged, all monsters -> When damaged, uniques/bosses -> Off. The shipped default is "when
+  damaged, all monsters". The modes are the plugin's keys `enabled`, `show_full_health` and `uniques_bosses_only`
+  (patch 0005); Off sets only `enabled = false` and keeps the other two.
+  - **"Uniques/bosses"** is the plugin's own unique class, the orange outline: unique and super unique monsters (Median's
+    uniques among them) and bosses (the MonStats boss flag: the act bosses, Median's ubers). **Champions do not count**
+    (decision of lane rel0130b): the owner asked for uniques and bosses, and the plugin already marks champions apart
+    (blue outline), so the filter is exactly the orange-outlined monsters. A unique's minions do not count either.
+- **Floating Damage Numbers:** each press turns the numbers and the DPS counter on or off (`show_numbers`, patch 0006).
+- **The line:** each press shows a yellow line in the message log (bottom left in HD, the classic place at the top left in
+  legacy graphics), which fades like D2R's own notices:
+  "Health bars: off", "Health bars: always, all monsters", "Health bars: always, uniques/bosses", "Health bars: when
+  damaged, all monsters", "Health bars: when damaged, uniques/bosses", "Floating damage: on" / "off". A setting that could
+  not be saved adds "(not saved)"; a missing plugin or Floating Damage's master switch off get a line that says so. The
+  line goes straight to the client's chat packet handler, as the map reveal's (docs/d2r-addresses.md section 13, chat type
+  4), so it works in a joined game and sends nothing to the server.
+- **NPC speech:** a chat line during an NPC's speech freezes the speech (docs/d2r-addresses.md section 13). While the
+  client talks to an NPC (`0x2a48760` non-zero) or the NPC menu state `0x2a486a4` is set, the setting still changes and
+  the line is skipped (counted as `skipped=`). In game (lane rel0130b) a real key press during the speech does not reach
+  D2RLoader's action at all (the game keeps the keyboard then), so nothing changes; the guard covers a press that does
+  arrive (checked with the harness verb, the same code: the setting changed, no line, the speech ended with the menu as
+  in a control run without a press).
+- **Saved:** each plugin applies the setting at once and writes it to its own TOML (`enemy-health-bars.toml`,
+  `ruffneckk-floating-damage.toml`), which are `preserve` files: the choice survives a restart, Update and Repair. A
+  player's file from before 0.1.30 gets the new key added on the line after its table header; the rest of the file is
+  kept as it is.
+- **Design:** the actions live in mxl2012-core (`plugin/src/overlay_keys.cpp`, pure part `overlay_keys_logic.h`, tests
+  `plugin/tests/overlay_keys_test.cpp`; off word `overlaykeys`), with the message and NPC rules in one place. The plugins
+  keep their settings: at each press the core finds their exports with `GetProcAddress` on the loaded DLL
+  (`Mxl2012EnemyBarsModeV1` / `Mxl2012EnemyBarsSetModeV1`, `Mxl2012FloatingDamageShownV1` /
+  `Mxl2012FloatingDamageSetShownV1`), so the load order does not matter. No hook.
+- **Test harness** (dev builds): `overlaykeys` prints the bound keys, the current modes, the NPC flags and the counters;
+  `overlaykeys bars` / `overlaykeys damage` does what a press does. The `mxl` command's `overlaykeys` line has the same.
 
 ## Monster Display by CelestialRayOne (shipped from 0.1.27)
 

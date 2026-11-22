@@ -15,8 +15,9 @@ SEVEN = pr.find_7z()
 
 
 # the shipped defaults: health bars only on damaged monsters, Floating Damage on
-EHB_CONFIG = "[bars]\nenabled = true\n# true = every enemy\nshow_full_health = false\nhide_with_side_panels = true\n"
-FD_CONFIG = ("[general]\n# Master switch.\nenabled = true\n\n[appearance]\nlegacy_text_scale = 2.5\n\n"
+EHB_CONFIG = ("[bars]\nenabled = true\n# true = every enemy\nshow_full_health = false\nuniques_bosses_only = false\n"
+              "hide_with_side_panels = true\n")
+FD_CONFIG = ("[general]\n# Master switch.\nenabled = true\nshow_numbers = true\n\n[appearance]\nlegacy_text_scale = 2.5\n\n"
              "[diagnostics]\nenabled = false\n")
 
 
@@ -27,7 +28,7 @@ def fake_ehb_build(tmp: Path):
     for k, rel in pr.EHB_FROM.items():
         (build / rel).parent.mkdir(parents=True, exist_ok=True)
         (build / rel).write_bytes(b"MZ " + pr.EHB["version"].encode()
-                                  + b"\0dev_keep_visible_unfocused\0legacy graphics placement\0" if k == "dll"
+                                  + b"\0dev_keep_visible_unfocused\0legacy graphics placement\0Mxl2012EnemyBarsSetModeV1\0" if k == "dll"
                                   else EHB_CONFIG.encode() if k == "config" else k.encode() + b"\n")
     tree = tmp / "enemyhealthbars-src" / "EnemyHealthBars"
     tree.mkdir(parents=True)
@@ -42,7 +43,7 @@ def fake_fd_build(tmp: Path):
     rel = tmp / "floatingdamage" / "Release"
     rel.mkdir(parents=True)
     for k, name in pr.FD_FROM.items():
-        (rel / name).write_bytes(b"MZ " + pr.FD["version"].encode() + b"\0ruffneckk-floating-damage-font.ttf\0" if k == "dll"
+        (rel / name).write_bytes(b"MZ " + pr.FD["version"].encode() + b"\0ruffneckk-floating-damage-font.ttf\0Mxl2012FloatingDamageSetShownV1\0" if k == "dll"
                                  else FD_CONFIG.encode() if k == "config" else k.encode() + b"\n")
     src = tmp / "floatingdamage-src"
     (src / "third_party" / "notices").mkdir(parents=True)

@@ -97,6 +97,9 @@
 //   +  the clear legacy fonts setting: mxl2012-core.toml [fonts] legacy_clear_fonts and the Controls action "Clear Legacy Fonts"
 //      (default Ctrl+F) switch classic text to the clearer set in data/local/font/latin/clear/ at once (clear_fonts.cpp, off
 //      word clearfonts);
+//   +  the health bar and damage number keys: the Controls actions "Enemy Health Bars Mode" and "Floating Damage Numbers" (no
+//      default keys) cycle the bundled Enemy Health Bars' mode and turn Floating Damage's numbers on and off, saved in their
+//      own TOML files, with a line in the message log (overlay_keys.cpp, off word overlaykeys);
 //   G  the test harness and its gameplay verbs (dev builds only; testharness.cpp, harness_cmds.cpp).
 // Other ports' Median / D2Sigma parts are not part of it (docs/plugin-plan.md section 11).
 #include <D2RLPlugin/api.h>
@@ -116,6 +119,7 @@
 #include "lvlup_ui.h"
 #include "npc_greet.h"
 #include "map_reveal.h"
+#include "overlay_keys.h"
 #include "melt_trail.h"
 #include "sprite_dir.h"
 #include "lob_aim.h"
@@ -166,7 +170,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.29";
+constexpr const char* PluginVersion = "0.1.30";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -232,7 +236,7 @@ char g_otherImage[256] = "";  // the message for a player on another game image,
 char g_conflict[256] = "";    // the message when a conflicting plugin is in the game (nothing installed), else empty
 
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
-// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim stunlen whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache npcgreet), separated by spaces, commas or lines. Off words are letters and digits only.
+// pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim stunlen whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache npcgreet overlaykeys), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
 // The other way round for parts that stay out unless asked for: mxl2012-core-on.txt next to the DLL lists them (any of:
 // spritedir spritedirlog spritedirtick), written the same way.
@@ -548,6 +552,7 @@ char g_wikiReport[320] = "";
 char g_stashPageReport[192] = "";
 char g_sendStashReport[192] = "";
 char g_mapRevealReport[256] = "";
+char g_overlayKeysReport[256] = "";
 char g_areaLevelReport[160] = "";
 char g_clearFontsReport[320] = "";
 char g_harnessReport[320] = "";
@@ -919,6 +924,12 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 		SayPart(command, "mapreveal", line);
 	}
 	{
+		char status[512];
+		OverlayKeysStatus(status, sizeof(status));
+		std::snprintf(line, sizeof(line), "%s | %s", g_overlayKeysReport, status);
+		SayPart(command, "overlaykeys", line);
+	}
+	{
 		long filled = 0;
 		int level = 0, area = 0, difficulty = -1;
 		AreaLevelCounts(&filled, &level, &area, &difficulty);
@@ -1232,6 +1243,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("mapreveal")) {
 		InstallMapReveal(context, g_mapRevealReport, sizeof(g_mapRevealReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_mapRevealReport);
+		context->LogInfo(line);
+	}
+	if (!Off("overlaykeys")) {
+		InstallOverlayKeys(context, g_overlayKeysReport, sizeof(g_overlayKeysReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_overlayKeysReport);
 		context->LogInfo(line);
 	}
 	if (!Off("arealvl")) {

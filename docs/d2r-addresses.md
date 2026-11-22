@@ -725,6 +725,8 @@ Ready-made path, called not hooked, verified in game (slot 2, background mode):
 - **Client-only lines** (lane mapreveal, 2026-11-06; map_reveal.cpp): a plugin part that runs on the client builds the record
   itself (`map_reveal::BuildChatPacket`: type 4, colour, empty name, text) and calls the client handler `0x12c190` directly
   on the UI thread. Nothing goes to the server, so it works in a joined game. Held while an NPC talks (`0x2a48760` non-zero).
+  The same path answers the 0.1.30 keys for the health bars and damage numbers (overlay_keys.cpp, yellow, colour 9); there
+  a line is skipped, not held, while `0x2a48760` or the NPC menu state `0x2a486a4` is non-zero (the setting still changes).
 - Not used: the client packet table also has 0x5a (34 bytes, builder `0x5282b0(unit,type)`, sender `0x480510`; Median's goblin notice
   is type 0x15) and unit message `0x491960(player,msg,subject)` (0x14 = D2R's generic "Impossible." line; Median's 0x13 and 0x88
   have no D2R handler). Several client handlers sit behind protected thunks (`0x3e2b7xx`), so they cannot be read statically.

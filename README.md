@@ -59,8 +59,21 @@ patches add the legacy placement). Its numbers use the font **Cinzel Bold** by N
 (SIL Open Font License 1.1). On by default; turn it off with `enabled = false` under `[general]` in
 `mods\mxl2012\d2rloader\config\ruffneckk-floating-damage.toml`.
 
-To turn off the health bars or the damage numbers: open the file named above in Notepad, change `enabled = true` to
-`enabled = false`, save, and start the game again. The downloader's Update and Repair keep your change.
+**Keys for the health bars and the damage numbers** (from 0.1.30): in the game, open Options > Controls, find the
+category **D2R-XL 2012** and give a key to **Enemy Health Bars Mode** and **Floating Damage Numbers** (they have no key
+until you set one).
+- Each press of **Enemy Health Bars Mode** moves to the next of five modes: off; always, all monsters; always,
+  uniques/bosses; when damaged, all monsters (the default); when damaged, uniques/bosses. "Uniques/bosses" are the
+  monsters with an orange outline: unique, super unique and boss monsters. Champions (blue outline) are not included.
+- Each press of **Floating Damage Numbers** turns the damage numbers (and the DPS counter) on or off.
+- A yellow line in the message area (bottom left in HD, top left in legacy graphics) says what you chose, for example
+  "Health bars: when damaged, uniques/bosses" or "Floating damage: off". No line is shown while an NPC is talking to you
+  (it would stop the NPC's speech).
+- The choice takes effect at once and is saved in the plugin's file above, so it is kept when you restart the game, and
+  the downloader's Update and Repair keep it too.
+
+To turn off the health bars or the damage numbers by hand instead: open the file named above in Notepad, change
+`enabled = true` to `enabled = false`, save, and start the game again. The downloader's Update and Repair keep your change.
 
 Shipped with the mod: **Monster Display** by **CelestialRayOne (Bogdan Bulai)**
 (<https://github.com/CelestialRayOne/d2rloader_plugins>, `plugins/monster-display`, MIT; licence in

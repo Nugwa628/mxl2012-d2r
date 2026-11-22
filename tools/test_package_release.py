@@ -680,10 +680,23 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn(f"$pin = '{pr.EHB['commit']}'", script)  # one pin for the build and the manifest
         names = [p.split("  ")[1] for p in pr.ehb_patches()]
         self.assertEqual(names, ["0001-no-build-fingerprint.patch", "0002-dev-keep-visible-unfocused.patch",
-                                 "0003-legacy-placement-damaged-only.patch"])
+                                 "0003-legacy-placement-damaged-only.patch", "0004-dirty-rect-idle-hidden.patch",
+                                 "0005-mxl2012-uniques-filter-mode-keys.patch"])
         readme = (pr.EHB_OURS / "README.md").read_text("utf-8")
         self.assertIn(pr.EHB["commit"], readme)
         self.assertIn("GPL-3.0", readme)
+
+    def test_ehb_renderer_sends_only_what_changed(self):
+        # 0.1.30 (lane rel0130): the standalone window is made with the first bar, hidden with nothing sent while no bar
+        # shows, only the changed area sent while bars show, and idle while the bars are off
+        patch = (pr.EHB_OURS / "0004-dirty-rect-idle-hidden.patch").read_text("utf-8")
+        self.assertIn("+++ b/src/present_plan.h", patch)
+        self.assertIn("UpdateLayeredWindowIndirect", patch)
+        self.assertIn("prcDirty=&dirty", patch)
+        self.assertIn("-        if(!UpdateLayeredWindow(", patch)  # the whole-window send every pass is gone
+        self.assertIn("if(!barsOn){hide();Sleep(50);continue;}", patch)
+        self.assertIn("bars::standalone::setEnabled(c.enabled);", patch)
+        self.assertIn("no ghost bars", patch)  # its policy_tests case
 
     def test_ehb_staged_with_licences_and_source(self):
         import test_verify_package as tvp
@@ -709,6 +722,8 @@ class PackageReleaseTests(unittest.TestCase):
         for bad, why in ((tvp.EHB_CONFIG.replace("show_full_health = false", "show_full_health = true"), "show_full_health"),
                          (tvp.EHB_CONFIG.replace("show_full_health = false\n", ""), "show_full_health"),
                          (tvp.EHB_CONFIG.replace("enabled = true", "enabled = false"), "enabled"),
+                         (tvp.EHB_CONFIG.replace("uniques_bosses_only = false", "uniques_bosses_only = true"), "uniques_bosses_only"),
+                         (tvp.EHB_CONFIG.replace("uniques_bosses_only = false\n", ""), "uniques_bosses_only"),
                          (tvp.EHB_CONFIG + "dev_keep_visible_unfocused = true\n", "test captures only")):
             self.assertIn(why, "\n".join(pr.ehb_config_problems(bad)))
         # the patch sets the default in the plugin and in its config, and places the bars in legacy graphics too
@@ -746,7 +761,7 @@ class PackageReleaseTests(unittest.TestCase):
         names = [p.split("  ")[1] for p in pr.fd_patches()]
         self.assertEqual(names, ["0001-mxl2012-legacy-projection.patch", "0002-mxl2012-bundled-font.patch",
                                  "0003-mxl2012-legacy-dps-counter.patch", "0004-mxl2012-legacy-text-scale.patch",
-                                 "0005-mxl2012-missing-system-font.patch"])
+                                 "0005-mxl2012-missing-system-font.patch", "0006-mxl2012-show-numbers-key.patch"])
         readme = (pr.FD_OURS / "README.md").read_text("utf-8")
         self.assertIn(pr.fd_commit(), readme)
         self.assertIn("SIL Open Font License 1.1", readme)
@@ -793,7 +808,8 @@ class PackageReleaseTests(unittest.TestCase):
         author = pr.ROOT / "third_party" / "RuffnecKk-D2RLoader-Suite" / "plugins" / "floating-damage" / "config"
         if (author / "ruffneckk-floating-damage.toml").is_file():
             self.assertEqual(pr.fd_config_problems((author / "ruffneckk-floating-damage.toml").read_text("utf-8")),
-                             [f"{pr.FD['config']}: [appearance] legacy_text_scale must be 2.5"])
+                             [f"{pr.FD['config']}: [general] show_numbers must be true (numbers shown by default)",
+                              f"{pr.FD['config']}: [appearance] legacy_text_scale must be 2.5"])
         # the config the build ships (all our patches applied)
         built = pr.ROOT / "build" / "floatingdamage" / "Release" / "ruffneckk-floating-damage.toml"
         if built.is_file() and "legacy_text_scale" in built.read_text("utf-8"):

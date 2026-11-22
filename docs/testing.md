@@ -4,6 +4,44 @@ Changes that are built and installed but not yet confirmed in the game. Restart 
 "Confirmed" (or into docs/bugs.md) once tested. Console command `mxl` shows the plugin version and how many skill
 functions it installed.
 
+## Lane rel0130b: the health bars and damage number keys in game (2026-11-23, slot 6, test profile 1600x900, private display)
+
+`plugin/src/overlay_keys.cpp` (Controls actions "Enemy Health Bars Mode" and "Floating Damage Numbers"), Enemy Health Bars
+patch 0005 and Floating Damage patch 0006. Bound in the slot's `input-bindings.toml` before the start (F12 and F11; F9 is
+Skill 9 in the test profile, so a press of F9 never reached the action). Driver `keysdrive.py` / `keys130.sh` in
+`/d2work/mxl2012-runs/rel0130/` (its own `tools/` folder); report `/d2work/mxl2012-runs/rel0130/REPORT-release.md`.
+
+- **Real key presses** through all five modes in a Blood Moor fight (two zombies and two Andariels, one of each damaged):
+  each press changes the mode, writes the three keys to `enemy-health-bars.toml` and shows its yellow line, which fades
+  after about 10 s (HD: bottom left; legacy: the classic message place at the top left). Bars by eye match each mode.
+- **Damage numbers:** F11 off: no numbers and no DPS counter; on: numbers over the hit monster. Saved as `show_numbers`.
+- **Restart** inside the run (the slot tools restore the whole slot after each run, and `game_ctl.stop` / `start` do too, so
+  the driver skips the restore and the new snapshot for that one restart): the mode and the numbers setting came back from
+  the files. A 0.1.29 file without the new keys got them added after the table header.
+- **NPC speech:** a new character's first talk with Akara: the action's press during the speech skips the line (counted),
+  changes the setting, and the speech ends with her menu after 96 s, as in a control run with no press (96 s). A real key
+  press during the speech does not reach D2RLoader's action (the game keeps the keyboard then); the press was sent with the
+  harness verb `overlaykeys bars` (the same code).
+- **Slot tools:** a test of saved settings across a restart must restart inside one run (above); a second run starts from
+  the restored slot.
+
+## Lane rel0130: Enemy Health Bars patch 0004 measured on Linux (2026-11-23, slot 6, test profile 1600x900, private display)
+
+`third_party/enemy-health-bars-mxl2012/0004-dirty-rect-idle-hidden.patch` (the window made with the first bar, hidden and
+idle without bars, dirty-area sends, idle when the bars are off) on the 0.1.29 package, against 0.1.29's DLL and no DLL.
+Report `/d2work/mxl2012-runs/rel0130/REPORT.md`; driver and data in `/d2work/mxl2012-runs/rel0130/` (its own `tools/`
+folder: `ehbdrive.py`, `ehbplan.py`; `data/`, shots in `shots/`).
+
+- **Unit tests:** `policy_tests` (author's + ours) pass under wine, with the new present-plan and simulated-window cases.
+- **Cost** (game process CPU per frame at the 30 FPS cap, repeat runs at equal machine load): 0.1.29's plugin adds 9 to 13 ms
+  per frame in HD and about 9 ms in legacy, with bars or without, and also with `enabled = false` or `enemybars off`; the
+  patched plugin costs the same as no plugin (town 27 against 29 ms, fight 22 against 23, legacy 13 against 12).
+- **Drawing (by eye, `shots/bars_compare.jpg`):** the same bars as 0.1.29 in HD and legacy; a killed zombie's bar goes and
+  the others stay; none are left after all die or after the switch back to HD; `enemybars off` hides them; with
+  `enabled = false` no window exists until `enemybars on`. The plugin log shows 3 whole-window sends per session (first bar,
+  and each show after a hide).
+- **Not run:** 4K (owner: not needed), a real Windows desktop, MapSense hosting (not bundled).
+
 ## Lane rel0129: release 0.1.29 built, packaged and smoked on Linux (2026-11-22, slots 6 and 7, HD and legacy, private display)
 
 lane/hdmaps2, lane/automapall and lane/fungus14 merged onto main 3039fca (with their base, lane/linux-integration), the

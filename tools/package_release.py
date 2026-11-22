@@ -700,9 +700,10 @@ def toml_values(text: str) -> dict:
 
 def ehb_config_problems(text: str) -> list:
     """Our Enemy Health Bars defaults the package must carry: on, bars only on damaged monsters (show_full_health is the
-    setting for all monsters), the dev-only capture option not on."""
+    setting for all monsters), on all monsters, not only uniques and bosses (uniques_bosses_only, patch 0005, the key the
+    Controls action "Enemy Health Bars Mode" sets), the dev-only capture option not on."""
     got = toml_values(text)
-    want = {"bars.enabled": "true", "bars.show_full_health": "false"}
+    want = {"bars.enabled": "true", "bars.show_full_health": "false", "bars.uniques_bosses_only": "false"}
     problems = [f"{EHB['config']}: {k.split('.', 1)[1]} must be {v}" for k, v in want.items() if got.get(k) != v]
     if got.get("bars.dev_keep_visible_unfocused", "false") != "false":
         problems.append(f"{EHB['config']}: dev_keep_visible_unfocused is for test captures only")
@@ -713,12 +714,15 @@ FD_LEGACY_TEXT_SCALE = "2.5"  # owner, 2026-11-17: the numbers in legacy graphic
 
 
 def fd_config_problems(text: str) -> list:
-    """Floating Damage is on by default: [general] enabled = true (the setting that turns it off), and its numbers are
-    FD_LEGACY_TEXT_SCALE times bigger in legacy graphics: [appearance] legacy_text_scale (patch 0004)."""
+    """Floating Damage is on by default: [general] enabled = true (the setting that turns it off) and show_numbers = true
+    (patch 0006, the key the Controls action "Floating Damage Numbers" sets), and its numbers are FD_LEGACY_TEXT_SCALE times
+    bigger in legacy graphics: [appearance] legacy_text_scale (patch 0004)."""
     values = toml_values(text)
     problems = []
     if values.get("general.enabled") != "true":
         problems.append(f"{FD['config']}: [general] enabled must be true (on by default)")
+    if values.get("general.show_numbers") != "true":
+        problems.append(f"{FD['config']}: [general] show_numbers must be true (numbers shown by default)")
     if values.get("appearance.legacy_text_scale") != FD_LEGACY_TEXT_SCALE:
         problems.append(f"{FD['config']}: [appearance] legacy_text_scale must be {FD_LEGACY_TEXT_SCALE}")
     return problems
@@ -745,9 +749,11 @@ def build_fd() -> Path:
 
 
 def check_fd(dll: Path) -> list:
-    """Problems of a Floating Damage DLL: ours (the author's version, with our font patch's file name in it)."""
+    """Problems of a Floating Damage DLL: ours (the author's version, with our font patch's file name and our patch 0006's
+    export for the Controls action in it)."""
     b = dll.read_bytes()
-    if FD["version"].encode() not in b or Path(FD["font"]).name.encode() not in b:
+    if (FD["version"].encode() not in b or Path(FD["font"]).name.encode() not in b
+            or b"Mxl2012FloatingDamageSetShownV1" not in b):
         return [f"{dll} is not Floating Damage {FD['version']} with our patches: build it with tools/build_floatingdamage.ps1"]
     return []
 
@@ -802,11 +808,11 @@ def build_ehb() -> Path:
 
 def check_ehb(dll: Path) -> list:
     """Problems of an Enemy Health Bars DLL: ours (the version our patch sets, the dev option of our second patch, the
-    legacy graphics placement of our third)."""
+    legacy graphics placement of our third, the mode export of our fifth)."""
     b = dll.read_bytes()
     problems = []
     if (EHB["version"].encode() not in b or b"dev_keep_visible_unfocused" not in b
-            or b"legacy graphics placement" not in b):
+            or b"legacy graphics placement" not in b or b"Mxl2012EnemyBarsSetModeV1" not in b):
         problems.append(f"{dll} is not Enemy Health Bars {EHB['version']} with our patches: build it with "
                         "tools/build_enemyhealthbars.ps1")
     return problems
