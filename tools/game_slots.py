@@ -36,6 +36,25 @@ still take: a lock is held when either folder exists, and taking it makes both. 
 holds it". Run output (run folders, logs, screenshots) goes to RUNS (default <repo>/work/runs, env MXL_RUNS), never into
 the shared lock folder.
 
+Linux (docs/testing.md "Linux slots"): the backend is picked by platform (BACKEND; env MXL_SLOT_BACKEND=windows|linux
+overrides, for tests). On Linux only the slots of LINUX_SLOTS exist (2, 5, 6 and 7; temporary 10 and up only with env
+MXL_EXTRA_SLOTS; <locks>/slots.json says which numbers are ours, another project's number is refused): each is a D2R 3.4 + D2RLoader folder
+(default /d2work/slots/sN) run under Proton Experimental in its own prefix (STEAM_COMPAT_DATA_PATH, default
+/d2work/prefixes/sN; Wine prefix <that>/pfx, drive D: -> the slot folder), saves in the prefix's Saved Games\\...\\mods\\
+mxl2012-sN. Slots 1, 3 and 4 are refused there with a clear message. Overrides (one place, linux_slot()): env
+MXL_SLOTn_DIR / MXL_SLOTn_COMPAT / MXL_SLOTn_SNAPSHOT, machine.json "linux_slots" {"N": {"dir", "compat", "snapshot"}}
+and "proton_dir", env MXL_PROTON. Processes are found in /proc (a Wine process of the slot's prefix whose command line
+names the image); the run's snapshot is the whole slot folder (tools/slot_share.py). Functions for the window layer
+(game_ctl): slot_dir, compat_dir, prefix_dir, save_root, wine_env, proton_cmd, wine_cmd, windows_path, ensure_drive,
+game_pids, prefix_pids, launch, stop_prefix, wait_prefix_idle, and for the owner's no-focus rule apply_launch_settings
+and FocusWatch (the run's _NET_ACTIVE_WINDOW must never become a game window).
+
+Shared seats (lane slotcap, 2026-11-21; <locks>/README.md, agreed with D2RGS): with <locks>/budget.json
+{"max_games": N} every slot lock comes with a seat game.seat.K (K = 1..N, owner.txt `<owner> pid=<pid> <time> slot=<n>`):
+taken first, the lock after it (a failure between gives the seat back), released after the lock; stale when its pid is
+gone, pid 0 never. No free seat: acquire() waits up to seat_wait / env MXL_SEAT_WAIT seconds (default 0), then refuses.
+Without budget.json nothing changes. `status` shows the budget and the seats held.
+
 Commands (py -3 tools/game_slots.py ...):
   status                    per slot: folder, running processes, lock, save folder
   setup [N ...]             (default slots 2 to 5, a missing one reported and skipped; slot 1 only when named; a named
@@ -46,7 +65,11 @@ Commands (py -3 tools/game_slots.py ...):
   unlock N [OWNER]          release it (only the owner, or with OWNER omitted a stale one); a pending snapshot of the
                             shared files (tools/slot_share.py) is restored first, and the lock stays when that fails
   install [N ...]           run tools/install_mod.py for those slots (default: slots 2 to 5 that exist; a named missing slot is refused)
+  profile N [test|visual]   Linux: write a graphics profile (tools/slot_profiles) into slot N's Settings.json now (default
+                            env MXL_PROFILE, else test); every launch writes it again (MXL_PROFILE / --profile)
 """
+import collections
+import contextlib
 import ctypes
 import fnmatch
 import ctypes.wintypes as wt
@@ -54,6 +77,7 @@ import datetime
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -84,6 +108,56 @@ DEFAULT_SET = tuple(n for n in SLOTS if n not in OWNER_SLOTS)  # `setup` / `inst
 SAVE_ROOT = os.path.join(os.environ.get("USERPROFILE", ""), r"Saved Games\Diablo II Resurrected\mods")
 MOD = "mxl2012"
 
+# ---------------------------------------------------------------- backend (Windows folders, or Linux slots under Proton)
+
+WINDOWS_SLOTS, WINDOWS_OWNER_SLOTS = SLOTS, OWNER_SLOTS
+LINUX_SLOTS = (2, 5, 6, 7)  # the slots that exist on Linux (MXL's numbers in <locks>/slots.json); 1, 3 and 4 do not
+# Temporary measurement slots (lane slotcap: copies of slot 5 numbered 10 and up) exist only while env MXL_EXTRA_SLOTS
+# names them ("10,11"); slots.json lists them as "MXL (temporary, slotcap measurement)" for that time.
+EXTRA_LINUX_SLOTS = tuple(int(x) for x in os.environ.get("MXL_EXTRA_SLOTS", "").replace(" ", "").split(",") if x.isdigit())
+LINUX_SLOT_ROOT = "/d2work/slots"  # defaults; env and machine.json override them per slot (linux_slot)
+LINUX_PREFIX_ROOT = "/d2work/prefixes"
+PROTON_DEFAULT = os.path.join("~", ".local", "share", "Steam", "steamapps", "common", "Proton - Experimental")
+# inside the prefix: Saved Games of Proton's user (steamuser), the same layout as the Windows SAVE_ROOT
+PREFIX_SAVES = ("drive_c", "users", "steamuser", "Saved Games", "Diablo II Resurrected", "mods")
+GAME_DRIVE = "d:"  # the slot folder is drive D: of its prefix (dosdevices/d: -> slot folder)
+BACKEND = None
+LINUX = False
+
+
+def use_backend(name=None):
+    """Pick the slot backend: "windows" (the folders of DEFAULTS, Win32 process calls) or "linux" (LINUX_SLOTS under
+    Proton, /proc). None: env MXL_SLOT_BACKEND, else by platform. Sets SLOTS, OWNER_SLOTS and DEFAULT_SET; returns the name."""
+    global BACKEND, LINUX, SLOTS, OWNER_SLOTS, DEFAULT_SET
+    name = name or os.environ.get("MXL_SLOT_BACKEND") or ("linux" if sys.platform.startswith("linux") else "windows")
+    if name not in ("windows", "linux"):
+        raise SystemExit(f"MXL_SLOT_BACKEND={name!r}: windows or linux")
+    BACKEND, LINUX = name, name == "linux"
+    SLOTS = (LINUX_SLOTS + EXTRA_LINUX_SLOTS) if LINUX else WINDOWS_SLOTS
+    OWNER_SLOTS = () if LINUX else WINDOWS_OWNER_SLOTS
+    DEFAULT_SET = tuple(n for n in SLOTS if n not in OWNER_SLOTS)
+    return name
+
+
+@contextlib.contextmanager
+def backend(name):
+    """Use backend `name` (also for tools started from here: env MXL_SLOT_BACKEND) and restore the previous one after.
+    The unit tests of the Windows slot rules run under the Windows backend on every platform."""
+    old_env, old = os.environ.get("MXL_SLOT_BACKEND"), BACKEND
+    os.environ["MXL_SLOT_BACKEND"] = name
+    use_backend(name)
+    try:
+        yield
+    finally:
+        if old_env is None:
+            os.environ.pop("MXL_SLOT_BACKEND", None)
+        else:
+            os.environ["MXL_SLOT_BACKEND"] = old_env
+        use_backend(old)
+
+
+use_backend()
+
 
 def require_machine(tool="game_slots"):
     """Exits unless machine.json has the slot safety keys (shared lock folder, protected mod and save folders)."""
@@ -97,13 +171,20 @@ def protected(name, saves=False):
 
 
 def require_slot(n):
-    """The slot number as an int; exits with an error for anything but 1 to 5."""
+    """The slot number as an int; exits with an error for a number that is no slot of this backend (Windows 1 to 5,
+    Linux SLOTS) or that <locks>/slots.json gives to another project."""
     try:
         n = int(n)
     except (TypeError, ValueError):
-        raise SystemExit(f"no game slot given ({n!r}): pass --slot 1|2|3|4|5 or set MXL_SLOT")
-    if n not in SLOTS:
+        raise SystemExit(f"no game slot given ({n!r}): pass --slot N or set MXL_SLOT")
+    if not LINUX and n not in WINDOWS_SLOTS:
         raise SystemExit(f"game slot {n} refused: only slots 1 to 5 exist")
+    if LINUX and n not in SLOTS:
+        raise SystemExit(f"game slot {n} refused: it does not exist on Linux (only slots "
+                         f"{', '.join(map(str, SLOTS))}, D2R under Proton; slots 1, 3 and 4 are Windows folders)")
+    other = slot_project(n) if LINUX else None  # slots.json numbers the Linux slots (/d2work/slots/sN)
+    if other and not other.upper().startswith("MXL"):
+        raise SystemExit(f"game slot {n} refused: slots.json gives it to {other}")
     return n
 
 
@@ -114,7 +195,26 @@ def env_slot():
 
 def slot_dir(n):
     require_slot(n)
+    if LINUX:
+        return linux_slot(n)["dir"]
     return os.environ.get(f"MXL_SLOT{n}_DIR", DEFAULTS[n])
+
+
+def linux_slot(n):
+    """The Linux slot table entry of slot N, all paths: dir (the game folder, drive D:), compat (STEAM_COMPAT_DATA_PATH),
+    prefix (the Wine prefix, compat/pfx), snapshot (the run snapshot folder of tools/slot_share.py). Defaults under
+    LINUX_SLOT_ROOT / LINUX_PREFIX_ROOT; machine.json "linux_slots" {"N": {...}} and env MXL_SLOTn_DIR / _COMPAT /
+    _SNAPSHOT override them (env wins)."""
+    n = require_slot(n)
+    if n not in LINUX_SLOTS + EXTRA_LINUX_SLOTS:
+        raise SystemExit(f"game slot {n} is not a Linux slot")
+    cfg = (MACHINE.get("linux_slots") or {}).get(str(n)) or {}
+    d = {"dir": os.path.join(LINUX_SLOT_ROOT, f"s{n}"), "compat": os.path.join(LINUX_PREFIX_ROOT, f"s{n}"),
+         "snapshot": os.path.join(LINUX_SLOT_ROOT, f".snap-s{n}")}
+    for k in d:
+        d[k] = os.path.expanduser(os.environ.get(f"MXL_SLOT{n}_{k.upper()}") or cfg.get(k) or d[k])
+    d["prefix"] = os.path.join(d["compat"], "pfx")
+    return d
 
 
 def present(n, game=None):
@@ -151,7 +251,16 @@ def save_name(n):
 def save_dir(n):
     if protected(save_name(n), saves=True):
         raise SystemExit(f"save folder {save_name(n)} is protected (machine.json): refused")
-    return os.path.join(SAVE_ROOT, save_name(n))
+    return os.path.join(save_root(n), save_name(n))
+
+
+def save_root(n):
+    """The folder holding the mods' save folders for slot N: SAVE_ROOT on Windows, the prefix's
+    drive_c/users/steamuser/Saved Games/Diablo II Resurrected/mods on Linux."""
+    if LINUX:
+        return os.path.join(prefix_dir(n), *PREFIX_SAVES)
+    require_slot(n)
+    return SAVE_ROOT
 
 
 def mod_dir(n):
@@ -198,7 +307,7 @@ def image_path(pid):
         _k32.CloseHandle(h)
 
 
-ALL_IMAGES = ("d2rloader.exe", "d2r.exe") + tuple(f"d2rloader-s{n}.exe" for n in SLOTS if n not in OWNER_SLOTS)
+ALL_IMAGES = ("d2rloader.exe", "d2r.exe") + tuple(f"d2rloader-s{n}.exe" for n in WINDOWS_SLOTS if n not in WINDOWS_OWNER_SLOTS)
 
 
 def loader_name(game):
@@ -212,7 +321,10 @@ def loader_name(game):
 
 
 def processes(names=ALL_IMAGES):
-    """[(pid, exe name, full image path)] of processes with these image names (none off Windows: the game cannot run there)."""
+    """[(pid, exe name, full image path)] of processes with these image names (Linux: Wine processes found in /proc, the
+    path mapped to the Linux file through the prefix's drive letters; neither backend available: none)."""
+    if LINUX:
+        return linux_processes(names)
     if not winapi.available():
         return []
     snap = _k32.CreateToolhelp32Snapshot(2, 0)
@@ -239,6 +351,8 @@ def slot_processes(game, names=ALL_IMAGES):
 
 
 def pid_alive(pid):
+    if LINUX:
+        return os.path.isdir(os.path.join(PROC, str(int(pid))))
     if not winapi.available():
         return False
     h = _k32.OpenProcess(0x1000, False, pid)
@@ -248,6 +362,490 @@ def pid_alive(pid):
     _k32.GetExitCodeProcess(ctypes.c_void_p(h), ctypes.byref(code))
     _k32.CloseHandle(ctypes.c_void_p(h))
     return code.value == 259  # STILL_ACTIVE
+
+
+# ---------------------------------------------------------------- Linux: /proc, Proton, the slot's prefix
+
+PROC = "/proc"
+
+
+def _read(path, mode="rb"):
+    try:
+        with open(path, mode) as f:
+            return f.read()
+    except OSError:  # gone, or another user's process
+        return None
+
+
+def proc_info(pid, proc=None):
+    """(argv list, environ dict) of a Linux process, or None when it is gone or not readable."""
+    base = os.path.join(proc or PROC, str(pid))
+    cmd, env = _read(os.path.join(base, "cmdline")), _read(os.path.join(base, "environ"))
+    if cmd is None or env is None:
+        return None
+    argv = [a.decode("utf-8", "replace") for a in cmd.split(b"\0") if a]
+    envd = {}
+    for kv in env.split(b"\0"):
+        k, eq, v = kv.partition(b"=")
+        if eq:
+            envd[k.decode("utf-8", "replace")] = v.decode("utf-8", "replace")
+    return argv, envd
+
+
+def unix_path(prefix, winpath):
+    """The Linux path of a Windows path ("D:\\D2R.exe") inside a Wine prefix (its dosdevices drive links), or "" when the
+    drive is not mapped. Paths without a drive letter give ""."""
+    if len(winpath) < 3 or winpath[1] != ":" or winpath[2] not in "\\/":
+        return ""
+    drive = os.path.join(prefix, "dosdevices", winpath[0].lower() + ":")
+    if not os.path.exists(drive):
+        return ""
+    root = os.path.realpath(drive)
+    rest = [p for p in winpath[3:].replace("\\", "/").split("/") if p]
+    return os.path.join(root, *rest)
+
+
+def wine_image(argv):
+    """The Windows image path of a Wine process: Wine sets argv[0] of a program's process to its Windows path
+    (e.g. D:\\D2RLoader.exe); "" for anything else."""
+    a0 = argv[0] if argv else ""
+    return a0 if len(a0) > 2 and a0[1] == ":" else ""
+
+
+def linux_processes(names=ALL_IMAGES, proc=None):
+    """[(pid, exe name, Linux image path)] of the Wine processes with these image names (any prefix)."""
+    out = []
+    root = proc or PROC
+    try:
+        pids = [int(d) for d in os.listdir(root) if d.isdigit()]
+    except OSError:
+        return []
+    for pid in sorted(pids):
+        info = proc_info(pid, proc)
+        if not info:
+            continue
+        argv, env = info
+        img = wine_image(argv)
+        exe = img.replace("/", "\\").rsplit("\\", 1)[-1]
+        if not img or exe.lower() not in names or not env.get("WINEPREFIX"):
+            continue
+        out.append((pid, exe, unix_path(env["WINEPREFIX"], img)))
+    return out
+
+
+def compat_dir(n):
+    """STEAM_COMPAT_DATA_PATH of Linux slot N (Proton's folder; the Wine prefix is its pfx)."""
+    return linux_slot(n)["compat"]
+
+
+def prefix_dir(n):
+    """The Wine prefix (WINEPREFIX) of Linux slot N."""
+    return linux_slot(n)["prefix"]
+
+
+def prefix_pids(n, proc=None):
+    """Linux pids of every process running in slot N's prefix (wineserver, services, the game ...)."""
+    want = os.path.realpath(prefix_dir(n))
+    out = []
+    root = proc or PROC
+    for d in (os.listdir(root) if os.path.isdir(root) else []):
+        if d.isdigit():
+            info = proc_info(int(d), proc)
+            if info and info[1].get("WINEPREFIX") and os.path.realpath(info[1]["WINEPREFIX"]) == want:
+                out.append(int(d))
+    return sorted(out)
+
+
+def game_pids(n, names=ALL_IMAGES):
+    """Linux pids of the game processes (D2RLoader*.exe, D2R.exe) of slot N."""
+    return [pid for pid, _ in slot_processes(slot_dir(n), names)]
+
+
+def proton_dir():
+    """Proton Experimental's folder (env MXL_PROTON, machine.json proton_dir, else Steam's default)."""
+    return os.path.expanduser(os.environ.get("MXL_PROTON") or MACHINE.get("proton_dir") or PROTON_DEFAULT)
+
+
+def steam_dir():
+    return os.path.expanduser(os.environ.get("STEAM_COMPAT_CLIENT_INSTALL_PATH") or os.path.join("~", ".local", "share", "Steam"))
+
+
+def wine_env(n, base=None, log_dir=None):
+    """The environment for a Proton / Wine process in slot N's prefix (a copy of `base`, default os.environ). log_dir:
+    Proton's own log (PROTON_LOG) goes there; else WINEDEBUG=-all and no Proton log."""
+    env = dict(os.environ if base is None else base)
+    env.update(STEAM_COMPAT_DATA_PATH=compat_dir(n), STEAM_COMPAT_CLIENT_INSTALL_PATH=steam_dir(), WINEPREFIX=prefix_dir(n),
+               SteamAppId="0", SteamGameId="0")
+    env.setdefault("WINEDEBUG", "-all")
+    if log_dir:
+        env.update(PROTON_LOG="1", PROTON_LOG_DIR=log_dir)
+    return env
+
+
+def proton_cmd(*args):
+    """argv for `proton run ...` (Proton's script is Python)."""
+    return ["python3", os.path.join(proton_dir(), "proton"), "run", *args]
+
+
+def wine_cmd(*args):
+    """argv for Proton's own wine binary (helpers such as a window tool inside the slot's prefix; use with wine_env)."""
+    return [os.path.join(proton_dir(), "files", "bin", "wine"), *args]
+
+
+def wineserver_cmd(*args):
+    return [os.path.join(proton_dir(), "files", "bin", "wineserver"), *args]
+
+
+def windows_path(n, path):
+    """The Windows path of a Linux file for slot N's prefix: D:\\... inside the slot folder, Z:\\... (Wine's root drive)
+    elsewhere."""
+    path = os.path.abspath(path)
+    game = os.path.abspath(slot_dir(n))
+    if path == game or under(path, game):
+        rel = os.path.relpath(path, game)
+        return GAME_DRIVE.upper() + "\\" + ("" if rel == "." else rel.replace("/", "\\"))
+    return "Z:" + path.replace("/", "\\")
+
+
+def ensure_drive(n):
+    """Drive D: of slot N's prefix points at the slot folder (made when missing). Exits when it points elsewhere."""
+    link = os.path.join(prefix_dir(n), "dosdevices", GAME_DRIVE)
+    game = slot_dir(n)
+    if os.path.islink(link) or os.path.exists(link):
+        if os.path.realpath(link) != os.path.realpath(game):
+            raise SystemExit(f"slot {n}: {link} points at {os.path.realpath(link)}, not the slot folder {game}: fix it by hand")
+        return link
+    if not os.path.isdir(os.path.dirname(link)):
+        raise SystemExit(f"slot {n}: no Wine prefix at {prefix_dir(n)} (dosdevices missing): set up the prefix first "
+                         "(docs/testing.md \"Linux slots\")")
+    os.symlink(game, link)
+    return link
+
+
+# ---------------------------------------------------------------- Linux: no focus stealing (owner rule, 2026-11-20)
+# Test games start in the background on the owner's desktop and never take keyboard focus or come to the front. The
+# start side is the slot prefix's own Wine registry (HKCU\Software\Wine\X11 Driver), written by launch() every time:
+#   UseTakeFocus=N    Wine does not answer the window manager's WM_TAKE_FOCUS by focusing its window
+#   GrabPointer=N     no pointer grab of a Wine window (a grab would take the owner's mouse)
+#   GrabFullscreen=N  no pointer confinement for a full-screen window
+# Wine itself marks windows mapped without user input with _NET_WM_USER_TIME 0, so the window manager does not focus
+# them. FocusWatch measures it every run: _NET_ACTIVE_WINDOW of the root window must never become a window of the
+# slot's prefix. Desktop / window-manager settings are never changed.
+X11_DRIVER_KEY = "Software\\\\Wine\\\\X11 Driver"  # as user.reg spells it
+NO_FOCUS_VALUES = (("UseTakeFocus", "N"), ("GrabPointer", "N"), ("GrabFullscreen", "N"))
+
+
+def set_reg_values(text, key, values, stamp=None):
+    """user.reg text with string `values` [(name, data)] set in [key] (key as user.reg spells it, backslashes doubled);
+    the section is added at the end when missing, other values and sections are kept as they are."""
+    lines = text.split("\n")
+    head = f"[{key}]"
+    start = next((i for i, l in enumerate(lines) if l.startswith(head + " ") or l == head), None)
+    if start is None:
+        stamp = int(time.time()) if stamp is None else stamp
+        while lines and lines[-1] == "":
+            lines.pop()
+        lines += ["", f"{head} {stamp}"] + [f'"{k}"="{v}"' for k, v in values] + [""]
+        return "\n".join(lines) + ("" if lines[-1] == "" else "\n")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")), len(lines))
+    while end > start + 1 and lines[end - 1] == "":
+        end -= 1
+    for k, v in values:
+        want = f'"{k}"="{v}"'
+        at = next((i for i in range(start + 1, end) if lines[i].lower().startswith(f'"{k.lower()}"=')), None)
+        if at is None:
+            lines.insert(end, want)
+            end += 1
+        else:
+            lines[at] = want
+    return "\n".join(lines)
+
+
+def reg_values(text, key):
+    """{name: data} of the string values in [key] of a user.reg text."""
+    out, inside = {}, False
+    for l in text.split("\n"):
+        if l.startswith("["):
+            inside = l.startswith(f"[{key}]")
+        elif inside and l.startswith('"') and '"="' in l:
+            k, v = l[1:].split('"="', 1)
+            out[k] = v.rstrip('"')
+    return out
+
+
+def apply_launch_settings(n):
+    """Write NO_FOCUS_VALUES into slot N's prefix registry (user.reg) unless they are there already. Only while nothing
+    runs in the prefix: a running wineserver would write its own copy over the file. Returns what was changed."""
+    reg = os.path.join(prefix_dir(n), "user.reg")
+    if not os.path.isfile(reg):
+        raise SystemExit(f"slot {n}: no {reg}: set up the prefix first (docs/testing.md \"Linux slots\")")
+    with open(reg, encoding="utf-8", newline="") as f:
+        text = f.read()
+    have = reg_values(text, X11_DRIVER_KEY)
+    missing = [(k, v) for k, v in NO_FOCUS_VALUES if have.get(k) != v]
+    if not missing:
+        return []
+    if prefix_pids(n):
+        raise SystemExit(f"slot {n}: the prefix runs, its registry cannot be changed now: stop it first")
+    tmp = reg + ".mxl2012-tmp"
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
+        f.write(set_reg_values(text, X11_DRIVER_KEY, NO_FOCUS_VALUES))
+    os.replace(tmp, reg)
+    return missing
+
+
+# Graphics profiles of the Linux slots (lane lowprofile, 2026-11-21): tools/slot_profiles/<name>.json hold only the
+# graphics keys of D2R's Settings.json. "test" (the default) is the low Windows test profile of 2026-10-28 at 1600x900:
+# it lets more games share the GPU. "visual" is the high quality the slots had before; HD visual checks and the hdkit
+# sign-off ask for it (VISUAL_CHECKS, game_checks.run_all). Settings.json sits in the prefix's save folder, outside the
+# slot snapshot, so every launch writes the profile again (apply_profile) instead of trusting the last run's.
+PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "slot_profiles")
+PROFILES = ("test", "visual", "visual4k")   # visual4k: visual at 3840x2160 (lane hdmaps2: map captures for 4K; counts as the one visual game)
+DEFAULT_PROFILE = "test"
+# game_checks check names that judge HD looks (effects, models, item art, tints, draw lists): run with "visual"
+VISUAL_CHECKS = frozenset({"signoff", "hdl_look", "tint_hd", "ua_look", "itemart_pics", "itemart_mons", "hdit_icons",
+                           "standin_mons", "drawcap", "hm2_monsters", "hm3_monsters", "mon_card"})
+
+
+def profile_name(name=None):
+    """The graphics profile of a launch: `name`, else env MXL_PROFILE, else "test". An unknown name is an error."""
+    p = (name or os.environ.get("MXL_PROFILE") or DEFAULT_PROFILE).strip().lower()
+    if p not in PROFILES:
+        raise SystemExit(f"unknown graphics profile {p!r} (MXL_PROFILE / --profile): one of {', '.join(PROFILES)}")
+    return p
+
+
+def profile_for_checks(names, explicit=None):
+    """The profile a game_checks run needs: `explicit` (MXL_PROFILE) when given, else "visual" when one of the checks
+    named is a visual check, else "test"."""
+    if explicit:
+        return profile_name(explicit)
+    return "visual" if VISUAL_CHECKS.intersection(names or ()) else DEFAULT_PROFILE
+
+
+def load_profile(name):
+    with open(os.path.join(PROFILE_DIR, profile_name(name) + ".json"), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def settings_path(n):
+    """D2R's Settings.json of slot N (in the slot's save folder inside the prefix)."""
+    return os.path.join(save_dir(n), "Settings.json")
+
+
+def apply_profile(n, name=None, path=None):
+    """Write the graphics keys of profile `name` (profile_name) into slot N's Settings.json, every other key kept as
+    it is, in D2R's own layout (4-space JSON, no newline at the end). Only while the prefix is idle: the running game
+    writes its settings back on exit. A slot without Settings.json gets one with only these keys (D2R fills the rest).
+    Returns (profile, {key: (old, new)} of what changed)."""
+    prof = profile_name(name)
+    want = load_profile(prof)
+    path = path or settings_path(n)
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            cur = json.load(f, object_pairs_hook=collections.OrderedDict)
+    except FileNotFoundError:
+        cur = collections.OrderedDict()
+    changed = {k: (cur.get(k), v) for k, v in want.items() if cur.get(k) != v}
+    if not changed:
+        return prof, {}
+    if prefix_pids(n):
+        raise SystemExit(f"slot {n}: the prefix runs, its Settings.json cannot be changed now: stop it first")
+    cur.update(want)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".mxl2012-tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps(cur, indent=4))
+    os.replace(tmp, path)
+    return prof, changed
+
+
+def xprop(*args, display=None):
+    """stdout of xprop (empty when it fails or is missing)."""
+    env = dict(os.environ, DISPLAY=display) if display else None
+    try:
+        return subprocess.run(["xprop", *args], capture_output=True, text=True, timeout=5, env=env).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def parse_active(out):
+    """The window id of `xprop -root _NET_ACTIVE_WINDOW` output (0 for none), or None when there is no such property."""
+    if "window id #" not in out:
+        return None
+    return int(out.split("window id #", 1)[1].split(",")[0].strip(), 16)
+
+
+def parse_window(out):
+    """(pid or None, WM_CLASS text) of `xprop -id W _NET_WM_PID WM_CLASS` output."""
+    pid, cls = None, ""
+    for l in out.splitlines():
+        if l.startswith("_NET_WM_PID") and "=" in l:
+            try:
+                pid = int(l.split("=", 1)[1].strip())
+            except ValueError:
+                pass
+        elif l.startswith("WM_CLASS") and "=" in l:
+            cls = l.split("=", 1)[1].strip()
+    return pid, cls
+
+
+def is_game_window(pid, cls, game_pids_):
+    """A window of the slot's prefix: its _NET_WM_PID is one of the prefix's processes, or its WM_CLASS names a Windows
+    program (Wine sets WM_CLASS to the .exe name)."""
+    return (pid is not None and pid in game_pids_) or ".exe" in cls.lower()
+
+
+class FocusWatch:
+    """Polls _NET_ACTIVE_WINDOW of the root window during a run (a thread; `interval` seconds). Every change is recorded
+    as (seconds since start, window id, pid, WM_CLASS, game?); `grabs` lists those that went to a window of slot N's
+    prefix. stop() returns a one-line summary for the run's report."""
+
+    def __init__(self, n, interval=0.2, display=None, query=None, pids=None):
+        import threading
+        self.n, self.interval, self.display = n, interval, display
+        self._query = query or (lambda *a: xprop(*a, display=display))
+        self._pids = pids or (lambda: set(prefix_pids(n)))
+        self.t0 = time.time()
+        self.before = parse_active(self._query("-root", "_NET_ACTIVE_WINDOW"))
+        self.changes, self.grabs, self.polls = [], [], 0
+        self._last = self.before
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def poll(self):
+        """One measurement; returns the grab it found, else None."""
+        self.polls += 1
+        now = parse_active(self._query("-root", "_NET_ACTIVE_WINDOW"))
+        if now == self._last:
+            return None
+        self._last = now
+        pid, cls = parse_window(self._query("-id", hex(now), "_NET_WM_PID", "WM_CLASS")) if now else (None, "")
+        game = bool(now) and is_game_window(pid, cls, self._pids())
+        rec = (round(time.time() - self.t0, 2), now, pid, cls, game)
+        self.changes.append(rec)
+        if game:
+            self.grabs.append(rec)
+            return rec
+        return None
+
+    def _run(self):
+        while not self._stop.is_set():
+            self.poll()
+            self._stop.wait(self.interval)
+
+    def stop(self):
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(5)
+        return self.summary()
+
+    def summary(self):
+        b = "none" if self.before is None else hex(self.before)
+        if self.grabs:
+            return (f"FOCUS GRAB: _NET_ACTIVE_WINDOW went to a game window {len(self.grabs)}x "
+                    f"({', '.join(f'{hex(w)} pid {p} {c} at {t}s' for t, w, p, c, _ in self.grabs)}); before launch {b}")
+        return (f"focus kept: _NET_ACTIVE_WINDOW never went to a game window ({self.polls} polls over "
+                f"{time.time() - self.t0:.0f} s, {len(self.changes)} changes by the owner; before launch {b})")
+
+
+# ---------------------------------------------------------------- VRAM cap (lane vramcap, 2026-11-21)
+# D2R sizes its texture streaming pool from the adapter's DedicatedVideoMemory. Under Proton, D3D12 runs on vkd3d-proton
+# with DXVK's dxgi.dll, whose option dxgi.maxDeviceMemory (MB) lowers that number (env DXVK_CONFIG; checked with a DXGI
+# probe: the adapter description follows it, IDXGIAdapter3::QueryVideoMemoryInfo's budget does not). Our Proton game
+# launches get the cap of their profile (VRAM_DEFAULTS) unless env MXL_VRAM_MB says otherwise (a number of MB, or
+# 0 / none / off for no cap). Measured in docs/testing.md, "Lane vramcap".
+VRAM_DEFAULTS = {"test": 2048, "visual": 3072, "visual4k": 4096}  # lane vramcap: visual at 2048 drew black tiles
+VRAM_MIN_MB = 256
+
+
+def vram_mb(profile=None, value=None):
+    """The VRAM cap in MB of a launch with graphics profile `profile`, or None for no cap: `value` when given, else env
+    MXL_VRAM_MB, else VRAM_DEFAULTS of the profile. "0", "none", "off" mean no cap. A cap below VRAM_MIN_MB is an error."""
+    v = value if value is not None else os.environ.get("MXL_VRAM_MB")
+    if v is None or str(v).strip() == "":
+        return VRAM_DEFAULTS.get(profile_name(profile))
+    s = str(v).strip().lower()
+    if s in ("0", "none", "off", "no"):
+        return None
+    try:
+        mb = int(s)
+    except ValueError:
+        raise SystemExit(f"MXL_VRAM_MB / --vram-mb: {v!r} is not a number of MB (or 0 / none for no cap)")
+    if mb < VRAM_MIN_MB:
+        raise SystemExit(f"MXL_VRAM_MB / --vram-mb: {mb} MB is below {VRAM_MIN_MB} MB")
+    return mb
+
+
+def vram_env(mb, base=None):
+    """The environment entries that tell the game it has `mb` MB of VRAM: DXVK_CONFIG with dxgi.maxDeviceMemory (an
+    existing DXVK_CONFIG of `base`, default os.environ, is kept, its own maxDeviceMemory replaced). {} for no cap."""
+    if not mb:
+        return {}
+    base = os.environ if base is None else base
+    keep = [o.strip() for o in (base.get("DXVK_CONFIG") or "").split(";")
+            if o.strip() and o.split("=", 1)[0].strip() != "dxgi.maxDeviceMemory"]
+    return {"DXVK_CONFIG": "; ".join(keep + [f"dxgi.maxDeviceMemory = {int(mb)}"])}
+
+
+LAST_VRAM = {}  # slot -> VRAM cap in MB (None: no cap) of the last launch(), for the caller's log
+LAST_PROFILE = {}  # slot -> (profile, changed keys) of the last launch(), for the caller's log
+
+
+def launch(n, args, log_dir=None, stdout=None, extra_env=None, profile=None, vram=None):
+    """Start `D:\\<loader> args...` of slot N under Proton in its prefix (cwd the slot folder); returns the Popen of
+    Proton's script. The caller holds the slot lock and has begun the run's snapshot (slot_share.begin). The prefix's
+    no-focus settings (apply_launch_settings) are written first, every launch; measure with FocusWatch.
+    extra_env: added to the game's environment; game runs pass the private display (DISPLAY + linux_window.PRIVATE_ENV,
+    see linux_window.PrivateDisplay): on the owner's desktop the game takes the focus whatever the prefix settings.
+    profile: the graphics profile written into the slot's Settings.json first (apply_profile; default env MXL_PROFILE,
+    else "test").
+    vram: the VRAM cap in MB (vram_mb: default env MXL_VRAM_MB, else the profile's VRAM_DEFAULTS; 0 / "none": no cap),
+    passed to DXVK's dxgi as DXVK_CONFIG dxgi.maxDeviceMemory (vram_env)."""
+    game = slot_dir(n)
+    ensure_drive(n)
+    apply_launch_settings(n)
+    LAST_PROFILE[n] = apply_profile(n, profile)
+    exe = windows_path(n, os.path.join(game, loader_name(game)))
+    env = wine_env(n, log_dir=log_dir)
+    env.update(extra_env or {})
+    LAST_VRAM[n] = vram_mb(LAST_PROFILE[n][0], vram)
+    env.update(vram_env(LAST_VRAM[n], env))
+    return subprocess.Popen(proton_cmd(exe, *args), cwd=game, env=env,
+                            stdout=stdout or subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+
+def stop_prefix(n, timeout=60):
+    """End every process of slot N's prefix (`wineserver -k`: only that prefix's processes; the lock holder started
+    them) and wait until the prefix is idle. Returns True when nothing of the prefix runs any more."""
+    subprocess.run(wineserver_cmd("-k"), env=wine_env(n), capture_output=True, timeout=timeout)
+    if wait_prefix_idle(n, timeout):
+        return True
+    # Lane linfix (2026-11-20, run p2): after a startup crash the prefix's wineserver was gone and its clients (the
+    # loader in a pipe read, services, explorer) stayed, so `-k` reached nobody. They are this slot prefix's processes
+    # (WINEPREFIX), started by the lock holder's launch: end them directly.
+    left = prefix_pids(n)
+    for pid in left:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    print(f"slot {n}: wineserver -k left {len(left)} process(es) of the slot prefix: SIGKILL {left}", file=sys.stderr)
+    return wait_prefix_idle(n, 15)
+
+
+def wait_prefix_idle(n, timeout=120):
+    """Wait until no process of slot N's prefix runs (its wineserver has gone); True when idle."""
+    end = time.time() + timeout
+    while time.time() < end:
+        if not prefix_pids(n):
+            return True
+        time.sleep(0.5)
+    return not prefix_pids(n)
 
 
 # ---------------------------------------------------------------- locks
@@ -288,9 +886,178 @@ def _owner_pid(txt):
     return None
 
 
-def acquire(n, owner, pid=None):
+# ---------------------------------------------------------------- shared seats (lane slotcap, 2026-11-21)
+# One machine-wide budget of games for every project that runs D2R here (<locks>/README.md, agreed with D2RGS):
+#   <locks>/budget.json   {"max_games": N, "set_by": ..., "measured": <run folder>}; missing: no budget (old behaviour)
+#   <locks>/game.seat.K   K = 1..max_games, a directory with owner.txt `<owner> pid=<pid> <time> slot=<N>`, taken like a
+#                         slot lock (mkdir); stale when its pid is gone (pid 0: taken by hand, never stale)
+# Order: seat first, then game.lock.N; a failure between the two releases the seat. Release: game.lock.N first, then the
+# seat. A seat is the lock's companion: it lives exactly as long as the slot lock.
+SEAT_WAIT = float(os.environ.get("MXL_SEAT_WAIT") or 0)  # default seconds acquire() waits for a free seat (0: refuse)
+
+
+def _locks_json(name):
+    try:
+        with open(os.path.join(LOCK_ROOT, name), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def slot_project(n):
+    """The project <locks>/slots.json gives slot N to ({"slots": {"N": "MXL" | "D2RGS" | ...}}), or None."""
+    if not LOCK_ROOT:
+        return None
+    d = _locks_json("slots.json") or {}
+    v = (d.get("slots") or {}).get(str(n))
+    return v if isinstance(v, str) else None
+
+
+def max_games():
+    """The machine-wide game budget of <locks>/budget.json, or None when there is none (no seats are taken)."""
+    if not LOCK_ROOT:
+        return None
+    d = _locks_json("budget.json")
+    try:
+        m = int(d["max_games"])
+    except (TypeError, KeyError, ValueError):
+        return None
+    return m if m > 0 else None
+
+
+def seat_path(k):
+    return os.path.join(LOCK_ROOT, f"game.seat.{k}")
+
+
+def _owner_text(path):
+    try:
+        with open(os.path.join(path, "owner.txt"), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def _seat_slot(txt):
+    for part in (txt or "").split():
+        if part.startswith("slot="):
+            try:
+                return int(part[5:])
+            except ValueError:
+                pass
+    return None
+
+
+def seats():
+    """[(K, owner text or None)] of every game.seat.K directory in the lock folder (also K above the budget)."""
+    out = []
+    try:
+        names = os.listdir(LOCK_ROOT)
+    except OSError:
+        return out
+    for nm in names:
+        if nm.startswith("game.seat.") and nm[10:].isdigit() and os.path.isdir(os.path.join(LOCK_ROOT, nm)):
+            out.append((int(nm[10:]), _owner_text(os.path.join(LOCK_ROOT, nm))))
+    return sorted(out)
+
+
+def _seat_stale(txt):
+    op = _owner_pid(txt)
+    return op is not None and op != 0 and not pid_alive(op)
+
+
+def our_seat(n, owner):
+    """K of the seat `owner` holds for slot N, else None."""
+    for k, txt in seats():
+        if txt and txt.split()[0] == owner and _seat_slot(txt) == n:
+            return k
+    return None
+
+
+OUR_PROJECT = "MXL"  # this project's name in <locks>/slots.json and game.want.<project>
+
+
+def wanted_by_others():
+    """Seats other projects are waiting for: the sum of count=C (1 or 2) over every game.want.<project> (not ours) whose
+    pid is alive (pid 0: by hand, always counts). <locks>/README.md "Waiting for seats" (owner, 2026-11-21): D2RGS may
+    hold 1 or 2 seats, never more; while it waits we take no seat that would leave it fewer free than it wants."""
+    total, notes = 0, []
+    try:
+        names = os.listdir(LOCK_ROOT)
+    except OSError:
+        return 0, notes
+    for nm in sorted(names):
+        proj = nm[len("game.want."):] if nm.startswith("game.want.") else None
+        if not proj or proj == OUR_PROJECT or not os.path.isdir(os.path.join(LOCK_ROOT, nm)):
+            continue
+        txt = _owner_text(os.path.join(LOCK_ROOT, nm))
+        if _seat_stale(txt):
+            continue
+        c = 1
+        for part in (txt or "").split():
+            if part.startswith("count="):
+                try:
+                    c = int(part[6:])
+                except ValueError:
+                    pass
+        c = max(1, min(2, c))
+        total += c
+        notes.append(f"{proj} waits for {c}")
+    return total, notes
+
+
+def take_seat(n, owner, pid, wait=None):
+    """Take a free game.seat.K (K = 1..max_games) for slot N. Returns (K or None, message). K 0: no budget.json, nothing
+    taken. A stale seat (pid gone, not 0) is replaced. No free seat: wait up to `wait` seconds (default SEAT_WAIT), then
+    refuse."""
+    m = max_games()
+    if m is None:
+        return 0, "no budget.json"
+    k = our_seat(n, owner)
+    if k:
+        return k, f"seat {k} already ours"
+    end = time.time() + (SEAT_WAIT if wait is None else wait)
+    while True:
+        held = []
+        want, want_notes = wanted_by_others()
+        free = sum(1 for k in range(1, m + 1)
+                   if not os.path.isdir(seat_path(k)) or _seat_stale(_owner_text(seat_path(k))))
+        if want and free - 1 < want:  # leave the waiting project the seats it asked for
+            held.append(f"yielding: {', '.join(want_notes)}, {free} free")
+        for k in (range(1, m + 1) if not (want and free - 1 < want) else ()):
+            p = seat_path(k)
+            txt = _owner_text(p) if os.path.isdir(p) else None
+            if os.path.isdir(p):
+                if not _seat_stale(txt):
+                    held.append(f"{k}: {txt or 'no owner.txt'}")
+                    continue
+                shutil.rmtree(p, ignore_errors=True)
+            try:
+                os.mkdir(p)
+            except FileExistsError:
+                held.append(f"{k}: taken just now")
+                continue
+            tmp = os.path.join(p, f"owner.txt.{os.getpid()}")
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(f"{owner} pid={pid} {datetime.datetime.now():%Y-%m-%d %H:%M:%S} slot={n}")
+            os.replace(tmp, os.path.join(p, "owner.txt"))
+            return k, f"seat {k} of {m} taken by {owner}"
+        if time.time() >= end:
+            return None, f"no free seat (max_games {m} in budget.json): " + "; ".join(held)
+        time.sleep(min(5.0, max(0.1, end - time.time())))
+
+
+def release_seat(n, owner):
+    """Remove the seat(s) `owner` holds for slot N (owner None: every seat of slot N)."""
+    for k, txt in seats():
+        if _seat_slot(txt) == n and (owner is None or (txt and txt.split()[0] == owner)):
+            shutil.rmtree(seat_path(k), ignore_errors=True)
+
+
+def acquire(n, owner, pid=None, seat_wait=None):
     """Take the lock of slot N. Returns (ok, message). Stale locks (owner pid gone) are replaced. pid=0 marks a manual
-    lock (command line `lock N`): it is never treated as stale and lasts until `unlock N`."""
+    lock (command line `lock N`): it is never treated as stale and lasts until `unlock N`. With <locks>/budget.json a
+    seat (game.seat.K) is taken first and released again when the slot lock cannot be taken (take_seat; seat_wait
+    seconds of waiting for one, default env MXL_SEAT_WAIT or 0)."""
     os.makedirs(LOCK_ROOT, exist_ok=True)
     pid = os.getpid() if pid is None else pid
     info = lock_info(n)
@@ -299,11 +1066,28 @@ def acquire(n, owner, pid=None):
         op = _owner_pid(txt)
         if txt and txt.split()[0] == owner:
             return True, f"lock {path} already ours"
-        if op is not None and op != 0 and not pid_alive(op):  # pid 0: manual lock, never stale
+        if not (op is not None and op != 0 and not pid_alive(op)):  # pid 0: manual lock, never stale
+            return False, f"lock {path} held by {txt or 'someone (no owner.txt)'}"
+    k, seat_msg = take_seat(n, owner, pid, seat_wait)
+    if k is None:
+        return False, seat_msg
+    seat_note = f" ({seat_msg})" if k else ""
+
+    def give_back(msg):
+        if k:
+            release_seat(n, owner)
+        return False, msg + seat_note
+    info = lock_info(n)
+    if info:  # stale (checked above), or taken while we waited for a seat
+        path, txt = info
+        op = _owner_pid(txt)
+        if op is not None and op != 0 and not pid_alive(op):
             for p in lock_paths(n):
                 shutil.rmtree(p, ignore_errors=True)
+            if txt:  # the dead owner's seat goes with its lock
+                release_seat(n, txt.split()[0])
         else:
-            return False, f"lock {path} held by {txt or 'someone (no owner.txt)'}"
+            return give_back(f"lock {path} held by {txt or 'someone (no owner.txt)'}")
     made = []
     for p in lock_paths(n):
         try:
@@ -311,11 +1095,11 @@ def acquire(n, owner, pid=None):
         except FileExistsError:
             for q in made:
                 shutil.rmtree(q, ignore_errors=True)
-            return False, f"lock {p} taken just now"
+            return give_back(f"lock {p} taken just now")
         made.append(p)
         with open(os.path.join(p, "owner.txt"), "w", encoding="utf-8") as f:
             f.write(f"{owner} pid={pid} {datetime.datetime.now():%Y-%m-%d %H:%M:%S}")
-    return True, f"lock {made[0]} taken by {owner}"
+    return True, f"lock {made[0]} taken by {owner}{seat_note}"
 
 
 def release(n, owner=None, manual=False):
@@ -323,9 +1107,12 @@ def release(n, owner=None, manual=False):
     (command line `unlock N`), whatever is there. A lock somebody made by hand (no owner.txt) is never removed by a
     run that merely used it, and neither is a manual lock (`lock N OWNER`, pid=0): a lane holds the slot with it for a
     whole session (setup, several runs, restore), and the runs inside it (game_ctl / game_checks with MXL_RUN=OWNER)
-    must not open the slot for another lane between them. Only `unlock N [OWNER]` (manual=True) removes it."""
+    must not open the slot for another lane between them. Only `unlock N [OWNER]` (manual=True) removes it. The lock's
+    seat (game.seat.K naming the same owner and slot) is removed right after the lock."""
     info = lock_info(n)
     if not info:
+        if owner is not None:
+            release_seat(n, owner)  # a seat left by a failure between the two steps
         return True
     path, txt = info
     if owner is not None and (not txt or txt.split()[0] != owner):
@@ -347,6 +1134,8 @@ def release(n, owner=None, manual=False):
             return False
     for p in lock_paths(n):
         shutil.rmtree(p, ignore_errors=True)
+    if txt:
+        release_seat(n, txt.split()[0])
     return True
 
 
@@ -487,6 +1276,10 @@ def setup(n):
 
 
 def status():
+    m = max_games()
+    held = seats()
+    print(f"budget: {'none (no budget.json)' if m is None else f'max_games {m}'}; seats held: "
+          + ("; ".join(f"{k}: {t or 'no owner.txt'}" for k, t in held) or "-"))
     for n in SLOTS:
         game = slot_dir(n)
         lk = lock_info(n)
@@ -501,9 +1294,11 @@ def status():
             sp = "?"
         import slot_share
         man = slot_share.pending(n)
-        print(f"slot {n}: {game} ok; running {procs or '-'}; "
+        where = f"; prefix {prefix_dir(n)}{'' if os.path.isdir(prefix_dir(n)) else ' MISSING'}" if LINUX else ""
+        what = "slot" if LINUX else "shared files"
+        print(f"slot {n}: {game} ok{where}; running {procs or '-'}; "
               f"lock {lk[1] or 'held (no owner.txt)' if lk else 'free'}; savepath {sp}"
-              + (f"; shared files PENDING restore (snapshot of {man['owner']} {man['at']})" if man else ""))
+              + (f"; {what} PENDING restore (snapshot of {man['owner']} {man['at']})" if man else ""))
 
 
 def main():
@@ -530,6 +1325,12 @@ def main():
         return 0 if ok else 1
     elif c == "unlock":
         return 0 if release(require_slot(a[1]), a[2] if len(a) > 2 else None, manual=True) else 1
+    elif c == "profile":  # profile N [test|visual]: write a graphics profile into the slot's Settings.json now (Linux)
+        if not LINUX:
+            print("graphics profiles are for the Linux slots only")
+            return 1
+        prof, changed = apply_profile(require_present(a[1], "profile"), a[2] if len(a) > 2 else None)
+        print(f"slot {a[1]}: profile {prof}; " + (", ".join(f"{k} {o} -> {v}" for k, (o, v) in changed.items()) or "already set"))
     elif c == "install":
         here = os.path.dirname(os.path.abspath(__file__))
         rc = 0

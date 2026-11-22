@@ -4,6 +4,32 @@ Changes that are built and installed but not yet confirmed in the game. Restart 
 "Confirmed" (or into docs/bugs.md) once tested. Console command `mxl` shows the plugin version and how many skill
 functions it installed.
 
+## Lane rel0129: release 0.1.29 built, packaged and smoked on Linux (2026-11-22, slots 6 and 7, HD and legacy, private display)
+
+lane/hdmaps2, lane/automapall and lane/fungus14 merged onto main 3039fca (with their base, lane/linux-integration), the
+Glowing Fungus shipped by `tools/m3d_ship.py`, the 12 classic maps built in raw ESRGAN 4x (`MXL2012_SPRITE_ALBEDO`,
+docs/release.md). Evidence in `/d2work/runs/rel0129/`, report `/d2work/mxl2012-runs/rel0129/REPORT.md`.
+
+- **Build:** plugins 66/66 test executables under wine; `tools/build.py` validate 0 errors (172, 13); `discover -s tools/tests`
+  2,332 OK; `-s tools` 686 OK; packager tests 72 OK.
+- **Package** `D2R-XL-2012-0.1.29.7z`: 8,291 files, 1,971 MB unpacked, 268 MB; `verify_package.py` OK. The 12 maps' 1,383
+  files are byte-equal to lane hdmaps2's 4x build, the 19 Fungus files to stage 8-r18k.
+- **Crash found and bisected:** `automap_void.py`'s tile copies (walls in the void moved to keys without an automap row)
+  crash legacy graphics after several Median areas in one session (`BC_ASSERT: n < m_size`, n 29423, m_size 2048, then an
+  access violation in D2RCore): 8 of 8 full `wall_maps` tours with the step, 0 with only its tile files put back. The step
+  is off in tools/build.py for 0.1.29 (owner, 2026-11-22); the rows, the bright legacy cels and the 4x maps are not involved.
+  Overlays for `MXL_AUTOMAP_OVERLAY` are a folder holding `global/...` / `hd/...` (laid under the mod's `data/`), not `data/...`.
+- **Smoke of the final package** (slot 7, `smoke129.sh`, `relchecks129.py`; slot restored byte-equal after every run):
+
+| Check | Result | Run (`/d2work/runs/rel0129/runs/`) |
+|-|-|-|
+| `mxl2012` (0.1.29, FAILED none), `clickmap`, `rel_plugins` (10 of 10) | PASS | `checks-20261122-155532-s7` |
+| Floating Damage and Enemy Health Bars, HD and legacy (by eye, against 0.1.28) | PASS with a new character (`-162541-s7`); the reused character RsA dealt no damage, so neither showed | `-162541-s7` |
+| Monster Display, Vendor Stock Refresh (by eye) | PASS | `-155532-s7` |
+| `wall_maps`: 16 Median areas in HD and legacy, no assert, 0 crash files | PASS (0.1.27's four classic areas look as in 0.1.28; Island of the Sunless Sea checked again in `-163433-s7` after a slow load) | `-160224-s7` |
+| `automap_fauz`: Fauztinville's minimap in HD and legacy (by eye) | PASS: Median's walls drawn, legacy as clear as HD | `-160224-s7` |
+| `mon_card fungus1`, HD and legacy, alive and dead (by eye against the r18k sign-off) | PASS, 0 asserts | `-162253-s7` |
+
 ## Lane rel0128: release 0.1.28 built, packaged and smoked on Linux (2026-11-21, slot 7, HD and legacy, private display)
 
 main `745084c` (lane/bugs128 merged with lane/legacystat's `790192d` cherry-picked, the 0.1.28 version, the gold-edged legacy
@@ -50,6 +76,336 @@ archers) do not show. Short effects need the 25 fps recording the checks make (`
 | VSR refresh in legacy graphics (new) | `v_legacy`: G, Charsi's trade, the button hovered and clicked (`V_LEG_BTN`), then Gheed's gamble; the layout laid into the slot, VSR's diagnostics on | Works: VSR takes its "legacy-frame" route (slot 64,385, gold anchor 14,356), the button shows on the stone left of Buy with its Refresh tooltip, and a click rerolls: 1600x900 with Legacy 16:9 (`-181332-s6`, 34 to 37, none kept), 1920x1080 without it (`-182528-s6`, 39, none kept), 2560x1440 with it (`-183656-s6`, 35 to 36, none kept). Gambling keeps D2R's refresh on the repair square. The click spot moves with the view: (240,692), (440,692) without Legacy 16:9, (272,691) at 1440p, in 1600x900 terms The two untested combos (lane bugs128, 0.1.27 package on slot 6 with the same layout and VSR build): 1920x1080 with Legacy 16:9 (`-193928-s6`, 39 to 35, none kept; click at (283,692)) and 2560x1440 without it (`-193346-s6`, 38 to 33, none kept; (440,692)): the button shows on the stone left of Buy with its tooltip and rerolls. A first try at 1080p clicked (256,692), beside the button (`-192851-s6`, unchanged) Gold edge (owner request, same day): the button's own art `PANEL\mxlrefreshbtn` (Buy's gold inset of the panel art round D2R's refresh button, `ui_layouts.vendor_refresh_art`, slot 62,383 36 x 36): the button now has the same gold outline as Buy, Sell, Repair and Close; trade rerolls at 900p with Legacy 16:9 (`/d2work/runs/bugs128/runs/checks-20261121-203753-s6`, 33 to 32, none kept) and 1440p without (`-204251-s6`, 40 to 31); gambling keeps it on the repair square, its ring on the panel's own |
 | #578 stance feathers in HD | `t578`, a Barbarian in the Rogue Encampment puts Lion, Bear, Snake and Eagle Stance on the right hand, HD then legacy, shots at 1, 3 and 6 s and 3 s at 25 fps | Fixed: HD shows Median's dark feathers swirling round him for every stance, as legacy (alpha-blended flipbook, `checks-20261121-192138-s2`). The first stand-in glowed in the stance colours (additive, `-184711-s2`); alpha blend with the white mask drew nothing (`-191248-s2`), with the coverage mask pale at gain 1.5 (`-191722-s2`), dark at 0.3 to 0.02 (`-191954-s2`, HD only) |
 | Stat Book + buttons under a page | `statbook_legacy_points` (tools/statbook_checks.py, run through `checks128.py sbpoints` with the cherry-picked legacy layout and this lane's statbook.dll laid into slot 5), legacy then HD: each + on the Character tab, clicks where the Vitality and Strength + sit on the Offense and All Stats pages, back on Character, then with 0 points and with points again | Fixed: on both pages in both modes the clicks spend nothing (the host reports "+ buttons off", 0 fails), every + on the Character tab spends a point before and after, and with no points left a click spends nothing; the pages show no + (`/d2work/runs/bugs128/runs/checks-20261121-191925-s5`, every judged row ok). Before (lane legacystat): a click there spent a point, in HD too |
+
+## Lane vramcap: telling each game it has less VRAM (2026-11-21, Linux slots 2, 5, 6, 7)
+
+**The setting works, through the adapter description.** Under Proton, D3D12 runs on vkd3d-proton with DXVK's `dxgi.dll`.
+DXVK's `dxgi.maxDeviceMemory` (MB, env `DXVK_CONFIG="dxgi.maxDeviceMemory = N"` or a `DXVK_CONFIG_FILE`) lowers the
+adapter's `DedicatedVideoMemory`, and D2R sizes its texture pool from that. A DXGI probe in a slot prefix
+(`tools/dxgi_vram_probe.cpp`, `/d2work/runs/vramcap/probe/out-*.txt`) shows:
+- `DedicatedVideoMemory` follows the cap: 16304 MB with no cap, 3072 / 2048 / 1024 MB with the cap. `dxgi.maxSharedMemory`
+  changes `SharedSystemMemory` the same way, but D2R does not need it.
+- `IDXGIAdapter3::QueryVideoMemoryInfo` ignores every DXVK option, including `dxvk.maxMemoryBudget`. It reports the
+  Vulkan budget (about 10.6 GB local, `AvailableForReservation` 8152 MB), and `CurrentUsage` counts the D3D12 heaps.
+- The game's DXVK log (`steam-0.log`) shows `Found config env: dxgi.maxDeviceMemory = N`.
+
+**In the slot tools**: every Proton game launch (`game_slots.launch`) gets `DXVK_CONFIG` with the run's cap. Helpers in
+the prefix (`wine_env`) do not. Which cap is used:
+- default: `game_slots.VRAM_DEFAULTS`, **`test` 2048 MB, `visual` 3072 MB**;
+- override: env `MXL_VRAM_MB=N` (`0` / `none` / `off` for no cap) or `parallel_smoke.py --vram-mb N`;
+- an existing `DXVK_CONFIG` keeps its other options.
+
+`game_ctl.log` says `VRAM cap N MB`; `parallel-summary.md` / `parallel-result.json` list the caps per slot. Tests:
+`tools/tests/test_vram_cap.py`. Also new:
+- `resource_sample_linux.py` samples each game's GTT (fdinfo `drm-memory-gtt`);
+- env `MXL_START_TIMEOUT` (s) raises the wait for D2R's startup line (a busy disk slowed the loader's mod compile past 120 s);
+- game check `vramhold`: town, then the Blood Moor, `MXL_HOLD_SECS` (45) each, one shot each.
+
+**One game** (slot 6, `MXL_CHAR=VramCap`, runs `/d2work/runs/vramcap/runs/`). `c*` runs are the full smoke (`parallel_smoke.py`);
+`checks-*` runs are `vramhold` (sampler `h-*/resources.jsonl`). Game VRAM / GTT are the slot prefix's fdinfo peaks; the
+machine figure includes the owner's desktop (2.2-2.3 GB idle). Every run passed (18/18 or PASS). No new crash files, and
+no engine asserts beyond the usual startup lines.
+
+| Profile | Cap (MB) | Runs | Game VRAM peak | Game GTT peak | Machine VRAM peak | Shots |
+|-|-|-|-|-|-|-|
+| test | none | `c0b`, `c0c`, hold | 4.4 / 4.2 / 4.0 GB | 0.2-0.4 GB | 6.3-6.5 GB | clean |
+| test | 3072 | `c3072`, hold | 3.8 / 3.8 GB | 0.2 GB | 6.0-6.2 GB | clean |
+| test | **2048** | `c2048`, `c2048b`, hold | 3.6 / 3.5 / 3.6 GB | 0.3-0.4 GB | 5.8-5.9 GB | clean |
+| test | 1536 | `c1536` | 3.6 GB | - | 5.8 GB | clean |
+| test | 1024 | `c1024`, hold | 3.6 / 3.6 GB | 0.3 GB | 5.9 GB | clean |
+| test | 512 | `c512` | 3.6 GB | 0.3 GB | 6.0 GB | clean |
+| visual | none | hold x2 | 5.1 / 5.1 GB | 0.4 GB | 7.5 GB | clean |
+| visual | **3072** | hold x3 | 4.4 / 4.4 / 4.4 GB | 0.4 GB | 6.7-6.8 GB | clean |
+| visual | 2048 | hold x2 | 4.0 / 4.0 GB | 0.4 GB | 6.5 GB | **broken**: a black patch over the town wall, then a black checkerboard over 25% of the world |
+
+- **How D2R reacts**: below about 2 GB on `test` nothing changes any more (3.5-3.6 GB is the fixed part: render targets,
+  UI, the resident set). The cap trims only the streamed texture pool: 0.6-0.8 GB per `test` game, 0.7 GB per `visual` game.
+- **Looks**: `test` shots (town, town after reload, the Blood Moor) look the same at every cap down to 512 MB, at 30 fps
+  (the debug overlay; the harness has no frame-time log). The black-block scan (`/d2work/runs/vramcap/blackblocks.py`) found
+  nothing. `visual` at 3072 looks the same as with no cap (`/d2work/runs/vramcap/visual-3072-cd.jpg`); at 2048 tiles render
+  black (`visual-town-b.jpg`, `visual-town-none-vs-2048.jpg`). So `visual` keeps a margin.
+- GPU and CPU do not change with the cap (`test` about 16% GPU and 1.5 cores, `visual` about 70% GPU).
+- The longer walk-and-fight run was not done (the owner asked for plain Act 1 VRAM readings instead).
+
+**Several games** (`parallel_smoke.py` with the default caps, launches 20-30 s apart; `max_games` set to 4 for the
+measuring window, then restored; stop rules from lane slotcap):
+
+| Games | Run | Smoke | Machine VRAM peak | GTT peak | GPU mean / peak | Load1 peak | Swap | Result |
+|-|-|-|-|-|-|-|-|-|
+| 3 test | `p3` (5, 6, 7), 20 s | 18/18 x 3 | **13.4 GB (82%)** | 1.4 GB | 26% / 100% | 17.6 | flat | passed |
+| 3 test | `p3b`, 30 s | 18/18 x 3 | **13.4 GB (82%)** | 1.2 GB | 24% / 86% | 12.4 | flat | passed |
+| 1 visual + 2 test | `mix3` (5 visual), 20 s | 18/18, 18/18, slot 7 hung at startup | 11.8 GB (2 games in) | 0.9 GB | 26% / 94% | 13.1 | +341 MB | stopped (swap) |
+| 1 visual + 2 test | `mix3b`, 30 s | all 3 in game | **13.9 GB (85%)** | 1.3 GB | 52% / 94% | 12.6 | +286 MB | stopped (swap) at 113 s |
+| 4 test | `p4` (2, 5, 6, 7), 20 s | slot 2 hung at startup | 14.9 GB (91%, over 90% for 54 s) | 1.2 GB | 30% / 100% | 17.3 | +260 MB | stopped (swap) |
+| 4 test | `p4b`, 30 s | 4th game loading | **15.8 GB, full** | **1.9 GB (spill)** | 26% / 58% | 13.2 | +264 MB | stopped (swap; VRAM full) |
+| 4 test, cap 1024 | `p4c1024` (5, 6, 7, 2), 30 s, swap rule off | 18/18 x 4 | 15.7 GB (96%; all 4 in game only ~15 s) | 1.4 GB | 24% / 51% | 24.4 | flat | passed |
+| 4 test, cap 1024 | `h4-1024` (`vramhold` 150 s per area, all 4 in game together for 140 s) | PASS x 4 | **15.7-15.8 GB, full** | **2.0 GB (about 0.7 GB spill)** | 58% while all in | 13.1 | flat | passed: 30 fps each (overlay), shots clean |
+
+Without the cap (lane lowprofile): 3 `test` games reached 14.6 GB (90%), and 4 filled VRAM and spilled 4.1 GB.
+
+- **Swap**: during these runs the owner added a 16 GB zram swap (18 GB in total now), and another lane's rsync / refs-fuse
+  copy kept the disk busy. The swap growth that stopped the runs went to zram. It held idle pages of the owner's VM, AnyDesk,
+  browsers and refs-fuse (3.7 GB); no game process had anything swapped (VmSwap 0). 33-35 GB was still available.
+  The 256 MB rule was set for a full 2 GB disk swap and now trips on that background churn. The coordinators may want to
+  measure growth per process, or allow more growth, now that zram is there.
+- **Loader hang at startup**: twice (p4 slot 2, mix3 slot 7) a game stopped during startup while another game was loading.
+  Its logs went quiet in the mod compile, and it sat idle until the run was stopped. That is 2 of 13 launches in multi-game
+  runs and 0 of 19 single-game launches. Both hangs were with the cap, so the cap cannot be ruled out; the cause is not known.
+  A rerun (`p3b`, `mix3b`) got in each time.
+
+**4 games at a lower cap** (asked by the owner): 1024 MB changes nothing per game (3.5-3.7 GB in game, as with 2048; 512
+also gave 3.6 GB alone), so 768 / 512 were not run. With all 4 in game together, VRAM was full and each game had 0.45-0.55 GB
+GTT instead of 0.3 GB (about 0.7 GB spilled in total). The games still held 30 fps, their shots were clean, and RAM stayed at
+34 GB available. **The floor** of about 3.6 GB is mostly in place before the world loads: 2.9-3.0 GB at the main menu with
+a 512 MB cap (3.0-3.3 GB with no cap), then +0.6-0.7 GB in game. So it is D2R's own startup set (UI and font atlases,
+shaders / pipeline state, the menu scene, resident data). Render targets at 1600x900 with Resolution Scale 50 are only tens of
+MB, and the CPU-copy present keeps its images in system memory (GTT), not VRAM. The fdinfo totals cannot split it further;
+the cap only reaches the streamed texture pool.
+
+**Recommendation**: keep the defaults (`test` 2048, `visual` 3072). Each `test` game then needs about 3.6 GB VRAM and
+0.3 GB GTT instead of 4.2-4.4 GB. **3 games fit**: 3 `test` games 82%, 1 `visual` + 2 `test` 85%. **4 do not**: 4 x 3.6 GB
+plus the desktop's 2.2 GB is more than the 16 GB card. `budget.json` is shared with D2RGS and is still `max_games` 2. Going
+to 3 needs both coordinators, and only while every game on the PC runs capped and at most one is `visual`. **4 `test` games
+run** but fill VRAM, with a small GTT spill (about 0.7 GB) and no headroom for the owner's desktop. 4 is acceptable while the
+owner is not using the PC; then count a `visual` game as 2 seats (1 `visual` + 2 `test` = 85%).
+`parallel_smoke.py --abort-swap-mb 0` turns the swap rule off (RAM available still stops a run, `--abort-avail-mb`).
+
+## Lane lowprofile: graphics profiles for the Linux slots, and max games with the low profile (2026-11-21, slots 2, 5, 6, 7)
+
+**Two profiles** (`tools/slot_profiles/<name>.json`, only graphics keys of D2R's `Settings.json`; window 1600x900 windowed in both):
+- **`test`** (the default): the Windows test profile of 2026-10-28 (`mxl2012-runs/d2r-settings-backup/Settings.test-profile.json`,
+  graphics keys only; its window was 1920x1080 and is 1600x900 here). Frame cap 30, VSync off, Resolution Scale 50, textures,
+  anisotropy, AO, character detail, atmospherics, transparency, shadows, light, AA, VFX and VFX lighting at 0, environment detail 4.
+  The owner chose it directly (no ladder of profiles was measured).
+- **`visual`**: what the Linux slots ran before: Resolution Scale 100, textures / shadows / AO / VFX 4, AA 3, VSync on, no frame cap.
+
+**How a profile is applied**: `Settings.json` sits in the prefix's save folder (`<prefix>/.../mods/mxl2012-sN/Settings.json`),
+outside the whole-slot snapshot, so a profile written there stays after the run. `game_slots.launch()` therefore writes the
+run's profile before every launch (`apply_profile`: only the profile's keys, every other key and the file layout kept, refused while
+the prefix runs). Which profile:
+- env `MXL_PROFILE=test|visual`, default `test`;
+- `parallel_smoke.py --profile test|visual` for all slots, `--visual-slots 5` for single slots;
+- `game_checks.py`: `MXL_PROFILE` when set, else `visual` when a check of `game_slots.VISUAL_CHECKS` is in the run (`signoff`,
+  `hdl_look`, `tint_hd`, `ua_look`, `itemart_pics`, `itemart_mons`, `hdit_icons`, `standin_mons`, `drawcap`, `hm2_monsters`,
+  `hm3_monsters`, `mon_card`), else `test`;
+- by hand: `game_slots.py profile N [test|visual]`.
+`game_ctl.log` says `graphics profile <name>`. Tests: `tools/tests/test_slot_profiles.py`.
+
+**What needs `visual`**: anything judged on the 3D world's pixels: HD effects and models, the hdkit viewer's in-game sign-off
+(frames against renders), item / monster art looks, tints, the drawcap draw-list fill (it depends on the settings). Everything
+else runs on `test`: functional checks, harness checks, panels, tooltips and other UI text, `in_game()` (life orb), `clickmap`.
+
+**Checks and shots on `test`** (run `checks-20261121-021534-s6` against `visual` in `checks-20261121-021559-s7`, the same
+character; contact sheets `/d2work/runs/lowprofile/contact-a.jpg`, `contact-b.jpg`, `zoom.png`):
+- `mxl2012` PASS, `clickmap` PASS (full frame, life orb found, every panel button and corner click lands) on both;
+  the smoke 18/18 on every `test` run below.
+- New check `profshots` (`game_checks.py all profshots`): HUD in town, ring tooltip in the inventory, Akara's trade panel and a
+  stock item's tooltip, a monster hovered (name label), fireball / frozen orb / firestorm missiles over monsters in the Blood
+  Moor. All 8 shots on both profiles.
+- **UI text is identical**: panels, tooltips and the hover label draw at the full 1600x900, Resolution Scale only lowers the 3D
+  world. Character sheet, skill tree, inventory and vendor tooltips read the same.
+- The world is softer at half resolution and has no shadows or ambient occlusion; the frozen orb's effect is visible but blurred.
+  Fine to see that an effect plays; not good enough for judging its look. Two of the missile shots caught no effect on either
+  profile (timing, not the profile). The night shot was not taken.
+- The debug overlay shows the frame rate: `test` 30 fps (the cap), `visual` 220-230 fps uncapped on the private display.
+
+**Measured** (`/d2work/runs/lowprofile/runs/<run>/`, `parallel_smoke.py`, full smoke per slot, `MXL_CHAR=LowProf`, plugin
+0.1.26 dev, 1 s samples). Idle: 2.1-2.3 GB VRAM (the owner's desktop), 0.5 GB GTT, GPU 4-13%, MemAvailable 40-50 GB.
+
+| Games | Run | Profiles | Smoke | VRAM peak | GTT peak | GPU mean / peak | CPU per game mean | Machine CPU peak / load1 peak | MemAvailable min | Swap |
+|-|-|-|-|-|-|-|-|-|-|-|
+| 1 | `t1b-s6` | test | 18/18 | 6.8 GB (game 4.3) | 0.9 GB | 17% / 32% | 1.5 cores | 40% / 5.6 | 35.7 GB | no growth |
+| 1 | slotcap `solo-s6` | high | 18/18 | 8.0 GB (game 5.1) | 0.8 GB | 64% / 96% | 3.9 cores | 56% / 9.2 | 45.9 GB | no growth |
+| 2 | `t2` (6, 7) | test | 18/18, 18/18 | 10.8 GB (66%) | 1.2 GB | 24% / 38% | 1.6 cores | 50% / 7.8 | 42.2 GB | +72 MB |
+| 2 | slotcap `par2` | high | 18/18, 18/18 | 12.8 GB (78%) | 1.0 GB | 74% / 100% | 3.2 cores | 72% / 12.8 | 42.8 GB | no growth |
+| 3 | `t3` (5, 6, 7), 4 s stagger | test | **stopped at 56 s**: swap +315 MB | 13.9 GB | 1.3 GB | 19% / 40% | 1.8 cores | 68% / 7.8 | 35.1 GB | **300 -> 1082 MB** |
+| 3 | `t3b` (5, 6, 7), 20 s stagger | test | 18/18 x 3 | **14.6 GB (90%; over 90% in 49 of 135 s)** | 1.4 GB | 28% / 76% | 1.6 cores | 51% / 8.2 | 31.9 GB | 1074 -> 1171 MB |
+| 4 | `t4b` (2, 5, 6, 7), 20 s stagger | test | **stopped at 115 s**: swap +414 MB | **15.9 GB, full** | **4.1 GB (spill)** | 30% / 74% | 1.6 cores | 68% / 13.6 | 29.0 GB | **1160 -> 1874 MB** |
+| 3 | `mix3` (5 visual; 6, 7 test) | mixed | 18/18 x 3 | **15.5 GB (95%)** | 1.6 GB | 54% / 97% | 3.75 (visual), 1.7 (test) | 58% / 11.0 | 32.7 GB | 1863 -> **2045 MB (swap full)** |
+
+Per game on `test`: 4.2-4.3 GB VRAM (high 5.1), 1.5-1.8 cores mean (high 3-4), GPU about 10-15% each (high 60-75%), PSS
+3.6-3.8 GB as before.
+
+**What `test` changes**: GPU and CPU fall to about a quarter to a half. The game stays at 30 fps, so the owner's desktop is
+no longer starved for GPU time. **VRAM, still the first limit, falls only about 0.9 GB per game.** Most of a game's VRAM is fixed
+(textures stay resident even at quality 0; render targets are small at 1600x900).
+
+**Swap**: the PC has only 2 GB of swap. The swap growth that stopped `t3` and `t4b` came while 29-36 GB was still available.
+The kernel moved idle pages of the owner's desktop session (outside the game slices) out during the loaders' start-up bursts:
+about 5 GB in 4 s with three loaders compiling together. Staggering the launches by 20 s (`--stagger 20`) avoided it with 3
+games, not with 4. After the session the swap was full (2045 of 2047 MB), mostly with the owner's session pages.
+
+**Recommendation: `max_games` stays 2** (budget.json unchanged). With `test`, 2 games use 66% VRAM and a quarter of the GPU,
+leaving real headroom for the owner. Any mix of 2 fits: 1 `visual` + 1 `test` is about 11.6 GB. Three `test` games pass the
+smoke, but VRAM is at 90% for a third of the run and swap grows. By slotcap's stop rule (VRAM over ~90%) 3 is not safe while
+the owner uses the PC. Never more than one `visual` game when 3 run (`mix3`: 95% VRAM). If the owner wants 3 seats (for example
+while away), the rule would be: 3 only when all are `test` and launches are 20 s apart. That is the owner's and both
+coordinators' call.
+
+## Lane slotcap: how many games this PC runs at once, and shared seats (2026-11-21, Linux slots 2, 5, 6, 7)
+
+Two projects run D2R test games on this PC: this one (slots 2, 5, 6, 7) and D2RGS (`~/arcane-protocol`, slots 3, 4, 8, 9).
+They share one machine-wide game budget. The protocol is in `/d2work/slots/locks/README.md`, agreed by both coordinators.
+
+**Shared seats** (`tools/game_slots.py`, both backends):
+- `<locks>/budget.json` `{"max_games": N, "set_by", "measured"}`. Without it, the tools work as before.
+- Every slot lock comes with a seat `game.seat.K` (K = 1..N). A seat is a directory taken with mkdir, like a lock.
+  Its `owner.txt` is `<owner> pid=<pid> <time> slot=<n>`.
+- Order: the seat first, then `game.lock.N`. A failure between the two releases the seat again. On release, the lock
+  goes first, then the seat.
+- A seat whose pid is gone is stale. `pid=0` (taken by hand) is never stale. A session lock (`game_slots.py lock N
+  <lane>`) holds its seat until `unlock`.
+- No free seat: `acquire()` waits up to `seat_wait` seconds (env `MXL_SEAT_WAIT`, `parallel_smoke.py --seat-wait`;
+  default 0), then refuses. `game_ctl`, `game_checks`, `parallel_smoke`, `lane_setup` and every other caller of
+  `acquire` get the seat this way. `slot_share` takes no lock itself. `game_slots.py status` shows the budget and the
+  seats held.
+- `<locks>/slots.json` says which project owns which slot number. On Linux, a slot number given to another project is
+  refused. The Windows numbering (slots 1 to 5) is not affected.
+- Linux slots are now 2, 5, 6, 7. Temporary slots 10 and up exist only while env `MXL_EXTRA_SLOTS` names them.
+- Tests: `tools/tests/test_game_slots_seats.py` (Linux and Windows backends, sampler, memory alarm).
+
+**Slots 6 and 7** are copies of slot 5: the folder `/d2work/slots/sN` (without `D2RLoader-s5.exe`) and the prefix
+`/d2work/prefixes/sN` with drive `d:` relinked to the slot folder. The save folder was renamed to `mxl2012-sN`, and
+`game_slots.py setup 6 7` was run. The Battle.net cookie and MachineGuid are as in slot 5 (owner-approved for s6/s7,
+2026-11-21). Each slot passed one smoke alone with 18/18 steps (runs `solo-s6`, `solo-s7`).
+
+**parallel_smoke.py on Linux**: there is no cursor watch, because games run on private Xvfb displays; the summary
+reports each run's `focus.json` instead. `tools/resource_sample_linux.py` samples every second into `resources.jsonl`:
+- machine: CPU, load, MemAvailable, swap, amdgpu VRAM / GTT / busy;
+- per game: CPU, PSS and amdgpu VRAM (fdinfo) of the slot prefix's processes;
+- the Xvfb displays.
+
+All games are stopped when MemAvailable falls below `--abort-avail-mb` (4096) or swap use grows by more than 256 MB.
+Results are in `parallel-result.json`.
+
+**Measured** (`/d2work/runs/slotcap/runs/<run>/`, full smoke per slot, `MXL_CHAR=SlotCap`, plugin 0.1.26 dev of
+`lane/linux-integration`). Idle machine: 2.6-2.8 GB VRAM (the owner's desktop), 0.2 GB GTT, GPU 4-10%, load about 6-10
+from the owner's other work.
+
+| Games | Run | Smoke result | Time | CPU machine mean / peak | CPU per game mean / peak | Load1 peak | MemAvailable min | Swap | VRAM peak | GTT peak | GPU busy mean / peak |
+|-|-|-|-|-|-|-|-|-|-|-|-|
+| 1 | `solo-s6` | 18/18 | 150 s | 20% / 56% | 3.9 / 12.6 cores | 9.2 | 45.9 GB | no growth | 8.0 GB | 0.8 GB | 64% / 96% |
+| 1 | `solo-s7` | 18/18 | 149 s | 19% / 47% | 3.9 / 13.1 cores | 9.6 | 45.1 GB | no growth | 8.0 GB | 0.8 GB | 68% / 97% |
+| 2 | `par2` (2, 5) | 18/18, 18/18 | 153 s, 156 s | 25% / 72% | 3.4 and 3.1 / 12 cores | 12.8 | 42.8 GB | no growth | 12.8 GB (78%) | 1.0 GB | 74% / 100% (99% in game) |
+| 3 | `par3` (2, 5, 6) | 18/18, **slot 5 crashed** (16/16, then gone), 18/18 | 140-152 s | 23% / 66% | 2.1-2.3 / 11 cores | 15.0 | 38.1 GB | no growth | **16.2 GB, full** | **3.3 GB (spill)** | 78% / 100% |
+
+Per game on Linux: about 5.1 GB VRAM (4.7-5.8 GB with 3 games), about 0.6 GB GTT, 3.7 GB PSS, and 3-4 cores on
+average with peaks of 10-13 cores at load. The Xvfb displays together used 0.3-0.4 cores. On Windows (2026-10-21) a
+game needed 4.1-4.5 GB VRAM, 6.6-7.2 GB RAM, 1.5 cores on average (6.6 at startup) and 17-21% GPU. On Linux a game
+uses less RAM, more VRAM, 2-3 times the CPU (Mesa's CPU-copy present on Xvfb, Proton), and far more GPU: one game
+keeps the GPU 60-75% busy, and two keep it at 99%. The frame rate on the private display is uncapped.
+
+**What limits first: VRAM.** Two games plus the desktop fit in 13 GB of 16. With three games, VRAM was full by +43 s
+(16.2 GB of 16.3) and GTT grew to 3.3 GB. A linear 0.6 GB per game would give about 2 GB, so the rest spilled to
+system memory. The GPU stayed at 100% and the per-game CPU fell to about 1 core, because the games were starved for GPU
+time. Slot 5 died with an access violation (last-resort crash report, then the shutdown assertions) as it loaded back
+into the game for step 4b.
+
+These were not near their limits:
+- RAM: at least 38 GB available;
+- swap: no growth;
+- CPU: 66% peak, load 15 out of 32 threads.
+
+By the stop rule (the first smoke failure, or VRAM over 90% or spilling into GTT), the measurement stopped at 3. The
+D2RGS slots 3 and 4 and the temporary slots 10 and up were not needed and were not touched.
+
+**Recommended `max_games`: 2** (written to `/d2work/slots/locks/budget.json`). With 2 games VRAM is at 78%. That
+leaves about 3 GB for the owner's desktop and browser, and any other GPU work the owner does takes some of it. A third
+game overflows VRAM and crashed a run. While 2 games run the GPU is at 99%, and the owner's desktop shares that GPU.
+If the owner notices lag, the next step is a frame-rate cap for test games, not a third seat. Re-measure with a cap
+(or a GPU change) before raising the budget, and change it only with both coordinators.
+
+## Lane linfix: fake focus default, the per-launch crash report, run cleanup, the 1574 x 828 frames (2026-11-20, Linux slots 2 and 5)
+
+Build `/d2work/build/linfix-b1` (63 of 63 test exes pass), installed into slots 2 and 5. Runs `/d2work/runs/linfix/runs/`.
+
+- **Fake focus is off by default, also under Wine** (`testharness_logic.h WantFakeFocus(mode)`: only the mode word
+  `fakefocus` turns it on, `nofakefocus` wins). Under Wine it hung startup at "Initializing graphics context (15/24)" on the
+  private Xvfb display (lane linharness r2 / r3), and Linux runs happen only there, where the game may hold its own
+  display's focus. Windows keeps its behaviour (it was off there unless asked). The Linux layer no longer adds
+  `nofakefocus` (`game_ctl_linux` has no harness-words wrapper). Measured: runs `p3`, `p4` and the check runs with the words
+  `volserial tag=sN` (no focus word): trace "fake focus off", startup to the game, owner focus never changed.
+- **The per-launch "last-resort crash report" was ours** (Stat Book, not Wine). D2R's last-resort handler also records
+  first-chance exceptions that a plugin handles itself (bugs #17, #399). The faulting address `+0x15599` of the module at
+  0x6fff...beb0000 is `statbook.dll`'s `FindKids` (sheet_host.cpp) in build linharness-b3 (`cmp [rax], rcx`, RAX 0x13 =
+  the entry pointer, R9 0x16 = the end, RSI = the sheet 0x3b00b400 that the next statbook.log line names): the scan for
+  the sheet's child list read a (begin, end) pair (0x13, 0x16) of the sheet's fields under SEH when the sheet widget is
+  set up, at every game entry (the stack holds "StatBookTabs"). On Windows the same report was "a module in the Windows DLL
+  range" at each start (lane devsock and others). The SEH frame also ended the whole scan at that pair, so the list was
+  never found ("child list not found (by name)"; the by-name fallback hides the same 43 widgets). Fix: a pair is read only
+  when `PlausibleList` (sheet_host_logic.h: 8-aligned user-space pointers above 64 KiB, at most 4096 entries) and
+  `VirtualQuery` agree, each candidate in its own SEH frame. Measured: before, 4 game entries with the sheet host set up
+  (linharness r15 and its three check runs) wrote 4 reports; after, 5 entries (runs `p3`, `p4`, `checks-20261120-131500-s2`,
+  `-131716-s2`, `-131842-s5`) wrote none; the scan still finds no list, so the sheet is unchanged (43 widgets hidden by name). Unit test `sheet_host_tests` (PlausibleList).
+  lane linharness r13 / r14 had a different one: the harness `diag` word's cookie-record field probe (mxl2012-core
+  `H_CookieRecord`, handled; diagnostics only, left as it is).
+- **Run cleanup** (`tools/run_cleanup.py`, called by `game_checks` at the end of each Linux run; `MXL_KEEP_RUN_FILES=1`
+  keeps all): removes empty files, last-resort reports of a known handled exception (`KNOWN_HANDLED`: the two above, told
+  apart by exception code, offset and read address) and, in a run that passed, Proton's `steam-N.log`, `xvfb.log`,
+  `blz-log.txt`, the slot logs copied out before the restore (logscan.txt keeps their summary) and screenshots no report
+  cites. It keeps report.md, logscan.txt, game_ctl.log, focus.json, cited shots, every log of a failed run (or a run a
+  report names, `--cited REPORT.md`) and every other crash file (a real crash's report and dump). One line in
+  game_ctl.log says what went. By hand: `python tools/run_cleanup.py RUN_DIR... --dry-run --cited <lane REPORT.md>`.
+- **The 1574 x 828 frames were the window placement**, not Wine, vkd3d or a D2R letterbox. `fit_window` put the window at
+  the Windows slot cascade (slot 5: 340, 220) on the 1920 x 1080 private screen, so the client (346, 252 to 1946, 1152)
+  reached 26 px past the right and 72 px past the bottom edge; nothing is drawn there (xwininfo of the game's X window:
+  1604 x 904 at +344+250, corners -28 / -74). Slot 2's spot (160, 100) fitted. The game itself drew the whole 1600 x 900
+  frame and the clicks (client coordinates in posted messages) were never off; only shots and pixel checks lost the HUD
+  strip (`in_game()`'s life-orb sample at y 783-828 sat on the edge). Now each run's own display gets the window at 0, 0
+  (client at 6, 32), the display grows for a large client (`screen_size`: client + 64 x 96, at least `MXL_XVFB_SCREEN`), and
+  a window past the screen is logged. The Linux HUD lines up with a Windows 1600 x 900 shot to the pixel (offset 0, 0 at
+  the left statue, the right demon and the skill bar).
+- **Check `clickmap`** (game_checks): a full frame (the right 26 columns and the bottom 72 rows drawn), the HUD's
+  character button (507, 878) and skill tree button (536, 878) open their panels and the close boxes (563, 103) and
+  (1484, 103) shut them, the left skill button (745, 868) opens and shuts its list, and clicks near the four corners
+  (40, 40), (1560, 40), (40, 700), (1560, 700) walk the character that way (screen x ~ world x - y, y ~ x + y; a spot the
+  character cannot reach is retried closer to the centre and reported). **PASS on slot 2 (`checks-20261120-131716-s2`) and
+  slot 5 (`checks-20261120-131842-s5`)**, with `mxl2012` PASS in the same runs. Before the fix slot 5's shots were cut.
+- **`stop_prefix`** (game_slots): after a startup crash (run `p2`, see below) the prefix's wineserver was gone and its
+  clients stayed, so `wineserver -k` reached nobody and the slot stayed locked. Processes of the slot's prefix left after
+  `-k` now get SIGKILL (logged).
+- **Seen once, kept as evidence**: run `p2` (slot 5, first launch after the install) died while loading the tables:
+  `BC_ASSERT: hnd->IsValid()` for `data\global\tiles\Expansion\voodoo\trees.dt1` (present in the slot), then
+  `TILEPROJECT_VERSION` and `hProject` (Tilecmp.cpp:936), and a real crash report with dump. The same pattern as bug #517
+  (another .dt1). The next 5 launches loaded it. Evidence `/d2work/runs/linfix/runs/p2/slot-logs-1/`.
+
+Tests: `tools/tests/test_linfix.py` (known handled reports, the cleanup rules, game_checks' call, clickmap helpers,
+stop_prefix fallback, plugin source checks), `tools/test_game_ctl_linux.py` (window at 0, 0, screen size, no words
+wrapper), plugin `testharness_logic_tests` (WantFakeFocus) and `sheet_host_tests` (PlausibleList).
+
+## Lane wineinput: harness input under Wine/Proton (2026-11-20, Linux slot 2, plugin 0.1.26 + lane, bug #619)
+
+The harness's win32u hooks now install under Proton. Wine's syscall stubs have the Windows head (`4c 8b d1 b8 <ssn> f6 04 25
+08 03 fe 7f 01 75 03 0f 05 c3`) but end in `eb 01 c3 ff 14 25 00 10 fe 7f c3` (`call [7ffe1000]`, Wine's dispatcher), and the
+harness used to refuse that tail. `plugin/src/testharness_logic.h` accepts both byte shapes; anything else is still left
+alone. Log line under Proton: "33 win32u input calls traced ... (2 not present, 33 of them Wine stubs; fake focus on)".
+Windows: same hooks, same line as before.
+
+- **Import fallbacks:** when one of the input stubs can't be hooked, the game exe's import of the matching user32 function
+  is redirected (GetCursorPos, SetCursorPos, ClipCursor, TrackMouseEvent, GetAsyncKeyState, Get/SetForegroundWindow,
+  SetActiveWindow, ShowWindow, PeekMessageW/A, CreateWindowExW, GetFocus, GetActiveWindow, SetFocus), with the same
+  behaviour as the stub hook. The report line lists any that are off. The mode word `iat` in `mxl2012-testharness.txt`
+  skips the stubs, to test this path (not yet run in game).
+- **Fake focus** (off by default since lane linfix, also under Wine; the mode word `fakefocus` turns it on, `nofakefocus`
+  wins; it was on under Wine before and hung startup on the private Xvfb display, see "Lane linfix" below): the
+  game window procedure drops WM_ACTIVATEAPP(FALSE), WM_ACTIVATE(WA_INACTIVE) and WM_KILLFOCUS and gets one
+  WM_ACTIVATEAPP(TRUE) + WM_SETFOCUS. GetForegroundWindow, GetFocus and GetActiveWindow answer the game window, and the
+  game's own SetFocus stays inside. The trace log shows "fake focus on: window procedure subclassed, ... dropped N".
+  Under Proton D2R calls none of GetForegroundWindow, GetFocus or GetActiveWindow (trace: 0 calls), so only the
+  messages matter. Not yet tested with keys in game (runs stopped by the focus rule below).
+
+Measured (`/d2work/runs/wineinput/run1`, real desktop, before the no-focus rule): the harness click (`vclick` of the window
+helper) passed Gamma, Screen Space and Color Blind Calibration. Posted keys arrive: the trace lists WM_KEYDOWN/WM_KEYUP
+taken by PeekMessage. But 4 x Up (with and without the extended bit) moved nothing on Screen Space Calibration. A 3 s Esc
+hold on the black intro was followed by the title screen; the intro may have ended by itself. The title showed the 30-day
+"not online" dialog, so the run stopped there (lane rule). Linux game runs therefore can't reach the main menu without a
+valid Battle.net cookie in the slot prefix.
+
+Focus (`run3/focus.txt`, `_NET_ACTIVE_WINDOW` polled every 0.1 s): with `HKCU\Software\Wine\X11 Driver`
+`UseTakeFocus=N` in the s2 prefix, the game still took the X focus three times: the D2RLoader notice dialog (+4 s, about
+1 s), the game window when created (+9 s, about 2 s) and once at about +20 s. The run aborted. On a private Xvfb display
+(`run4`, `MESA_VK_WSI_DEBUG=sw`) the owner's focus never moved, but the frame is black and the game's UI thread stalls
+(5 PeekMessage calls in 60 s, the console mailbox is never served), so Xvfb can't be used either.
 
 ## Lane devsock: developer menu uniques and set items with their maximum sockets (2026-11-17, slots 5 and 2, HD and legacy, background input)
 
@@ -720,6 +1076,64 @@ Status 2026-10-21: the full smoke passes in background mode while the user worke
 never entered the game window, the game window was never the foreground window (sampled every 25 ms), and D2R's
 `SetCursorPos` never reached the system.
 
+### Linux window control (tools/game_ctl_linux.py, tools/wctl, lane linctl, 2026-11-20)
+
+On Linux the game runs under Proton in a slot's own prefix (game_slots' Linux backend, "Linux slots" below). When that
+backend is active, `game_ctl.py` calls `game_ctl_linux.install(globals())` at the end of the module: its window
+functions (find, size, keys, mouse, virtual input block, console, D2RLoader notice, screenshots, start, stop) are
+swapped for Linux twins. The Windows code of game_ctl.py is unchanged, and everything else (smoke scenario, logs,
+harness file, `hcmd`) is the same code on both systems.
+
+- **Private display, never the owner's desktop.** On the desktop (`:0`) the loader's notice dialog and the game window
+  took the keyboard focus whatever the prefix's Wine settings (`UseTakeFocus=N`; lanes linslots and wineinput). So
+  `start` runs every game on its own Xvfb display (`linux_window.PrivateDisplay`: the first free `:N` from `:100`,
+  `MXL_XVFB_SCREEN`, default 1920x1080) with `linux_window.PRIVATE_ENV`:
+  `MESA_VK_WSI_DEBUG=sw` (Mesa's CPU-copy present; Xvfb has no DRI3) **and**
+  `VKD3D_DISABLE_EXTENSIONS=VK_KHR_present_wait,VK_KHR_present_wait2`. With `sw` alone the frame stays black and the
+  game's UI thread stalls: vkd3d-proton paces frames with present_wait, and those waits never end there. Measured on slot 5,
+  D2R 3.4.95032, plugin 0.1.26, 2026-11-20:
+
+  | Run (`/d2work/runs/linctl/`) | Private display setup | Frames |
+  |-|-|-|
+  | `x1-both` | sw, Present extension off, immediate present | black (mean luminance 0.7 out of 255) |
+  | `x2-both-nowait` | as x1 + present_wait hidden | Blizzard intro at +15 s, Gamma Calibration from +30 s |
+  | `x3-nowait` | sw + present_wait hidden (Present on, FIFO) | same as x2: this is the setting used |
+  | `c1` | `game_ctl start` / `shot` / `click` / `stop` | intro, then Gamma Calibration, 1600 x 900 window-only shots |
+
+  The display and its Xvfb pid are kept in the run's `state.json`, so later `game_ctl` commands of the run use the same
+  display; `stop` ends that Xvfb (checked by its command line first). No command ever uses the owner's display: without
+  the run's private display there is no helper and no capture.
+- **Owner focus watch.** `start` polls the owner's `_NET_ACTIVE_WINDOW` (`game_slots.FocusWatch` on the display the tool
+  was started on) from before the launch; `stop` or the end of the process writes `focus.json` to the run folder and
+  logs the summary (`FOCUS STOLEN` on a grab). Every run above: the owner's active window never changed (x1 525 polls,
+  x2 507, x3 506, c1 397).
+- **Helper `wctl.exe`** (source `tools/wctl/wctl.c`) runs inside the slot's prefix on the private display, so it shares
+  the game's wineserver: window handles, Windows process ids and the plugin's named input block are the game's own.
+  Build it with `tools/wctl/build.sh [OUT_DIR]` (clang-19 targeting x86_64-pc-windows-msvc, lld-link-19, headers and
+  libs from the msvc-wine tree in `MSVC_ROOT`, default `/d2work/toolchains/msvc`; static CRT, imports only user32 and
+  kernel32; byte-identical from build to build). Default output `tools/wctl/wctl.exe` (`*.exe` is never committed), where game_ctl
+  and `slot_share.window_helper` look; `MXL_WCTL` names another. game_ctl keeps one `wine wctl.exe serve` per run open:
+  one TAB-separated request per line (`find`, `rect`, `pos`, `post`, `mapvk`, `windows`, `buttons`, `procs`,
+  `vopen`/`vget`/`vset`/`vtext`; see the header of wctl.c). Every request that changes something and its answer go to
+  `game_ctl.log` (`wctl: post ...`). A request without an answer in 20 s ends the helper with an error instead of
+  hanging the run (a synchronous SetWindowPos on the busy game thread hung a run once; the helper now always uses
+  SWP_ASYNCWINDOWPOS). `stop` closes the helper before it waits for the prefix to go idle.
+- **Nothing activates, raises or focuses a window**: the helper has no SetForegroundWindow / SetActiveWindow /
+  SetFocus / ShowWindow / SendInput / SetCursorPos; its `pos` always adds SWP_NOACTIVATE and turns any z-order but
+  HWND_BOTTOM into SWP_NOZORDER. D2RLoader's 3.4 notice is answered by a posted TDM_CLICK_BUTTON (under Wine its
+  "Don't remind me" check box is a Button too, so only push buttons count), the game is closed by a posted WM_CLOSE.
+- **Processes**: `game_pids()` returns Wine's (Windows) pids of the slot's loader, from the helper; it asks Wine only
+  when `game_slots.game_pids` (/proc) shows the loader running. A game that does not close on WM_CLOSE is ended with
+  `game_slots.stop_prefix` (wineserver -k on that prefix only).
+- **Screenshots** come from the private display only: the game window's own X pixmap (XComposite; PrintWindow is black
+  under Wine, WineHQ bug 46257) cut to the client size, else that display's root cut to the client rect.
+- **Background only**: `--foreground` / `MXL_INPUT=sendinput` is refused on Linux.
+- **Input**: with lane wineinput's plugin fix (f3eb646, Proton's stubs hook) clicks, keys, typed text and the harness
+  console work on the private display (lane linharness, "Linux game runs" below). Plugin 0.1.26 as released hooks no input
+  under Proton.
+
+Tests: `tools/test_game_ctl_linux.py` (no game, Wine or X needed: a fake helper and a fake `wctl serve`).
+
 ### Parallel slots: up to five games at once (tools/game_slots.py, tools/parallel_smoke.py)
 
 A slot is a full copy of D2R 3.3 build 93847 with D2RLoader and the mod, its own save folder and its own run lock.
@@ -951,6 +1365,158 @@ Load, 3 games at once (par-3way-2): machine CPU 26% mean, 57% peak of 32 logical
 33-38 GB with no game); GPU engines (all processes, summed) 53% mean, 99% peak. Per game (par-2way-9, two games): about
 1.5 cores on average and 6.6 cores at the startup peak (the txt compile), 6.6-7.2 GB RAM, 4.1-4.5 GB VRAM, GPU 17-21%
 mean (28-57% peak). The RX 9070 XT (16 GB) has room for three; RAM is the thing to watch (about 7 GB per game).
+
+### Linux slots (tools/game_slots.py, tools/slot_share.py, lane linslots, 2026-11-20)
+
+On Linux the slot tools use a second backend. It is picked by platform; env `MXL_SLOT_BACKEND=windows|linux` overrides it,
+and `game_slots.backend(name)` does the same in tests. The Windows code path is unchanged. The Windows-rule tests pin
+the Windows backend, and the Linux classes in `test_game_slots.py` / `test_slot_share.py` switch to Linux themselves.
+
+- **Slots**: only 2 and 5 exist (lane slotcap added 6 and 7, copies of 5; see "Lane slotcap"). Each is a D2R 3.4 + D2RLoader 1.3.1 + mod folder that runs under Proton Experimental in its
+  own prefix. Slots 1, 3 and 4 are refused with "does not exist on Linux". The table is in one place, `game_slots.linux_slot(n)`:
+  game folder `/d2work/slots/sN` (drive `D:` of the prefix), `STEAM_COMPAT_DATA_PATH` `/d2work/prefixes/sN` (Wine
+  prefix `<that>/pfx`), snapshot `/d2work/slots/.snap-sN`. Override with machine.json `"linux_slots": {"N": {"dir", "compat",
+  "snapshot"}}` or env `MXL_SLOTn_DIR` / `MXL_SLOTn_COMPAT` / `MXL_SLOTn_SNAPSHOT`. Proton: env `MXL_PROTON`, machine.json
+  `proton_dir`, else Steam's default. Saves: `<prefix>/drive_c/users/steamuser/Saved Games/Diablo II Resurrected/mods/mxl2012-sN`.
+- **machine.json**: the slot tools still refuse to run without `shared_lock_dir` and the protected folders. On Linux
+  `shared_lock_dir` is `/d2work/slots/locks`. The lock folders `game.lock.N/owner.txt` (`<owner> pid=<pid> <time>`) are the
+  same format as the earlier prototype `linslot.py` uses, so both tools see each other's locks.
+- **Processes**: read from `/proc`. A Wine process's argv[0] is its Windows image path, and its `WINEPREFIX` plus the
+  prefix's `dosdevices` links map that path to the Linux file, so `slot_processes(game)` works as on Windows.
+  `pid_alive` checks `/proc/<pid>`. Before this, every lock with a pid looked stale on Linux. D2RLoader 1.3.1 on 3.4 runs
+  the game inside its own process, so `D2RLoader-sN.exe` is the game pid. There is no separate `D2R.exe`.
+- **Snapshot**: the run snapshot is the whole slot folder, not only `d2rloader/config`. rsync copies every file except
+  the CASC archives `Data/data/data.NNN`; the archives get a size + mtime manifest. `Data/` small files are included: the
+  game rewrites `Data/data/*.idx` and `shmem`, and D2RLoader writes `Data/hd/objects/dummy/d2rloader_stash_proxy.json`.
+  The pending manifest sits beside the snapshot (`/d2work/slots/.snap-sN.json`), so every checkout sees it. `end()`
+  rsyncs back with `--delete --checksum`, then checks with a checksum dry run, which must list nothing, plus the
+  archive manifest. A changed archive keeps the snapshot and stops. A pending `linslot.py` snapshot (`.snap-sN.data.json`)
+  makes `begin()` refuse.
+- **Launch**: `game_slots.launch(n, args)` makes drive D:, writes the no-focus settings below, and starts
+  `D:\D2RLoader-sN.exe args` with `proton run`. `stop_prefix(n)` runs `wineserver -k` for that prefix only.
+  `slot_share.py bootcheck N` does the whole run (snapshot, launch, D2RLoader's 3.4 notice, mod mount, game pid, close,
+  restore). It runs the game on a private Xvfb display (lane linctl, "Linux window control" above) and uses the Win32
+  helper (`tools/wctl/wctl.exe`, or `MXL_WCTL`) for the notice and for WM_CLOSE. It exits 1 on FAIL. `launch(n, args,
+  extra_env=...)` takes the private display's environment.
+- **No focus stealing** (owner rule): `launch()` writes `HKCU\Software\Wine\X11 Driver` `UseTakeFocus=N`,
+  `GrabPointer=N`, `GrabFullscreen=N` into the slot prefix's `user.reg`, and only while the prefix is idle.
+  `game_slots.FocusWatch` polls `xprop -root _NET_ACTIVE_WINDOW` every 0.2 s from before the launch. A change to a window
+  whose `_NET_WM_PID` is a process of the prefix (or whose WM_CLASS names an `.exe`) is a grab. bootcheck then stops the
+  run and fails it. **Measured 2026-11-20 on slot 5: these settings are not enough.** The loader's first window took
+  focus at 2.8 s on xfwm4 (mxl2012-runs/linslots/REPORT.md). So no game runs on the owner's desktop: game_ctl and
+  bootcheck run it on a private display, and the FocusWatch on the owner's display stays as the check (lane linctl:
+  no change of the owner's active window in any private-display run).
+- **Functions for the window layer** (game_ctl on Linux): `slot_dir`, `compat_dir`, `prefix_dir`, `save_root`,
+  `wine_env`, `proton_cmd`, `wine_cmd`, `windows_path`, `ensure_drive`, `game_pids`, `prefix_pids`, `launch`,
+  `stop_prefix`, `wait_prefix_idle`, `apply_launch_settings`, `FocusWatch`.
+- **Install**: `MXL_RUN=<owner> python tools/game_slots.py install 5` runs `install_mod.py` as on Windows. It needs
+  `work/mod/data` and the plugin DLLs. Text files written on Linux have LF line ends instead of CRLF.
+
+### Linux game runs (lane linharness, 2026-11-20)
+
+Scripted checks run on Linux end to end, as they did on Windows: `game_checks.py all mxl2012` PASS on slot 5 (D2R 3.4.95032,
+D2RLoader 1.3.1, Proton Experimental 11.0), from launch through calibration, intro, main menu, a new character and back
+out, with the owner's focus untouched.
+
+**One-time setup per slot** (already done for slots 2 and 5):
+- The slot folder and prefix as in "Linux slots" above; the mod and plugins installed with
+  `MXL_RUN=<owner> MXL_PLUGIN=... MXL_DRAWCAP=... MXL_STATBOOK=... python tools/game_slots.py install N` (the DLLs from
+  `build_plugins_linux.sh`; `install` needs `work/mod/data`).
+- The Win32 helper: `tools/wctl/build.sh`.
+- **Battle.net cookie.** D2R asks for the 30-day online check unless D2RLoader can decrypt the owner's `cookie.bin`
+  (`<prefix>/drive_c/users/steamuser/AppData/Local/Blizzard Entertainment/ClientSdk/`, copied by the coordinator with the
+  owner's approval; tools never read, copy or print it). Its key comes from the **volume serial** of the loader's drive and
+  the prefix's **MachineGuid** (`HKLM\Software\Microsoft\Cryptography`). Measured with the harness word `diag`
+  (2026-11-20): Wine gives a drive without `.windows-serial` the serial of its letter (`vol` in the slot prefix: C:
+  `4300-0000`, D: `4400-0000`), and `volserial` makes D: report C:'s, so the serial already matches the owner's prefix.
+  The MachineGuid did not: every prefix gets its own, and D2RLoader's decrypt threw `Botan::Decoding_Error`, after which
+  the game showed the "not been online in the last 30 days" dialog after the intro (OK quits). So each slot prefix's
+  `system.reg` carries the owner prefix's MachineGuid (set once, prefix idle, the old file kept in the lane's run folder;
+  never logged or committed: compare by hash). The slot snapshot and restore cover the slot folder, not the prefix, so
+  this stays. With it the cookie decrypts and the main menu follows the intro.
+
+**A run** (`game_checks.py` or `game_ctl.py`, nothing to start by hand; the shared `mxl2012-runs/machine.json` has the
+Linux lock folder `/d2work/slots/locks`):
+
+    MXL_SLOT=5 MXL_RUN=<lane> MXL_RUNS=/d2work/runs/<lane>/runs MXL_CHAR=<Name> MXL_CHAR_CLASS=barbarian \
+        /d2work/venv/mxl2012/bin/python tools/game_checks.py all mxl2012
+
+lock, whole-slot snapshot, a private Xvfb display (`:100` up), owner focus watch, launch, D2RLoader's notice, the checks,
+WM_CLOSE (`wineserver -k` on this prefix only if the game stays), slot logs copied out, slot restored and checked
+byte-equal, unlock, `focus.json` written; also on failure.
+
+| Env | What |
+|-|-|
+| `MXL_SLOT` | 2 or 5 (the Linux slots) |
+| `MXL_RUN` / `MXL_RUNS` | lock owner and run folder name / where run folders go (keep them on `/d2work`) |
+| `MXL_CHAR`, `MXL_CHAR_CLASS` | the lane's own test character (made through Create New when the slot has none) |
+| `MXL_HARNESS_WORDS` | harness words instead of `volserial tag=sN` (written as given; fake focus only with `fakefocus`) |
+| `MXL_KEEP_RUN_FILES` | `1`: no run cleanup at the end of a Linux `game_checks` run (`tools/run_cleanup.py`) |
+| `MXL_XVFB_SCREEN` | private display size (1920x1080) |
+| `MXL_WCTL` | another `wctl.exe` |
+
+**What changed for Linux** (game_ctl_linux, game_checks):
+- **No fake focus on the private display.** The game may hold the focus of its own Xvfb display (the owner's focus is not
+  there). With the plugin's fake focus on, the game hung at "Initializing graphics context (15/24)" on Xvfb in every try
+  (runs r2, r3 control). Lane linharness added `nofakefocus` to the harness words; since lane linfix the plugin keeps fake
+  focus off unless the word `fakefocus` is given, and the words are written unchanged.
+- **Slot logs kept.** The whole-slot restore deletes what the run wrote, logs included. `stop()` copies d2rloader's logs and
+  crash reports, the mod's logs, the harness logs and console file into `<run>/slot-logs-N/` first and points logscan and
+  `console_text` at the copies.
+- **Watchdog**: the owner's cursor can never be in the game window (another X display), so `game_checks`' watchdog reads the
+  owner focus watch instead; a grab by a game window aborts the run. `game_private_mb` reads `/proc/<pid>/smaps_rollup`;
+  `hc_hold` posts through `g.post_message` (no direct user32 calls on the run path).
+- **`diag` works under Wine** (plugin fix): its logger asked the loader for module names while holding its own lock, and
+  a thread loading a DLL waits for that lock while holding the loader lock; the game hung at graphics init.
+
+**Input measured** (slot 5, runs `/d2work/runs/linharness/runs/r*`, `checks-*`): harness clicks pass Gamma, Screen Space and
+Color Blind Calibration; posted keys move the Screen Space corners (Down x 6) and skip the intro (Esc held 3 s); the name
+typed on the hero screen is the save's name (`LinHarn`); the harness console runs `mxl2012` (10 KB of output) and `h state`
+answers in a game. Two keys can change the slot prefix's saved settings (`Settings.json` in the save folder, outside the
+slot snapshot): a Screen Space test with Down moved the Continue button of the next run's calibration screens.
+
+**Focus measurement**: every run polls `xprop -root _NET_ACTIVE_WINDOW` on the owner's display from before the launch
+(`game_slots.FocusWatch`, 0.2 s) and writes `focus.json`; across the 16 lane runs it never went to a game window.
+
+**Seen, not fixed**: each launch writes one D2R "last-resort crash report" for a first-chance access violation inside a
+Wine module (address range 0x6fff...); the game runs on. The calibration screens come back on every launch. (Lane linfix:
+the module was Stat Book, not Wine, and it is fixed; the frames were cut by the window placement. See "Lane linfix".)
+
+Tests: `tools/test_game_ctl_linux.py` (harness words, slot logs, post_message), `tools/tests/test_game_checks_linux.py`
+(watchdog, private memory, no user32 on the run path, the two plugin source fixes).
+
+### Lane gpugate: GPU gate on Linux
+
+`python -m hdkit.gpugate` from `tools/` prints one reading. The gate checks slot locks from machine.json's
+`shared_lock_dir` first. On Linux it reads `/sys/class/drm/card*/device/gpu_busy_percent`, takes the median of five
+samples of the busiest card, and divides the one-minute system load average by the logical CPU count. At the default
+limits, a job waits when GPU use reaches 20% or normalized CPU load reaches 60%. The Windows backend uses `typeperf`.
+`tools/tests/test_hdkit_gpugate_linux.py` covers the Linux readings and decisions with fake inputs.
+
+### hdkit in-game sign-off on Linux (tools/hdkit/signoff, lane viewerlinux, 2026-11-20)
+
+`python -m hdkit.signoff all|prep|run|views <token>` compares a 3D unit in the offline viewer with the same unit in the
+game. Its game run picks its backend at run time (`hdkit.signoff.config.backend`: by platform, or `backend` in the
+settings):
+- **Linux**: `run.run_linux` uses this repo's slot tools. `game_checks.py --slot N all signoff` (through
+  `signoff/gamecheck.py`) takes the slot lock, `game_ctl` takes the whole-slot snapshot, and then the new
+  `game_ctl.PRE_LAUNCH` hook lays the plan into the slot (`signoff_plan.json` in the run folder). The plan is the unit's
+  overlay, `monsters.json` and `model_lod_desc.bin` made from the installed mod's own files, and the dev plugin. The game
+  then runs on a private Xvfb display, and frames are captured from that display only. Stop, the whole-slot restore
+  (verified byte-equal; copied as `slot-restore.json` beside the shots) and the unlock follow, also when the run fails.
+  The owner's focus is watched (`focus.json`).
+- **Windows**: unchanged. The heavy lock runs `run.py`, which runs monster3d's `g6_gamerun.py` with `dll=1`.
+
+Settings (no project names in `signoff/`): defaults, then `tools/hdkit_site.py signoff_settings()` (units by token, slots
+2/5, lock holder, evidence places, framework paths), then machine.json `hdkit_signoff` (same keys), then a JSON file
+(`--config` or `HDKIT_SIGNOFF_CONFIG`). The runs root comes from `localconfig.runs_dir()`. The art store comes from
+`MXL_ART_STORE`, else machine.json `art_store`. `m3d_ev` (the monster stages) is the monster3d setting: `MXL_M3D_DIR`, else
+machine.json `m3d_dir` (`hdkit_signoff.m3d_ev` still overrides). On Windows the run uses this checkout's own
+`g6_gamerun.py` and `game_checks.py` (the monster lanes are merged here), not sibling worktrees.
+
+The harness verb `facing <monster id>` (the unit's path direction, key, mode and spots) is in the dev plugin (from lane
+hdtools-monster, with `sprite_dir_logic.h`). On Linux the plan lays the dev build over the slot's plugin for the run
+(`--dll` or `linux.dev_plugin`).
 
 ### Test what players get: a release install (tools/release_install.py)
 
@@ -8664,3 +9230,32 @@ Damage off; slot restored and verified byte-equal after every launch, install un
 War Cry and Shock Wave are not in Median's skills.txt. Earlier launches in this round: lane/bugs127's own harness DLL closed at the
 intro (`checks-20261121-044922-s2`, `-045044-s2`, and with `stunlen` off `-045153-s2`); lane relsmoke's harness DLL entered the game
 (`-045251-s2`, Blink L3 stunned), so the test DLL was built with relsmoke's Linux `testharness.cpp` (harness only).
+
+## Lane hdtools-monster: a Median monster's classic sprite as an HD unit (2026-11-17, slot 2, HD and legacy, background input)
+
+Prototype, not shipped: nothing here is in the mod's build. `tools/monster_sheet.py` reads a monster's classic art (COF, DCC,
+contact sheets), `tools/monster_card.py` builds one frame as a camera-facing card (an HD unit of its own: model, textures,
+unit JSON, `monsters.json` row, `model_lod_desc.bin` record), `tools/monster_flipbook.py` builds every frame of the chosen
+modes as cards on one mesh and atlas, shown and hidden by bones with the game's own clips and state machine, and
+`tools/monster_upscale.py` makes the frames larger (colour bled outward and scaled by a method, alpha by Lanczos and a soft
+threshold or, with `+shape`, through the scaler too).
+
+The check `mon_card` (`tools/game_checks.py`) spawns each monster of `MXL_MONCARD_IDS` (default `hardliner`) next to a tanked
+character in area `MXL_MONCARD_AREA` (default 2, the Blood Moor) in every mode of `MXL_MONCARD_MODES` (default `hd,legacy`),
+takes shots (`moncard_<id>_<mode>[_o<i>]_{spot,near,fight,burst<n>,death}.png`) and reports the engine asserts raised while
+the monster was on screen, the render fps (needs `MXL_DRAWCAP_PROBE=1`) and the private MB. `MXL_MONCARD_BURST=n` adds n
+shots in a row, `MXL_MONCARD_OFFSETS="8,-8;-8,8"` spawns at several sub-tile offsets, `MXL_MONCARD_SPREAD=1` gives the n-th
+monster the n-th offset (no corpse of an earlier monster under the next). Whether HD shows the classic art is judged by hand
+on the shots, so the check never reports PASS.
+
+| What | Result |
+|-|-|
+| Static card of one frame (Hardliner, monstats Id `hardliner`, token `~k`) | In game: the classic art stands in HD, 0 asserts, 68.6 fps (baseline 68.6) |
+| Animation per mode from data only (NU, WL, A1, GH, DT; one direction) | In game: the modes play at the classic frame time, 0 asserts, 67.5 fps |
+| Upscaled cards, 2x and 4x (Real-ESRGAN x4plus, `+shape`) | In game: sharper than 1x; 2x and 4x nearly equal at 1600x900; 0 asserts, 66.7 to 67.5 fps |
+| Direction (8 facings) from data | Fails: the fan of turned-back one-sided cards shows 3 to 4 cards at once, leaning the cards smears the art, the aim layer draws every direction (aimTarget 0, 1, 2, 4) |
+| Brightness against classic | Not fixed: the card is lit like any model (about 65% of the sprite's value next to the player); `--gain` lifts it linearly and clips the highlights; `EmissiveIntensity` 4 and 20 changed nothing visible |
+
+`BC_ASSERT: outAnimationTimeElapsed >= 0.0f (animation_controller.cpp:456)` came once for some monsters spawned after the
+first one of a run (never for the first); cause unknown. A state for mode `sq` without a skill raises
+`skillIndex != INVALID_SKILL (unit_animation_state_machine.cpp:370)`, so the state machine has none.

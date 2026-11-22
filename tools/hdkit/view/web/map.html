@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map viewer</title>
+<style>
+  :root { --bg: #16171b; --panel: #202228; --line: #34373f; --text: #e4e4e7; --muted: #9a9ca5; --accent: #e0b050; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; }
+  #bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel);
+         border-bottom: 1px solid var(--line); }
+  #bar label { color: var(--muted); }
+  input, select, button { background: #2a2d35; color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+                          padding: 3px 6px; font: inherit; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  #map { width: 260px; }
+  #main { position: absolute; top: 44px; left: 0; right: 340px; bottom: 0; }
+  #cv { width: 100%; height: 100%; display: block; cursor: grab; }
+  #side { position: absolute; top: 44px; right: 0; width: 340px; bottom: 0; overflow: auto; background: var(--panel);
+          border-left: 1px solid var(--line); padding: 8px 10px; }
+  h3 { margin: 10px 0 4px; font-size: 13px; color: var(--accent); }
+  pre { white-space: pre-wrap; word-break: break-all; font: 11px/1.35 ui-monospace, monospace; margin: 0; color: #cfd0d6; }
+  .muted { color: var(--muted); }
+  #status { color: var(--muted); margin-left: auto; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+  details summary { cursor: pointer; color: var(--muted); }
+  @media (max-width: 800px) { #main { right: 0; bottom: 45%; } #side { top: auto; height: 45%; width: 100%; } }
+</style>
+</head>
+<body>
+<div id="bar">
+  <input id="map" list="maps" placeholder="act1/cathedrl/cathy3">
+  <datalist id="maps"></datalist>
+  <select id="source"><option>auto</option><option>mod</option><option>d2r</option></select>
+  <input id="work" placeholder="working copy (optional)" style="width:150px">
+  <button id="load">Load</button>
+  <label><input type="radio" name="mode" value="classic" checked> classic</label>
+  <label><input type="radio" name="mode" value="hd"> HD</label>
+  <label><input type="radio" name="mode" value="overlay"> overlay</label>
+  <input id="alpha" type="range" min="0" max="100" value="50" title="HD opacity in overlay">
+  <label><input id="grid" type="checkbox"> grid</label>
+  <input id="clayers" placeholder="classic layers e.g. -roof,+walk" style="width:170px">
+  <button id="fit">Fit</button>
+  <span id="status"></span>
+</div>
+<div id="main"><canvas id="cv"></canvas></div>
+<div id="side">
+  <div class="muted">Drag: pan | wheel: zoom | click: cell info | shift+drag: select a region</div>
+  <h3>Map</h3><pre id="mapinfo">-</pre>
+  <h3>Region</h3>
+  <div id="region" class="muted">none (shift+drag on the map)</div>
+  <div class="row">
+    <button id="shot">Save view of region</button>
+  </div>
+  <div class="row">
+    <select id="rkind"><option>classic</option><option>hd</option><option>sheet</option></select>
+    <label>scale <input id="rscale" value="1" size="3"></label>
+    <button id="render">Render region</button>
+  </div>
+  <div id="rlink" class="muted"></div>
+  <h3>Cell</h3>
+  <div id="cellsum" class="muted">click a cell</div>
+  <details><summary>raw JSON</summary><pre id="cellraw"></pre></details>
+</div>
+<script src="map.js"></script>
+</body>
+</html>

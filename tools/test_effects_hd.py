@@ -253,6 +253,7 @@ class Picks(unittest.TestCase):
         with self.assertRaises(SystemExit):                                          # unknown effect is an error
             e.hand_pick(picks, "missile", m, [], False)
 
+    @unittest.skipUnless(e.HDO.is_dir() and e.HDM.is_dir(), "needs the D2R baseline extraction (fxpaths.D2R: MXL_D2R_EXTRACT)")
     def test_committed_picks_resolve(self):
         """Every committed pick names an effect D2R has (or an authored one, data/hd-effects-authored.json, built on one D2R
         has) and an art file of the mod or the base game."""
@@ -269,6 +270,7 @@ class Picks(unittest.TestCase):
             self.assertTrue(any((root / rel).exists() for root in (fxpaths.MXL, fxpaths.D2R_DATA / "global")),
                             f"{kind} {art}: no art file")
 
+    @unittest.skipUnless(e.HDO.is_dir() and e.HDM.is_dir(), "needs the D2R baseline extraction (fxpaths.D2R: MXL_D2R_EXTRACT)")
     def test_overlay_picks_not_empty(self):
         """No overlay pick names one of D2R's empty HD stubs (bug #507: it draws nothing in HD)."""
         picks = e.load_picks(fxpaths.PICKS_TSV)

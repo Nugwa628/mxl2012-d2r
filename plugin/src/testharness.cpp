@@ -6,6 +6,7 @@
 // (checked byte for byte before patching, nothing rip-relative in the 16 bytes that are copied). The first 14 bytes
 // become `jmp [rip+0]; dq hook`, the trampoline holds the copied 16 bytes and a jump back to stub+16.
 #include "testharness.h"
+#include "testharness_logic.h"
 
 
 #include <windows.h>
@@ -98,9 +99,9 @@ void Note(Stat* stat, uint64_t a0 = 0, uint64_t a1 = 0, uint64_t a2 = 0, uint64_
 	X(NtUserGetCursorInfo) X(NtUserGetRawInputData) X(NtUserGetRawInputBuffer)                \
 	X(NtUserGetAsyncKeyState) X(NtUserGetKeyboardState) X(NtUserGetMessage) \
 	X(NtUserGetPointerInfoList) X(NtUserMapWindowPoints) X(NtUserRegisterRawInputDevices)      \
-	X(NtUserGetMouseMovePointsEx) X(NtUserGetForegroundWindow) X(NtUserGetKeyNameText) X(NtUserSetCapture)          \
-	X(NtUserGetGUIThreadInfo) X(NtUserGetClipCursor) X(NtUserSetCursor) X(NtUserGetKeyboardLayout) \
-	X(NtUserGetPointerDevices) X(NtUserGetTouchInputInfo) X(NtUserGetCapture) X(NtUserSetWindowsHookEx) X(NtUserSetFocus) X(NtUserSetWindowPos) X(NtUserSetWindowLongPtr) X(NtUserSetWindowLong)
+	X(NtUserGetMouseMovePointsEx) X(NtUserGetKeyNameText) X(NtUserSetCapture)          \
+	X(NtUserGetClipCursor) X(NtUserSetCursor) X(NtUserGetKeyboardLayout) \
+	X(NtUserGetPointerDevices) X(NtUserGetTouchInputInfo) X(NtUserGetCapture) X(NtUserSetWindowsHookEx) X(NtUserSetWindowPos) X(NtUserSetWindowLongPtr) X(NtUserSetWindowLong)
 
 #define DECLARE(name)                                                                                               \
 	Stat g_stat_##name;                                                                                             \
@@ -113,7 +114,8 @@ void Note(Stat* stat, uint64_t a0 = 0, uint64_t a1 = 0, uint64_t a2 = 0, uint64_
 HARNESS_FUNCTIONS(DECLARE)
 #undef DECLARE
 
-#define HARNESS_ALL(X) HARNESS_FUNCTIONS(X) X(NtUserGetCursorPos) X(NtUserGetKeyState) X(NtUserSetCursorPos) X(NtUserClipCursor) X(NtUserSetForegroundWindow) X(NtUserPeekMessage) X(NtUserTrackMouseEvent) X(NtUserShowWindow) X(NtUserSetActiveWindow) X(NtUserCreateWindowEx)
+#define HARNESS_ALL(X) HARNESS_FUNCTIONS(X) X(NtUserGetCursorPos) X(NtUserGetKeyState) X(NtUserSetCursorPos) X(NtUserClipCursor) X(NtUserSetForegroundWindow) X(NtUserPeekMessage) X(NtUserTrackMouseEvent) X(NtUserShowWindow) X(NtUserSetActiveWindow) X(NtUserCreateWindowEx) \
+	X(NtUserGetForegroundWindow) X(NtUserGetGUIThreadInfo) X(NtUserSetFocus)
 
 // Virtual input, shared with tools/game_ctl.py through the mapping "Local\mxl2012-testharness-input-<game PID>". While `active` is
 // set, GetCursorPos returns the virtual client position (as screen coordinates of the game window), and GetKeyState
@@ -394,6 +396,96 @@ int64_t H_NtUserSetActiveWindow(uint64_t a, uint64_t b, uint64_t c, uint64_t d, 
 	return g_orig_NtUserSetActiveWindow(a, b, c, d, e, f, g, h, i, j, k, l);
 }
 
+// Fake focus (testharness_logic.h WantFakeFocus; only with the mode word "fakefocus"): the game believes it is the active, focused window
+// while the owner's window keeps the real focus. Its window procedure is subclassed once the window exists
+// (FocusThread): WM_ACTIVATEAPP(FALSE), WM_ACTIVATE(WA_INACTIVE) and WM_KILLFOCUS are dropped, and it gets one
+// WM_ACTIVATEAPP(TRUE) + WM_SETFOCUS; GetForegroundWindow / GetFocus / GetActiveWindow answer the game window and the
+// game's own SetFocus stays inside (under Wine a real SetFocus can ask the window manager for the X focus).
+bool g_fakeFocus = false;
+WNDPROC g_gameProc = nullptr;
+volatile LONG g_focusDropped = 0;
+volatile LONG g_focusSubclassed = 0;
+
+auto FakeFocusNow() noexcept -> bool {
+	return g_fakeFocus && g_shared != nullptr && g_shared->active != 0;
+}
+
+LRESULT CALLBACK FocusProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+	if (FakeFocusNow()) {
+		if ((message == WM_ACTIVATEAPP && wParam == FALSE) || (message == WM_ACTIVATE && LOWORD(wParam) == WA_INACTIVE) ||
+		    message == WM_KILLFOCUS) {
+			InterlockedIncrement(&g_focusDropped);
+			return 0;
+		}
+	}
+	return CallWindowProcW(g_gameProc, window, message, wParam, lParam);
+}
+
+DWORD WINAPI FocusThread(LPVOID) noexcept {
+	while (g_running != 0) {
+		const HWND window = GameWindow();
+		if (window != nullptr) {
+			Sleep(500);  // let the game finish setting up its own window procedure
+			g_gameProc = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(window, GWLP_WNDPROC));
+			if (g_gameProc != nullptr &&
+			    SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&FocusProc)) != 0) {
+				g_focusSubclassed = 1;
+				DWORD_PTR result = 0;
+				SendMessageTimeoutW(window, WM_ACTIVATEAPP, TRUE, 0, SMTO_ABORTIFHUNG, 1000, &result);
+				SendMessageTimeoutW(window, WM_SETFOCUS, 0, 0, SMTO_ABORTIFHUNG, 1000, &result);
+			}
+			return 0;
+		}
+		Sleep(250);
+	}
+	return 0;
+}
+
+Stat g_stat_NtUserGetForegroundWindow;
+Fn g_orig_NtUserGetForegroundWindow = nullptr;
+int64_t H_NtUserGetForegroundWindow(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e, uint64_t f, uint64_t g,
+                                    uint64_t h, uint64_t i, uint64_t j, uint64_t k, uint64_t l) {
+	Note(&g_stat_NtUserGetForegroundWindow, a, b, c, d);
+	if (FakeFocusNow()) {
+		if (const HWND window = GameWindow(); window != nullptr) {
+			return reinterpret_cast<int64_t>(window);
+		}
+	}
+	return g_orig_NtUserGetForegroundWindow(a, b, c, d, e, f, g, h, i, j, k, l);
+}
+
+// NtUserGetGUIThreadInfo(thread id, GUITHREADINFO*): user32's GetFocus and GetActiveWindow go through it under Wine.
+Stat g_stat_NtUserGetGUIThreadInfo;
+Fn g_orig_NtUserGetGUIThreadInfo = nullptr;
+int64_t H_NtUserGetGUIThreadInfo(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e, uint64_t f, uint64_t g,
+                                 uint64_t h, uint64_t i, uint64_t j, uint64_t k, uint64_t l) {
+	Note(&g_stat_NtUserGetGUIThreadInfo, a, b, c, d);
+	const int64_t result = g_orig_NtUserGetGUIThreadInfo(a, b, c, d, e, f, g, h, i, j, k, l);
+	if ((result & 0xff) != 0 && b != 0 && FakeFocusNow()) {
+		const HWND window = GameWindow();
+		if (window != nullptr && GetWindowThreadProcessId(window, nullptr) == (a != 0 ? static_cast<DWORD>(a) : GetCurrentThreadId())) {
+			auto* info = reinterpret_cast<GUITHREADINFO*>(b);
+			info->hwndActive = window;
+			info->hwndFocus = window;
+		}
+	}
+	return result;
+}
+
+Stat g_stat_NtUserSetFocus;
+Fn g_orig_NtUserSetFocus = nullptr;
+int64_t H_NtUserSetFocus(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e, uint64_t f, uint64_t g, uint64_t h,
+                         uint64_t i, uint64_t j, uint64_t k, uint64_t l) {
+	Note(&g_stat_NtUserSetFocus, a, b, c, d);
+	if (FakeFocusNow()) {
+		const HWND window = GameWindow();
+		if (window != nullptr && (a == 0 || a == reinterpret_cast<uint64_t>(window))) {
+			return reinterpret_cast<int64_t>(window);  // the previous focus, as the game sees it
+		}
+	}
+	return g_orig_NtUserSetFocus(a, b, c, d, e, f, g, h, i, j, k, l);
+}
+
 // Top-level windows get WS_EX_NOACTIVATE so the game window never becomes the foreground window by itself (it is
 // created in front of the user's windows otherwise, for about a second). NtUserCreateWindowEx has 15 arguments.
 using Fn15 = int64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
@@ -459,16 +551,22 @@ void DiagLine(const char* kind, const wchar_t* name, int length, void* const* fr
 	if (g_diag == nullptr) {
 		return;
 	}
-	AcquireSRWLockExclusive(&g_diagLock);
-	std::fprintf(g_diag, "%s %.*ls extra=%llx", kind, name != nullptr ? length : 0, name != nullptr ? name : L"",
-	             static_cast<unsigned long long>(extra));
-	for (USHORT i = 0; i < n && i < 24; ++i) {
+	// The whole line is made before g_diagLock is taken: ModuleOf asks the loader (GetModuleHandleEx / GetModuleFileName),
+	// and under Wine that takes the loader lock. A thread that loads a DLL holds the loader lock and comes through the
+	// NtOpenSection / NtCreateSection hooks here; with the lookup inside g_diagLock the two threads waited for each other
+	// and the game hung at "Initializing graphics context" (lane linharness, Proton 11, 2026-11-20).
+	char line[1600];
+	int used = std::snprintf(line, sizeof(line), "%s %.*ls extra=%llx", kind, name != nullptr ? length : 0,
+	                         name != nullptr ? name : L"", static_cast<unsigned long long>(extra));
+	for (USHORT i = 0; i < n && i < 24 && used >= 0 && static_cast<size_t>(used) < sizeof(line); ++i) {
 		char module[64] = "?";
 		uint64_t offset = 0;
 		ModuleOf(frames[i], module, sizeof(module), &offset);
-		std::fprintf(g_diag, " | %s+0x%llx", module, static_cast<unsigned long long>(offset));
+		used += std::snprintf(line + used, sizeof(line) - static_cast<size_t>(used), " | %s+0x%llx", module,
+		                      static_cast<unsigned long long>(offset));
 	}
-	std::fprintf(g_diag, "\n");
+	AcquireSRWLockExclusive(&g_diagLock);
+	std::fprintf(g_diag, "%s\n", line);
 	std::fflush(g_diag);
 	ReleaseSRWLockExclusive(&g_diagLock);
 }
@@ -730,20 +828,18 @@ void H_CryptoBox(void* out, const char* data, int64_t length, void* pass) {
 	g_origCryptoBox(out, data, length, pass);
 }
 
+// Shapes found by Patch, for the report line (a Wine stub on Windows or the other way round would show here).
+int g_windowsStubs = 0;
+int g_wineStubs = 0;
+
 auto Patch(void* stub, void* hook, void** original) noexcept -> bool {
-	static const uint8_t Shape[16] = {0x4c, 0x8b, 0xd1, 0xb8, 0, 0, 0, 0, 0xf6, 0x04, 0x25, 0x08, 0x03, 0xfe, 0x7f, 0x01};
 	const auto* code = static_cast<const uint8_t*>(stub);
-	for (int i = 0; i < 16; ++i) {
-		if (i >= 4 && i < 8) {
-			continue;  // syscall number
-		}
-		if (code[i] != Shape[i]) {
-			return false;
-		}
-	}
-	if (code[16] != 0x75 || code[17] != 0x03 || code[18] != 0x0f || code[19] != 0x05 || code[20] != 0xc3 || code[21] != 0xcd ||
-	    code[22] != 0x2e || code[23] != 0xc3) {
+	if (code == nullptr) {
 		return false;
+	}
+	const harness_logic::StubShape shape = harness_logic::ClassifyStub(code);
+	if (shape == harness_logic::StubShape::Unknown) {
+		return false;  // another build of win32u / ntdll, or already hooked by someone else
 	}
 	auto* trampoline = static_cast<uint8_t*>(VirtualAlloc(nullptr, 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 	if (trampoline == nullptr) {
@@ -766,8 +862,202 @@ auto Patch(void* stub, void* hook, void** original) noexcept -> bool {
 	VirtualProtect(stub, 16, old, &old);
 	FlushInstructionCache(GetCurrentProcess(), stub, 16);
 	*original = trampoline;
+	++(shape == harness_logic::StubShape::Wine ? g_wineStubs : g_windowsStubs);
 	return true;
 }
+
+// Import fallbacks: when a win32u stub of the list below could not be hooked (another stub layout), the game exe's
+// import of the user32 function above it is redirected to a hook with the same behaviour as the stub hook. Only the
+// game's own calls pass through an import hook (not user32's internal ones), which is what the virtual input needs.
+#define IMPORT_HOOK_STAT(name) Stat g_istat_##name;
+#define IMPORT_FALLBACKS(X)                                                                                         \
+	X(GetCursorPos) X(SetCursorPos) X(ClipCursor) X(TrackMouseEvent) X(GetAsyncKeyState) X(GetForegroundWindow)   \
+	X(SetForegroundWindow) X(SetActiveWindow) X(ShowWindow) X(PeekMessageW) X(PeekMessageA) X(CreateWindowExW)       \
+	X(GetFocus) X(GetActiveWindow) X(SetFocus)
+IMPORT_FALLBACKS(IMPORT_HOOK_STAT)
+#undef IMPORT_HOOK_STAT
+
+using GetCursorPosFn = BOOL(WINAPI*)(LPPOINT);
+GetCursorPosFn g_imp_GetCursorPos = nullptr;
+BOOL WINAPI I_GetCursorPos(LPPOINT out) {
+	Note(&g_istat_GetCursorPos, reinterpret_cast<uint64_t>(out));
+	const BOOL result = g_imp_GetCursorPos(out);
+	if (g_shared != nullptr && g_shared->active != 0 && out != nullptr) {
+		const HWND window = GameWindow();
+		POINT pt {g_shared->x, g_shared->y};
+		if (window != nullptr && ClientToScreen(window, &pt) != 0) {
+			*out = pt;
+			return TRUE;
+		}
+	}
+	return result;
+}
+
+using SetCursorPosFn = BOOL(WINAPI*)(int, int);
+SetCursorPosFn g_imp_SetCursorPos = nullptr;
+BOOL WINAPI I_SetCursorPos(int x, int y) {
+	Note(&g_istat_SetCursorPos, static_cast<uint64_t>(x), static_cast<uint64_t>(y));
+	if (g_shared != nullptr && g_shared->active != 0) {
+		const HWND window = GameWindow();
+		POINT pt {x, y};
+		if (window != nullptr && ScreenToClient(window, &pt) != 0) {
+			g_shared->x = pt.x;
+			g_shared->y = pt.y;
+		}
+		return TRUE;
+	}
+	return g_imp_SetCursorPos(x, y);
+}
+
+using ClipCursorFn = BOOL(WINAPI*)(const RECT*);
+ClipCursorFn g_imp_ClipCursor = nullptr;
+BOOL WINAPI I_ClipCursor(const RECT* rect) {
+	Note(&g_istat_ClipCursor, reinterpret_cast<uint64_t>(rect));
+	if (g_shared != nullptr && g_shared->active != 0) {
+		return TRUE;
+	}
+	return g_imp_ClipCursor(rect);
+}
+
+using TrackMouseEventFn = BOOL(WINAPI*)(LPTRACKMOUSEEVENT);
+TrackMouseEventFn g_imp_TrackMouseEvent = nullptr;
+BOOL WINAPI I_TrackMouseEvent(LPTRACKMOUSEEVENT track) {
+	Note(&g_istat_TrackMouseEvent, reinterpret_cast<uint64_t>(track));
+	if (g_shared != nullptr && g_shared->active != 0) {
+		return TRUE;
+	}
+	return g_imp_TrackMouseEvent(track);
+}
+
+using GetAsyncKeyStateFn = SHORT(WINAPI*)(int);
+GetAsyncKeyStateFn g_imp_GetAsyncKeyState = nullptr;
+SHORT WINAPI I_GetAsyncKeyState(int vk) {  // traced only, as the win32u hook
+	Note(&g_istat_GetAsyncKeyState, static_cast<uint64_t>(vk));
+	return g_imp_GetAsyncKeyState(vk);
+}
+
+using GetForegroundWindowFn = HWND(WINAPI*)();
+GetForegroundWindowFn g_imp_GetForegroundWindow = nullptr;
+HWND WINAPI I_GetForegroundWindow() {
+	Note(&g_istat_GetForegroundWindow);
+	if (FakeFocusNow()) {
+		if (const HWND window = GameWindow(); window != nullptr) {
+			return window;
+		}
+	}
+	return g_imp_GetForegroundWindow();
+}
+
+using GetWindowFn = HWND(WINAPI*)();
+GetWindowFn g_imp_GetFocus = nullptr;
+GetWindowFn g_imp_GetActiveWindow = nullptr;
+HWND WINAPI I_GetFocus() {
+	Note(&g_istat_GetFocus);
+	const HWND window = FakeFocusNow() ? GameWindow() : nullptr;
+	return window != nullptr && GetWindowThreadProcessId(window, nullptr) == GetCurrentThreadId() ? window : g_imp_GetFocus();
+}
+HWND WINAPI I_GetActiveWindow() {
+	Note(&g_istat_GetActiveWindow);
+	const HWND window = FakeFocusNow() ? GameWindow() : nullptr;
+	return window != nullptr && GetWindowThreadProcessId(window, nullptr) == GetCurrentThreadId() ? window : g_imp_GetActiveWindow();
+}
+
+using SetFocusFn = HWND(WINAPI*)(HWND);
+SetFocusFn g_imp_SetFocus = nullptr;
+HWND WINAPI I_SetFocus(HWND target) {
+	Note(&g_istat_SetFocus, reinterpret_cast<uint64_t>(target));
+	if (FakeFocusNow()) {
+		const HWND window = GameWindow();
+		if (window != nullptr && (target == nullptr || target == window)) {
+			return window;
+		}
+	}
+	return g_imp_SetFocus(target);
+}
+
+using SetForegroundWindowFn = BOOL(WINAPI*)(HWND);
+SetForegroundWindowFn g_imp_SetForegroundWindow = nullptr;
+BOOL WINAPI I_SetForegroundWindow(HWND window) {
+	Note(&g_istat_SetForegroundWindow, reinterpret_cast<uint64_t>(window));
+	if (g_shared != nullptr && (g_shared->reserved & 1) != 0 && window == GameWindow()) {
+		return TRUE;
+	}
+	return g_imp_SetForegroundWindow(window);
+}
+
+using SetActiveWindowFn = HWND(WINAPI*)(HWND);
+SetActiveWindowFn g_imp_SetActiveWindow = nullptr;
+HWND WINAPI I_SetActiveWindow(HWND window) {
+	Note(&g_istat_SetActiveWindow, reinterpret_cast<uint64_t>(window));
+	if (g_shared != nullptr && (g_shared->reserved & 1) != 0) {
+		return nullptr;
+	}
+	return g_imp_SetActiveWindow(window);
+}
+
+using ShowWindowFn = BOOL(WINAPI*)(HWND, int);
+ShowWindowFn g_imp_ShowWindow = nullptr;
+BOOL WINAPI I_ShowWindow(HWND window, int show) {
+	Note(&g_istat_ShowWindow, reinterpret_cast<uint64_t>(window), static_cast<uint64_t>(show));
+	if (g_shared != nullptr && (g_shared->reserved & 1) != 0 && show == SW_SHOW) {
+		show = SW_SHOWNA;
+	}
+	return g_imp_ShowWindow(window, show);
+}
+
+void CountMessage(const MSG* msg) noexcept {
+	const uint32_t id = msg->message;
+	if (id < 0x400) {
+		InterlockedIncrement64(&g_msgCounts[id]);
+	}
+	if ((id >= 0x100 && id <= 0x105) || (id >= 0x200 && id <= 0x20a && id != 0x200)) {
+		const LONG pos = InterlockedIncrement(&g_ringPos) & 31;
+		g_ring[pos][0] = id;
+		g_ring[pos][1] = msg->wParam;
+	}
+}
+
+using PeekMessageFn = BOOL(WINAPI*)(LPMSG, HWND, UINT, UINT, UINT);
+PeekMessageFn g_imp_PeekMessageW = nullptr;
+PeekMessageFn g_imp_PeekMessageA = nullptr;
+BOOL WINAPI I_PeekMessageW(LPMSG msg, HWND window, UINT first, UINT last, UINT remove) {
+	Note(&g_istat_PeekMessageW, reinterpret_cast<uint64_t>(msg));
+	ServiceCommands();
+	const BOOL result = g_imp_PeekMessageW(msg, window, first, last, remove);
+	if (result != FALSE && msg != nullptr) {
+		CountMessage(msg);
+	}
+	return result;
+}
+BOOL WINAPI I_PeekMessageA(LPMSG msg, HWND window, UINT first, UINT last, UINT remove) {
+	Note(&g_istat_PeekMessageA, reinterpret_cast<uint64_t>(msg));
+	ServiceCommands();
+	const BOOL result = g_imp_PeekMessageA(msg, window, first, last, remove);
+	if (result != FALSE && msg != nullptr) {
+		CountMessage(msg);
+	}
+	return result;
+}
+
+using CreateWindowExWFn = HWND(WINAPI*)(DWORD, LPCWSTR, LPCWSTR, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, LPVOID);
+CreateWindowExWFn g_imp_CreateWindowExW = nullptr;
+HWND WINAPI I_CreateWindowExW(DWORD exStyle, LPCWSTR className, LPCWSTR title, DWORD style, int x, int y, int w, int h,
+                              HWND parent, HMENU menu, HINSTANCE instance, LPVOID param) {
+	Note(&g_istat_CreateWindowExW, exStyle, style);
+	if (g_shared != nullptr && (g_shared->reserved & 1) != 0 && (style & WS_CHILD) == 0) {
+		exStyle |= WS_EX_NOACTIVATE;
+	}
+	return g_imp_CreateWindowExW(exStyle, className, title, style, x, y, w, h, parent, menu, instance, param);
+}
+
+// The win32u stub each import stands in for: the import is tried only when that stub hook is not installed.
+struct ImportFallback {
+	const char* name;
+	const Stat* stub;
+	Stat* stat;
+	void* hook;
+	void** original;
+};
 
 void DumpTrace() noexcept {
 	char path[MAX_PATH];
@@ -776,25 +1066,28 @@ void DumpTrace() noexcept {
 	if (fopen_s(&f, path, "wb") != 0 || f == nullptr) {
 		return;
 	}
-#define DUMP(name)                                                                                                  \
-	if (g_stat_##name.label != nullptr) {                                                                            \
-		std::fprintf(f, "%s calls=%lld last args %llx %llx %llx %llx\n", g_stat_##name.label,                       \
-		             static_cast<long long>(g_stat_##name.calls),                                                   \
-		             static_cast<unsigned long long>(g_stat_##name.lastArgs[0]),                                    \
-		             static_cast<unsigned long long>(g_stat_##name.lastArgs[1]),                                    \
-		             static_cast<unsigned long long>(g_stat_##name.lastArgs[2]),                                    \
-		             static_cast<unsigned long long>(g_stat_##name.lastArgs[3]));                                   \
+#define DUMP_STAT(st)                                                                                                  \
+	if (st.label != nullptr) {                                                                            \
+		std::fprintf(f, "%s calls=%lld last args %llx %llx %llx %llx\n", st.label,                       \
+		             static_cast<long long>(st.calls),                                                   \
+		             static_cast<unsigned long long>(st.lastArgs[0]),                                    \
+		             static_cast<unsigned long long>(st.lastArgs[1]),                                    \
+		             static_cast<unsigned long long>(st.lastArgs[2]),                                    \
+		             static_cast<unsigned long long>(st.lastArgs[3]));                                   \
 		AcquireSRWLockShared(&g_lock);                                                                              \
-		for (int i = 0; i < g_stat_##name.callerCount; ++i) {                                                       \
+		for (int i = 0; i < st.callerCount; ++i) {                                                       \
 			char module[64] = "?";                                                                                  \
 			uint64_t offset = 0;                                                                                    \
-			ModuleOf(g_stat_##name.callers[i], module, sizeof(module), &offset);                                    \
-			std::fprintf(f, "    %lld x %s+0x%llx\n", static_cast<long long>(g_stat_##name.callerCalls[i]), module, \
+			ModuleOf(st.callers[i], module, sizeof(module), &offset);                                    \
+			std::fprintf(f, "    %lld x %s+0x%llx\n", static_cast<long long>(st.callerCalls[i]), module, \
 			             static_cast<unsigned long long>(offset));                                                  \
 		}                                                                                                           \
 		ReleaseSRWLockShared(&g_lock);                                                                              \
 	}
+#define DUMP(name) DUMP_STAT(g_stat_##name)
+#define DUMP_IMPORT(name) DUMP_STAT(g_istat_##name)
 	HARNESS_ALL(DUMP)
+	IMPORT_FALLBACKS(DUMP_IMPORT)
 	std::fprintf(f, "GetKeyState import calls %lld; vk histogram (syscall and import):", static_cast<long long>(g_iatKeyStateCalls));
 	for (int vk = 0; vk < 256; ++vk) {
 		if (g_vkCounts[vk] != 0) {
@@ -814,11 +1107,15 @@ void DumpTrace() noexcept {
 			std::fprintf(f, " %llx/%llx", static_cast<unsigned long long>(g_ring[idx][0]), static_cast<unsigned long long>(g_ring[idx][1]));
 		}
 	}
+	std::fprintf(f, "\nfake focus %s: window procedure %s, deactivation messages dropped %ld",
+	             g_fakeFocus ? "on" : "off", g_focusSubclassed != 0 ? "subclassed" : "not subclassed", static_cast<long>(g_focusDropped));
 	std::fprintf(f, "\nExecuteConsoleCommand %s, IsInGame %s, UI-thread commands run: seq %u done %u result %d\n",
 	             g_execute != nullptr ? "found" : "MISSING", g_isInGame != nullptr ? "found" : "missing",
 	             g_shared != nullptr ? g_shared->cmdSeq : 0, g_shared != nullptr ? g_shared->cmdDone : 0,
 	             g_shared != nullptr ? g_shared->cmdResult : 0);
 #undef DUMP
+#undef DUMP_IMPORT
+#undef DUMP_STAT
 	std::fclose(f);
 }
 
@@ -874,9 +1171,11 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 	if (win32u == nullptr) {
 		win32u = LoadLibraryA("win32u.dll");
 	}
+	// "iat": leave the win32u stubs alone and take the import fallbacks (a test of that path where the stubs hook).
+	const bool forceImport = harness_logic::HasWord(mode, "iat");
 #define INSTALL(name)                                                                                               \
 	{                                                                                                               \
-		void* stub = win32u != nullptr ? reinterpret_cast<void*>(GetProcAddress(win32u, #name)) : nullptr;          \
+		void* stub = win32u != nullptr && !forceImport ? reinterpret_cast<void*>(GetProcAddress(win32u, #name)) : nullptr; \
 		if (stub != nullptr && Patch(stub, reinterpret_cast<void*>(&H_##name), reinterpret_cast<void**>(&g_orig_##name))) {                   \
 			g_stat_##name.label = #name;                                                                             \
 			++hooked;                                                                                               \
@@ -886,6 +1185,43 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 	}
 	HARNESS_ALL(INSTALL)
 #undef INSTALL
+	// The input hooks the virtual mouse, focus and console need: each stub that is not hooked falls back to the exe import.
+	const ImportFallback fallbacks[] = {
+	    {"GetCursorPos", &g_stat_NtUserGetCursorPos, &g_istat_GetCursorPos, reinterpret_cast<void*>(&I_GetCursorPos), reinterpret_cast<void**>(&g_imp_GetCursorPos)},
+	    {"SetCursorPos", &g_stat_NtUserSetCursorPos, &g_istat_SetCursorPos, reinterpret_cast<void*>(&I_SetCursorPos), reinterpret_cast<void**>(&g_imp_SetCursorPos)},
+	    {"ClipCursor", &g_stat_NtUserClipCursor, &g_istat_ClipCursor, reinterpret_cast<void*>(&I_ClipCursor), reinterpret_cast<void**>(&g_imp_ClipCursor)},
+	    {"TrackMouseEvent", &g_stat_NtUserTrackMouseEvent, &g_istat_TrackMouseEvent, reinterpret_cast<void*>(&I_TrackMouseEvent), reinterpret_cast<void**>(&g_imp_TrackMouseEvent)},
+	    {"GetAsyncKeyState", &g_stat_NtUserGetAsyncKeyState, &g_istat_GetAsyncKeyState, reinterpret_cast<void*>(&I_GetAsyncKeyState), reinterpret_cast<void**>(&g_imp_GetAsyncKeyState)},
+	    {"GetForegroundWindow", &g_stat_NtUserGetForegroundWindow, &g_istat_GetForegroundWindow, reinterpret_cast<void*>(&I_GetForegroundWindow), reinterpret_cast<void**>(&g_imp_GetForegroundWindow)},
+	    {"SetForegroundWindow", &g_stat_NtUserSetForegroundWindow, &g_istat_SetForegroundWindow, reinterpret_cast<void*>(&I_SetForegroundWindow), reinterpret_cast<void**>(&g_imp_SetForegroundWindow)},
+	    {"SetActiveWindow", &g_stat_NtUserSetActiveWindow, &g_istat_SetActiveWindow, reinterpret_cast<void*>(&I_SetActiveWindow), reinterpret_cast<void**>(&g_imp_SetActiveWindow)},
+	    {"ShowWindow", &g_stat_NtUserShowWindow, &g_istat_ShowWindow, reinterpret_cast<void*>(&I_ShowWindow), reinterpret_cast<void**>(&g_imp_ShowWindow)},
+	    {"PeekMessageW", &g_stat_NtUserPeekMessage, &g_istat_PeekMessageW, reinterpret_cast<void*>(&I_PeekMessageW), reinterpret_cast<void**>(&g_imp_PeekMessageW)},
+	    {"PeekMessageA", &g_stat_NtUserPeekMessage, &g_istat_PeekMessageA, reinterpret_cast<void*>(&I_PeekMessageA), reinterpret_cast<void**>(&g_imp_PeekMessageA)},
+	    {"GetFocus", &g_stat_NtUserGetGUIThreadInfo, &g_istat_GetFocus, reinterpret_cast<void*>(&I_GetFocus), reinterpret_cast<void**>(&g_imp_GetFocus)},
+	    {"GetActiveWindow", &g_stat_NtUserGetGUIThreadInfo, &g_istat_GetActiveWindow, reinterpret_cast<void*>(&I_GetActiveWindow), reinterpret_cast<void**>(&g_imp_GetActiveWindow)},
+	    {"SetFocus", &g_stat_NtUserSetFocus, &g_istat_SetFocus, reinterpret_cast<void*>(&I_SetFocus), reinterpret_cast<void**>(&g_imp_SetFocus)},
+	    {"CreateWindowExW", &g_stat_NtUserCreateWindowEx, &g_istat_CreateWindowExW, reinterpret_cast<void*>(&I_CreateWindowExW), reinterpret_cast<void**>(&g_imp_CreateWindowExW)},
+	};
+	harness_logic::PathCounts paths;
+	char offList[160] = "";
+	const HMODULE exeModule = GetModuleHandleA(nullptr);
+	for (const ImportFallback& fb : fallbacks) {
+		const bool stubHooked = fb.stub->label != nullptr;
+		bool imported = false;
+		if (harness_logic::WantImport(stubHooked)) {
+			imported = PatchImport(exeModule, "user32.dll", fb.name, fb.hook, fb.original);
+			if (imported) {
+				fb.stat->label = fb.name;
+			}
+		}
+		const harness_logic::InputPath path = harness_logic::ChoosePath(stubHooked, imported);
+		paths.Add(path);
+		if (path == harness_logic::InputPath::Off) {
+			const size_t used = std::strlen(offList);
+			std::snprintf(offList + used, sizeof(offList) - used, "%s%s", used != 0 ? "," : "", fb.name);
+		}
+	}
 	const bool keyStateImport = PatchImport(GetModuleHandleA(nullptr), "user32.dll", "GetKeyState",
 	                                        reinterpret_cast<void*>(&H_GetKeyState), reinterpret_cast<void**>(&g_origGetKeyState));
 	if (std::strstr(mode, "diag") != nullptr) {
@@ -971,6 +1307,7 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 		g_execute = reinterpret_cast<ExecuteConsoleCommandFn>(execute);
 		g_isInGame = reinterpret_cast<IsInGameFn>(GetProcAddress(core, "IsInGame"));
 	}
+	g_fakeFocus = harness_logic::WantFakeFocus(mode);
 	HarnessCmdsInit(context->exeBase);
 	HarnessCmdsContext(context);
 	g_running = 1;
@@ -978,9 +1315,24 @@ auto InstallTestHarness(const D2RL::PluginContext* context, char* report, size_t
 	if (g_titleText[0] != L'\0') {
 		CreateThread(nullptr, 0, TitleThread, nullptr, 0, nullptr);
 	}
+	if (g_fakeFocus) {
+		CreateThread(nullptr, 0, FocusThread, nullptr, 0, nullptr);
+	}
+	char stubs[64] = "";
+	if (g_wineStubs != 0) {
+		std::snprintf(stubs, sizeof(stubs), ", %d of them Wine stubs", g_wineStubs);
+	}
+	if (g_fakeFocus) {
+		std::snprintf(stubs + std::strlen(stubs), sizeof(stubs) - std::strlen(stubs), "; fake focus on");
+	}
+	char importPart[240] = "";
+	if (paths.imports != 0 || paths.off != 0) {  // nothing new on a system whose stubs all hook (Windows)
+		std::snprintf(importPart, sizeof(importPart), "; input fallbacks: %d user32 imports hooked, %d off%s%.150s%s", paths.imports,
+		              paths.off, paths.off != 0 ? " (" : "", offList, paths.off != 0 ? ")" : "");
+	}
 	std::snprintf(report, reportSize,
-	              "on (mode '%.20s'): %d win32u input calls traced to mxl2012-testharness-trace.log (%d not present), GetKeyState import %s%s",
-	              mode, hooked, missing, keyStateImport ? "hooked" : "not found", g_spoofSerial != 0 ? "; volume serial of C: reported (offline cookie readable from another drive)"
+	              "on (mode '%.20s'): %d win32u input calls traced to mxl2012-testharness-trace.log (%d not present%s), GetKeyState import %s%s%s",
+	              mode, hooked, missing, stubs, keyStateImport ? "hooked" : "not found", importPart, g_spoofSerial != 0 ? "; volume serial of C: reported (offline cookie readable from another drive)"
 	                                 : (g_noCookie ? "; offline cookie.bin hidden" : ""));
 	return true;
 }

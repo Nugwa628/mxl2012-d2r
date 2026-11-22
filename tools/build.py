@@ -93,6 +93,8 @@ plugin-header data generators (sigma_data.py, items_data.py, ...): Median XL 201
                      clearfonts), from the local repack archive (MXL2012_LEGACY_FONT_ARCHIVE, default under
                      <MXL2012_RUNS>/extract-merged; MXL2012_LEGACY_FONTS=0 leaves them out); stock dialogue/chat pairs
                      retained; checks classic line-height divisors (docs/legacy-font-research.md)
+  m3d_ship.py build  the approved 3D monsters (tools/data/m3d_ship.json: the Glowing Fungus) from the art store, with their
+                     monsters.json and model_lod_desc.bin entries (MXL_ART_STORE; MXL2012_M3D=0 leaves them out)
   merge_string_overrides.py, strings_check.py   as above, after the writers
   validate.py        D2R schema checks        -> work/mod/validate_report.md
 
@@ -168,6 +170,10 @@ DATA_STEPS = [["mxl2012_prep.py", "--src", str(SRC)],
               ["level_entries.py", "apply", "--mod", str(MOD), "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")],
               ["shared_icons.py", "tables", "--d2r", str(D2R_EXTRACT)],
               ["objstr.py", "--mod", str(SRC), "--tiles", str(SRC.parent / "tiles")],
+              # D2R's automap.txt plus rows for Median's own wall tiles in every Median map (automap_rows.map_list()); the
+              # plan (cells, rows) is read by automap_art.py below (and by automap_void.py, off since 0.1.29)
+              ["automap_rows.py", str(MOD / "data" / "global" / "excel" / "automap.txt"), "--d2r", str(D2R_EXTRACT),
+               "--plan", str(MOD / "automap_plan.json")],
               ["cube_rules_check.py", "--src", str(SRC)],
               ["strings_check.py", "--excel-dir", str(ROOT / "work" / "mod" / "data" / "global" / "excel"), "--rewritten", "--warn-missing",
                "--d2r-lng", str(D2R_EXTRACT / "data" / "local" / "lng")]]
@@ -205,6 +211,13 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["legacy_art.py", "build", "--d2r", str(D2R_EXTRACT), "--out", str(MOD / "data")],  # after the tiles: it checks them
              ["shrine_colours.py", "art", str(MOD / "data")],  # needs HD jbscross; preserve the ground/drop art
              ["elixir_colours.py", "art", str(MOD / "data")],
+             # the automap: brighter legacy cels for automap_rows.py's rows (after the tile and scene writers above)
+             ["automap_art.py", "build", str(MOD / "data"), "--d2r", str(D2R_EXTRACT),
+              "--objects", str(MOD / "data" / "global" / "excel" / "objects.txt"), "--plan", str(MOD / "automap_plan.json")],
+             # automap_void.py (walls no player reaches moved to tile keys without a row) is OFF since 0.1.29 (owner,
+             # 2026-11-22): its tile copies crash legacy graphics after several Median areas in one session (BC_ASSERT
+             # n < m_size, n 29423, m_size 2048; lane rel0129, /d2work/mxl2012-runs/rel0129/REPORT.md). Back in once fixed:
+             # ["automap_void.py", "build", str(MOD / "data"), "--plan", str(MOD / "automap_plan.json")],
              ["ds1_paths.py", "build", "--mod", str(MOD / "data"), "--d2r", str(D2R_EXTRACT)],  # after every tile / scene writer
              ["sounds_port.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
              # after legacy_art: its item pictures. In the mod by default (owner, 2026-10-31): the plugin's rotwstash part keeps
@@ -224,7 +237,10 @@ ART_STEPS = [["art_fix.py"], ["own_tokens.py", "tables"], ["gfx_placeholders.py"
              ["statbook_layout.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
              # after statbook_layout.py: the same book in the legacy sheet layout and the classic side panel (DC6 art)
              ["statbook_legacy.py", "build", "--d2r", str(D2R_EXTRACT), "--mod", str(MOD / "data")],
-             ["legacy_fonts.py", "--mod", str(MOD)]]  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
+             ["legacy_fonts.py", "--mod", str(MOD)],  # the clear set beside the stock names; unsafe dialogue/chat pairs excluded
+             # last of the art: the approved 3D monsters (tools/data/m3d_ship.json, files from the art store) with their
+             # monsters.json and model_lod_desc.bin entries, after every writer of those two files; MXL2012_M3D=0 leaves them out
+             ["m3d_ship.py", "build", str(MOD / "data")]]
 # The steps that depend on the charm inventory (tools/charm_inventory.py). DATA_STEPS / ART_STEPS above are the `charminv` build.
 CHARMINV_STEP = ["charm_inv.py", "apply", "--mod", str(MOD)]
 INVTABS_STEPS = [["invtabs_tables.py", "build", "--out", str(MOD)],  # tabs.txt, types_<tab>.txt from invtabs/invtabs.toml

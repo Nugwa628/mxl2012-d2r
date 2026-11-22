@@ -2,6 +2,7 @@
 command line and puts everything back byte for byte; another mod's folder and settings are never changed. No game runs and
 no real lock or slot is touched (slot folders, lock folder and run folder are temp folders)."""
 import json
+import contextlib
 import os
 import shutil
 import subprocess
@@ -10,13 +11,24 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import game_slots  # noqa: E402
 import install_mod  # noqa: E402
 import slot_share  # noqa: E402
+
+
+_PIN = contextlib.ExitStack()
+
+
+def setUpModule():  # the Windows slot rules: Windows backend on every platform (the Linux class below switches itself)
+    _PIN.enter_context(game_slots.backend("windows"))
+
+
+def tearDownModule():
+    _PIN.close()
 
 OTHER_TOML = '[d2rcore.stash]\nadd_shared_tabs = 0\n\n[d2rloader]\ndefault_mod = "OtherMod"\nlaunch_arguments = "-w -txt"\n'
 
@@ -398,6 +410,195 @@ class OwnerSlot(FakeSlot):
         game_slots.setup(1)
         self.assertFalse(Path(self.game, "D2RLoader-s1.exe").exists())
         self.assertEqual(tree(self.game), self.before)
+
+
+# ---------------------------------------------------------------- the Linux backend: whole-slot snapshot (rsync)
+
+
+def tree_all(root):
+    """{rel: (bytes, mtime_ns, mode)} of every file and {rel/: mode} of every folder under root (byte-equal check)."""
+    out = {}
+    for dirpath, dirs, files in os.walk(root):
+        for d in dirs:
+            p = os.path.join(dirpath, d)
+            out[os.path.relpath(p, root) + "/"] = os.stat(p).st_mode
+        for f in files:
+            p = os.path.join(dirpath, f)
+            st = os.stat(p)
+            out[os.path.relpath(p, root)] = (Path(p).read_bytes(), st.st_mtime_ns, st.st_mode)
+    return out
+
+
+@unittest.skipUnless(shutil.which("rsync"), "rsync is not installed")
+class LinuxSlot(unittest.TestCase):
+    """Slot 5 on the Linux backend: a temp slot folder with Data/ small files and a CASC archive, prefix, snapshot folder."""
+
+    def setUp(self):
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        stack.enter_context(game_slots.backend("linux"))
+        self.tmp = tempfile.mkdtemp(prefix="linslot-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.game = os.path.join(self.tmp, "slots", "s5")
+        self.snap = os.path.join(self.tmp, "slots", ".snap-s5")
+        compat = os.path.join(self.tmp, "prefixes", "s5")
+        g = Path(self.game)
+        for d in ("d2rloader/config", "d2rloader/plugins", "d2rloader/patches", "mods/mxl2012/d2rloader/plugins",
+                  "Data/data", "Data/hd/objects/dummy"):
+            (g / d).mkdir(parents=True)
+        os.makedirs(os.path.join(compat, "pfx", "dosdevices"))
+        for f in ("D2R.exe", "D2RLoader.exe"):
+            (g / f).write_bytes(b"MZ")
+        (g / "d2rloader" / "config" / "d2rloader.toml").write_text('[d2rloader]\nlaunch_arguments = "-w -txt"\n')
+        (g / "mods" / "mxl2012" / "modinfo.json").write_text('{"name": "mxl2012", "savepath": "mxl2012-s5/"}')
+        (g / "Data" / "data" / "data.000").write_bytes(b"CASC" * 1000)
+        (g / "Data" / "data" / "0000000001.idx").write_bytes(b"idx-1")
+        (g / "Data" / "data" / "shmem").write_bytes(b"shmem-1")
+        old = time.time() - 3600
+        for dirpath, _, files in os.walk(self.game):
+            for f in files:
+                os.utime(os.path.join(dirpath, f), (old, old))
+        self.locks = os.path.join(self.tmp, "locks")
+        self.runs = os.path.join(self.tmp, "runs")
+        for p in (patch.dict(os.environ, {"MXL_SLOT5_DIR": self.game, "MXL_SLOT5_COMPAT": compat,
+                                          "MXL_SLOT5_SNAPSHOT": self.snap}),
+                  patch.object(game_slots, "LOCK_ROOT", self.locks), patch.object(game_slots, "RUNS", self.runs),
+                  patch.object(game_slots, "PROC", os.path.join(self.tmp, "proc")),
+                  patch.object(game_slots, "PROTECTED_MODS", ["OtherMod"])):
+            stack.enter_context(p)
+        os.makedirs(os.path.join(self.tmp, "proc"))
+        os.environ.pop("MXL_LAUNCH_ARGS", None)
+        self.before = tree_all(self.game)
+
+    def lock(self, owner="linslots"):
+        self.assertTrue(game_slots.acquire(5, owner, pid=0)[0])
+
+    def run_changes(self):
+        """What a run does to a Linux slot (smoke1/2 of lane linuxslots): the game rewrites Data/data/*.idx and shmem,
+        D2RLoader writes the stash proxy json and its logs, rewrites its toml, and a file goes away."""
+        g = Path(self.game)
+        (g / "Data" / "data" / "0000000001.idx").write_bytes(b"idx-2")
+        (g / "Data" / "data" / "shmem").write_bytes(b"shmem-1")  # same bytes, new mtime
+        (g / "Data" / "hd" / "objects" / "dummy" / "d2rloader_stash_proxy.json").write_text("{}")
+        (g / "d2rloader" / "logs").mkdir()
+        (g / "d2rloader" / "logs" / "d2rloader.log").write_text("log")
+        (g / "d2rloader" / "config" / "d2rloader.toml").write_text('[d2rloader]\nlaunch_arguments = "-w"\n')
+        (g / "mods" / "mxl2012" / "modinfo.json").unlink()
+        os.chmod(g / "D2R.exe", 0o600)
+
+    def test_begin_needs_our_lock(self):
+        with self.assertRaises(SystemExit):
+            slot_share.begin(5, "linslots")
+        self.lock("wineinput")
+        with self.assertRaises(SystemExit):
+            slot_share.begin(5, "linslots")
+        self.assertIsNone(slot_share.pending(5))
+
+    def test_whole_slot_is_restored_byte_equal(self):
+        self.lock()
+        msg = slot_share.begin(5, "linslots")
+        self.assertIn("whole slot snapshotted", msg)
+        man = slot_share.pending(5)
+        self.assertEqual((man["kind"], man["owner"], list(man["archives"])), ("slot", "linslots", ["data.000"]))
+        self.assertEqual(slot_share.manifest_path(5), self.snap + ".json", "beside the snapshot: one per slot")
+        self.assertFalse(os.path.exists(os.path.join(self.snap, "Data", "data", "data.000")), "archives are not copied")
+        self.assertTrue(os.path.exists(os.path.join(self.snap, "Data", "data", "shmem")), "Data/ small files are")
+        self.assertEqual(slot_share.diff(5), [])
+        self.run_changes()
+        what = dict(slot_share.diff(5))
+        self.assertEqual(what["Data/data/0000000001.idx"], "changed")
+        self.assertTrue(what["Data/data/shmem"].startswith("touched"))
+        self.assertEqual(what["Data/hd/objects/dummy/d2rloader_stash_proxy.json"], "created")
+        self.assertEqual(what["d2rloader/logs/"], "created")
+        self.assertEqual(what["mods/mxl2012/modinfo.json"], "deleted")
+        self.assertTrue(what["D2R.exe"].startswith("touched"), "mode change")
+        out = slot_share.end(5, "linslots")
+        self.assertIn("restored and verified byte-equal", out)
+        self.assertEqual(tree_all(self.game), self.before)
+        self.assertIsNone(slot_share.pending(5))
+        with open(os.path.join(slot_share.state_dir(5), "last-restore.json"), encoding="utf-8") as f:
+            rep = json.load(f)
+        self.assertIn(["Data/data/0000000001.idx", "changed"], rep["changed_by_run"])
+        self.assertTrue(os.path.isdir(self.snap), "the snapshot stays for a quick next copy")
+
+    def test_changed_archive_refuses_and_keeps_the_snapshot(self):
+        self.lock()
+        slot_share.begin(5, "linslots")
+        os.utime(os.path.join(self.game, "Data", "data", "data.000"), (1, 1))
+        self.assertIn(("Data/data/data.000", "archive changed (size or mtime)"), slot_share.diff(5))
+        with self.assertRaises(SystemExit) as cm:
+            slot_share.end(5, "linslots")
+        self.assertIn("CASC archives changed", str(cm.exception))
+        self.assertIsNotNone(slot_share.pending(5))
+
+    def test_restore_refused_while_the_game_or_the_prefix_runs(self):
+        self.lock()
+        slot_share.begin(5, "linslots")
+        self.run_changes()
+        with patch.object(game_slots, "slot_processes", return_value=[(101, "D2R.exe")]), self.assertRaises(SystemExit):
+            slot_share.end(5, "linslots")
+        with patch.object(game_slots, "prefix_pids", return_value=[99]), self.assertRaises(SystemExit):
+            slot_share.end(5, "linslots")
+        self.assertIsNotNone(slot_share.pending(5))
+        slot_share.end(5, "linslots")
+        self.assertEqual(tree_all(self.game), self.before)
+
+    def test_unlock_restores_first_and_a_killed_run_is_restored_by_the_next_begin(self):
+        self.lock()
+        slot_share.begin(5, "linslots")
+        self.run_changes()
+        self.assertIn("pending snapshot of an earlier run restored first", slot_share.begin(5, "linslots"))
+        self.assertEqual(tree_all(self.game), self.before)
+        self.run_changes()
+        self.assertTrue(game_slots.release(5, "linslots", manual=True))
+        self.assertEqual(tree_all(self.game), self.before)
+        self.assertIsNone(game_slots.lock_info(5))
+
+    def test_pending_linslot_snapshot_refuses_begin(self):
+        self.lock()
+        Path(self.tmp, "slots", ".snap-s5.data.json").write_text("{}")
+        with self.assertRaises(SystemExit) as cm:
+            slot_share.begin(5, "linslots")
+        self.assertIn("linslot.py", str(cm.exception))
+
+    def test_global_plugin_still_refuses_the_run(self):
+        self.lock()
+        Path(self.game, "d2rloader", "plugins", "x.dll").write_bytes(b"MZ")
+        with self.assertRaises(SystemExit):
+            slot_share.begin(5, "linslots")
+
+    def test_launch_args_on_linux(self):
+        self.assertEqual(slot_share.launch_args(5), ["-mod", "mxl2012"])
+
+    def test_itemized(self):
+        self.assertEqual(slot_share.itemized(["*deleting   a/new.txt", ">f+++++++++ gone.txt", ">fc.t...... ch.txt",
+                                              ">f.st...... grown.txt", ".f..t...... t.txt", "cd+++++++++ dir/", ""]),
+                         [("a/new.txt", "created"), ("gone.txt", "deleted"), ("ch.txt", "changed"), ("grown.txt", "changed"),
+                          ("t.txt", "touched (same bytes, other mtime or mode)"), ("dir/", "deleted")])
+
+    def test_window_helper_is_optional(self):
+        with patch.dict(os.environ, {"MXL_WCTL": os.path.join(self.tmp, "none.exe")}):
+            self.assertIsNone(slot_share.window_helper())
+        Path(self.tmp, "wctl.exe").write_bytes(b"MZ")
+        with patch.dict(os.environ, {"MXL_WCTL": os.path.join(self.tmp, "wctl.exe")}):
+            self.assertEqual(slot_share.window_helper(), os.path.join(self.tmp, "wctl.exe"))
+
+    def test_helper_notice_finds_only_the_loader_dialog(self):
+        helper = MagicMock(name="helper")
+        helper.windows.return_value = [
+            {"hwnd": 0x10, "pid": 32, "visible": True, "class": "#32770", "title": "D2RLoader"},
+            {"hwnd": 0x11, "pid": 32, "visible": False, "class": "#32770", "title": "D2RLoader"},
+            {"hwnd": 0x12, "pid": 40, "visible": True, "class": "OsWindow", "title": "Diablo II: Resurrected"},
+            {"hwnd": 0x13, "pid": 32, "visible": True, "class": "#32770", "title": "D2RLoader"}]
+        # Wine's task dialog: the check box is a Button too; only push buttons count (0x13: an error with Retry)
+        helper.buttons.side_effect = lambda h, push_only=False: ["OK"] if h == 0x10 else ["Retry", "Cancel"]
+        find, post = slot_share.helper_notice(helper)
+        self.assertEqual(find([1]), [0x10])
+        post(0x10)
+        helper.post.assert_called_once_with(0x10, 0x0400 + 102, 1, 0)
+        helper.find.return_value = (0x12, 40, 0, 1600, 900, False)
+        self.assertIn("WM_CLOSE", slot_share.helper_close(helper))
+        helper.post.assert_called_with(0x12, 0x10, 0, 0)
 
 
 if __name__ == "__main__":

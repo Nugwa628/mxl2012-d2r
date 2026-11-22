@@ -117,6 +117,7 @@
 #include "npc_greet.h"
 #include "map_reveal.h"
 #include "melt_trail.h"
+#include "sprite_dir.h"
 #include "lob_aim.h"
 #include "stun_len.h"
 #include "missile_stubs.h"
@@ -165,7 +166,7 @@
 
 namespace {
 
-constexpr const char* PluginVersion = "0.1.28";
+constexpr const char* PluginVersion = "0.1.29";
 constexpr uint32_t ExpectedImage = image_guard::ExpectedImage;  // TimeDateStamp of the dumped image (the game program in D2RLoader 1.3.1)
 #ifdef MXL_RELEASE
 constexpr const char* BuildKind = "release";  // cmake -DMXL_RELEASE=ON: no test harness compiled in
@@ -233,12 +234,15 @@ char g_conflict[256] = "";    // the message when a conflicting plugin is in the
 // Diagnosis switch: mxl2012-core-off.txt next to the DLL lists parts to leave out (any of: otherplugins envguard
 // pluginguard cltdo22 cltdostub cltnomis itemeffect skillremove rangedesc dodgelist statelist melttrail lobaim stunlen whirlwind moveonly charmlen cubedupe animseq monequip aurastate ilvl runeletter skilltext mercequip dursync soundguard spiritsound transguard lvlupui petspread spiritwarp appleuse charmdup vochat reassign savemode rotwstash rotwwarn medtab stashtip tabflash void65 stashpage2 sendstash mapreveal arealvl clearfonts modelcache npcgreet), separated by spaces, commas or lines. Off words are letters and digits only.
 char g_offList[256] = "";
+// The other way round for parts that stay out unless asked for: mxl2012-core-on.txt next to the DLL lists them (any of:
+// spritedir spritedirlog spritedirtick), written the same way.
+char g_onList[64] = "";
 
-void ReadOffList() noexcept {
+void ReadWordList(const char* file, char* list, size_t size) noexcept {
 	HMODULE self = nullptr;
 	char path[MAX_PATH] = "";
 	if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-	                        reinterpret_cast<LPCSTR>(&ReadOffList), &self) ||
+	                        reinterpret_cast<LPCSTR>(&ReadWordList), &self) ||
 	    GetModuleFileNameA(self, path, MAX_PATH) == 0) {
 		return;
 	}
@@ -246,27 +250,40 @@ void ReadOffList() noexcept {
 	if (slash == nullptr || static_cast<size_t>(slash - path) + 24 >= sizeof(path)) {
 		return;
 	}
-	strcpy_s(slash + 1, sizeof(path) - static_cast<size_t>(slash + 1 - path), "mxl2012-core-off.txt");
+	strcpy_s(slash + 1, sizeof(path) - static_cast<size_t>(slash + 1 - path), file);
 	FILE* f = nullptr;
 	if (fopen_s(&f, path, "rb") != 0 || f == nullptr) {
 		return;
 	}
-	const size_t n = std::fread(g_offList, 1, sizeof(g_offList) - 1, f);
-	g_offList[n] = '\0';
+	const size_t n = std::fread(list, 1, size - 1, f);
+	list[n] = '\0';
 	std::fclose(f);
-	for (char* c = g_offList; *c != '\0'; ++c) {
+	for (char* c = list; *c != '\0'; ++c) {
 		*c = (*c >= 'A' && *c <= 'Z') ? static_cast<char>(*c - 'A' + 'a') : (std::isalnum(static_cast<unsigned char>(*c)) ? *c : ' ');
 	}
 }
 
-auto Off(const char* part) noexcept -> bool {
+void ReadOffList() noexcept {
+	ReadWordList("mxl2012-core-off.txt", g_offList, sizeof(g_offList));
+	ReadWordList("mxl2012-core-on.txt", g_onList, sizeof(g_onList));
+}
+
+auto Listed(const char* list, const char* part) noexcept -> bool {
 	const size_t len = std::strlen(part);
-	for (const char* p = std::strstr(g_offList, part); p != nullptr; p = std::strstr(p + 1, part)) {
-		if ((p == g_offList || p[-1] == ' ') && (p[len] == ' ' || p[len] == '\0')) {
+	for (const char* p = std::strstr(list, part); p != nullptr; p = std::strstr(p + 1, part)) {
+		if ((p == list || p[-1] == ' ') && (p[len] == ' ' || p[len] == '\0')) {
 			return true;
 		}
 	}
 	return false;
+}
+
+auto Off(const char* part) noexcept -> bool {
+	return Listed(g_offList, part);
+}
+
+auto On(const char* part) noexcept -> bool {
+	return Listed(g_onList, part);
 }
 
 // Console line; with the test harness on it is also appended to mxl2012-testharness-console.txt (the console panel cannot
@@ -495,6 +512,7 @@ char g_rangedDescReport[160] = "";
 char g_dodgeListReport[160] = "";
 char g_stateListReport[160] = "";
 char g_meltTrailReport[160] = "";
+char g_spriteDirReport[224] = "off: mxl2012-core-on.txt does not name spritedir";
 char g_lobAimReport[160] = "";
 char g_stunLenReport[200] = "";
 char g_whirlwindReport[160] = "";
@@ -532,7 +550,7 @@ char g_sendStashReport[192] = "";
 char g_mapRevealReport[256] = "";
 char g_areaLevelReport[160] = "";
 char g_clearFontsReport[320] = "";
-char g_harnessReport[192] = "";
+char g_harnessReport[320] = "";
 char g_saveModeReport[MAX_PATH + 160] = "";
 bool g_partsInstalled = false;
 char g_clashReport[768] = "";  // the `plugin clashes` line of `mxl2012` (#522), set 15 s after the start
@@ -732,6 +750,15 @@ auto Mxl2012Command(D2R::Game::Client* client, const D2RL::ConsoleCommandContext
 	MeltTrailCounts(&trailsClient, &trailsServer);
 	std::snprintf(line, sizeof(line), "%s; trails made: client %ld, server %ld", g_meltTrailReport, trailsClient, trailsServer);
 	SayPart(command, "melttrail", line);
+	long cardKeyed = 0, cardUnkeyed = 0, cardTurns = 0, cardSkipped = 0, cardWatched = 0;
+	long cardTurnsLayer = 0, cardTurnsMode = 0;
+	SpriteDirCounts(&cardKeyed, &cardUnkeyed, &cardTurns, &cardSkipped, &cardWatched);
+	SpriteDirTurns(&cardTurnsLayer, &cardTurnsMode);
+	std::snprintf(line, sizeof(line),
+	              "spritedir %s; card transitions with a facing %ld, without %ld; turns %ld, not applied %ld; watched %ld; "
+	              "turns after the layer update %ld, after a mode call %ld",
+	              g_spriteDirReport, cardKeyed, cardUnkeyed, cardTurns, cardSkipped, cardWatched, cardTurnsLayer, cardTurnsMode);
+	Say(command, line);
 	long lobSeen = 0, lobServer = 0, lobClient = 0;
 	LobAimCounts(&lobSeen, &lobServer, &lobClient);
 	std::snprintf(line, sizeof(line), "%s; missiles seen %ld, targets capped: server %ld, client %ld", g_lobAimReport, lobSeen, lobServer, lobClient);
@@ -1035,6 +1062,11 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!Off("melttrail")) {
 		InstallMeltTrail(context, g_meltTrailReport, sizeof(g_meltTrailReport));
 		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_meltTrailReport);
+		context->LogInfo(line);
+	}
+	if (On("spritedir")) {  // sprite-card monsters turn: stays out unless mxl2012-core-on.txt asks for it
+		InstallSpriteDir(context, On("spritedirlog"), On("spritedirtick"), g_spriteDirReport, sizeof(g_spriteDirReport));
+		std::snprintf(line, sizeof(line), "mxl2012-core: %s", g_spriteDirReport);
 		context->LogInfo(line);
 	}
 	if (!Off("lobaim")) {

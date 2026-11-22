@@ -26,6 +26,19 @@ import release_install  # noqa: E402
 import slot_share  # noqa: E402
 
 
+_PIN = contextlib.ExitStack()
+
+
+def setUpModule():  # the Windows slot rules: Windows backend on every platform (Linux: test_game_slots.py, test_slot_share.py)
+    _PIN.enter_context(game_slots.backend("windows"))
+    # release_install takes its slots from game_slots at import: on Linux those are the Linux slots
+    _PIN.enter_context(patch.object(release_install, "RELEASE_SLOTS", game_slots.DEFAULT_SET))
+
+
+def tearDownModule():
+    _PIN.close()
+
+
 class Names(unittest.TestCase):
     def setUp(self):
         machine_fixture.use_neutral_machine(self)

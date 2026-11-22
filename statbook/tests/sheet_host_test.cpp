@@ -232,9 +232,20 @@ void TestAll() {
 	Check(lines.size() == 3 && lines[1].text == "stat 17: 5", "fallback text");
 }
 
+void TestPlausibleList() {
+	Check(!PlausibleList(0x13, 0x16, 4096, false), "the pair seen in game (0x13, 0x16) is not a list");
+	Check(!PlausibleList(0, 0x10, 4096, true) && !PlausibleList(0xfff8, 0x10008, 4096, false), "low addresses are not lists");
+	Check(!PlausibleList(0x3b00b404, 0x3b00b414, 4096, false) && !PlausibleList(0x3b00b400, 0x3b00b414, 4096, false), "unaligned");
+	Check(PlausibleList(0x3b00b400, 0x3b00b420, 4096, false) && !PlausibleList(0x3b00b420, 0x3b00b400, 4096, true), "4 entries; end before begin");
+	Check(!PlausibleList(0x3b00b400, 0x3b00b400, 4096, false) && PlausibleList(0x3b00b400, 0x3b00b400, 4096, true), "empty list");
+	Check(!PlausibleList(0x10000, 0x10000 + 8 * 4097, 4096, false) && PlausibleList(0x10000, 0x10000 + 8 * 4096, 4096, false), "size cap");
+	Check(!PlausibleList(0x800000000000ull, 0x800000000008ull, 4096, false), "kernel half");
+}
+
 }  // namespace
 
 int main() {
+	TestPlausibleList();
 	TestNames();
 	TestShow();
 	TestWindow();

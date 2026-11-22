@@ -83,6 +83,11 @@ if "--foreground" in sys.argv:
     sys.argv.remove("--foreground")
     os.environ["MXL_INPUT"] = "sendinput"
 BG = os.environ.get("MXL_INPUT", "").lower() != "sendinput"
+# Callables the Linux start runs after the whole-slot snapshot and before the launch (game_ctl_linux.start): a check may lay
+# test files into the slot there (hdkit.signoff: a unit's overlay and a dev plugin); the run's whole-slot restore takes them
+# out again, also when the run fails. Each returns a short line for the log; an error stops the launch (slot restored).
+# Windows snapshots only the shared files, so its start does not run them.
+PRE_LAUNCH = []
 
 user32 = winapi.Dll("user32")
 kernel32 = winapi.Dll("kernel32")
@@ -528,6 +533,18 @@ def _set_mods(mods):
         v[5] = sum(bits[m] for m in mods)
 
 
+def post_message(h, msg, wparam=0, lparam=0):
+    """Post one window message to the game window h (Windows: PostMessageW; Linux: game_ctl_linux, through the helper).
+    For checks that send their own mouse messages (game_checks.hc_hold) instead of calling user32 themselves."""
+    return bool(user32.PostMessageW(h, msg, wparam, lparam))
+
+
+def client_size(h):
+    """(width, height) of the game window's client area."""
+    l, t, r, b = client_rect(h)
+    return r - l, b - t
+
+
 def click_bg(fx, fy, button="left", move_only=False, mods=()):
     """Mouse without the real mouse: the virtual cursor in the plugin's input block (position and button state as
     D2R's GetCursorPos / GetKeyState see them) plus WM_MOUSEMOVE / WM_xBUTTON messages with client coordinates.
@@ -705,7 +722,8 @@ def _keep_out_of_front(prev_fg, wait=60, notice=None):
 def take_lock():
     """Slot run lock (game.lock.N). A lock somebody made by hand (mkdir, no owner.txt) is
     taken to mean the caller holds it (the older lanes do that before running game_ctl); a lock owned by another
-    run stops the launch."""
+    run stops the launch. With <locks>/budget.json the lock comes with a seat (game_slots.take_seat); no free seat
+    stops the launch too, after env MXL_SEAT_WAIT seconds of waiting (default 0)."""
     ok, msg = game_slots.acquire(SLOT, LOCK_OWNER)
     if not ok and msg.endswith("(no owner.txt)"):
         log(f"slot {SLOT}: {msg}; assuming the caller holds it")
@@ -1175,6 +1193,10 @@ def run_smoke():
             extra = f"## logscan\n\nlogscan failed: {e!r}"
         rep.write(extra)
 
+
+if game_slots.LINUX:  # a slot under Proton: every name above that touches user32/kernel32 gets its Linux twin
+    import game_ctl_linux  # noqa: E402  (tools/game_ctl_linux.py; the Windows code above is unchanged)
+    game_ctl_linux.install(globals())
 
 if __name__ == "__main__":
     main()

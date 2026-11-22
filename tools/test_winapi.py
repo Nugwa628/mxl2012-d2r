@@ -34,7 +34,7 @@ print("ok")
 
 class WithoutWindows(unittest.TestCase):
     def test_game_tools_import_and_degrade_without_windll(self):
-        env = dict(os.environ, MXL_SLOT="2")
+        env = dict(os.environ, MXL_SLOT="2", MXL_SLOT_BACKEND="windows")
         r = subprocess.run([sys.executable, "-I", "-c", NO_WINDOWS, TOOLS], capture_output=True, text=True, env=env)
         self.assertEqual((r.returncode, r.stdout.strip()), (0, "ok"), r.stdout + r.stderr)
 

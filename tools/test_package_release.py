@@ -162,6 +162,14 @@ class PackageReleaseTests(unittest.TestCase):
         (ext / "data" / "global" / "excel" / "sounds.txt").write_bytes(b"vanilla\n")
         return {**os.environ, "MXL_D2R_EXTRACT": str(ext), "MXL_D2R_CACHE": str(self.tmp / "no-cache")}
 
+    def own_plugins(self):
+        """--drawcap / --statbook of fake DLLs of this source's versions (not PE images, as self.dll): a package with data
+        bundles them, and the tests must not depend on this checkout's build/ folder (an out-of-tree Linux build has none)."""
+        dc, sb = self.tmp / "drawcap.dll", self.tmp / "statbook.dll"
+        dc.write_bytes(b"MZ...Draw List Cap\0drawcap\0" + pr.drawcap_version().encode() + b"\0...")
+        sb.write_bytes(b"MZ...Stat Book\0statbook\0" + pr.statbook_version().encode() + b"\0...")
+        return ["--drawcap", str(dc), "--statbook", str(sb)]
+
     def fake_7z(self, mod):
         out = self.tmp / "D2R-XL-2012-1.2.3.7z"
         out.write_bytes(b"7z fake")
@@ -949,11 +957,13 @@ class PackageReleaseTests(unittest.TestCase):
         v = pr.plugin_version()
         # a player release whose --version is not PluginVersion is refused before anything is written
         r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll),
-                            "--version", "99.0.0", "--data-from", str(data), "--out", str(out)], capture_output=True, text=True)
+                            "--version", "99.0.0", "--data-from", str(data), "--out", str(out), "--charm-inventory", "charminv"],
+                           capture_output=True, text=True)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("PluginVersion", r.stdout)
         r = subprocess.run([sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll),
-                            "--data-from", str(data), "--out", str(out), "--no-bundled", "--charm-inventory", "charminv"],
+                            "--data-from", str(data), "--out", str(out), "--no-bundled", "--charm-inventory", "charminv",
+                            *self.own_plugins()],
                            capture_output=True, text=True, env=self.baseline_env())  # this small data tree has nothing of invtabs
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         seven = out / f"D2R-XL-2012-{v}.7z"
@@ -994,7 +1004,7 @@ class PackageReleaseTests(unittest.TestCase):
         clear_fonts(data)
         out = self.tmp / "dist"
         args = [sys.executable, "-I", str(HERE / "package_release.py"), "--plugin", str(self.dll), "--data-from", str(data),
-                "--out", str(out), "--no-bundled", "--charm-inventory", "charminv"]  # this small data tree has nothing of invtabs
+                "--out", str(out), "--no-bundled", "--charm-inventory", "charminv", *self.own_plugins()]  # nothing of invtabs here
         env = {**os.environ, "MXL_D2R_EXTRACT": str(self.tmp / "nothing-here")}
         r = subprocess.run(args, capture_output=True, text=True, env=env)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)

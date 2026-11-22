@@ -12,6 +12,9 @@ import game_slots  # noqa: E402
 
 
 def read_game_dir() -> str:
+    if game_slots.LINUX:  # the data tools read D2R 93847's files; the Linux slots hold D2R 3.4.95032 (other fonts, ...)
+        raise SystemExit("d2r_game: the Linux game slots hold D2R 3.4, not build 93847: the data tools read D2R 93847's "
+                         "files from its extraction or the shared cache (docs/setup.md), not from a Linux slot")
     path = os.environ.get("MXL_D2R_GAME")
     if path:
         if game_slots.slot_of_game_dir(path) is None:

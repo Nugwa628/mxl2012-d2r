@@ -115,6 +115,24 @@ class AutomapChecks(unittest.TestCase):
         problems, _n = self.run_check(built_extra=("objpreset.txt",))
         self.assertTrue(any("objpreset.txt" in p and "replace" in p for p in problems))
 
+    def test_built_automap_appends_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            src, built = self.folder(root, "src"), self.folder(root, "built", types=self.TYPES)
+            d2r = self.folder(root, "d2r", types=self.TYPES, automap=["1 Town", "5 Ice"])
+            base = (d2r / "automap.txt").read_bytes().decode("utf-8")
+            hd = "LevelName\tTileName\tCel1\r\n"
+            (d2r / "automap.txt").write_text(hd + base.split("\r\n", 1)[1], "utf-8")
+            (built / "automap.txt").write_text(hd + base.split("\r\n", 1)[1] + "2 Tomb\twr\t240\r\n", "utf-8")
+            problems, notes = objstr.check_automap(src, built, d2r, self.OBJ, self.OBJ)
+            self.assertEqual(problems, [])
+            self.assertTrue(any("plus 1 for Median's own walls" in n for n in notes))
+            (built / "automap.txt").write_text(hd + base.split("\r\n", 1)[1] + "2 Tomb\twr\t1600\r\n", "utf-8")
+            problems, _n = objstr.check_automap(src, built, d2r, self.OBJ, self.OBJ)
+            self.assertTrue(any("cel 1600" in p for p in problems))
+            (built / "automap.txt").write_text(hd + "2 Tomb\twr\t240\r\n", "utf-8")
+            problems, _n = objstr.check_automap(src, built, d2r, self.OBJ, self.OBJ)
+            self.assertTrue(any("D2R's rows unchanged" in p for p in problems))
+
     def test_level_type_names_must_match(self):
         problems, _n = self.run_check(mod_types=["None", "Act 1 - Town", "Act 5 - Ice", "Expansion", "Act 5 - Town"])
         self.assertTrue(any("lvltypes.txt names differ" in p for p in problems))

@@ -2,10 +2,13 @@
 no default slot, the locks are the machine's shared lock folder (shared game.lock.N, slot 1 also the old game.lock),
 the machine's protected folders are refused and run output stays in the repo. No game is started and no real lock or slot folder is touched: the locks, runs and slot
 folders of the lock / owner-slot tests are temp folders inside the project (tools/projtemp.py)."""
+import contextlib
+import io
 import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -13,6 +16,17 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
 import game_slots  # noqa: E402
+
+
+_PIN = contextlib.ExitStack()
+
+
+def setUpModule():  # the Windows slot rules: Windows backend on every platform (the Linux classes below switch themselves)
+    _PIN.enter_context(game_slots.backend("windows"))
+
+
+def tearDownModule():
+    _PIN.close()
 
 
 class SlotRules(unittest.TestCase):
@@ -281,6 +295,308 @@ class NeedWrite(TempRoot):
             game_slots.need_write([os.path.join(self.slot1, "mods", "mxl2012")], "test")
         self.assertIn("does not exist", str(cm.exception))
         self.assertEqual(os.listdir(self.tmp), [], "nothing written into the folder above the slot")
+
+
+# ---------------------------------------------------------------- the Linux backend (slots 2 and 5 under Proton)
+
+
+class Backend(unittest.TestCase):
+    def test_backend_is_picked_by_platform_and_env(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MXL_SLOT_BACKEND", None)
+            with game_slots.backend(game_slots.BACKEND):
+                os.environ.pop("MXL_SLOT_BACKEND", None)
+                with patch.object(sys, "platform", "linux"):
+                    self.assertEqual(game_slots.use_backend(), "linux")
+                    self.assertEqual((game_slots.SLOTS, game_slots.OWNER_SLOTS, game_slots.DEFAULT_SET), ((2, 5, 6, 7), (), (2, 5, 6, 7)))
+                with patch.object(sys, "platform", "win32"):
+                    self.assertEqual(game_slots.use_backend(), "windows")
+                    self.assertEqual((game_slots.SLOTS, game_slots.OWNER_SLOTS, game_slots.DEFAULT_SET),
+                                     ((1, 2, 3, 4, 5), (1,), (2, 3, 4, 5)))
+                with patch.object(sys, "platform", "win32"), patch.dict(os.environ, {"MXL_SLOT_BACKEND": "linux"}):
+                    self.assertEqual(game_slots.use_backend(), "linux")
+                with self.assertRaises(SystemExit):
+                    game_slots.use_backend("macos")
+        self.assertEqual(game_slots.BACKEND, "windows", "this module's pin is back")
+
+    def test_windows_images_do_not_depend_on_the_backend(self):
+        self.assertEqual(game_slots.ALL_IMAGES, ("d2rloader.exe", "d2r.exe", "d2rloader-s2.exe", "d2rloader-s3.exe",
+                                                 "d2rloader-s4.exe", "d2rloader-s5.exe"))
+
+
+class LinuxRoot(unittest.TestCase):
+    """A fake Linux slot 5 (and 2) with its own prefix, snapshot folder and lock folder, all in a temp folder; a fake /proc."""
+
+    def setUp(self):
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        stack.enter_context(game_slots.backend("linux"))
+        self.tmp = tempfile.mkdtemp(prefix="linslots-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.game = os.path.join(self.tmp, "slots", "s5")
+        self.compat = os.path.join(self.tmp, "prefixes", "s5")
+        os.makedirs(os.path.join(self.game, "mods", "mxl2012"))
+        os.makedirs(os.path.join(self.compat, "pfx", "dosdevices"))
+        os.symlink("../drive_c", os.path.join(self.compat, "pfx", "dosdevices", "c:"))
+        for f in ("D2R.exe", "D2RLoader.exe"):
+            Path(self.game, f).write_bytes(b"MZ")
+        self.locks = os.path.join(self.tmp, "locks")
+        self.runs = os.path.join(self.tmp, "runs")
+        self.proc = os.path.join(self.tmp, "proc")
+        os.makedirs(self.proc)
+        for p in (patch.dict(os.environ, {"MXL_SLOT5_DIR": self.game, "MXL_SLOT5_COMPAT": self.compat,
+                                          "MXL_SLOT5_SNAPSHOT": os.path.join(self.tmp, "slots", ".snap-s5"),
+                                          "MXL_SLOT2_DIR": os.path.join(self.tmp, "slots", "s2"),
+                                          "MXL_SLOT2_COMPAT": os.path.join(self.tmp, "prefixes", "s2")}),
+                  patch.object(game_slots, "LOCK_ROOT", self.locks), patch.object(game_slots, "RUNS", self.runs),
+                  patch.object(game_slots, "PROC", self.proc)):
+            stack.enter_context(p)
+
+    def fake_proc(self, pid, argv, env):
+        d = os.path.join(self.proc, str(pid))
+        os.makedirs(d)
+        Path(d, "cmdline").write_bytes(b"\0".join(a.encode() for a in argv) + b"\0")
+        Path(d, "environ").write_bytes(b"\0".join(f"{k}={v}".encode() for k, v in env.items()) + b"\0")
+
+
+class LinuxSlots(LinuxRoot):
+    def test_only_slots_two_five_six_and_seven_exist(self):
+        for n in (2, 5, "5", 6, 7):
+            self.assertEqual(game_slots.require_slot(n), int(n))
+        for n in (1, 3, 4):
+            with self.assertRaises(SystemExit) as cm:
+                game_slots.require_slot(n)
+            self.assertIn("does not exist on Linux", str(cm.exception))
+            for fn in (game_slots.slot_dir, game_slots.save_dir, game_slots.lock_paths, game_slots.prefix_dir):
+                with self.assertRaises(SystemExit, msg=f"{fn.__name__}({n})"):
+                    fn(n)
+        for bad in (0, 8, 10, "x", None):
+            with self.assertRaises(SystemExit):
+                game_slots.require_slot(bad)
+        with patch.dict(os.environ, {"MXL_SLOT": "1"}), self.assertRaises(SystemExit):
+            game_slots.env_slot()
+
+    def test_slot_table_defaults_and_overrides(self):
+        with patch.dict(os.environ, {}, clear=False):
+            for k in ("DIR", "COMPAT", "SNAPSHOT"):
+                os.environ.pop(f"MXL_SLOT2_{k}", None)
+            with patch.object(game_slots, "MACHINE", {}):
+                self.assertEqual(game_slots.linux_slot(2), {
+                    "dir": "/d2work/slots/s2", "compat": "/d2work/prefixes/s2", "snapshot": "/d2work/slots/.snap-s2",
+                    "prefix": "/d2work/prefixes/s2/pfx"})
+            with patch.object(game_slots, "MACHINE", {"linux_slots": {"2": {"dir": "/elsewhere/two", "compat": "~/pfx2"}}}):
+                t = game_slots.linux_slot(2)
+                self.assertEqual(t["dir"], "/elsewhere/two")
+                self.assertEqual(t["prefix"], os.path.join(os.path.expanduser("~/pfx2"), "pfx"))
+                with patch.dict(os.environ, {"MXL_SLOT2_DIR": "/env/wins"}):
+                    self.assertEqual(game_slots.slot_dir(2), "/env/wins")
+        self.assertEqual(game_slots.slot_dir(5), self.game)
+        self.assertEqual(game_slots.prefix_dir(5), os.path.join(self.compat, "pfx"))
+
+    def test_saves_live_in_the_prefix(self):
+        self.assertEqual(game_slots.save_dir(5), os.path.join(self.compat, "pfx", "drive_c", "users", "steamuser",
+                                                              "Saved Games", "Diablo II Resurrected", "mods", "mxl2012-s5"))
+        self.assertTrue(game_slots.mod_dir(5).endswith(os.path.join("s5", "mods", "mxl2012")))
+
+    def test_wine_env_and_commands(self):
+        env = game_slots.wine_env(5, base={"HOME": "/h", "WINEDEBUG": "+seh"}, log_dir="/logs")
+        self.assertEqual(env["WINEPREFIX"], os.path.join(self.compat, "pfx"))
+        self.assertEqual(env["STEAM_COMPAT_DATA_PATH"], self.compat)
+        self.assertEqual((env["PROTON_LOG"], env["PROTON_LOG_DIR"], env["WINEDEBUG"], env["HOME"]), ("1", "/logs", "+seh", "/h"))
+        self.assertEqual(game_slots.wine_env(5, base={})["WINEDEBUG"], "-all")
+        with patch.dict(os.environ, {"MXL_PROTON": "/opt/proton-x"}):
+            self.assertEqual(game_slots.proton_cmd("D:\\D2RLoader.exe", "-mod", "mxl2012"),
+                             ["python3", "/opt/proton-x/proton", "run", "D:\\D2RLoader.exe", "-mod", "mxl2012"])
+            self.assertEqual(game_slots.wine_cmd("Z:\\x.exe")[0], "/opt/proton-x/files/bin/wine")
+        self.assertEqual(game_slots.windows_path(5, os.path.join(self.game, "D2RLoader.exe")), "D:\\D2RLoader.exe")
+        self.assertEqual(game_slots.windows_path(5, os.path.join(self.game, "mods", "mxl2012")), "D:\\mods\\mxl2012")
+        self.assertEqual(game_slots.windows_path(5, "/d2work/runs/w.exe"), "Z:\\d2work\\runs\\w.exe")
+
+    def test_drive_d_is_made_and_a_wrong_one_refused(self):
+        link = game_slots.ensure_drive(5)
+        self.assertEqual(os.path.realpath(link), os.path.realpath(self.game))
+        self.assertEqual(game_slots.ensure_drive(5), link, "a second call keeps it")
+        os.remove(link)
+        os.symlink(self.tmp, link)
+        with self.assertRaises(SystemExit):
+            game_slots.ensure_drive(5)
+
+    def test_processes_are_found_in_proc_by_prefix(self):
+        game_slots.ensure_drive(5)
+        pfx5 = os.path.join(self.compat, "pfx")
+        other = os.path.join(self.tmp, "otherpfx")
+        os.makedirs(os.path.join(other, "dosdevices"))
+        os.symlink(self.tmp, os.path.join(other, "dosdevices", "d:"))
+        self.fake_proc(100, ["D:\\D2RLoader.exe", "-mod", "mxl2012"], {"WINEPREFIX": pfx5})
+        self.fake_proc(101, ["D:\\D2R.exe", "-w", "-mod", "mxl2012"], {"WINEPREFIX": pfx5})
+        self.fake_proc(102, ["C:\\windows\\system32\\services.exe"], {"WINEPREFIX": pfx5})
+        self.fake_proc(103, ["/usr/bin/python3", "D2R.exe"], {"WINEPREFIX": pfx5})  # not a Wine image
+        self.fake_proc(104, ["D:\\D2R.exe"], {"WINEPREFIX": other})  # the same name in another prefix
+        self.fake_proc(105, ["D:\\D2R.exe"], {})  # no prefix
+        os.makedirs(os.path.join(self.proc, "106"))  # gone / not readable
+        found = game_slots.linux_processes()
+        self.assertEqual([(p, n) for p, n, _ in found], [(100, "D2RLoader.exe"), (101, "D2R.exe"), (104, "D2R.exe")])
+        self.assertEqual(found[1][2], os.path.join(os.path.realpath(self.game), "D2R.exe"))
+        self.assertEqual(game_slots.slot_processes(self.game), [(100, "D2RLoader.exe"), (101, "D2R.exe")])
+        self.assertEqual(game_slots.game_pids(5), [100, 101])
+        self.assertEqual(game_slots.game_pids(5, ("d2r.exe",)), [101])
+        self.assertEqual(game_slots.prefix_pids(5), [100, 101, 102, 103])
+        self.assertEqual(game_slots.prefix_pids(2), [])
+        self.assertTrue(game_slots.pid_alive(100))
+        self.assertFalse(game_slots.pid_alive(99))
+
+    def test_unix_path(self):
+        pfx = os.path.join(self.compat, "pfx")
+        game_slots.ensure_drive(5)
+        self.assertEqual(game_slots.unix_path(pfx, "D:\\mods\\mxl2012\\x.dll"),
+                         os.path.join(os.path.realpath(self.game), "mods", "mxl2012", "x.dll"))
+        self.assertEqual(game_slots.unix_path(pfx, "Q:\\x.exe"), "")
+        self.assertEqual(game_slots.unix_path(pfx, "x.exe"), "")
+
+    def test_locks_are_linslot_compatible(self):
+        self.assertEqual(game_slots.lock_paths(5), [os.path.join(self.locks, "game.lock.5")])  # no legacy lock
+        ok, _ = game_slots.acquire(5, "linslots", pid=0)
+        self.assertTrue(ok)
+        txt = Path(self.locks, "game.lock.5", "owner.txt").read_text()
+        self.assertRegex(txt, r"^linslots pid=0 \d{4}-\d\d-\d\d \d\d:\d\d:\d\d$")
+        self.assertFalse(game_slots.acquire(5, "wineinput")[0])
+        self.assertTrue(game_slots.release(5, "linslots", manual=True))
+        # a lock written by linslot.py (lane linuxslots): same format, held
+        os.makedirs(os.path.join(self.locks, "game.lock.2"))
+        Path(self.locks, "game.lock.2", "owner.txt").write_text("wineinput pid=0 2026-11-20 09:00:00")
+        self.assertEqual(game_slots.lock_info(2)[1].split()[0], "wineinput")
+        self.assertFalse(game_slots.acquire(2, "linslots")[0])
+
+    def test_a_dead_owner_pid_is_stale_and_a_live_one_holds(self):
+        os.makedirs(os.path.join(self.locks, "game.lock.5"))
+        Path(self.locks, "game.lock.5", "owner.txt").write_text("crashed pid=4242 2026-11-20 09:00:00")
+        self.assertTrue(game_slots.acquire(5, "linslots", pid=77)[0], "pid 4242 is not in /proc")
+        game_slots.release(5, "linslots")
+        Path(self.proc, "4243").mkdir()
+        os.makedirs(os.path.join(self.locks, "game.lock.5"))
+        Path(self.locks, "game.lock.5", "owner.txt").write_text("busy pid=4243 2026-11-20 09:00:00")
+        self.assertFalse(game_slots.acquire(5, "linslots")[0])
+
+    def test_status_lists_only_the_linux_slots(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            game_slots.status()
+        lines = out.getvalue().splitlines()
+        self.assertEqual([l.split(":")[0] for l in lines], ["budget", "slot 2", "slot 5", "slot 6", "slot 7"])
+        self.assertIn("none (no budget.json)", lines[0])
+        self.assertIn("MISSING", lines[1])
+        self.assertIn("prefix " + os.path.join(self.compat, "pfx"), lines[2])
+
+    def test_data_tools_never_read_d2r_files_from_a_linux_slot(self):
+        import d2r_game
+        Path(self.game, "D2RLoader.exe").write_bytes(b"MZ")
+        with patch.dict(os.environ, {"MXL_SLOT": "5"}), self.assertRaises(SystemExit) as cm:
+            d2r_game.read_game_dir()  # the slots hold D2R 3.4; the data tools want build 93847's files
+        self.assertIn("not build 93847", str(cm.exception))
+
+    def test_setup_makes_the_loader_copy_and_the_save_folder_in_the_prefix(self):
+        os.makedirs(os.path.join(self.game, "mods", "mxl2012", "mxl2012.mpq"))
+        msg = game_slots.setup(5)
+        self.assertIn("D2RLoader-s5.exe", msg)
+        self.assertTrue(os.path.isdir(game_slots.save_dir(5)))
+        self.assertEqual(game_slots.loader_name(self.game), "D2RLoader-s5.exe")
+        self.assertIn('"savepath": "mxl2012-s5/"', Path(self.game, "mods", "mxl2012", "modinfo.json").read_text())
+
+
+USER_REG = ('WINE REGISTRY Version 2\n;; All keys relative to REGISTRY\\\\User\\\\S-1\n\n#arch=win64\n\n'
+            '[Software\\\\Wine\\\\DllOverrides] 1794497076\n#time=1dd\n"d3d12"="native,builtin"\n\n'
+            '[Volatile Environment] 1794497076\n"USERNAME"="steamuser"\n')
+
+
+class LinuxNoFocus(LinuxRoot):
+    """Owner rule (2026-11-20): test games never take focus. The launch writes the prefix's X11 Driver settings; a
+    FocusWatch measures _NET_ACTIVE_WINDOW."""
+
+    def reg(self):
+        return os.path.join(self.compat, "pfx", "user.reg")
+
+    def test_settings_are_added_once_and_other_keys_kept(self):
+        Path(self.reg()).write_text(USER_REG)
+        self.assertEqual(game_slots.apply_launch_settings(5), list(game_slots.NO_FOCUS_VALUES))
+        text = Path(self.reg()).read_text()
+        self.assertEqual(game_slots.reg_values(text, game_slots.X11_DRIVER_KEY),
+                         {"UseTakeFocus": "N", "GrabPointer": "N", "GrabFullscreen": "N"})
+        self.assertIn('[Software\\\\Wine\\\\X11 Driver] ', text)
+        self.assertTrue(text.startswith(USER_REG.rstrip("\n")), "everything else as it was")
+        self.assertEqual(game_slots.apply_launch_settings(5), [], "nothing to do the second time")
+        self.assertEqual(Path(self.reg()).read_text(), text)
+
+    def test_an_existing_section_is_updated_in_place(self):
+        text = USER_REG + '\n[Software\\\\Wine\\\\X11 Driver] 1\n"UseTakeFocus"="Y"\n"Decorated"="Y"\n\n[Zzz] 2\n"a"="b"\n'
+        out = game_slots.set_reg_values(text, game_slots.X11_DRIVER_KEY, game_slots.NO_FOCUS_VALUES)
+        self.assertEqual(game_slots.reg_values(out, game_slots.X11_DRIVER_KEY),
+                         {"UseTakeFocus": "N", "Decorated": "Y", "GrabPointer": "N", "GrabFullscreen": "N"})
+        self.assertEqual(game_slots.reg_values(out, "Zzz"), {"a": "b"})
+        self.assertEqual(out.count("[Software\\\\Wine\\\\X11 Driver]"), 1)
+
+    def test_settings_refused_while_the_prefix_runs_and_without_a_prefix(self):
+        with self.assertRaises(SystemExit):
+            game_slots.apply_launch_settings(5)  # no user.reg yet
+        Path(self.reg()).write_text(USER_REG)
+        with patch.object(game_slots, "prefix_pids", return_value=[7]), self.assertRaises(SystemExit):
+            game_slots.apply_launch_settings(5)
+        self.assertEqual(Path(self.reg()).read_text(), USER_REG)
+
+    def test_launch_writes_the_settings_before_proton_starts(self):
+        Path(self.reg()).write_text(USER_REG)
+        seen = {}
+
+        def popen(argv, **kw):
+            seen["reg"] = game_slots.reg_values(Path(self.reg()).read_text(), game_slots.X11_DRIVER_KEY)
+            seen["argv"], seen["env"] = argv, kw["env"]
+            return "proc"
+        with patch.object(game_slots.subprocess, "Popen", side_effect=popen), patch.dict(os.environ, {"MXL_PROTON": "/p"}):
+            self.assertEqual(game_slots.launch(5, ["-mod", "mxl2012"]), "proc")
+        self.assertEqual(seen["reg"]["UseTakeFocus"], "N")
+        self.assertEqual(seen["argv"], ["python3", "/p/proton", "run", "D:\\D2RLoader.exe", "-mod", "mxl2012"])
+        self.assertEqual(seen["env"]["WINEPREFIX"], os.path.join(self.compat, "pfx"))
+
+    def test_xprop_parsers(self):
+        self.assertEqual(game_slots.parse_active("_NET_ACTIVE_WINDOW(WINDOW): window id # 0xa600030, 0x0\n"), 0xa600030)
+        self.assertEqual(game_slots.parse_active("_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0\n"), 0)
+        self.assertIsNone(game_slots.parse_active("_NET_ACTIVE_WINDOW:  not found.\n"))
+        self.assertEqual(game_slots.parse_window('_NET_WM_PID(CARDINAL) = 521884\nWM_CLASS(STRING) = "d2rloader-s5.exe", '
+                                                 '"d2rloader-s5.exe"\n'), (521884, '"d2rloader-s5.exe", "d2rloader-s5.exe"'))
+        self.assertEqual(game_slots.parse_window("_NET_WM_PID:  not found.\n"), (None, ""))
+        self.assertTrue(game_slots.is_game_window(5, "", {5}))
+        self.assertTrue(game_slots.is_game_window(None, '"explorer.exe", "explorer.exe"', set()))
+        self.assertFalse(game_slots.is_game_window(9, '"xfce4-terminal", "Xfce4-terminal"', {5}))
+
+    def fake_x(self, active, windows):
+        def query(*a):
+            if a[0] == "-root":
+                return f"_NET_ACTIVE_WINDOW(WINDOW): window id # {hex(active[0])}\n"
+            pid, cls = windows[int(a[1], 16)]
+            return f"_NET_WM_PID(CARDINAL) = {pid}\nWM_CLASS(STRING) = {cls}\n"
+        return query
+
+    def test_focus_watch_ignores_the_owner_and_catches_the_game(self):
+        active = [0x100]
+        windows = {0x100: (11, '"code", "Code"'), 0x200: (12, '"xfce4-terminal", "Xfce4-terminal"'),
+                   0x300: (500, '"d2rloader-s5.exe", "d2rloader-s5.exe"')}
+        w = game_slots.FocusWatch(5, query=self.fake_x(active, windows), pids=lambda: {500, 501})
+        self.assertEqual(w.before, 0x100)
+        self.assertIsNone(w.poll())
+        active[0] = 0x200  # the owner switched windows: fine
+        self.assertIsNone(w.poll())
+        self.assertIn("focus kept", w.summary())
+        active[0] = 0x300  # the game window became active
+        grab = w.poll()
+        self.assertEqual(grab[1:], (0x300, 500, '"d2rloader-s5.exe", "d2rloader-s5.exe"', True))
+        self.assertEqual(len(w.changes), 2)
+        self.assertIn("FOCUS GRAB", w.summary())
+
+    def test_focus_watch_thread_stops(self):
+        active = [0x100]
+        w = game_slots.FocusWatch(5, interval=0.01, query=self.fake_x(active, {0x100: (1, '"x", "X"')}), pids=set).start()
+        time.sleep(0.05)
+        self.assertIn("focus kept", w.stop())
+        self.assertGreater(w.polls, 0)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Rig a generated, posed character mesh to a D2R skeleton: proximity skin weights + "unposing" into the skeleton's bind pose.
 
-  rig_fit.py <mesh_lods.npz> <profile: wolf|goatman1|bear> <out.npz> [--skeleton file.skeleton] [--png prefix]
+  rig_fit.py <mesh_lods.npz> <profile: wolf|goatman1|bear|hellbovine|mummy1> <out.npz> [--skeleton file.skeleton] [--png prefix]
 
 <mesh_lods.npz> is the Wereowl set (pos/nrm/uv/tris and the _1.._4 level-of-detail suffixes; y up, faces +z, a standing figure
 with its arms spread). The mesh is not in the skeleton's bind pose (the arms are horizontal at shoulder height of a chunky body, the
@@ -23,7 +23,14 @@ POSED table), `skip` (roles the skeleton has no bone for: the weight chains brid
 where `posed` puts them instead of at the scaled bind skeleton), `keep` ({axis: roles} carried without travel along that axis),
 `stretch` (True: each segment is also scaled along its length by bind length / posed length, clipped to `smin` .. `smax`, with
 `girth` the exponent that shares that scale across the other two axes), `rscale` ({role: factor} extra uniform scale per role).
+A `posed` key with a side (`R_thigh`) places that side on its own instead of mirroring: a mesh generated from one sprite
+view stands in the sprite's stance, not in a symmetric one.
 The capsule weights are the fallback; the Druid form uses Blender bone heat weights made from this fit (owl_refit.py, owl_weights.py).
+
+Lane rigaudit (docs/rigging.md): this carry squeezes a mesh into the donor's proportions and its capsule weights cross gaps
+(a hand next to a thigh); monster3d/rig_embed.py embeds the skeleton in the mesh instead (medial joints, geodesic voxel
+weights, bind in place, retargeted clips). carry_maps / uncarry expose the carry so that rig_audit.py can recover the
+generated mesh from a stage built here.
 """
 import json
 import sys
@@ -81,6 +88,47 @@ PROFILES = {
                         "neck": "C_Neck_neck1", "head": "head", "clav": "{S}_Clavicle_Clavicle", "upperarm": "{S}_Arm_UpperArm",
                         "forearm": "{S}_Arm_ForeArm", "hand": "{S}_Arm_Wrist", "thigh": "{S}_Leg_Thigh", "calf": "{S}_Leg_Calf",
                         "ankle": "{S}_Leg_Foot", "toe": "{S}_Leg_Ball"}),
+    # D2R's Hell Bovine (enemy/hellbovine, 97 bones): an A-pose, upright biped with two-handed polearm clips (hip 4.4, shoulders
+    # 8.1, head joint 9.5, hands at 5.4); no toe bone. The posed joints are the Hardliner mesh of lane hdtools-monster3d (TripoSG,
+    # seed 1, scaled to 9 units): it stands in the sprite's stance, right arm stretched out, right leg bent back, left thigh
+    # forward, the trunk 0.45 to its left of the box centre. The segments are stretched to the Bovine's lengths (its trunk and
+    # upper arms are longer), u is the unit scale that brings the result back to the Hardliner's height.
+    "hellbovine": dict(u=0.8, k=1.0, leg_snap=False, skip={"toe"}, stretch=True, girth=0.35, smin=0.7, smax=1.6,
+                       posed={"pelvis": (0.45, 4.1, 0.0), "spine_a": (0.45, 4.4, 0.0), "spine_b": (0.45, 5.0, 0.0),
+                              "chest": (0.45, 5.7, 0.0), "neck": (0.4, 6.6, 0.0), "head": (0.4, 7.2, 0.1),
+                              "head_end": (0.4, 8.2, 0.1),
+                              "R_clav": (0.0, 6.4, 0.0), "R_upperarm": (-0.7, 6.3, 0.0), "R_forearm": (-1.7, 6.0, 0.2),
+                              "R_hand": (-2.5, 5.9, 0.3), "R_hand_end": (-3.0, 5.9, 0.4),
+                              "L_clav": (0.9, 6.4, 0.0), "L_upperarm": (1.6, 6.3, 0.0), "L_forearm": (2.05, 5.2, 0.1),
+                              "L_hand": (2.35, 3.9, 0.0), "L_hand_end": (2.4, 3.3, 0.0),
+                              "L_thigh": (0.9, 3.7, 0.2), "L_calf": (0.9, 2.8, 1.6), "L_ankle": (0.9, 0.8, 1.15),
+                              "L_foot": (0.9, 0.35, 1.2), "L_toe_end": (0.9, 0.1, 1.9),
+                              "R_thigh": (-0.5, 3.7, 0.0), "R_calf": (-1.0, 2.8, -0.8), "R_ankle": (-0.9, 2.1, -1.5),
+                              "R_foot": (-0.9, 2.0, -1.7), "R_toe_end": (-0.9, 1.9, -1.9)},
+                       bones={"pelvis": "pelvis_bind_jnt", "spine_a": "spine_01_bind_jnt", "spine_b": "spine_02_bind_jnt",
+                              "chest": "spine_04_bind_jnt", "neck": "neck_bind_jnt", "head": "head_bind_jnt",
+                              "clav": "{S}_shoulder_bind_jnt", "upperarm": "{S}_upr_arm_bind_jnt",
+                              "forearm": "{S}_lwr_arm_bind_jnt", "hand": "{S}_hand_bind_jnt", "thigh": "{S}_leg_01_bind_jnt",
+                              "calf": "{S}_leg_02_bind_jnt", "ankle": "{S}_leg_03_bind_jnt", "foot": "{S}_leg_04_bind_jnt"}),
+    # D2R's Dried Corpse (enemy/mummy1, 82 bones): a T-pose, upright human biped without weapon (hip 4.2, shoulders 6.2, head
+    # joint 6.8, arm span 6); no ankle bone: the ankle role takes its Foot bone, the toe its Ball (`skip` bridges the foot role).
+    # The posed joints are the Glowing Fungus mesh of lane hdtools-monster3d (TripoSG, front view, seed 42, scaled to 9.2
+    # units): it squats with both knees forward, the right foot ahead, the trunk leaning forward from a pelvis 0.8 behind the
+    # box centre, the arms hanging with the elbows back. The cap is not posed: monster3d/s5_build.py binds it to the head alone.
+    "mummy1": dict(u=0.9, k=1.0, leg_snap=False, skip={"foot"}, stretch=True, girth=0.35, smin=0.7, smax=1.6,
+                   posed={"pelvis": (0, 3.86, -0.83), "spine_a": (0, 4.32, -1.0), "spine_b": (0, 4.88, -0.92),
+                          "chest": (0, 5.52, -0.55), "neck": (0, 6.26, 0.18), "head": (0, 6.72, 0.83), "head_end": (0, 7.54, 1.47),
+                          "L_clav": (0.74, 5.89, -0.46), "L_upperarm": (1.75, 5.89, -0.74), "L_forearm": (2.02, 4.42, -1.01),
+                          "L_hand": (1.84, 2.76, 0.0), "L_hand_end": (1.81, 1.93, -0.37),
+                          "R_clav": (-0.74, 5.89, -0.46), "R_upperarm": (-1.66, 5.89, -0.83), "R_forearm": (-1.84, 4.51, -1.29),
+                          "R_hand": (-1.98, 3.04, 0.32), "R_hand_end": (-1.97, 2.39, 0.0),
+                          "L_thigh": (0.92, 3.86, -0.83), "L_calf": (1.47, 2.21, 0.37), "L_ankle": (1.29, 0.55, -0.55),
+                          "L_toe": (1.47, 0.14, 0.28), "L_toe_end": (1.47, 0.09, 0.64),
+                          "R_thigh": (-0.92, 3.86, -0.74), "R_calf": (-1.10, 2.39, 0.92), "R_ankle": (-1.10, 0.64, 0.28),
+                          "R_toe": (-1.20, 0.18, 1.29), "R_toe_end": (-1.20, 0.14, 1.66)},
+                   bones={"pelvis": "pelvis", "spine_a": "spine_01", "spine_b": "spine_02", "chest": "chest", "neck": "neck",
+                          "head": "head", "clav": "{S}_Clavicle", "upperarm": "{S}_UpperArm", "forearm": "{S}_ForeArm",
+                          "hand": "{S}_Wrist", "thigh": "{S}_Thigh", "calf": "{S}_Calf", "ankle": "{S}_Foot", "toe": "{S}_Ball"}),
 }
 
 
@@ -103,14 +151,15 @@ def instances(profile, bones):
     k, skip, keep = profile.get("k", 1.0), profile.get("skip", ()), profile.get("keep", {})
     out = {}
     for role, p in posed.items():
-        if role in skip:
+        if role in skip or role[:2] in ("R_", "L_"):
             continue
         for side in ("R", "L") if role in SIDED else (None,):
-            p3 = np.array(p, float) * k
-            p3[2] += profile.get("dz", 0.0)
-            if side == "R":
-                p3[0] = -p3[0]
             key = role if side is None else "%s_%s" % (side, role)
+            own = side is not None and key in posed
+            p3 = np.array(posed[key] if own else p, float) * k
+            p3[2] += profile.get("dz", 0.0)
+            if side == "R" and not own:
+                p3[0] = -p3[0]
             if role in ENDS:  # a posed end point only shapes the capsule; no bone
                 out[key] = (p3, None, None, p3)
                 continue
@@ -161,12 +210,13 @@ def smooth(w, tris, it=4):
     return w
 
 
-def fit(profile, bones, pos, nrm, tris, soft=2.0):
+def carry_maps(profile, bones):
+    """{joint key: (bind point b, matrix M, carry point c, bone name)} of every joint with a bone: rig_fit carries a vertex
+    of that joint to b + M (v - c) / u. M = R S: R the minimal turn of the posed segment onto the bind segment (none for the
+    NO_ROT roles: the hand, foot, toe, ankle take their parent's), S the stretch along the segment when the profile has
+    `stretch`, times `rscale`."""
     inst = instances(profile, bones)
     segs = segments(inst, profile)
-    u = profile["u"]
-    pos = pos * profile.get("k", 1.0) + np.array([0, 0, profile.get("dz", 0.0)])  # the mesh scaled into the unit's size
-    # rotation per segment start joint
     rot = {k: np.eye(3) for k in inst}
     for ka, kb, r in segs:
         role = ka.split("_", 1)[1] if ka[:2] in ("R_", "L_") else ka
@@ -184,6 +234,53 @@ def fit(profile, bones, pos, nrm, tris, soft=2.0):
         for role, parent in (("hand", "forearm"), ("foot", "calf"), ("ankle", "calf"), ("toe", "calf")):
             if side + "_" + role in inst:
                 rot[side + "_" + role] = rot[side + "_" + parent]
+    stretch, girth, rscale = profile.get("stretch", False), profile.get("girth", 0.0), profile.get("rscale", {})
+    out = {}
+    for k in rot:
+        b, c = inst[k][1], inst[k][3]
+        M = rot[k].copy()
+        role = k.split("_", 1)[1] if k[:2] in ("R_", "L_") else k
+        if stretch and role not in NO_ROT:
+            seg = next(((ka, kb) for ka, kb, r in segs if ka == k and inst[kb][1] is not None), None)
+            if seg:
+                dp, db = inst[seg[1]][0] - inst[seg[0]][0], inst[seg[1]][1] - inst[seg[0]][1]
+                s = float(np.clip(np.linalg.norm(db) / np.linalg.norm(dp), profile.get("smin", 0.6), profile.get("smax", 1.9)))
+                g = s ** girth
+                d = dp / np.linalg.norm(dp)
+                M = M @ (g * np.eye(3) + (s - g) * np.outer(d, d))
+        if role in rscale:
+            M = M * rscale[role]
+        out[k] = (b, M, c, inst[k][2])
+    return out
+
+
+def uncarry(profile, bones, pos, bidx, wts, names, extra=None):
+    """The inverse of the carry: posed positions (this module's frame, after k and dz) of bind-space vertices that fit()
+    skinned (pos, bone_idx, weights, bone names as s5_build saves them). The weights blend one affine map per joint, so a
+    vertex's map is affine too and is inverted exactly. extra: {bone name: joint key} for bones bound after the fit (a cap
+    bone carried with the head)."""
+    maps = carry_maps(profile, bones)
+    by_name = {v[3]: v for v in maps.values()}
+    for n, key in (extra or {}).items():
+        by_name[n] = maps[key]
+    u = profile["u"]
+    A = np.zeros((len(pos), 3, 3))
+    t = np.zeros((len(pos), 3))
+    for j, n in enumerate(names):
+        b, M, c, _ = by_name[n]
+        w = (wts * (bidx == j)).sum(1)
+        A += w[:, None, None] * (M / u)
+        t += w[:, None] * (b - (M @ c) / u)
+    return np.linalg.solve(A, (pos - t)[..., None])[..., 0]
+
+
+def fit(profile, bones, pos, nrm, tris, soft=2.0, rigid=None):
+    """rigid: {joint key ('head', 'L_hand', ...): bool mask of vertices} that follow that one joint alone (a hat, a shell)."""
+    inst = instances(profile, bones)
+    segs = segments(inst, profile)
+    u = profile["u"]
+    pos = pos * profile.get("k", 1.0) + np.array([0, 0, profile.get("dz", 0.0)])  # the mesh scaled into the unit's size
+    maps = carry_maps(profile, bones)
     # weights: one column per joint instance that starts a segment; a segment gives its start joint the weight at the start
     # and its end joint the weight at the end by interpolation along the segment
     cols = []
@@ -212,25 +309,19 @@ def fit(profile, bones, pos, nrm, tris, soft=2.0):
     idx = np.argsort(-W, axis=1)[:, 4:]
     np.put_along_axis(W, idx, 0, axis=1)
     W /= W.sum(1, keepdims=True)
-    # carry: per joint an affine map  b + M (v - c) / u  with M = R S (S stretches along the posed segment to the bind segment's
-    # length when the profile has `stretch`, its girth the stretch to the power `girth`; `rscale` scales whole roles)
-    stretch, girth, rscale = profile.get("stretch", False), profile.get("girth", 0.0), profile.get("rscale", {})
+    for key, mask in (rigid or {}).items():
+        W[mask] = 0
+        W[mask, cols.index(key)] = 1
+    return carry(maps, cols, W, pos, nrm, u) + (inst, cols)
+
+
+def carry(maps, cols, W, pos, nrm, u):
+    """Bind-space positions and normals of posed vertices with weights W over the joint keys `cols` (carry_maps), and the
+    top-4 bone indices, weights and bone names that d2r_mesh writes."""
     out = np.zeros_like(pos)
     on = np.zeros_like(nrm)
     for j, k in enumerate(cols):
-        b, c = inst[k][1], inst[k][3]
-        M = rot[k].copy()
-        role = k.split("_", 1)[1] if k[:2] in ("R_", "L_") else k
-        if stretch and role not in NO_ROT:
-            seg = next(((ka, kb) for ka, kb, r in segs if ka == k and inst[kb][1] is not None), None)
-            if seg:
-                dp, db = inst[seg[1]][0] - inst[seg[0]][0], inst[seg[1]][1] - inst[seg[0]][1]
-                s = float(np.clip(np.linalg.norm(db) / np.linalg.norm(dp), profile.get("smin", 0.6), profile.get("smax", 1.9)))
-                g = s ** girth
-                d = dp / np.linalg.norm(dp)
-                M = M @ (g * np.eye(3) + (s - g) * np.outer(d, d))
-        if role in rscale:
-            M = M * rscale[role]
+        b, M, c, _ = maps[k]
         moved = b + ((pos - c) / u) @ M.T
         out += W[:, [j]] * moved
         on += W[:, [j]] * (nrm @ np.linalg.inv(M))
@@ -238,10 +329,10 @@ def fit(profile, bones, pos, nrm, tris, soft=2.0):
     top = np.argsort(-W, axis=1)[:, :4]
     wts = np.take_along_axis(W, top, 1)
     used = sorted({int(c) for c in np.unique(top[wts > 0])})
-    names = [inst[cols[c]][2] for c in used]
+    names = [maps[cols[c]][3] for c in used]
     remap = {c: i for i, c in enumerate(used)}
     bidx = np.vectorize(remap.get, otypes=[int])(np.where(wts > 0, top, used[0]))
-    return out, on, bidx, wts, names, inst, cols
+    return out, on, bidx, wts, names
 
 
 def main():

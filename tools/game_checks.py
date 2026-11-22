@@ -89,6 +89,8 @@ class Watchdog(threading.Thread):
         self.rest_inside = None
 
     def run(self):
+        if g.game_slots.LINUX:
+            return self._run_linux()
         pt = wt.POINT()
         prev = None
         while not self.stop_flag:
@@ -120,7 +122,27 @@ class Watchdog(threading.Thread):
                     self.abort = "the game window became the foreground window"
             time.sleep(0.025)
 
+    def _run_linux(self):
+        """Linux: the game runs on its own private X display (game_ctl_linux), so the owner's real cursor can never be
+        inside the game window and the game cannot reach the owner's foreground. What is watched is the owner's
+        _NET_ACTIVE_WINDOW (game_ctl_linux's FocusWatch from before the launch): a change to a window of the slot's
+        prefix aborts the run, as a game window in front does on Windows."""
+        import game_ctl_linux
+        self.linux = True
+        while not self.stop_flag:
+            self.samples += 1
+            grabs = game_ctl_linux.focus_grabs()
+            if len(grabs) != self.fg_changes:
+                self.fg_changes = len(grabs)
+                if not self.abort:
+                    self.abort = "the owner's active window went to a game window: %s" % (grabs[-1],)
+            time.sleep(0.25)
+
     def summary(self):
+        if getattr(self, "linux", False):
+            return ("Linux: the game ran on a private X display (the owner's cursor and keyboard never reach it); owner's "
+                    "_NET_ACTIVE_WINDOW sampled %d times at 250 ms by this watchdog: %d grabs by a game window (focus.json in "
+                    "the run folder has the full watch); abort: %s" % (self.samples, self.fg_changes, self.abort))
         return ("%d samples at 25 ms; cursor before %s, after %s, range x %s..%s y %s..%s, %d cursor changes (the user's own "
                 "mouse); foreground window changed %d times; abort: %s" % (
                     self.samples, self.first, self.last, self.min[0], self.max[0], self.min[1], self.max[1],
@@ -911,10 +933,14 @@ _TABLES = {}
 
 
 def table(name):
-    """A built table (work/mod, what install_mod.py put into the slot) as a list of dicts."""
+    """A built table (work/mod, what install_mod.py put into the slot; the slot's own copy when this checkout has no build) as a
+    list of dicts."""
     if name not in _TABLES:
         import csv
-        with open(os.path.join(EXCEL, name + ".txt"), encoding="latin-1", newline="") as f:
+        path = os.path.join(EXCEL, name + ".txt")
+        if not os.path.isfile(path):
+            path = os.path.join(g.GAME_DIR, "mods", "mxl2012", "mxl2012.mpq", "data", "global", "excel", name + ".txt")
+        with open(path, encoding="latin-1", newline="") as f:
             _TABLES[name] = list(csv.DictReader(f, delimiter="\t"))
     return _TABLES[name]
 
@@ -1082,12 +1108,12 @@ def be_class(class_id):
 
 
 def smoke_plugins_ok(line):
-    """Only bundled mod plugins and the explicit global-plugin test probes."""
+    """Only bundled mod plugins (install_mod.py installs drawcap and statbook with the mod) and the explicit global-plugin test probes."""
     if line == "other plugins: none":
         return True
     prefix = "other plugins: "
     return line.startswith(prefix) and all(re.fullmatch(
-        r"(?:gp-probe-\w+\.dll \(global\)|(?:d2rl-charm-inv|drawcap|invtabs)\.dll \(mod mxl2012\))", p)
+        r"(?:gp-probe-\w+\.dll \(global\)|(?:d2rl-charm-inv|drawcap|invtabs|statbook)\.dll \(mod mxl2012\))", p)
         for p in line[len(prefix):].split(", "))
 
 
@@ -9124,6 +9150,8 @@ SWARM_MONSTER = "cultist2"  # Heretic, monstats MissA1 skullswarmcenter (FetishB
 
 def game_private_mb():
     """Private bytes of this slot's game process in MB (None when it cannot be read)."""
+    if g.game_slots.LINUX:
+        return linux_private_mb(g.game_slots.game_pids(g.SLOT))
     class PMC(ctypes.Structure):
         _fields_ = [("cb", wt.DWORD), ("PageFaultCount", wt.DWORD)] + [(n, ctypes.c_size_t) for n in (
             "PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage", "QuotaPagedPoolUsage",
@@ -9140,6 +9168,19 @@ def game_private_mb():
         k32.CloseHandle(wt.HANDLE(h))
         if ok:
             return pmc.PrivateUsage // (1 << 20)
+    return None
+
+
+def linux_private_mb(pids, proc="/proc"):
+    """Linux twin of game_private_mb: Private_Clean + Private_Dirty + Swap of the first readable game pid (Linux pids, from
+    /proc/<pid>/smaps_rollup), the closest Linux number to Windows' PrivateUsage. None when none can be read."""
+    for pid in pids:
+        try:
+            with open(os.path.join(proc, str(pid), "smaps_rollup")) as f:
+                kb = {k: int(v.split()[0]) for k, v in (ln.split(":", 1) for ln in f if ":" in ln and ln.split(":", 1)[1].strip()[:1].isdigit())}
+        except (OSError, ValueError):
+            continue
+        return (kb.get("Private_Clean", 0) + kb.get("Private_Dirty", 0) + kb.get("Swap", 0)) // 1024
     return None
 
 
@@ -10595,6 +10636,10 @@ CHECKS += [("hdit_icons", hdit_icons)]
 WALL_MAPS = {60: "desertpeak", 59: "cypherpunk", 95: "glados", 18: "downtown", 98: "moskvich", 126: "borgir", 125: "macumba",
              127: "charismatic", 90: "dungrm6a", 96: "temple5", 15: "caveroom4", 84: "excelsior3", 65: "belial", 13: "epicwhiners",
              14: "inarius", 116: "rockisdead"}
+for _part in os.environ.get("MXL_WALL_EXTRA", "").split(","):   # lane hdmaps2: "33:cathy3" adds D2R maps (viewer calibration)
+    _lv, _, _nm = _part.partition(":")
+    if _lv.strip().isdigit() and _nm.strip():
+        WALL_MAPS[int(_lv)] = _nm.strip()
 WALL_OFFSETS = ((0, 0), (12, 12), (-12, 12))   # subtiles from the arrival: three views per map (`place`, travel help)
 
 
@@ -11451,6 +11496,9 @@ def run_all(only=None):
     if bad_names:  # before the lock, the game and the run folder: a misspelt name used to be skipped without a word
         print("unknown check name(s): %s (not in the CHECKS list at the end of tools/game_checks.py)" % ", ".join(bad_names))
         return 2
+    # lane lowprofile: the slot's graphics profile (game_slots.apply_profile at launch): MXL_PROFILE when set, else
+    # "visual" for a run with an HD visual check (game_slots.VISUAL_CHECKS), else the low "test" profile
+    os.environ["MXL_PROFILE"] = g.game_slots.profile_for_checks(only, os.environ.get("MXL_PROFILE"))
     new_run()
     if not lock():
         print("game lock held for 30 min, giving up")
@@ -11511,7 +11559,20 @@ def run_all(only=None):
             r = g.logscan()
             write_report(cache_poll_stop() + "## Real input watchdog\n\n" + WD.summary() + "\n\n## logscan\n\n```\n" + r["text"] + "\n```")
             print(WD.summary())
+            run_cleanup_linux()
     return 0
+
+
+def run_cleanup_linux():
+    """Linux runs: tools/run_cleanup.py on this run's folder after the report (noise logs and uncited shots of a passed run,
+    empty files, crash reports of a known handled exception; logged in game_ctl.log). Env MXL_KEEP_RUN_FILES=1 keeps all."""
+    if not getattr(g.game_slots, "LINUX", False) or os.environ.get("MXL_KEEP_RUN_FILES") == "1":
+        return
+    try:
+        import run_cleanup
+        run_cleanup.clean(g.current_run(), log=g.log)
+    except Exception as e:  # never fails the run
+        g.log("run cleanup skipped: %r" % (e,))
 
 
 def main():
@@ -17154,17 +17215,16 @@ def hc_hold(mid, log, secs):
     fx, fy = (800 + (dx - dy) * 27) / 1600, (405 + (dx + dy) * 13.5) / 900
     g.click(fx, fy, move_only=True)
     h, v = g.need_window(), g.vinput()
-    cr = wt.RECT()
-    g.user32.GetClientRect(h, ctypes.byref(cr))
-    lp = ((int(fy * cr.bottom) & 0xFFFF) << 16) | (int(fx * cr.right) & 0xFFFF)
+    cw, ch = g.client_size(h)
+    lp = ((int(fy * ch) & 0xFFFF) << 16) | (int(fx * cw) & 0xFFFF)
     before, f0 = rd("mon:%d" % mid, 6), hc_frame()
     v[4] |= 1
-    g.user32.PostMessageW(h, g.WM_LBUTTONDOWN, 1, lp)
+    g.post_message(h, g.WM_LBUTTONDOWN, 1, lp)
     try:
         time.sleep(secs)
     finally:
         v[4] &= ~1
-        g.user32.PostMessageW(h, g.WM_LBUTTONUP, 0, lp)
+        g.post_message(h, g.WM_LBUTTONUP, 0, lp)
     after = rd("mon:%d" % mid, 6)
     lost = ((before or 0) - (after or 0)) >> 8
     if before is not None:
@@ -17767,6 +17827,574 @@ def check_fx_card():
 
 CHECKS += [("fx_card", check_fx_card)]
 
+
+# --- lane linfix: the click tables against what the game draws (Linux private display; any 1600 x 900 client) -----------
+# Pixel spots of the 1600 x 900 client, measured on Windows (mxl2012-runs/text/text_inventory.png) and hit on Linux (lane
+# linfix run p4): the HUD's mini panel buttons and the left skill button (the strip below y 828 that lane linharness's slot 5
+# shots never showed), and the close boxes of the left and right panels near the top corners.
+CLICKMAP_SPOTS = {"char_button": (507, 878), "skilltree_button": (536, 878), "left_skill": (745, 868),
+                  "left_close": (563, 103), "right_close": (1484, 103)}
+CLICKMAP_LEFT, CLICKMAP_RIGHT, CLICKMAP_POPUP = (130, 150, 540, 650), (1060, 150, 1470, 650), (480, 700, 780, 780)
+# play-field spots near the four corners; the character walks that way (D2 screen x ~ world x - y, screen y ~ x + y)
+CLICKMAP_CORNERS = {"top_left": (40, 40), "top_right": (1560, 40), "left_low": (40, 700), "right_low": (1560, 700)}
+CLICKMAP_OPEN, CLICKMAP_SHUT = 18.0, 5.0  # mean grey difference to the frame before (run p4: open 21-32, shut 1-2)
+
+
+def clickmap_diff(a, b, box):
+    """Mean grey difference of two client shots inside box (l, t, r, b), scaled to the shots' size."""
+    from PIL import ImageChops, ImageStat
+    sx, sy = a.size[0] / 1600.0, a.size[1] / 900.0
+    bb = (int(box[0] * sx), int(box[1] * sy), int(box[2] * sx), int(box[3] * sy))
+    return ImageStat.Stat(ImageChops.difference(a.convert("L").crop(bb), b.convert("L").crop(bb))).mean[0]
+
+
+def clickmap_full_frame(img):
+    """True when the right 26 columns and the bottom 72 rows of the shot hold picture (lane linharness's slot 5 shots were
+    black there: the window reached past the private screen, 1574 x 828 of 1600 x 900 drawn)."""
+    g_ = img.convert("L")
+    w, h = g_.size
+    right = g_.crop((w - max(1, w * 26 // 1600), 0, w, h)).point(lambda v: 255 if v > 8 else 0)
+    bottom = g_.crop((0, h - max(1, h * 72 // 900), w, h)).point(lambda v: 255 if v > 8 else 0)
+    from PIL import ImageStat
+    return ImageStat.Stat(right).mean[0] / 255 > 0.2 and ImageStat.Stat(bottom).mean[0] / 255 > 0.2
+
+
+def clickmap_direction(click, centre, d):
+    """Whether a world step d = (dx, dy) goes the screen way of `click` from `centre` (both client pixels): screen x
+    follows dx - dy, screen y follows dx + dy. None when the character did not move."""
+    if d == (0, 0):
+        return None
+    sx, sy = d[0] - d[1], d[0] + d[1]
+    return (sx > 0) == (click[0] > centre[0]) and (sy > 0) == (click[1] > centre[1])
+
+
+def check_clickmap():
+    """The click tables against the drawn frame: a full 1600 x 900 frame, the HUD's character and skill tree buttons open
+    their panels and the panels' close boxes shut them, the left skill button opens its list, and clicks near the four
+    corners of the play field walk the character that way."""
+    mark = engine_mark()
+    if not need_game():
+        return add("clickmap", "BLOCKED", "not in a game")
+    spot = lambda name: (CLICKMAP_SPOTS[name][0] / 1600.0, CLICKMAP_SPOTS[name][1] / 900.0)  # noqa: E731
+    rows, bad, shots = [], [], []
+    end = time.time() + 40
+    while time.time() < end and not clickmap_orb(g.grab_client()):  # a level load or the entry banner: wait for the HUD
+        time.sleep(1.0)
+    time.sleep(3.0)
+    base = g.grab_client()
+    shots.append(sh("clickmap_town"))
+    full = clickmap_full_frame(base)
+    if not full:
+        bad.append("the frame is cut or not drawn (right or bottom strip black)")
+    rows.append("client shot %dx%d, full frame %s, life orb drawn %s" % (base.size[0], base.size[1], full, clickmap_orb(base)))
+    for panel, button, box, close in (("character sheet", "char_button", CLICKMAP_LEFT, "left_close"),
+                                      ("skill tree", "skilltree_button", CLICKMAP_RIGHT, "right_close")):
+        before = g.grab_client()
+        g.click(*spot(button))
+        time.sleep(2.0)
+        opened = clickmap_diff(before, g.grab_client(), box)
+        shots.append(sh("clickmap_%s_open" % button))
+        g.click(*spot(close))
+        time.sleep(2.0)
+        shut = clickmap_diff(before, g.grab_client(), box)
+        shots.append(sh("clickmap_%s_closed" % close))
+        rows.append("%s: button %s -> %.1f, close %s -> %.1f" % (panel, CLICKMAP_SPOTS[button], opened, CLICKMAP_SPOTS[close], shut))
+        if opened < CLICKMAP_OPEN:
+            bad.append("%s did not open" % panel)
+        if shut > CLICKMAP_SHUT:
+            bad.append("%s did not close" % panel)
+    before = g.grab_client()
+    g.click(*spot("left_skill"))
+    time.sleep(2.0)
+    popup = clickmap_diff(before, g.grab_client(), CLICKMAP_POPUP)
+    shots.append(sh("clickmap_left_skill_list"))
+    g.click(*spot("left_skill"))  # the same button shuts it (Esc would open the game menu)
+    time.sleep(1.5)
+    after = clickmap_diff(before, g.grab_client(), CLICKMAP_POPUP)
+    rows.append("left skill list: %.1f open, %.1f after the second click" % (popup, after))
+    if popup < CLICKMAP_OPEN:
+        bad.append("the left skill list did not open")
+    if after > CLICKMAP_SHUT:
+        bad.append("the left skill list did not close")
+    centre = (800, 430)
+    for name, xy in CLICKMAP_CORNERS.items():
+        way, tried = None, []
+        for t in (0.0, 0.25, 0.5):  # the corner spot first; closer to the centre only when the character could not go there
+            px, py = int(xy[0] + (centre[0] - xy[0]) * t), int(xy[1] + (centre[1] - xy[1]) * t)
+            x0, y0 = player_xy()
+            g.click(px / 1600.0, py / 900.0)
+            time.sleep(2.5)
+            x1, y1 = player_xy()
+            way = clickmap_direction((px, py), centre, (x1 - x0, y1 - y0))
+            tried.append("(%d, %d): %d,%d -> %d,%d %s" % (px, py, x0, y0, x1, y1, {None: "no move", True: "that way", False: "WRONG WAY"}[way]))
+            if way is not None:
+                break
+        rows.append("corner %s: %s" % (name, "; ".join(tried)))
+        if not way:
+            bad.append("corner %s: %s" % (name, "no move" if way is None else "wrong way"))
+    shots.append(sh("clickmap_after_corners"))
+    finish("clickmap", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, rows)
+
+
+def clickmap_orb(img):
+    """The red life orb of the HUD is drawn (in_game()'s sample spot, below y 828: lost in the cut frame)."""
+    from PIL import ImageStat
+    w, h = img.size
+    r, gg, b = ImageStat.Stat(img.crop((int(.235 * w), int(.87 * h), int(.265 * w), int(.92 * h))).convert("RGB")).mean
+    return r > 90 and r > 2 * gg and r > 2 * b
+
+
+CHECKS += [("clickmap", check_clickmap)]
+
+
+
+# ---------------------------------------------------------------- lane hdtools-monster: a monster's classic art in HD
+# `MXL_RUN=<lock> MXL_SLOT=N MXL_CHAR=<throwaway> py -3 tools/game_checks.py all mon_card` over a mod whose HD data carries the
+# unit under test (tools/monster_card.py lays a card unit over the slot's mod for the run). A graphics check with harness
+# set-up (`spawn`, god mode, Tank), judged by hand on the shots; launch with MXL_DRAWCAP_PROBE=1 for the render rate.
+
+
+def check_mon_card():
+    """Lane hdtools-monster: each monster of MXL_MONCARD_IDS (monstats Ids, default hardliner) spawned 8 sub-tiles to the screen
+    right of a tanked character in area MXL_MONCARD_AREA (default 2, the Blood Moor), in every graphics mode of
+    MXL_MONCARD_MODES (default hd,legacy): shots after 0.5 s (still at its spot), 2.5 s and 5 s (it walks and fights), then it is
+    killed (death shot). Per monster and mode: engine asserts (`asserttrace`), the render rate of the drawcap probe's stats
+    file while it was on screen (None without MXL_DRAWCAP_PROBE=1 at launch) and the game's private MB. MXL_MONCARD_BURST=n
+    adds n shots in a row before the kill; MXL_MONCARD_OFFSETS="8,-8;-8,8" spawns each monster once per sub-tile offset
+    (the sides it comes from: the directions it faces); with MXL_MONCARD_SPREAD=1 the n-th monster takes the n-th offset
+    alone. PASS: every monster
+    spawned, no assert, the game alive; whether HD shows the classic art is judged by hand on the moncard_<id>_<mode>_*.png
+    shots."""
+    import drawcap_stats
+    mark = engine_mark()
+    log, rows, bad, shots = [], [], [], []
+    ids = [i.strip() for i in (os.environ.get("MXL_MONCARD_IDS") or "hardliner").split(",") if i.strip()]
+    area = int(os.environ.get("MXL_MONCARD_AREA") or 2)
+    modes = [m.strip().lower() for m in (os.environ.get("MXL_MONCARD_MODES") or "hd,legacy").split(",") if m.strip()]
+    offsets = [tuple(int(v) for v in o.split(",")) for o in (os.environ.get("MXL_MONCARD_OFFSETS") or "8,-8").split(";")]
+    _, csv_path = drawcap_files()
+    enable_debug()
+    cheat("god 1")
+    goto(1)
+    Hl("asserttrace on", log)
+    with Tank():
+        for mode in modes:
+            goto(1)
+            if graphics_mode() != mode and not set_graphics(mode):
+                bad.append("graphics mode %s not reached" % mode)
+                continue
+            goto(area)
+            time.sleep(2.0)
+            for _ in range(12):  # the area's own monsters near the character: the shots show the spawned one alone
+                if not Hl("kill nearest", log)[0]:
+                    break
+            pairs = [(i, o) for i in ids for o in enumerate(offsets)]
+            if os.environ.get("MXL_MONCARD_SPREAD"):      # one spot per monster: no corpse of an earlier one under the next
+                pairs = [(i, (n % len(offsets), offsets[n % len(offsets)])) for n, i in enumerate(ids)]
+            for mid, (oi, (ox, oy)) in pairs:
+                row = row_of("monstats", "Id", mid)
+                if row is None:
+                    bad.append("%s: not in the built monstats" % mid)
+                    continue
+                stag = "%s_%s" % (mid, mode) if len(offsets) == 1 else "%s_%s_o%d" % (mid, mode, oi)
+                a0 = pot_asserts()
+                n0 = len(drawcap_stats.read(csv_path)) if os.path.isfile(csv_path) else None
+                px, py = player_xy()
+                _, sp = Hl("spawn %s 1 %d %d" % (row["*hcIdx"], px + ox, py + oy), log)
+                uid = first(sp, r"id=(\d+)")
+                if uid is None:
+                    bad.append("%s (%s): not spawned" % (mid, mode))
+                    continue
+                for wait, what in ((0.5, "spot"), (2.0, "near"), (2.5, "fight")):
+                    time.sleep(wait)
+                    shots.append(sh("moncard_%s_%s" % (stag, what)))
+                for b in range(int(os.environ.get("MXL_MONCARD_BURST") or 0)):  # as fast as shots go: the frames of an animation
+                    shots.append(sh("moncard_%s_burst%d" % (stag, b)))
+                alive = game_alive()
+                H("kill %s" % uid)
+                time.sleep(1.5)
+                shots.append(sh("moncard_%s_death" % stag))
+                for _ in range(6):  # what it brought along (minions, summons)
+                    if not Hl("kill nearest", log)[0]:
+                        break
+                a1 = pot_asserts()
+                n = (a1 - a0) if a0 is not None and a1 is not None else None
+                msgs = pot_assert_lines(n or 0)
+                fps = drawcap_stats.summary(drawcap_stats.read(csv_path)[n0:], mode).get("fps") if n0 is not None else None
+                rows.append("%s (area %d, %s, offset %d,%d): spawned id %s, asserts %s%s, render fps %s, private MB %s" % (
+                    mid, area, mode, ox, oy, uid, n if n is not None else "?", " %s" % msgs if msgs else "", fps, game_private_mb()))
+                if n is None or n > 0:
+                    bad.append("%s (%s): %s engine asserts" % (mid, mode, n))
+                if not alive or not game_alive():
+                    bad.append("the game died at %s (%s)" % (mid, mode))
+                    break
+            if bad and "game died" in bad[-1]:
+                break
+    if game_alive():
+        goto(1)
+        if graphics_mode() != "hd":
+            set_graphics("hd")
+        cheat("god 0")
+    finish("mon_card", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, rows + log[-300:],
+           partial="whether HD shows the classic art is judged by hand on the moncard_*.png shots")
+
+
+CHECKS += [("mon_card", check_mon_card)]
+
+# Lane hdtools-monster, the turning sprite card: where a monster is spawned so that it faces key k of the plugin part
+# spritedir (plugin/src/sprite_dir_logic.h KeyOf: key 0 faces the screen's bottom, then clockwise). A spawned monster turns
+# to the character; FACE[k] is the step in sub-tiles a unit facing key k looks along, the spot is the character's minus it.
+MON_TURN_FACE = ((1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0))
+MON_TURN_SPOTS = ((0, 0), (1, 0), (2, 0), (2, 1), (1, 1), (0, 1), (0, 2), (1, 2), (2, 2), (3, 2), (3, 1), (3, 0))  # where the
+# character stands per monster
+
+
+def check_mon_turn():
+    """Lane hdtools-monster: does a monster's art show the direction it faces. Monster MXL_MONTURN_ID (monstats Id, default
+    fungus1) is spawned once per facing key of MXL_MONTURN_KEYS (default 0 to 7) next to a tanked character in area
+    MXL_MONTURN_AREA (default 2, the Blood Moor), in every graphics mode of MXL_MONTURN_MODES (default hd,legacy), on the
+    side that makes it face that key while it comes (MXL_MONTURN_REACH sub-tiles away, default 10; it then settles at a
+    spot of its own choice next to the character, mostly on the side it came from, so a key may be named more than once).
+    Shots: MXL_MONTURN_EARLY (default 3) at once (it still stands at its spot),
+    MXL_MONTURN_LIVE (default 6) a quarter second apart (it walks and attacks), MXL_MONTURN_HITS (default 0) after a swing
+    of the character at it each (harness `cast 0 unit`), three while it dies and one of its corpse; before each spawn up to
+    MXL_MONTURN_CLEAR (default 8) of the area's monsters nearest the character are killed (a large number leaves the
+    spawned monster the only live one: the lone-card test, logged per key);
+    with MXL_MONTURN_CORPSE_BOTH=1 the corpse is shot in the other graphics mode as well (the same corpse, both looks).
+    Every shot is labelled with the harness `facing` of the client monster before and after it (direction 0-63, key, unit
+    mode, spot, the character's spot): monturn_index.json in the run folder, which tools/monster_turn_sheet.py lays out as
+    sheets. The character walks MXL_MONTURN_STEP sub-tiles (default 14) to a fresh spot per monster (no corpse under the
+    next one). Per graphics mode: engine asserts, render rate (MXL_DRAWCAP_PROBE=1 at launch), private MB. PASS: every
+    monster spawned and labelled, no assert, the game alive; whether the art shows the facing is judged on the sheets."""
+    import drawcap_stats
+    import json
+    mark = engine_mark()
+    log, rows, bad, shots, index = [], [], [], [], []
+    mid = os.environ.get("MXL_MONTURN_ID") or "fungus1"
+    area = int(os.environ.get("MXL_MONTURN_AREA") or 2)
+    modes = [m.strip().lower() for m in (os.environ.get("MXL_MONTURN_MODES") or "hd,legacy").split(",") if m.strip()]
+    keys = [int(k) for k in (os.environ.get("MXL_MONTURN_KEYS") or "0,1,2,3,4,5,6,7").split(",")]
+    early = int(os.environ.get("MXL_MONTURN_EARLY") or 3)
+    live = int(os.environ.get("MXL_MONTURN_LIVE") or 6)
+    step = int(os.environ.get("MXL_MONTURN_STEP") or 14)
+    reach = int(os.environ.get("MXL_MONTURN_REACH") or 10)
+    hits = int(os.environ.get("MXL_MONTURN_HITS") or 0)
+    clear = int(os.environ.get("MXL_MONTURN_CLEAR") or 8)
+    both = bool(os.environ.get("MXL_MONTURN_CORPSE_BOTH"))
+    _, csv_path = drawcap_files()
+    index_path = os.path.join(g.current_run(), "monturn_index.json")
+    row = row_of("monstats", "Id", mid)
+    if row is None:
+        return finish("mon_turn", False, "%s: not in the built monstats" % mid, mark)
+
+    def facing(uid):
+        ok, ln = H("facing %s" % uid)
+        f = kv(" ".join(ln)) if ok else {}
+        return {k: int(f[k]) for k in ("mode", "dir", "key", "x", "y", "px", "py") if re.fullmatch(r"-?\d+", f.get(k, ""))}
+
+    def snap(uid, graphics, key, what, t0):
+        before = facing(uid)
+        name = sh("monturn_%s_%s_n%02dk%d_%s" % (mid, graphics, len({r["id"] for r in index} | {uid}), key, what))
+        after = facing(uid)
+        shots.append(name)
+        index.append({"shot": name, "monster": mid, "id": uid, "graphics": graphics, "spawn_key": key, "what": what,
+                      "t": round(time.time() - t0, 2), "before": before, "after": after})
+        return bool(before and after)
+
+    def walk_to(x, y):
+        H("move %d %d" % (x, y))
+        last = None
+        for _ in range(16):  # until the character stands
+            time.sleep(0.3)
+            now = player_xy()
+            if now == last:
+                break
+            last = now
+
+    enable_debug()
+    cheat("god 1")
+    goto(1)
+    Hl("asserttrace on", log)
+    with Tank():
+        for mode in modes:
+            goto(1)
+            if graphics_mode() != mode and not set_graphics(mode):
+                bad.append("graphics mode %s not reached" % mode)
+                continue
+            goto(area)
+            time.sleep(2.0)
+            base = player_xy()
+            a0 = pot_asserts()
+            n0 = len(drawcap_stats.read(csv_path)) if os.path.isfile(csv_path) else None
+            seen = 0
+            for n, key in enumerate(keys):
+                sx, sy = MON_TURN_SPOTS[n % len(MON_TURN_SPOTS)]
+                if n:
+                    walk_to(base[0] + sx * step, base[1] + sy * step)
+                killed, alone = 0, False
+                for _ in range(clear):  # the area's own monsters near the character: the shots show the spawned one alone
+                    if not H("kill nearest")[0]:
+                        alone = True
+                        break
+                    killed += 1
+                if clear > 8:  # a lone run: say whether the spawned monster is the only live one the game knows
+                    log.append("key %d (%s): %d of the area's monsters killed first; %s" % (
+                        key, mode, killed, "none left alive" if alone else "some still alive"))
+                fx, fy = MON_TURN_FACE[key % 8]
+                r = reach if 0 in (fx, fy) else max(2, round(reach * 0.7))
+                px, py = player_xy()
+                _, sp = Hl("spawn %s 1 %d %d" % (row["*hcIdx"], px - fx * r, py - fy * r), log)
+                t0 = time.time()
+                uid = first(sp, r"id=(\d+)")
+                if uid is None:
+                    bad.append("%s (%s, key %d): not spawned" % (mid, mode, key))
+                    continue
+                seen += 1
+                read = 0
+                for i in range(early):
+                    read += snap(uid, mode, key, "e%d" % i, t0)
+                for i in range(live):
+                    time.sleep(0.25)
+                    read += snap(uid, mode, key, "l%d" % i, t0)
+                for i in range(hits):  # the character's own swing at it: a hit that lands makes it flinch (unit mode 3)
+                    H("cast 0 unit %s" % uid)
+                    time.sleep(0.25)
+                    read += snap(uid, mode, key, "h%d" % i, t0)
+                H("kill %s" % uid)
+                for i, wait in enumerate((0.1, 0.2, 0.25)):
+                    time.sleep(wait)
+                    read += snap(uid, mode, key, "d%d" % i, t0)
+                time.sleep(1.2)
+                read += snap(uid, mode, key, "c0", t0)
+                if read < 4:  # (the very first shot may come before the client has the unit)
+                    bad.append("%s (%s, key %d): %d shots with a facing" % (mid, mode, key, read))
+                if both:
+                    other = "legacy" if mode == "hd" else "hd"
+                    if set_graphics(other):
+                        snap(uid, other, key, "c1", t0)
+                    else:
+                        bad.append("corpse of key %d: graphics mode %s not reached" % (key, other))
+                    set_graphics(mode)
+                with open(index_path, "w", encoding="utf-8") as f:
+                    json.dump(index, f, indent=1)
+                if not game_alive():
+                    bad.append("the game died at key %d (%s)" % (key, mode))
+                    break
+            a1 = pot_asserts()
+            na = (a1 - a0) if a0 is not None and a1 is not None else None
+            msgs = pot_assert_lines(na or 0)
+            fps = drawcap_stats.summary(drawcap_stats.read(csv_path)[n0:], mode).get("fps") if n0 is not None else None
+            got = sorted({(r["before"].get("key"), r["before"].get("mode")) for r in index
+                          if r["graphics"] == mode and r["before"] and r["before"] == r["after"]})
+            rows.append("%s (area %d, %s): %d of %d spawned, asserts %s%s, render fps %s, private MB %s, steady (key, unit mode) "
+                        "pairs shot %d" % (mid, area, mode, seen, len(keys), na if na is not None else "?",
+                                           " %s" % msgs if msgs else "", fps, game_private_mb(), len(got)))
+            if na is None or na > 0:
+                bad.append("%s (%s): %s engine asserts" % (mid, mode, na))
+            if bad and "game died" in bad[-1]:
+                break
+    if game_alive():
+        goto(1)
+        if graphics_mode() != "hd":
+            set_graphics("hd")
+        cheat("god 0")
+    finish("mon_turn", not bad, "; ".join(rows) + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, rows + log[-300:],
+           partial="whether the art shows the facing is judged on the sheets of tools/monster_turn_sheet.py")
+
+
+CHECKS += [("mon_turn", check_mon_turn)]
+
+
+def check_mon_group():
+    """Lane hdtools-monster: full-frame pictures of a group. MXL_MONGROUP_N (default 7) monsters MXL_MONGROUP_ID (monstats
+    Id, default fungus1) are spawned in a ring MXL_MONGROUP_REACH sub-tiles (default 12) round a tanked character in area
+    MXL_MONGROUP_AREA (default 2, the Blood Moor) in HD graphics, the area's own monsters killed first. Shots, with the
+    debug build's text bar switched off for them: mongroup_1 (they come), mongroup_2 (they fight), mongroup_3 (three of
+    them killed: corpses on the ground, the others fight on), then the same scene in legacy graphics (mongroup_3_classic)
+    and once more in HD (mongroup_4). Engine asserts, render rate (MXL_DRAWCAP_PROBE=1), private MB. PASS: all spawned,
+    no assert, the game alive; the look is judged on the pictures."""
+    import drawcap_stats
+    import math
+    mark = engine_mark()
+    log, bad, shots = [], [], []
+    mid = os.environ.get("MXL_MONGROUP_ID") or "fungus1"
+    area = int(os.environ.get("MXL_MONGROUP_AREA") or 2)
+    count = int(os.environ.get("MXL_MONGROUP_N") or 7)
+    reach = int(os.environ.get("MXL_MONGROUP_REACH") or 12)
+    _, csv_path = drawcap_files()
+    row = row_of("monstats", "Id", mid)
+    if row is None:
+        return finish("mon_group", False, "%s: not in the built monstats" % mid, mark)
+    enable_debug()
+    cheat("god 1")
+    goto(1)
+    Hl("asserttrace on", log)
+    ids = []
+    with Tank():
+        if graphics_mode() != "hd":
+            set_graphics("hd")
+        goto(area)
+        time.sleep(2.0)
+        for _ in range(200):  # the area's own monsters
+            if not H("kill nearest")[0]:
+                break
+        a0 = pot_asserts()
+        n0 = len(drawcap_stats.read(csv_path)) if os.path.isfile(csv_path) else None
+        px, py = player_xy()
+        con("debug_mode")  # off for the pictures: no text bar of the debug build
+        time.sleep(0.5)
+        for i in range(count):
+            a = 2 * math.pi * (i + 0.5) / count
+            _, sp = Hl("spawn %s 1 %d %d" % (row["*hcIdx"], px + round(reach * math.cos(a)), py + round(reach * math.sin(a))), log)
+            uid = first(sp, r"id=(\d+)")
+            if uid is None:
+                bad.append("monster %d not spawned" % i)
+            else:
+                ids.append(uid)
+        time.sleep(0.25)
+        shots.append(sh("mongroup_1"))
+        time.sleep(2.0)
+        shots.append(sh("mongroup_2"))
+        for uid in ids[:3]:
+            H("kill %s" % uid)
+        time.sleep(1.6)
+        shots.append(sh("mongroup_3"))
+        if set_graphics("legacy"):
+            shots.append(sh("mongroup_3_classic"))
+        else:
+            bad.append("legacy graphics not reached in the field")
+        set_graphics("hd")
+        shots.append(sh("mongroup_4"))
+        con("debug_mode")  # on again: the cheats below need it
+        time.sleep(0.5)
+        for _ in range(count + 8):
+            if not H("kill nearest")[0]:
+                break
+        a1 = pot_asserts()
+        na = (a1 - a0) if a0 is not None and a1 is not None else None
+        fps = drawcap_stats.summary(drawcap_stats.read(csv_path)[n0:], "hd").get("fps") if n0 is not None else None
+        note = "%s x %d of %d spawned (area %d): asserts %s, render fps %s, private MB %s" % (
+            mid, len(ids), count, area, na if na is not None else "?", fps, game_private_mb())
+        if na is None or na > 0:
+            bad.append("%s engine asserts %s" % (na, pot_assert_lines(na or 0)))
+    if game_alive():
+        goto(1)
+        if graphics_mode() != "hd":
+            set_graphics("hd")
+        cheat("god 0")
+    else:
+        bad.append("the game died")
+    finish("mon_group", not bad, note + ("; PROBLEMS: " + "; ".join(bad) if bad else ""), mark, shots, [note] + log[-100:],
+           partial="the look is judged on the mongroup_*.png pictures")
+
+
+CHECKS += [("mon_group", check_mon_group)]
+
+# lane lowprofile (2026-11-21): the standard screenshot set to compare the slot graphics profiles (game_slots.apply_profile,
+# tools/slot_profiles): run once with MXL_PROFILE=test and once with MXL_PROFILE=visual, then compare the shots side by side
+PROF_MONSTER = "zombie1"   # monstats Id: a plain melee monster, for the hover label, Monster Display and the health bar
+PROF_MISSILES = ("fireball", "frozenorb", "firestorm")  # fire and cold effects drawn in the HD layer
+PROF_VENDOR = 148  # Akara (Trade panel; the cursor over her first stock item gives the vendor tooltip)
+
+
+def check_profshots():
+    """Lane lowprofile: HUD in town, an item tooltip in the inventory, the vendor panel with an item tooltip, a monster hovered
+    (name label, Monster Display, health bar) and fire / cold missiles over monsters outside town. Screenshots only: the text and
+    the effects are read by eye (REVIEW); the pass is that every step got its shot and no engine assert came."""
+    mark = engine_mark()
+    log, shots, miss = [], [], []
+    enable_debug()
+    cheat("god 1")
+    goto(1, timeout=60)
+    time.sleep(2)
+    shots.append(sh("prof_town_hud"))
+    # inventory with a tooltip
+    _, ln = Hl("item rin q=4 inv", log)
+    x, y = first(ln, r" x=(\d+) y="), first(ln, r" y=(\d+) quality")
+    g.press("i")
+    time.sleep(1.5)
+    if x is not None and y is not None:
+        hover_px(*inv_px(x, y))
+        shots.append(sh("prof_inv_tooltip"))
+    else:
+        miss.append("inventory tooltip (no ring)")
+    g.press("i")
+    time.sleep(1.0)
+    # vendor panel and a stock item's tooltip
+    menu = rp_npc_menu(PROF_VENDOR, log)
+    line = rp_menu_line(menu, RP_TRADE) if menu else None
+    if line is not None:
+        Hl("menu %d" % line, log)
+        for _ in range(12):
+            time.sleep(1.5)
+            if trade_panel_open():
+                break
+    if trade_panel_open():
+        shots.append(sh("prof_vendor"))
+        stock = [kv(l) for l in Hl("shop %d" % PROF_VENDOR, log)[1] if l.startswith("item ")]
+        first_tab = [s for s in stock if str(s.get("page")) == "0"]
+        if first_tab:
+            g.click(*rp_inv_xy(int(first_tab[0]["x"]), int(first_tab[0]["y"]), RP_SHOP), move_only=True)
+            time.sleep(1.0)
+            shots.append(sh("prof_vendor_tooltip"))
+        rp_close_trade()
+    else:
+        miss.append("vendor panel")
+        close_menu()
+    # outside town: a monster hovered, then fire / cold missiles over a few monsters
+    goto(2, timeout=60)
+    time.sleep(2)
+    row = row_of("monstats", "Id", PROF_MONSTER)
+    cls = int(row["*hcIdx"]) if row else 5
+    p = hstate()["player"]
+    Hl("spawn %d 1 %d %d" % (cls, p["x"] + 4, p["y"]), log)
+    time.sleep(2.0)
+    mon = next((m for m in hstate()["mons"] if m.get("class") == cls), None)
+    if mon is not None and hover_unit(mon["id"], -22):
+        shots.append(sh("prof_monster_hover"))
+    else:
+        miss.append("monster hover")
+    Hl("spawn %d 4 %d %d" % (cls, p["x"] + 10, p["y"]), log)
+    time.sleep(1.5)
+    for name in PROF_MISSILES:
+        mid = missile_id(name)
+        if mid is None:
+            miss.append("missile %s" % name)
+            continue
+        Hl("missile %d 12 0" % mid, log)
+        time.sleep(0.45)
+        shots.append(sh("prof_fx_%s" % name))
+        time.sleep(1.2)
+    kill_all_near()
+    goto(1, timeout=60)
+    finish("profshots", not miss, "%d screenshots%s" % (len(shots), "; missing: " + ", ".join(miss) if miss else ""), mark, shots,
+           log, partial="text, Monster Display and effects on the screenshots are read by eye")
+
+
+CHECKS += [("profshots", check_profshots)]
+
+
+def check_vramhold():
+    """Lane vramcap: stand in the Rogue Encampment, then in the Blood Moor, MXL_HOLD_SECS (45) each, one screenshot in each,
+    so a resource sampler reads the game's settled VRAM in Act 1 (the VRAM cap, MXL_VRAM_MB). PASS: both areas reached and
+    no engine assert."""
+    mark = engine_mark()
+    log, shots = [], []
+    secs = float(os.environ.get("MXL_HOLD_SECS") or 45)
+    reached = []
+    enable_debug()
+    cheat("god 1")
+    for area, name in ((1, "town"), (2, "bloodmoor")):
+        ok = goto(area, timeout=60)
+        reached.append((name, bool(ok)))
+        time.sleep(secs)
+        shots.append(sh("vram_" + name))
+    miss = [n for n, ok in reached if not ok]
+    finish("vramhold", not miss, "held %d s in %s%s" % (secs, ", ".join(n for n, _ in reached), "; not reached: " + ", ".join(miss)
+                                                         if miss else ""), mark, shots, log)
+
+
+CHECKS += [("vramhold", check_vramhold)]
 
 if __name__ == "__main__":
     main()

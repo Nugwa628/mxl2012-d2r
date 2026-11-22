@@ -27,6 +27,15 @@ Every mxl2012 run (game_ctl start ... stop, so also game_checks / parallel_smoke
                     only a clean comparison drops the pending snapshot. Returns what the run had changed.
 `game_slots.py unlock N` and `game_ctl stop` call end() too, so a crashed or killed tool is restored before the lock goes.
 
+Linux slots (game_slots.LINUX, docs/testing.md "Linux slots"): the slot folder is ours alone, so the snapshot is the WHOLE
+slot folder, not only d2rloader\\config: every file except the CASC archives Data/data/data.NNN is copied with rsync to the
+slot's snapshot folder (game_slots.linux_slot: /d2work/slots/.snap-sN, kept between runs so the next copy is quick), the
+archives get a size + mtime manifest. The game itself rewrites small files in Data/ (Data/data/*.idx, shmem) and D2RLoader
+writes Data/hd/objects/dummy/d2rloader_stash_proxy.json, so Data/ is not skipped. The pending manifest sits beside the
+snapshot (<snapshot>.json), so every checkout sees it. end() rsyncs back with --delete --checksum and verifies with a
+checksum dry run (must list nothing) plus the archive manifest. A pending snapshot of the lane linuxslots prototype
+(linslot.py, .snap-sN.data.json) refuses begin().
+
 CLI: py -3 tools/slot_share.py status|diff|restore N     (restore needs MXL_RUN = the lock owner)
      MXL_RUN=<owner> py -3 tools/slot_share.py probe N add DLL...  the one exception to the empty global folders (lane
                                                           globalplugins): our own test plugins (gp-probe-*.dll of tools/gp_probe,
@@ -41,6 +50,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -60,6 +70,8 @@ def state_dir(n):
 
 
 def manifest_path(n):
+    if game_slots.LINUX:  # beside the whole-slot snapshot: one per slot, seen by every checkout
+        return game_slots.linux_slot(n)["snapshot"] + ".json"
     return os.path.join(state_dir(n), "snapshot.json")
 
 
@@ -215,6 +227,8 @@ def begin(n, owner, game=None):
     # end() must be able to put every shared file back, and the run writes the harness file into our mod folder
     game_slots.need_write([os.path.join(game, *d.split("/")) for d in SHARED_DIRS] + sorted(shared_files(game).values())
                           + [os.path.join(game, "mods", game_slots.MOD)], f"slot {n}: refusing the run", root=game)
+    if game_slots.LINUX:
+        return msg + linux_begin(n, owner, game)
     snap = os.path.join(state_dir(n), "snapshot")
     shutil.rmtree(snap, ignore_errors=True)
     files = {}
@@ -240,6 +254,8 @@ def diff(n, game=None, man=None):
     if not man:
         return []
     game = game or man["game"]
+    if man.get("kind") == "slot":
+        return linux_diff(man, game)
     now = shared_files(game)
     out = []
     for rel, info in man["files"].items():
@@ -265,6 +281,8 @@ def end(n, owner, game=None, running=None):
     procs = game_slots.slot_processes(game) if running is None else running
     if procs:
         raise SystemExit(f"slot {n}: game still running {procs}: stop it before the shared files are restored")
+    if man.get("kind") == "slot":
+        return linux_end(n, owner, game, man)
     changes = diff(n, game, man)
     try:
         _put_back(n, game, man, changes)
@@ -368,6 +386,249 @@ def launch_args(n, game=None):
     return ["-mod", game_slots.MOD]
 
 
+# ---------------------------------------------------------------- Linux: the whole slot folder
+
+ARCHIVES = ("Data", "data")  # the CASC archives data.NNN: 27 GB, only read by the game: size + mtime manifest
+RSYNC_EXCLUDE = "/Data/data/data.[0-9]*"
+
+
+def archives(game):
+    """{name: [size, mtime_ns]} of the CASC archives Data/data/data.NNN."""
+    base = os.path.join(game, *ARCHIVES)
+    out = {}
+    for f in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        if f.startswith("data.") and f[5:].isdigit():
+            st = os.lstat(os.path.join(base, f))
+            out[f] = [st.st_size, st.st_mtime_ns]
+    return out
+
+
+def rsync(*args):
+    """rsync -a --delete of a slot (the CASC archives excluded on both sides); returns the CompletedProcess."""
+    try:
+        return subprocess.run(["rsync", "-a", "--delete", "--exclude", RSYNC_EXCLUDE, *args], capture_output=True, text=True)
+    except FileNotFoundError:
+        raise SystemExit("rsync is not installed: the Linux slot snapshot needs it")
+
+
+def linslot_marker(n):
+    """The pending-snapshot marker of the lane linuxslots prototype (linslot.py), beside the same snapshot folder."""
+    snap = game_slots.linux_slot(n)["snapshot"]
+    return os.path.join(os.path.dirname(snap), f".snap-s{n}.data.json")
+
+
+def itemized(lines):
+    """[(rel, what)] from `rsync -n -i` lines run snapshot -> slot: what the run did to the slot."""
+    out = []
+    for line in lines:
+        if not line.strip():
+            continue
+        item, _, rel = line.partition(" ")
+        rel = rel.strip()
+        if item == "*deleting":
+            out.append((rel, "created"))
+        elif "+++++++" in item:
+            out.append((rel, "deleted"))
+        elif len(item) > 3 and (item[2] == "c" or item[3] == "s"):
+            out.append((rel, "changed"))
+        else:
+            out.append((rel, "touched (same bytes, other mtime or mode)"))
+    return out
+
+
+def linux_diff(man, game):
+    """[(rel, what)] of everything in the slot folder that differs from the whole-slot snapshot (checksums), plus CASC
+    archives whose size or mtime moved."""
+    r = rsync("-n", "-i", "--checksum", man["snapshot"].rstrip("/") + "/", game.rstrip("/") + "/")
+    if r.returncode:
+        raise SystemExit(f"slot {man['slot']}: rsync compare failed: {r.stderr.strip()}")
+    out = itemized(r.stdout.splitlines())
+    now, old = archives(game), man.get("archives", {})
+    out += [("/".join(ARCHIVES + (k,)), "archive changed (size or mtime)" if k in now and k in old else
+             "archive created" if k in now else "archive deleted") for k in sorted(set(now) | set(old)) if now.get(k) != old.get(k)]
+    return out
+
+
+def linux_begin(n, owner, game):
+    """The whole-slot snapshot of a Linux slot (see the module text); writes the pending manifest last."""
+    if os.path.exists(linslot_marker(n)):
+        raise SystemExit(f"slot {n}: linslot.py has a snapshot pending ({linslot_marker(n)}): run its `restore {n}` first")
+    snap = game_slots.linux_slot(n)["snapshot"]
+    os.makedirs(snap, exist_ok=True)
+    r = rsync(game.rstrip("/") + "/", snap + "/")
+    if r.returncode:
+        raise SystemExit(f"slot {n}: snapshot copy failed: {r.stderr.strip()}")
+    man = {"slot": n, "owner": owner, "game": os.path.abspath(game), "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+           "kind": "slot", "snapshot": snap, "archives": archives(game)}
+    left = linux_diff(man, game)
+    if left:
+        raise SystemExit(f"slot {n}: snapshot differs from the slot right after the copy (something writes it?): {left[:10]}")
+    man["count"] = sum(len(f) for _, _, f in os.walk(snap))
+    tmp = manifest_path(n) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(man, f, indent=1)
+    os.replace(tmp, manifest_path(n))
+    return f"slot {n}: whole slot snapshotted ({man['count']} files in {snap}, {len(man['archives'])} CASC archives by size+mtime)"
+
+
+def linux_end(n, owner, game, man):
+    if game_slots.prefix_pids(n):
+        raise SystemExit(f"slot {n}: processes still run in the prefix {game_slots.prefix_dir(n)}: stop them first "
+                         "(game_slots.stop_prefix)")
+    changes = linux_diff(man, game)
+    bad = [c for c in changes if c[1].startswith("archive")]
+    if bad:
+        raise SystemExit(f"slot {n}: CASC archives changed, they are not in the snapshot: {bad} (snapshot kept, fix by hand "
+                         "from an identical copy)")
+    r = rsync("--checksum", man["snapshot"].rstrip("/") + "/", game.rstrip("/") + "/")
+    if r.returncode:
+        raise SystemExit(f"slot {n}: restore failed: {r.stderr.strip()} (snapshot kept in {man['snapshot']})")
+    left = linux_diff(man, game)
+    if left:
+        raise SystemExit(f"slot {n}: restore incomplete, still different: {left[:20]} (snapshot kept in {man['snapshot']})")
+    os.makedirs(state_dir(n), exist_ok=True)
+    report = {"slot": n, "owner": owner, "snapshot_at": man["at"], "restored_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+              "changed_by_run": changes, "verified": f"rsync checksums of all {man.get('count')} files (empty dry run), "
+              f"size+mtime of {len(man['archives'])} CASC archives"}
+    with open(os.path.join(state_dir(n), "last-restore.json"), "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=1)
+    os.replace(manifest_path(n), os.path.join(state_dir(n), "last-snapshot.json"))
+    return (f"slot {n}: whole slot restored and verified byte-equal ({man.get('count')} files, {len(man['archives'])} "
+            f"archives); the run had changed {len(changes)} entries" + (": " + ", ".join(f"{r} ({w})" for r, w in changes[:12])
+                                                                        + (" ..." if len(changes) > 12 else "") if changes else ""))
+
+
+def window_helper():
+    """The Win32 window helper run inside a slot's prefix (tools/wctl/wctl.exe, built by tools/wctl/build.sh, or env
+    MXL_WCTL), or None. bootcheck uses it only to answer D2RLoader's notice and to close the game window."""
+    p = os.environ.get("MXL_WCTL") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "wctl", "wctl.exe")
+    return p if os.path.isfile(p) else None
+
+
+def helper_notice(helper):
+    """(find, post) for loader_notice.Watch through a linux_window.Helper: the prefix holds only this run's processes,
+    so a visible #32770 dialog titled D2RLoader whose only push button is OK is our launch's notice (Wine's task
+    dialog makes its check box a Button too; the log line of this launch is still required by Watch)."""
+    def find(pids):
+        return [w["hwnd"] for w in helper.windows()
+                if w["visible"] and w["class"] == loader_notice.DIALOG_CLASS and w["title"] == loader_notice.DIALOG_TITLE
+                and [t.replace("&", "") for t in helper.buttons(w["hwnd"], push_only=True)] == ["OK"]]
+
+    def post(h):
+        return helper.post(h, loader_notice.TDM_CLICK_BUTTON, loader_notice.IDOK, 0)
+    return find, post
+
+
+def helper_close(helper):
+    """WM_CLOSE posted to the game window through the helper; a short note for the report."""
+    r = helper.find("Diablo II: Resurrected")
+    if not r:
+        return "no game window"
+    helper.post(r[0], 0x0010, 0, 0)
+    return f"WM_CLOSE to window {r[0]}"
+
+
+def bootcheck_linux(n, owner, timeout=90, hold=0):
+    """bootcheck on a Linux slot: start the loader under Proton in the slot's prefix (launch_args), answer D2RLoader's
+    3.4 notice through the window helper (when there is one), wait for the mod mount in d2rloader.log with the game
+    process alive (/proc; on 3.4 that is D2RLoader itself, it runs the game in-process), keep it `hold` seconds,
+    measure focus all along (game_slots.FocusWatch: a grab stops the run and fails it), close it (WM_CLOSE through the helper, else and after 30 s
+    `wineserver -k` of this prefix only), wait for the prefix to be idle, restore and verify the whole slot."""
+    n = game_slots.require_slot(n)
+    game = game_slots.slot_dir(n)
+    if game_slots.slot_processes(game) or game_slots.prefix_pids(n):
+        raise SystemExit(f"slot {n}: something already runs in the prefix {game_slots.prefix_dir(n)}")
+    log = os.path.join(game, "d2rloader", "logs", "d2rloader.log")
+    exe = window_helper()
+    print(begin(n, owner, game))
+    out_dir = os.path.join(state_dir(n), "bootcheck")
+    os.makedirs(out_dir, exist_ok=True)
+    t0 = time.time()
+    lines, ok, pids, seen = [], False, [], {}
+    focus = game_slots.FocusWatch(n).start()  # owner rule: the game never takes focus; measured from before the launch
+    import linux_window  # the game runs on a private display (never the owner's: there it takes the focus)
+    xdisplay, xpid, helper = None, None, None
+    try:
+        xdisplay, xpid = linux_window.PrivateDisplay.start(log_path=os.path.join(out_dir, "xvfb.log"))
+        game_env = dict(linux_window.PRIVATE_ENV, DISPLAY=xdisplay)
+        print(f"private display {xdisplay} (Xvfb pid {xpid})")
+        if exe:
+            helper = linux_window.Helper(linux_window.slot_env(n), exe=exe, extra_env=game_env,
+                                         stderr_path=os.path.join(out_dir, "wctl-stderr.log"))
+        args = launch_args(n)
+        with open(os.path.join(out_dir, "proton.out"), "w") as out:
+            proc = game_slots.launch(n, args, log_dir=out_dir, stdout=out, extra_env=game_env)
+        print(f"launched D:\\{game_slots.loader_name(game)} {' '.join(args)} under Proton (prefix {game_slots.prefix_dir(n)}, "
+              f"display {xdisplay})")
+        notice = loader_notice.Watch(log, started=t0, find=helper_notice(helper)[0], post=helper_notice(helper)[1]) \
+            if helper else None
+        while time.time() - t0 < timeout:
+            time.sleep(1)
+            if focus.grabs:
+                print("the game took focus: stopping the run (owner rule: no focus stealing)")
+                ok = False
+                break
+            procs = game_slots.slot_processes(game)
+            for pid, nm in procs:
+                seen.setdefault(pid, nm)
+            pids = [p for p, _ in procs]
+            if notice:
+                said = notice.poll(pids)
+                if said:
+                    print(said)
+            elif loader_notice.log_has_notice(log, t0):
+                print("D2RLoader shows its notice for an untested D2R and there is no window helper (MXL_WCTL): stopping")
+                break
+            try:
+                if os.stat(log).st_mtime < t0 - 1:
+                    continue
+                with open(log, encoding="utf-8-sig", errors="replace") as f:
+                    lines = f.read().splitlines()
+            except OSError:
+                continue
+            ok = any("[CASC]" in l and "paths:" in l for l in lines)
+            if ok and procs:  # D2RLoader 1.3.1 on 3.4 runs the game inside its own process (no separate D2R.exe)
+                print(f"game up after {time.time() - t0:.0f} s: " + ", ".join(f"{nm} pid {p}" for p, nm in sorted(seen.items())))
+                end_hold = time.time() + hold
+                while time.time() < end_hold and not focus.grabs:
+                    time.sleep(0.5)
+                break
+            if proc.poll() is not None and not procs:
+                break  # the game ended by itself
+    finally:
+        closed = ""
+        if helper and game_slots.slot_processes(game):
+            try:
+                closed = helper_close(helper)
+            except linux_window.HelperError as e:
+                closed = f"helper: {e}"
+            for _ in range(60):
+                if not game_slots.slot_processes(game):
+                    break
+                time.sleep(0.5)
+        if game_slots.slot_processes(game) or game_slots.prefix_pids(n):
+            idle = game_slots.wait_prefix_idle(n, 20) if closed else False
+            if not idle:
+                closed += "; wineserver -k (this prefix only)"
+                game_slots.stop_prefix(n)
+        if helper:
+            helper.close()
+        print(f"closed: {closed or 'nothing left running'}; prefix idle: {not game_slots.prefix_pids(n)}")
+        if xpid:
+            print(f"private display {xdisplay}: {'ended' if linux_window.PrivateDisplay.stop(xpid, xdisplay) else 'STILL RUNNING'}")
+        said = focus.stop()
+        print(said)
+        with open(os.path.join(out_dir, "focus.json"), "w", encoding="utf-8") as f:
+            json.dump({"before": focus.before, "polls": focus.polls, "changes": focus.changes, "grabs": focus.grabs}, f, indent=1)
+        msg = end(n, owner, game)
+    keep = [l for l in lines if any(k in l for k in ("D2RLoader command line", "D2R command line", "| name ", "modinfo.",
+                                                       "default_mod", "launch_arguments", "plugins:", "[PLUGIN]", "paths:",
+                                                       "patches:", "Active mod", "hasn't been fully tested"))]
+    keep.append("game processes seen: " + (", ".join(f"{nm} pid {p}" for p, nm in sorted(seen.items())) or "none"))
+    keep.append(said)
+    return ok and not focus.grabs, keep, msg
+
+
 # ---------------------------------------------------------------- before/after scans (reports only, read-only)
 
 SCAN_SKIP = ("Data",)  # the CASC game data: read-only for D2R, large
@@ -406,6 +667,8 @@ def bootcheck(n, owner, timeout=90):
     shared files and verify them. On a D2R that this D2RLoader has not been tested with (3.4 with D2RLoader 1.3.1) the
     loader first shows a notice and waits: it is answered in the background (loader_notice.py).
     Returns (ok, log excerpt lines, restore message)."""
+    if game_slots.LINUX:
+        return bootcheck_linux(n, owner, timeout, hold=float(os.environ.get("MXL_BOOTCHECK_HOLD") or 0))
     import subprocess
     n = game_slots.require_slot(n)
     game = game_slots.slot_dir(n)
@@ -470,7 +733,7 @@ def main():
     n = game_slots.require_slot(a[1])
     if c == "status":
         man = pending(n)
-        print(f"slot {n}: " + (f"PENDING snapshot of {man['owner']} at {man['at']} ({len(man['files'])} files)" if man
+        print(f"slot {n}: " + (f"PENDING snapshot of {man['owner']} at {man['at']} ({man.get('count', len(man.get('files', {})))} files)" if man
                                else "no pending snapshot"))
         bad = foreign_extensions(game_slots.slot_dir(n))
         print("extensions: " + ("; ".join(bad) if bad else "no plugin in the global folders, none of ours in another mod"))
@@ -489,7 +752,10 @@ def main():
         ok, keep, msg = bootcheck(n, os.environ.get("MXL_RUN"))
         print("\n".join(keep))
         print(msg)
-        print("BOOTCHECK " + ("PASS" if ok and any(f'mod="{game_slots.MOD}"' in l for l in keep) else "FAIL"))
+        passed = ok and any(f'mod="{game_slots.MOD}"' in l for l in keep)
+        print("BOOTCHECK " + ("PASS" if passed else "FAIL"))
+        if game_slots.LINUX and not passed:
+            return 1  # Linux: scripts stop on a failed boot or a focus grab
     elif c == "scan":
         json.dump(scan(game_slots.slot_dir(n)), open(a[2], "w", encoding="utf-8"))
     else:

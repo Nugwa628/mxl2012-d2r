@@ -324,6 +324,15 @@ The same steps with the venv's Python instead of `py -3`, MSVC under wine for th
    builds), then `python tools/verify_package.py DIR/D2R-XL-2012-X.7z --scratch DIR2` and, from `tools/`,
    `python -m unittest test_package_release test_verify_package`.
 
+**From 0.1.29 (lane rel0129): the 4x maps and the 3D monsters come from the art store.** Set, for `tools/build.py`:
+`MXL_ART_STORE=/d2work/mxl2012-art` (the 3D monsters of `tools/data/m3d_ship.json`, laid by the last art step
+`m3d_ship.py build` with their `monsters.json` and `model_lod_desc.bin` entries; without a store the step stops, and
+`MXL2012_M3D=0` builds without them) and `MXL2012_SPRITE_ALBEDO=DIR` after
+`python tools/maps_upscale.py fetch DIR --manifest tools/data/maps_classic_4x_raw.json` (the 12 classic maps in raw
+ESRGAN 4x, the owner's pick; docs/maps-hd.md "Classic maps at 4K"). A build without them ships the 1x maps and the
+Thornhulk stand-in for the Fungus. Check the package: the 12 maps' textures are 4x and `hd/character/enemy/mxl_m3d_fungus.json`
+is in it.
+
 What differs from a Windows package with the same content: text files are LF (Python writes `\n`; on Windows text mode
 writes CRLF), the DLLs come from another compiler build, and the 7z bytes differ (7-Zip version, threads). Every reader
 of the shipped configs and JSON takes LF (owner, 2026-11-20). `tools/statbook_layout.py` measures D2R's font with

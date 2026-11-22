@@ -1,5 +1,6 @@
 """Slot selection/refusal checks; no game files or saves are written."""
 import projtemp  # noqa: E402,F401  (temp files stay inside the project, tools/projtemp.py)
+import contextlib
 import os
 from pathlib import Path
 import sys
@@ -9,6 +10,17 @@ from unittest.mock import patch
 import game_slots
 import install_mod
 import machine_fixture  # a neutral machine.json: CI has none
+
+
+_PIN = contextlib.ExitStack()
+
+
+def setUpModule():  # the Windows slot rules: Windows backend on every platform (Linux: test_game_slots.py, test_slot_share.py)
+    _PIN.enter_context(game_slots.backend("windows"))
+
+
+def tearDownModule():
+    _PIN.close()
 
 
 class InstallSlotTests(unittest.TestCase):

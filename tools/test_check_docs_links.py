@@ -1,6 +1,7 @@
 """Tests for literal documentation references."""
 import sys
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -49,6 +50,16 @@ class DocsLinksTests(unittest.TestCase):
                            '[encoded](other%20file.md#heading)\n', encoding='utf-8')
             (root / 'other file.md').write_text('# Heading\n', encoding='utf-8')
             self.assertEqual(checker.findings(root, doc), [(3, 'missing heading', '#no')])
+
+    def test_ignored_build_output_is_not_missing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            (root / '.gitignore').write_text('*.exe\n', encoding='utf-8')
+            (root / 'docs').mkdir()
+            doc = root / 'docs' / 'a.md'
+            doc.write_text('`tools/wctl/wctl.exe` `tools/wctl/build.sh`\n', encoding='utf-8')
+            self.assertEqual(checker.findings(root, doc), [(1, 'missing repo path', 'tools/wctl/build.sh')])
 
     def test_scope(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -1,0 +1,321 @@
+{
+ "about": "4x atlases of the classic-art maps (tools/maps_upscale.py, docs/maps-hd.md 'Classic maps at 4K'); objects in the art store, `maps_upscale.py fetch OUT` puts them back",
+ "origin": {},
+ "files": [
+  {
+   "path": "act1-cathedrl-alter-a1_atlas.png",
+   "sha256": "62e8cfbef7cf7ba02b0a7e2b46b959d9afc57f17d26d85c8c9d82f8c7307e980",
+   "size": 2305307
+  },
+  {
+   "path": "act1-cathedrl-coffers-a1_atlas.png",
+   "sha256": "2e8aea0860612617dbc2f654865fa08d90bef50c171ee609a8d13a27461c5704",
+   "size": 5034808
+  },
+  {
+   "path": "act1-cathedrl-column-a1_atlas.png",
+   "sha256": "94441f11d553186e5abdbfbabfe4bec9a46f8db7b354d615555d1c06e7c2695d",
+   "size": 578070
+  },
+  {
+   "path": "act1-cathedrl-frescoes-a1_atlas.png",
+   "sha256": "7f9b3e766111e865e33d9d33e8b4da605b57af61cfebebd149125251b3e5642b",
+   "size": 2706642
+  },
+  {
+   "path": "act1-cathedrl-stained-a1_atlas.png",
+   "sha256": "ed545d6eb77310010e2780d96543a5b5828c3f573b67116b94cb0912a449163d",
+   "size": 2657810
+  },
+  {
+   "path": "act1-caves-cave-a1_atlas.png",
+   "sha256": "f2f2855f598cb733e3df7839d5cf1c90e740dd0e1231b5635b2de9d2adc22758",
+   "size": 698186
+  },
+  {
+   "path": "act1-court-archwall-a1_atlas.png",
+   "sha256": "ddbf29a323808e9c39fd1e28853faa257bf939ee3ae960c420884d5406bae2bd",
+   "size": 3077717
+  },
+  {
+   "path": "act1-court-outwall-a1_atlas.png",
+   "sha256": "34ebeabe7b26ee43d745b94a3d86fa83a6df09daf22347d977213729091ae70f",
+   "size": 5122858
+  },
+  {
+   "path": "act1-crypt-basewall-a1_atlas.png",
+   "sha256": "fa33ed0ca1b6484f638241bea45436df23c221a7431ff36f5626396c2034126d",
+   "size": 201518
+  },
+  {
+   "path": "act1-monastry-facade-a1_atlas.png",
+   "sha256": "92f9a2f73e1f04ef9461b4db1d465738391a2fca6e433942e00c86c67b45f7f6",
+   "size": 26319973
+  },
+  {
+   "path": "act2-arcane-sanctuary-a2_atlas.png",
+   "sha256": "2a02c92ff3fee234c796b09bbc9626f1107f7cf46185e39ca1fd789e5c8cab6d",
+   "size": 4647890
+  },
+  {
+   "path": "act2-tomb-talrasha-a2_atlas.png",
+   "sha256": "c0c3eaabb9015a6ab73b4f8a3e1f3bd48ccb42eeac686d822c92d738bdd2e9b0",
+   "size": 288561
+  },
+  {
+   "path": "act2-tomb-tomb-a2_atlas.png",
+   "sha256": "c57681bf81ec4b043b92b3e09b3e49a23075e4fe792213f560348528a95b6c3b",
+   "size": 3400057
+  },
+  {
+   "path": "act3-jungle-treegrp-a3_atlas.png",
+   "sha256": "c67f9b6a760f70f13c8300264826a12cbf45c2c5327b9cfcd9bad41ac055f4b7",
+   "size": 5756035
+  },
+  {
+   "path": "act3-jungle-trees-a3_atlas.png",
+   "sha256": "760ad8ac566a63ee03614e4278753407482d9025cede9866620be349b72520a9",
+   "size": 6964049
+  },
+  {
+   "path": "act3-kurast-huts-a3_atlas.png",
+   "sha256": "fe225212b697021d8a0268850fbaa915fa8050b1d88680d1b973329a582aa86d",
+   "size": 12177485
+  },
+  {
+   "path": "act3-kurast-interior-a3_atlas.png",
+   "sha256": "08a877d70989d15773aef92f95cef5d62ee41a47ff04922f0efbde9fa5409561",
+   "size": 7704934
+  },
+  {
+   "path": "act3-kurast-roofs-a3_atlas.png",
+   "sha256": "410926825afda4d201121977e59a90fbd31126f8bb9476fdcfaf68e22964794f",
+   "size": 12210696
+  },
+  {
+   "path": "act3-kurast-sets-a3_atlas.png",
+   "sha256": "b3fec79d43d44c009f50c5d31fc00755093117525f0b2bf78b09fea65c960d3a",
+   "size": 671471
+  },
+  {
+   "path": "act3-kurast-terraces-a3_atlas.png",
+   "sha256": "18c211c775a62a674c6661e6256941ba7bd5f75b1ecb1d0ca67b640a6cb4478f",
+   "size": 1251641
+  },
+  {
+   "path": "act3-kurast-walls-a3_atlas.png",
+   "sha256": "ef438a9b58fddf5bdf948eddf1d40cf20185ccc274e4a6d9e2b2d5f69c530c4c",
+   "size": 19724393
+  },
+  {
+   "path": "belial_floor_atlas.png",
+   "sha256": "234f3e8ea83f9c3ccdd8066d0d1e0c157a9521051a1ecca9cdd1acfc80f3af47",
+   "size": 454468
+  },
+  {
+   "path": "borgir_floor_atlas.png",
+   "sha256": "ee5b7eb48f19d8c33792eb9435ce0196cb6532f587a70f7f921382bf6b3f8a84",
+   "size": 2432188
+  },
+  {
+   "path": "charismatic_floor_atlas.png",
+   "sha256": "8a046baf7ff1112fadcabbeae6ca30add58126f2c86ca542d340e255baafba5f",
+   "size": 6237265
+  },
+  {
+   "path": "cypherpunk_floor_atlas.png",
+   "sha256": "ee4c584f338f88020a474d51f8a68b32fefeb1879b0a02a5dc22e01cc4550f8c",
+   "size": 8275724
+  },
+  {
+   "path": "desertpeak_floor_atlas.png",
+   "sha256": "5466c5055a50bb0e8b3d280939f4f403e2ba32bb183574b59b0637587bbcdc0f",
+   "size": 4922508
+  },
+  {
+   "path": "downtown_floor_atlas.png",
+   "sha256": "f6f8b1699cf786782db32a759e465b081e79ee666823de806b5ac9c7446d4a2d",
+   "size": 2153822
+  },
+  {
+   "path": "epicwhiners_floor_atlas.png",
+   "sha256": "71f175274a7a22f35fa1d42bd00611b679981d328786772ba7c418cf54d20e15",
+   "size": 16411919
+  },
+  {
+   "path": "excelsior3_floor_atlas.png",
+   "sha256": "483a7bba54bea89c4bc399c06e27c1db63f04f09a242cb3df6ac10ee6435b45b",
+   "size": 13878793
+  },
+  {
+   "path": "expansion-dystopic-interior-a2_atlas.png",
+   "sha256": "d9ad4e72c0cb3ba07df5ab5f374a77c122531f4b249021e7d9c4c0a3a19ae4d6",
+   "size": 21013431
+  },
+  {
+   "path": "expansion-dystopic-ruinwall-a2_atlas.png",
+   "sha256": "79093dda7f732fcfc0d5c08975956940e0616647d1f8de748cbdba2682a22bd1",
+   "size": 3854668
+  },
+  {
+   "path": "expansion-dystopic-terraces-a2_atlas.png",
+   "sha256": "26950f30e49899600e4af8deb6042c13bf8ce94bf204cd9b719f1232b3991327",
+   "size": 860409
+  },
+  {
+   "path": "expansion-dystopic-treegrp-a2_atlas.png",
+   "sha256": "d32436e069305cf202168ced2165f0192d2b3cebc399e1fa28827595ba746848",
+   "size": 9386871
+  },
+  {
+   "path": "expansion-dystopic-trees-a2_atlas.png",
+   "sha256": "68022ef3bcf1eacfc49f12558def3fab63cbed1f1e48fc41d0d83c0c8cda4d5b",
+   "size": 6070343
+  },
+  {
+   "path": "expansion-icecave-interior-a5_atlas.png",
+   "sha256": "9a7349668e343087731081999e7eb7dc202697ce9675acf2a461375b17179bc7",
+   "size": 268994
+  },
+  {
+   "path": "expansion-neonmile-bridge-a2_atlas.png",
+   "sha256": "bd848df031b30e3baa7cdab6b1be5f4016bd172db375b49cc9119363b8c30853",
+   "size": 163056
+  },
+  {
+   "path": "expansion-neonmile-buildings-a1_atlas.png",
+   "sha256": "a85f46005691954491158c57e7d6ac3d50f1433c6d6040aba702c01304660175",
+   "size": 3094338
+  },
+  {
+   "path": "expansion-neonmile-keepwall-a1_atlas.png",
+   "sha256": "ca47b10e36e2d555137b429161d17ac27d8ff3f162dd109b950841000aeac69c",
+   "size": 1700222
+  },
+  {
+   "path": "expansion-neonmile-maingate-a1_atlas.png",
+   "sha256": "c8ee7fa9c4e3f7cb1ca5d662e03b9eff15759221c26d619a83e94d14229b33ea",
+   "size": 4696052
+  },
+  {
+   "path": "expansion-neonmile-townwalls-a1_atlas.png",
+   "sha256": "60e86c3775c5f1831601b5698f12986120df867933192b3d42c98cbe49770631",
+   "size": 9568874
+  },
+  {
+   "path": "expansion-neonmile-trees-a1_atlas.png",
+   "sha256": "3fe1ef186e9016f4712fff9660b6d20ab9b58df380136a46db5f830a331bdc88",
+   "size": 699674
+  },
+  {
+   "path": "expansion-neonmile-walls2-a1_atlas.png",
+   "sha256": "cbdafae3f149ad94ff00fe60ce366eaabb0863cc7f474b6a2e9f748de71fe935",
+   "size": 1998537
+  },
+  {
+   "path": "expansion-redsquare-brick_walls-a3_atlas.png",
+   "sha256": "b3cc85c9c37a9ed83b936e64e51e119ddf4be35ef8bba059cc4efa7716b1d5b6",
+   "size": 461765
+  },
+  {
+   "path": "expansion-redsquare-inv_wall-a1_atlas.png",
+   "sha256": "197f5c42586223495b391e5c7ce01600d84509b4c1e37add97929bc70b20b51b",
+   "size": 2099770
+  },
+  {
+   "path": "expansion-redsquare-inv_wall-a3_atlas.png",
+   "sha256": "937f9f9d3479a87942fd16eb09752984a019500b4d12f0a90c5b8906dd395aab",
+   "size": 2362528
+  },
+  {
+   "path": "expansion-terror-graveyrd-a5_atlas.png",
+   "sha256": "3c97f0c9e442a1d0f1cd2c705369fe729eaeb830ee263fded3e03ed0df684689",
+   "size": 7476003
+  },
+  {
+   "path": "expansion-voodoo-terraces-a5_atlas.png",
+   "sha256": "69abe185fe543ee259b2f71e2e6efa345acd3c13982b8fced3c302e612374c5c",
+   "size": 629369
+  },
+  {
+   "path": "expansion-voodoo-treegrp-a5_atlas.png",
+   "sha256": "24d4c19d7c5363a13ba3dc8ff2138dd7cf764f1cc484f3ee755d4c06424ba601",
+   "size": 666768
+  },
+  {
+   "path": "expansion-voodoo-trees-a5_atlas.png",
+   "sha256": "e8394e3593ff80f4ab620ffa0f4c6e6606d67dc93cabdbb20de5ce09e123fa0f",
+   "size": 1891940
+  },
+  {
+   "path": "expansion-voodoo-walls-a5_atlas.png",
+   "sha256": "3af2c80edf2f8cd872d87c4599e7af12c4dcb8096b1dcc21f6a7a6b28c7ca429",
+   "size": 16589996
+  },
+  {
+   "path": "expansion-zakarum-exterior-a2_atlas.png",
+   "sha256": "59b1489ffa5974e6984407bb1c7472f1c5780aad325ca0fa1c94d2045d4f61e1",
+   "size": 2839666
+  },
+  {
+   "path": "expansion-zakarum-exterior-a3_atlas.png",
+   "sha256": "2cfc58e4634f9f555a0eb61440c9bbecb8c6dd27c20490448a03ed9036b039b9",
+   "size": 5448543
+  },
+  {
+   "path": "expansion-zakarum-exterior-a5_atlas.png",
+   "sha256": "70b8a8894713b70de0cdc04ea7976d5a415dbeb565e65bd6082022718daffa69",
+   "size": 8701772
+  },
+  {
+   "path": "expansion-zakarum-foregate-a3_atlas.png",
+   "sha256": "89b87d19a937920ab2160ef7e56ebb4fbbb9dc4b110adda5110a63012b998fa1",
+   "size": 2497224
+  },
+  {
+   "path": "expansion-zakarum-foregate-a5_atlas.png",
+   "sha256": "fe89a1280905d2d9a6c1583ece711740f3234dd08e4c72b4ec0348e35957bb72",
+   "size": 11806592
+  },
+  {
+   "path": "expansion-zakarum-interior-a2_atlas.png",
+   "sha256": "f92be96cadbedeb1fbdd3d15ef92234d1b8b98af404c39e17b28739a68b0e04e",
+   "size": 753214
+  },
+  {
+   "path": "expansion-zakarum-interior-a5_atlas.png",
+   "sha256": "ceef52276c1a628b7c24660c4bce906c2e3039dd7f2356b9bb502de4c0e5bce6",
+   "size": 3332042
+  },
+  {
+   "path": "expansion-zakarum-plaza-a5_atlas.png",
+   "sha256": "50c8b5a832de4769d45680af2f92939bf5898a6935cb107ae19a3aae49f66ebc",
+   "size": 1243047
+  },
+  {
+   "path": "glados_floor_atlas.png",
+   "sha256": "e30be281ab5197e0594c6fa6b15f794fe52c9adc34606847f63354131358c640",
+   "size": 9590183
+  },
+  {
+   "path": "inarius_floor_atlas.png",
+   "sha256": "9146dcf3a0de5d5ae8914196b054f46498a81ecc47ff09de21a9d8be508387b4",
+   "size": 8946050
+  },
+  {
+   "path": "macumba_floor_atlas.png",
+   "sha256": "9e0bb06fcff388f795e9d64ae7e076c53f9afc8b6cc5131374ca299275048029",
+   "size": 595402
+  },
+  {
+   "path": "moskvich_floor_atlas.png",
+   "sha256": "66ee6a1df73f6a118741913cf28413bac2d80836709fb35439acbf010de51981",
+   "size": 11180027
+  },
+  {
+   "path": "upscale.json",
+   "sha256": "8658337d62d9cee9629ad71331c8801af5c8390b8a61e76bead7a7df2b1cb397",
+   "size": 5851
+  }
+ ]
+}

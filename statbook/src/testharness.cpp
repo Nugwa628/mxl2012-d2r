@@ -5,9 +5,9 @@
 // Off unless statbook-testharness.txt sits next to the DLL. Its text is a list of words; "tag=s1" renames the window
 // "Diablo II: Resurrected [s1]".
 //
-// Every user32 input call ends in a win32u syscall stub of the fixed shape
-//     4c 8b d1 / b8 <ssn32> / f6 04 25 08 03 fe 7f 01 / 75 03 / 0f 05 / c3 / cd 2e / c3
-// (checked byte for byte before patching). The first 14 bytes become `jmp [rip+0]; dq hook`, the trampoline holds the
+// Every user32 input call ends in a win32u syscall stub of one of the two shapes of mxl2012-core's
+// plugin/src/testharness_logic.h (ClassifyStub, shared: Windows `... 0f 05 / c3 / cd 2e / c3` and Wine/Proton
+// `... 0f 05 / c3 / eb 01 / c3 / ff 14 25 00 10 fe 7f / c3`), checked byte for byte before patching. The first 14 bytes become `jmp [rip+0]; dq hook`, the trampoline holds the
 // copied 16 bytes and a jump back to stub+16. While the block's `active` is set:
 //   GetCursorPos returns the virtual client position, GetKeyState (syscall and the exe's import) the virtual buttons and
 //   modifiers; SetCursorPos and ClipCursor only move the virtual cursor; TrackMouseEvent is accepted and ignored (no
@@ -15,6 +15,7 @@
 //   WS_EX_NOACTIVATE). Console lines in the block run on the UI thread through D2RCore's ExecuteConsoleCommand.
 // When the block already exists (mxl2012-core's harness is on in the same game) nothing is installed.
 #include "testharness.h"
+#include "testharness_logic.h"  // ../plugin/src: the stub shapes, shared with mxl2012-core
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -266,17 +267,15 @@ DWORD WINAPI TitleThread(LPVOID) noexcept {
 	return 0;
 }
 
+// Shapes PatchStub hooked, for the report line.
+int g_windowsStubs = 0;
+int g_wineStubs = 0;
+
 auto PatchStub(void* stub, void* hook, void** original) noexcept -> bool {
-	static const uint8_t Shape[24] = {0x4c, 0x8b, 0xd1, 0xb8, 0, 0, 0, 0, 0xf6, 0x04, 0x25, 0x08,
-	                                  0x03, 0xfe, 0x7f, 0x01, 0x75, 0x03, 0x0f, 0x05, 0xc3, 0xcd, 0x2e, 0xc3};
 	const auto* code = static_cast<const uint8_t*>(stub);
-	if (code == nullptr) {
-		return false;
-	}
-	for (int i = 0; i < 24; ++i) {
-		if ((i < 4 || i >= 8) && code[i] != Shape[i]) {
-			return false;  // another build of win32u, or already hooked
-		}
+	const harness_logic::StubShape shape = harness_logic::ClassifyStub(code);
+	if (shape == harness_logic::StubShape::Unknown) {
+		return false;  // another build of win32u, or already hooked
 	}
 	auto* trampoline = static_cast<uint8_t*>(VirtualAlloc(nullptr, 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 	if (trampoline == nullptr) {
@@ -299,6 +298,7 @@ auto PatchStub(void* stub, void* hook, void** original) noexcept -> bool {
 	std::memcpy(stub, jump, 14);
 	VirtualProtect(stub, 16, old, &old);
 	FlushInstructionCache(GetCurrentProcess(), stub, 16);
+	++(shape == harness_logic::StubShape::Wine ? g_wineStubs : g_windowsStubs);
 	return true;
 }
 
@@ -396,7 +396,7 @@ auto InstallTestHarness(char* report, size_t reportSize) noexcept -> bool {
 			CloseHandle(t);
 		}
 	}
-	std::snprintf(report, reportSize, "TEST HARNESS ON (test build): %d input calls hooked, %d not, GetKeyState import %s, console %s", hooked,
-	              missing, keyStateImport ? "hooked" : "not found", g_execute != nullptr ? "on" : "off (no D2RCore export)");
+	std::snprintf(report, reportSize, "TEST HARNESS ON (test build): %d input calls hooked%s, %d not, GetKeyState import %s, console %s", hooked,
+	              g_wineStubs > 0 ? " (Wine stubs)" : "", missing, keyStateImport ? "hooked" : "not found", g_execute != nullptr ? "on" : "off (no D2RCore export)");
 	return true;
 }

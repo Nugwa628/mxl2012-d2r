@@ -9,18 +9,17 @@ number of LODs is a good template (the vanilla override at the `horse` path draw
 
 File layout (little endian): three arrays, header `{count, self-relative offset}` x 3 (the offset is from its own field):
   array 1  count1 x 44 B, sorted by key: u32 key | f32 bbMin[3] | f32 bbMax[3] | u8 lodMask (bit k+1 = lod k) + 3 B | u32 lodCount |
-           u32 offset | u32 size (offset / size index the stream records of arrays 2 and 3)
-  array 2  count2 x 12 B     array 3  count3 x 32 B  (per mesh / per LOD stream records)
-Adding entries only grows array 1 (so the offsets of arrays 2 and 3 grow by 44 B per entry); the new entries share the donor's
-records, unless they are given records of their own (`own`, lane hdtools-spritewall).
-
-What the records hold (read from the table and D2R's own files, 14,310 entries; no record is shared by two of D2R's entries):
-  entry +36  u32 self-relative offset to the model's array 2 records, one per LOD (lodCount of them)
-  entry +40  u32, a power of two (32 for 7,104 entries); copied from the donor
-  array 2    u8 isMeshFlipbook + 3 B unused | u32 meshCount | u32 self-relative offset (from +8) to the LOD's array 3 records
-  array 3    f32 bbMin[3] | f32 bbMax[3] | u32 (1 for 94%) | u16 (1 for 90%) | u16 vertex format (32: position, normal,
-             tangent, uv; 48: the same with a colour; 4, 33, 49 on skinned or other meshes)
-No vertex or index count is stored anywhere, so a model need not be padded to its donor's counts.
+           u32 offset (self-relative, to the model's first array-2 record) | u32 modelType (the model root's ExtendedData.modelType:
+           32 props, 1 terrain, ...)
+  array 2  count2 x 12 B, one per LOD file: u8 isMeshFlipbook + 3 B | u32 meshCount | u32 offset (self-relative, to the LOD's
+           first array-3 record)
+  array 3  count3 x 32 B, one per mesh of a LOD: f32 bbMin[3] | f32 bbMax[3] | u32 meshRenderLayer | u16 bone bindings |
+           u16 vertex format (0x20 static, 0x30 static with vertex colour, 0x04 skinned)
+Read from the table and D2R's own files (14,310 entries; no record is shared by two of D2R's entries). The pad bytes hold
+leftovers. No vertex or index count is stored anywhere, so a model need not be padded to its donor's counts.
+add() only grows array 1 (so the offsets of arrays 2 and 3 grow by 44 B per entry); its new entries share the donor's records,
+unless they are given records of their own (`own`, lane hdtools-spritewall). add_own() writes an entry with its own records
+(a brand-new model: any number of LODs and meshes); records() reads one entry's whole description.
 
   py -3 tools/model_lod_desc.py show data/hd/character/enemy/horse/torso.model [...]
   py -3 tools/model_lod_desc.py add OUT.bin NEW_PATH=DONOR_PATH [...]        (reads D2R's table: extraction or shared cache)
@@ -197,6 +196,102 @@ def compact(data):
         out1.append(bytes(e))
     head = struct.pack("<6i", len(entries), 20, len(new2), a2n_at - 12, len(new3), a3n_at - 20)
     return head + b"".join(out1) + bytes(out2) + out3
+
+
+LOD_RECORD, MESH_RECORD = 12, 32
+FMT_STATIC, FMT_COLOUR, FMT_SKINNED = 0x20, 0x30, 0x04  # mesh record's format word (see mesh_format)
+
+
+def mesh_format(members) -> int:
+    """The format word of a mesh record from the vertex struct's member names: 0x04 skinned (BoneWeights), 0x30 static with
+    DiffuseColor0, 0x20 static (Position, Normal, Tangent, TextureCoordinates0). A few of D2R's own static meshes carry 0x21
+    with the same four members (tent01_canvas_a, blowdart01, short_skull01); what bit 0 says is not known (it is not the
+    number of triangle groups: meshes with several groups carry 0x20)."""
+    names = set(members)
+    return FMT_SKINNED if "BoneWeights" in names else FMT_COLOUR if "DiffuseColor0" in names else FMT_STATIC
+
+
+def records(data, path):
+    """The whole description of `path`: {bounds, mask, model_type, lods: [{flipbook, meshes: [{bounds, layer, bones, format}]}]}
+    (None when the path has no entry). The table holds no vertex or index counts."""
+    n1, r1, n2, r2, n3, r3 = struct.unpack_from("<6i", data, 0)
+    a1, a2, a3 = 4 + r1, 12 + r2, 20 + r3
+    key = fnv(path)
+    lo, hi = 0, n1
+    while lo < hi:  # the entries are sorted by key
+        mid = (lo + hi) // 2
+        if struct.unpack_from("<I", data, a1 + mid * ENTRY)[0] < key:
+            lo = mid + 1
+        else:
+            hi = mid
+    at = a1 + lo * ENTRY
+    if lo >= n1 or struct.unpack_from("<I", data, at)[0] != key:
+        return None
+    f = struct.unpack_from("<6f", data, at + 4)
+    count, off, model_type = struct.unpack_from("<3I", data, at + 32)
+    out = {"bounds": (f[:3], f[3:]), "mask": data[at + 28], "model_type": model_type, "lods": []}
+    rec = at + 36 + off
+    for k in range(count):
+        r = rec + k * LOD_RECORD
+        if not a2 <= r < a3:
+            raise ValueError("lod record of %s outside array 2" % path)
+        meshes, moff = struct.unpack_from("<2I", data, r + 4)
+        lod = {"flipbook": data[r], "meshes": []}
+        for j in range(meshes):
+            m = r + 8 + moff + j * MESH_RECORD
+            b = struct.unpack_from("<6f", data, m)
+            layer, bones, fmt = struct.unpack_from("<IHH", data, m + 24)
+            lod["meshes"].append({"bounds": (b[:3], b[3:]), "layer": layer, "bones": bones, "format": fmt})
+        out["lods"].append(lod)
+    return out
+
+
+def add_own(data, models):
+    """A table with entries that have their OWN lod and mesh records (add() shares a donor's). `models`: {path: {"bounds":
+    (min xyz, max xyz), "model_type": 32, "lods": [{"flipbook": 0, "meshes": [{"bounds": (min, max), "layer": 1, "bones": 1,
+    "format": 0x20}, ...]}, ...]}}, one "lods" item per `_lodN.model` file, LOD 0 first. Existing entries of the same paths are
+    replaced (their old records stay in the file, unused).
+
+    The new records go to the ends of arrays 2 and 3, so each old lod record's self-relative offset to its mesh records grows
+    by the bytes added to array 2, and every entry's offset by the bytes added to array 1."""
+    old, a2, a3, (n2, n3) = parse(data)
+    a2_old = 24 + len(old) * ENTRY
+    drop = {fnv(p) for p in models}
+    items = [(e, 24 + i * ENTRY + 36 + struct.unpack_from("<I", e, 36)[0] - a2_old) for i, e in enumerate(old)
+             if struct.unpack_from("<I", e)[0] not in drop]  # (entry, offset of its first lod record inside array 2)
+    new2, new3 = bytearray(), bytearray()
+    lod_at = []  # per new lod record: index of its first mesh record among the new mesh records
+    for path, m in sorted(models.items(), key=lambda kv: fnv(kv[0])):
+        lods = m["lods"]
+        if not 1 <= len(lods) <= 7:
+            raise ValueError("%s: %d LODs (1 to 7 fit the mask byte)" % (path, len(lods)))
+        e = struct.pack("<I6f", fnv(path), *m["bounds"][0], *m["bounds"][1])
+        e += bytes([sum(2 << k for k in range(len(lods))), 0, 0, 0]) + struct.pack("<3I", len(lods), 0, m.get("model_type", 32))
+        items.append((e, len(a2) + len(new2)))
+        for lod in lods:
+            lod_at.append(len(new3) // MESH_RECORD)
+            new2 += bytes([lod.get("flipbook", 0), 0, 0, 0]) + struct.pack("<2I", len(lod["meshes"]), 0)
+            for mesh in lod["meshes"]:
+                new3 += struct.pack("<6fIHH", *mesh["bounds"][0], *mesh["bounds"][1], mesh.get("layer", 1), mesh.get("bones", 1),
+                                    mesh.get("format", FMT_STATIC))
+    items.sort(key=lambda it: struct.unpack_from("<I", it[0])[0])
+    n1 = len(items)
+    a2s = 24 + n1 * ENTRY
+    a3s = a2s + len(a2) + len(new2)
+    out1 = bytearray()
+    for i, (e, t) in enumerate(items):
+        e = bytearray(e)
+        struct.pack_into("<I", e, 36, a2s + t - (24 + i * ENTRY + 36))
+        out1 += e
+    a2 = bytearray(a2)
+    for k in range(n2):  # array 3 moved away from the old lod records by the new lod records
+        off = struct.unpack_from("<I", a2, k * LOD_RECORD + 8)[0]
+        struct.pack_into("<I", a2, k * LOD_RECORD + 8, off + len(new2))
+    for k, first in enumerate(lod_at):
+        field = a2s + len(a2) + k * LOD_RECORD + 8
+        struct.pack_into("<I", new2, k * LOD_RECORD + 8, a3s + len(a3) + first * MESH_RECORD - field)
+    head = struct.pack("<6i", n1, 20, n2 + len(new2) // LOD_RECORD, a2s - 12, n3 + len(new3) // MESH_RECORD, a3s - 20)
+    return head + bytes(out1) + bytes(a2) + bytes(new2) + a3 + bytes(new3)
 
 
 def main():

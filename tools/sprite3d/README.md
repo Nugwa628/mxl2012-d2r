@@ -1,7 +1,8 @@
 # sprite -> 3D prototype helpers (lane `wereowl-3d`)
 
 Prototype: turn a Median 2D monster sprite into a D2R HD model. Everything heavy (Blender, Real-ESRGAN, the 3D venv, model
-weights, meshes) lives under `D:\mxl-3d\` and is never committed.
+weights, meshes) lives outside the repository (the art store and the machine's tool folders, see "Settings" below) and is
+never committed.
 
 | Script | Use |
 |---|---|
@@ -10,10 +11,39 @@ weights, meshes) lives under `D:\mxl-3d\` and is never committed.
 | `model_to_glb.py` | D2R `.model` -> GLB (bind pose + albedo), runs in the 3D venv (needs trimesh) |
 | `render_glb.py` | `blender -b -P` 4-angle Workbench render strip of GLBs |
 | `donor_info.py`, `extract_anims.py`, `ai/clip_survey.py` | skeleton bone counts and real clip names of the D2R enemy units |
-| `rig_fit.py` | Wereowl mesh -> skinned to a D2R skeleton (profiles `wolf`, `goatman1`): capsule weights, per-role unposing; used by `tools/wereowl_models.py` |
+| `rig_fit.py` | Wereowl mesh -> skinned to a D2R skeleton (profiles `wolf`, `goatman1`, `bear`, `hellbovine`): capsule weights, per-role unposing; used by `tools/wereowl_models.py` |
 | `owl_hi.py`, `owl_retopo.py`, `owl_bake.py`, `owl_maps.py`, `owl_lods.py`, `owl_pose.py`, `bl_common.py`, `render_npz.py` | lane wereowl-mesh: high-poly clean-up, QuadriFlow retopology, normal / AO bake and albedo re-projection (Blender), maps to PNG, LOD collapse (pymeshlab), fit to the bear skeleton, Blender helpers, static Blender renders; commands in `docs/hd-wereowl-assets.md` |
 | `morph_shots.py` | in game: a Druid casts Wereowl (`cast 1364 self`) and the form is screenshot (neutral / walk / run / attack / cast / get hit; `MXL_MORPH_DIRS=1` adds eight walk directions), background input, slot lock held by the caller |
-| `ai/run_hunyuan.py`, `ai/run_triposg.py`, `ai/diso_stub.py` | Hunyuan3D-2 (mv / mini) and TripoSG shape generation on local weights (copies of what ran from `D:\mxl-3d\scripts`) |
+| `ai/run_triposg.py`, `ai/diso_stub/` | TripoSG (MIT) one sprite view -> shape on local weights, offline; `diso` (CUDA only) replaced by a stand-in |
+| `ai/run_hunyuan.py`, `ai/cv2_stub/` | Hunyuan3D-2mv front / left / back / right sprite views -> shape on local weights, offline. COMPARISON ONLY, never shipped (its licence excludes the EU, the UK and South Korea); OpenCV replaced by a stand-in |
+| `render_soft.py` | software rasteriser (numba): grey or textured views of a mesh, also through a `cam_fit` camera; no Blender or GPU needed |
+| `monster3d/` | lane hdtools-monster3d: the stage scripts of the Hardliner 3D test (section below) |
+
+## Settings and Linux (lane m3dlinux, 2026-11-20)
+
+The `monster3d/` scripts name no drive or user path. `monster3d/common.py` reads each setting from its environment variable,
+else the git-ignored machine config (`machine.json`, `tools/localconfig.py`), else a default:
+
+| Setting | machine.json key | Default |
+|-|-|-|
+| `MXL_M3D_DIR` (the lane's working folder EV: stages, shots, logs, `ART-MANIFEST.json`) | `m3d_dir` | `<runs folder>/hdtools/monster3d` |
+| `MXL_ART_STORE` (large files, tool and weight trees) | `art_store` | none (an error names the setting when it is needed) |
+| `MXL_BLENDER`, `MXL_REALESRGAN` | `blender`, `realesrgan` | Windows: the art store's trees; Linux: `blender` / `realesrgan-ncnn-vulkan` on PATH |
+| `MXL_TRIPOSG_SRC`, `MXL_TRIPOSG_WEIGHTS`, `MXL_HUNYUAN_SRC`, `MXL_HUNYUAN_WEIGHTS` | `triposg_src`, ... | the art store's trees (`ART-MANIFEST.json` toolchain) |
+| `MXL_M3D_DLL` (dev plugin for `g6_gamerun.py dll=1`) | `m3d_dll` | `<framework>/build/plugin/Release/mxl2012-core.dll` |
+
+On Linux, `. /d2work/tools/env.sh` sets the tool variables (Blender 4.5.9, Real-ESRGAN 0.2.5.0, `$MXL_PY3D` = the ROCm torch
+venv); GPU stages run as `sg render -c '...'` until the `render` group is active in the login. The GPU gate (`common.gpu_gate`)
+reads the slot locks through `tools/game_slots.py` and, on Linux, the amdgpu load through `hdkit.gpugate.read_linux`
+(Windows: the `GPU Engine` counter). `g6_gamerun.py` and its capture steps (`g6_deathcap.py`, `g6_movecap.py`) use the
+game-check framework of this checkout (lane hdtools-monster's `mon_card` / `mon_turn` are merged here; `framework=<dir>` or
+`MXL_M3D_FRAMEWORK` names another) and the slot backend `tools/game_slots.py` picks at run time: on Linux the game runs on a
+private Xvfb display, the whole slot is snapshotted and restored, and the run's logs are read from `<run>/slot-logs-N/`.
+A short Linux run (slot 5, 2 facings, HD and legacy) takes about 5 minutes:
+
+```
+MXL_M3D_TOKEN='2(' python tools/sprite3d/monster3d/g6_gamerun.py 5 <tag> <stage>/overlay check=mon_moves dll=<dev mxl2012-core.dll> MXL_MONTURN_KEYS=0,2
+```
 
 Environment notes (RX 9070 XT, Windows, build of 2026-10-22):
 - Python 3.12 venv, AMD wheels from `repo.radeon.com/rocm/windows/rocm-rel-7.2.1/` (torch 2.9.1+rocm7.2.1); works with the installed
@@ -49,3 +79,31 @@ one camera sees and its UVs are that camera's screen coordinates; xatlas only pa
 bilinearly from the sprite (next best cameras where the first does not see the texel); the rest is filled from the nearest sampled
 texel. Blender's Smart UV Project shatters the bumpy generated mesh into thousands of islands (unwrap.py keeps that path for other
 meshes); xatlas's own charting gives ~1200, so charts come from the cameras instead.
+
+## Hardliner 3D test (lane hdtools-monster3d)
+One 8-direction Median monster (token `~k`) from classic sprite to a skinned HD unit in game, all local. The working folder
+(venv, weights, Blender, stages, shots) is outside the repository: `MXL_M3D_DIR`, default `mxl2012-runs/hdtools/monster3d`
+(`monster3d/common.py`). Result and numbers: that folder's `REPORT.md`. GPU jobs go through `common.py`'s gate (no slot
+locked, GPU idle).
+
+| Stage script (`monster3d/`) | Does |
+|---|---|
+| `s1_frames.py` | classic frames of every mode, and the 8 standing directions 4x (Real-ESRGAN x4plus; decoder and upscaler are lane hdtools-monster's, copied into the working folder) |
+| `ai/run_triposg.py`, `s2_clean.py`, `s2_candidates.py` | shapes from one view, cleaned; connected pieces listed (a loose axe is its own piece) |
+| `s3_axemask.py` | sprites split into body and axe by colour (the blades are the only large grey area) |
+| `s3_prep.py`, `cam_fit.py`, `project_texture.py`, `s3_albedo.py` | body upright at height 1 (`--asis` for a mesh that already is), sprite cameras, projected albedo, clean-up without repainting |
+| `s3_axe.py` | the axe as its own rigid piece with a local frame (shaft along y, grip at the origin) and its own atlas strip |
+| `s3_renderback.py` | render-back sheet: classic, 4x sprite, then each mesh through the fitted cameras with its per-direction IoU |
+| `s4_lods.py` | body + axe, 5 LODs (Blender Decimate, UVs kept) |
+| `s5_build.py` | skin to the Hell Bovine skeleton (`rig_fit` profile `hellbovine`), axe rigid on `R_hand_bind_jnt`, `.model` x5, textures, unit JSON as an overlay |
+| `g6_gamerun.py`, `g6_contact.py`, `g6_strip.py` | overlay on a test slot under its lock with the two index files made from the installed mod, lane hdtools-monster's `mon_card` check, restore; contact sheet; comparison sheet |
+| `casc_get.py` | named vanilla D2R files out of a test slot's CASC under its lock |
+
+What the 8-direction case needs that the Wereowl did not:
+- `cam_fit.py --ring 4,0,5,1,6,2,7,3 --front 4 --sign 1`: file directions of an 8-direction monster clockwise on screen.
+  `--gen` names the directions the mesh was made from, `--yaw0` / `--span` steer the yaw search.
+- A mesh from ONE sprite view is in that picture's frame, read as a level view: stretch y by 1/cos(30), turn it to face +z
+  (`s3_prep.py`), then fit with `--elev 30 --ky 1.0`.
+- `project_texture.py --ztol 0.02` for a mesh of height 1, `--trust P` to weight views by their silhouette IoU.
+- The right-hand sprites (directions 2, 7, 3) are exact mirror silhouettes of the left-hand ones (1, 5, 0): a monster that
+  holds something in one hand cannot match both sides, the IoU of the mirrored side stays near 0.5 for every mesh.

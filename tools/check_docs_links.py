@@ -3,6 +3,7 @@ import argparse
 from collections import Counter
 from pathlib import Path
 import re
+import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -48,6 +49,17 @@ def anchors(path):
     return result
 
 
+def ignored(root, target):
+    """True when git ignores the path: a build output (tools/wctl/wctl.exe) the docs name but no checkout commits."""
+    if not (root / '.git').exists():   # only the checkout's own rules (not a parent repository's)
+        return False
+    try:
+        return subprocess.run(['git', '-C', str(root), 'check-ignore', '-q', '--no-index', target],
+                              capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
 def findings(root, path):
     text = visible(path.read_text(encoding='utf-8'))
     out = []
@@ -68,7 +80,7 @@ def findings(root, path):
         target = match[1]
         # `data/...` is an ellipsis, not a path (Windows drops trailing dots, so it only showed on Linux)
         if (REPO_PATH.fullmatch(target) and not target.startswith(('data/global/', 'data/hd/', 'data/local/'))
-                and not target.endswith('...') and not (root / target).exists()):
+                and not target.endswith('...') and not (root / target).exists() and not ignored(root, target)):
             out.append((text.count('\n', 0, match.start()) + 1, 'missing repo path', target))
     return sorted(out)
 

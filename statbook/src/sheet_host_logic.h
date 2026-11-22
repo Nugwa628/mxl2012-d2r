@@ -5,6 +5,7 @@
 
 #include "book_logic.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -520,6 +521,23 @@ auto AllLines(const statbook::Book& book, Value&& value, StatText&& statText, St
 			stats->pop_back();
 		}
 	}
+}
+
+// A (begin, end) pointer pair that may be a widget child list: begin and end 8-aligned user-space pointers above the first
+// 64 KiB (never mapped), end >= begin, at most maxEntries entries (empty allows begin == end). The child list scan reads
+// candidate pairs of a widget's fields; before 2026-11-20 it read the entries of a pair (0x13, 0x16) under SEH, D2R's
+// last-resort handler wrote a first-chance crash report for that handled fault at every game entry (the sheet host
+// set-up; Windows and Wine), and the scan stopped there ("child list not found").
+inline auto PlausibleList(uintptr_t begin, uintptr_t end, size_t maxEntries, bool allowEmpty) noexcept -> bool {
+	constexpr uintptr_t Low = 0x10000;
+	constexpr uintptr_t High = 0x800000000000ull;  // x64 user space
+	if (begin < Low || end < begin || end >= High || (begin & 7) != 0 || (end & 7) != 0) {
+		return false;
+	}
+	if (end == begin) {
+		return allowEmpty;
+	}
+	return (end - begin) / 8 <= maxEntries;
 }
 
 }  // namespace sheet_host

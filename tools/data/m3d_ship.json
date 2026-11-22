@@ -1,0 +1,126 @@
+{
+ "about": "3D monsters that tools/build.py ships (tools/m3d_ship.py): files in the art store by sha256, the monsters.json and model_lod_desc.bin edits from each entry",
+ "monsters": [
+  {
+   "ids": [
+    "fungus1",
+    "fungus2",
+    "glowingfs",
+    "sumelite_1272"
+   ],
+   "unit": "mxl_m3d_fungus",
+   "model": "data/hd/character/enemy/mxl/m3d/fungus/torso.model",
+   "donor_model": "data/hd/character/enemy/mummy1/torso.model",
+   "bounds": [
+    [
+     -3.207455191647647,
+     -0.41103978514990747,
+     -2.964717376068081
+    ],
+    [
+     3.0743987440501206,
+     8.086246205964231,
+     1.526230423931919
+    ]
+   ],
+   "stage": "/d2work/runs/fungus12/ev/fungus/stages/8-r18k",
+   "files": [
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/animation/combined.animations",
+     "sha256": "0c02fbbcb785e364a3a3279a8f1be7138f1f30ee847c648abdf20a327116f958",
+     "size": 313156
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/fungus.skeleton",
+     "sha256": "b01821969088e2c6c643fd5d727ab7b4131031d799863a92e6765534e3dccc7e",
+     "size": 284472
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/fungus_alb.texture",
+     "sha256": "a3f43ac8bc58aca857f6812447866a3d6e775778284d4c4991c4cf7493c9cc47",
+     "size": 5592564
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/fungus_msk.texture",
+     "sha256": "e8070eab4a913c5065bebb57412be4c9835a9dbd2592d8dea4bb67e35c92558d",
+     "size": 87516
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/fungus_nrm.texture",
+     "sha256": "1bb8e46ab254c3c767a52c3c9855c6d93a3f2d9f7f8a7d7bcd62199cc9184c34",
+     "size": 5592564
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/fungus_orm.texture",
+     "sha256": "02b95ea440a6462d6f905dd4caafa17bf530d4e851ddd2d8efa4c96a5ea39f92",
+     "size": 1398252
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/fungus_state_machine.json",
+     "sha256": "d58c75b160b42492b3f6f8aec345b593824556d283aae05643c2d6a2ba9b4e68",
+     "size": 33984
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/torso_lod0.model",
+     "sha256": "7e87a793f429c768413399e41095ad1c41f1affeadd833e3fa01050ae32e32ce",
+     "size": 1337028
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/torso_lod1.model",
+     "sha256": "ab9a0a109fa3eecb4edac5434d732cc9eb02c32d794c93b8fe2670d439c7211f",
+     "size": 834008
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/torso_lod2.model",
+     "sha256": "625fdda356a02c3bc3a12349e13cc402ba02e611da3ce12edb236fd83b05dfc1",
+     "size": 577312
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/torso_lod3.model",
+     "sha256": "43f1dc23f4d9738ca81f76715fc07b44fa4e27637a2b88b18e87959c4315c5ba",
+     "size": 437536
+    },
+    {
+     "path": "hd/character/enemy/mxl/m3d/fungus/torso_lod4.model",
+     "sha256": "afef6edea2dd7abdf4c4d40f317baf97be0db37f36c8902be1b501178c937a21",
+     "size": 303328
+    },
+    {
+     "path": "hd/character/enemy/mxl_m3d_fungus.json",
+     "sha256": "8d754d5bc233aec9d6c916ead591e29d6b02e463b67ccfb98353bb193e236ca8",
+     "size": 6049
+    },
+    {
+     "path": "hd/vfx/particles/mxl/m3d/fungus/fungus_glow_body.particles",
+     "sha256": "403e2c04438541687489ecb001f2c1cf2970668552d2518fb28c664bf3ef87b4",
+     "size": 40178
+    },
+    {
+     "path": "hd/vfx/particles/mxl/m3d/fungus/fungus_glow_cap.particles",
+     "sha256": "6e1cc49f63552f5aae5aaae139a24225af15705f0119220acbad194cc3a95df6",
+     "size": 40176
+    },
+    {
+     "path": "hd/vfx/textures/mxl/m3d/fungus/fungus_glow_body_mask.texture",
+     "sha256": "de75375079ad233a49db078ffb67e01f89bec6728f59121a8195306fae52d502",
+     "size": 2796348
+    },
+    {
+     "path": "hd/vfx/textures/mxl/m3d/fungus/fungus_glow_body_strip.texture",
+     "sha256": "83ce9f2b5f4a4697f853e5328ee741be005cd3c8833b38a01010126f87f92505",
+     "size": 16428
+    },
+    {
+     "path": "hd/vfx/textures/mxl/m3d/fungus/fungus_glow_cap_mask.texture",
+     "sha256": "6393df6a29cf768d8f88de19b648425b95eb747167e5a8bf5d2ce940dcf285b1",
+     "size": 2796348
+    },
+    {
+     "path": "hd/vfx/textures/mxl/m3d/fungus/fungus_glow_cap_strip.texture",
+     "sha256": "37c144718c781d9947bc100364d3e3406ac8eecca0f137a46a0750f7d241bf60",
+     "size": 16428
+    }
+   ]
+  }
+ ]
+}

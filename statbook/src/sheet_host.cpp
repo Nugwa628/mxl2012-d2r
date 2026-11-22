@@ -407,16 +407,46 @@ void CalibrateVisible(const char* aName, const char* bName) noexcept {
 	}
 }
 
-// The child list: a (begin, end) pointer pair of the widget whose entries hold every one of `known`.
+// Readable memory: [p, p + bytes) lies in committed pages that are neither guard nor no-access pages. The child list scan asks
+// this before it reads a candidate list, so it raises no exception (D2R's last-resort handler records even handled ones).
+auto Readable(const void* p, size_t bytes) noexcept -> bool {
+	auto at = reinterpret_cast<uintptr_t>(p);
+	const uintptr_t end = at + bytes;
+	while (at < end) {
+		MEMORY_BASIC_INFORMATION mbi{};
+		if (VirtualQuery(reinterpret_cast<const void*>(at), &mbi, sizeof(mbi)) == 0 || mbi.State != MEM_COMMIT ||
+		    (mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) != 0 || mbi.Protect == 0) {
+			return false;
+		}
+		at = reinterpret_cast<uintptr_t>(mbi.BaseAddress) + mbi.RegionSize;
+	}
+	return true;
+}
+
+// A candidate (begin, end) pair at w + off that may be read as a list (sheet_host_logic.h PlausibleList, then Readable).
+auto ListAt(void* w, size_t off, bool allowEmpty, void* const** begin, void* const** end) noexcept -> bool {
+	auto* p = static_cast<uint8_t*>(w);
+	if (!Readable(p + off, 16)) {
+		return false;
+	}
+	*begin = *reinterpret_cast<void* const* const*>(p + off);
+	*end = *reinterpret_cast<void* const* const*>(p + off + 8);
+	const auto b = reinterpret_cast<uintptr_t>(*begin);
+	const auto e = reinterpret_cast<uintptr_t>(*end);
+	return sheet_host::PlausibleList(b, e, 4096, allowEmpty) && Readable(*begin, e - b);
+}
+
+// The child list: a (begin, end) pointer pair of the widget whose entries hold every one of `known`. Pairs that are no
+// readable list are skipped without a read (sheet_host_logic.h PlausibleList); each candidate has its own SEH frame, so a
+// fault in one does not end the scan.
 auto FindKids(void* panel, void* const* known, size_t n) noexcept -> size_t {
-	__try {
-		auto* p = static_cast<uint8_t*>(panel);
-		for (size_t off = 8; off < 0x600; off += 8) {
-			auto* const* b = *reinterpret_cast<void* const* const*>(p + off);
-			auto* const* e = *reinterpret_cast<void* const* const*>(p + off + 8);
-			if (b == nullptr || e <= b || e - b > 4096) {
-				continue;
-			}
+	for (size_t off = 8; off < 0x600; off += 8) {
+		void* const* b = nullptr;
+		void* const* e = nullptr;
+		if (!ListAt(panel, off, false, &b, &e)) {
+			continue;
+		}
+		__try {
 			size_t found = 0;
 			for (size_t k = 0; k < n; ++k) {
 				for (auto* const* it = b; it < e; ++it) {
@@ -429,8 +459,8 @@ auto FindKids(void* panel, void* const* known, size_t n) noexcept -> size_t {
 			if (found == n) {
 				return off;
 			}
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
 		}
-	} __except (EXCEPTION_EXECUTE_HANDLER) {
 	}
 	return 0;
 }
@@ -440,13 +470,12 @@ auto Kids(void* w, std::vector<void*>& out) noexcept -> bool {
 	if (g_kidsOff == 0 || w == nullptr) {
 		return false;
 	}
+	void* const* b = nullptr;
+	void* const* e = nullptr;
+	if (!ListAt(w, g_kidsOff, true, &b, &e)) {
+		return false;
+	}
 	__try {
-		auto* p = static_cast<uint8_t*>(w);
-		auto* const* b = *reinterpret_cast<void* const* const*>(p + g_kidsOff);
-		auto* const* e = *reinterpret_cast<void* const* const*>(p + g_kidsOff + 8);
-		if (b == nullptr || e < b || e - b > 4096) {
-			return false;
-		}
 		for (auto* const* it = b; it < e; ++it) {
 			if (*it != nullptr) {
 				out.push_back(*it);

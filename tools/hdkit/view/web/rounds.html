@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map rounds</title>
+<style>
+  :root { --bg: #16171b; --panel: #202228; --line: #34373f; --text: #e4e4e7; --muted: #9a9ca5; --accent: #e0b050; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; }
+  #bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel);
+         border-bottom: 1px solid var(--line); }
+  select, button { background: #2a2d35; color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+                   padding: 3px 6px; font: inherit; }
+  button { cursor: pointer; } button:hover, button.on { border-color: var(--accent); }
+  label, .muted { color: var(--muted); }
+  #note { padding: 4px 10px; color: var(--muted); white-space: pre-wrap; border-bottom: 1px solid var(--line); }
+  #note:empty { display: none; }
+  #panes { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 2px; }
+  .pane { position: relative; flex: 1 1 0; overflow: hidden; background: #000; cursor: grab; min-width: 0; }
+  .pane img { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: auto; user-select: none;
+              -webkit-user-drag: none; }
+  .pane.px img { image-rendering: pixelated; }
+  .cap { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.65); padding: 1px 6px; border-radius: 3px;
+         color: var(--accent); pointer-events: none; z-index: 2; }
+  .wipe { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 2; pointer-events: none; }
+  @media (max-width: 800px) { #panes { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div id="bar">
+  <label>round</label><select id="round"></select>
+  <label>map</label><select id="set"></select>
+  <button id="prev" title="previous map ([)">&lsaquo;</button><button id="next" title="next map (])">&rsaquo;</button>
+  <span class="muted">|</span>
+  <button id="side" class="on" title="all pictures side by side (s)">side by side</button>
+  <button id="flick" title="one picture; keys 1-9 or space switch (f)">flick</button>
+  <button id="wipe" title="first two pictures, the split follows the mouse; drag pans (w)">wipe</button>
+  <span class="muted">|</span>
+  <button id="fit" title="whole picture (0)">fit</button>
+  <button id="one" title="1 picture pixel = 1 screen pixel, as on a 4K screen (1:1)">1:1</button>
+  <label><input type="checkbox" id="px"> pixels</label>
+  <span id="status" class="muted" style="margin-left:auto"></span>
+</div>
+<div id="note"></div>
+<div id="panes"></div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let data = [], R = null, S = null, mode = "side", cur = 0, wipeAt = 0.5;
+const view = { s: 1, x: 0, y: 0 };   // picture px -> pane px: p * s + (x, y)
+let natural = [1, 1];
+
+function pics() { return S ? S.pics : []; }
+function url(p) { return "/rounds/" + [R.name, S.name, p].map(encodeURIComponent).join("/"); }
+function label(p) { return p.replace(/\.[a-z]+$/i, "").replace(/^\d+[_-]/, "").replace(/_/g, " "); }
+
+async function load() {
+  const r = await (await fetch("/api/rounds")).json();
+  data = r.rounds;
+  $("status").textContent = data.length ? "" : "no rounds in " + r.root;
+  $("round").innerHTML = data.map((d, i) => `<option value="${i}">${d.name}</option>`).join("");
+  const h = new URLSearchParams(location.hash.slice(1));
+  const ri = Math.max(0, data.findIndex((d) => d.name === h.get("round")));
+  $("round").value = ri;
+  pickRound(ri, h.get("map"));
+}
+
+function pickRound(i, want) {
+  R = data[i];
+  if (!R) return;
+  $("set").innerHTML = R.sets.map((s, j) => `<option value="${j}">${s.name}</option>`).join("");
+  const j = Math.max(0, R.sets.findIndex((s) => s.name === want));
+  $("set").value = j;
+  pickSet(j);
+}
+
+function pickSet(j) {
+  S = R.sets[j];
+  cur = Math.min(cur, pics().length - 1);
+  $("note").textContent = [R.note, S.note].filter(Boolean).join("\n");
+  location.hash = "round=" + encodeURIComponent(R.name) + "&map=" + encodeURIComponent(S.name);
+  build(true);
+}
+
+function build(refit) {
+  const box = $("panes");
+  box.style.top = ($("bar").offsetHeight + $("note").offsetHeight) + "px";
+  box.innerHTML = "";
+  const show = mode === "side" ? pics().map((p, i) => i) : mode === "flick" ? [cur] : [0];
+  for (const i of show) {
+    const pane = document.createElement("div");
+    pane.className = "pane" + ($("px").checked ? " px" : "");
+    const list = mode === "wipe" ? [Math.min(1, pics().length - 1), 0] : [i];   // wipe: right picture under the left one
+    for (const k of list) {
+      const img = new Image();
+      img.src = url(pics()[k]);
+      img.draggable = false;
+      img.dataset.k = k;
+      img.onload = () => { if (refit && k === list[0]) { natural = [img.naturalWidth, img.naturalHeight]; fit(); refit = false; } };
+      pane.appendChild(img);
+    }
+    const cap = document.createElement("div");
+    cap.className = "cap";
+    cap.textContent = mode === "wipe" ? label(pics()[0]) + "  |  " + label(pics()[Math.min(1, pics().length - 1)])
+                                      : (i + 1) + "  " + label(pics()[i]);
+    pane.appendChild(cap);
+    if (mode === "wipe") { const w = document.createElement("div"); w.className = "wipe"; pane.appendChild(w); }
+    box.appendChild(pane);
+    hook(pane);
+  }
+  apply();
+}
+
+function paneSize() { const p = document.querySelector(".pane"); return p ? [p.clientWidth, p.clientHeight] : [1, 1]; }
+
+function fit() {
+  const [w, h] = paneSize();
+  view.s = Math.min(w / natural[0], h / natural[1]);
+  view.x = (w - natural[0] * view.s) / 2;
+  view.y = (h - natural[1] * view.s) / 2;
+  apply();
+}
+
+function zoomAt(f, cx, cy) {
+  const s = Math.min(16, Math.max(0.02, view.s * f));
+  view.x = cx - (cx - view.x) * (s / view.s);
+  view.y = cy - (cy - view.y) * (s / view.s);
+  view.s = s;
+  apply();
+}
+
+function apply() {
+  for (const pane of document.querySelectorAll(".pane")) {
+    const imgs = pane.querySelectorAll("img");
+    imgs.forEach((img) => { img.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.s})`; });
+    if (mode === "wipe" && imgs.length > 1) {
+      const x = pane.clientWidth * wipeAt;
+      imgs[1].style.clipPath = `inset(0 ${Math.max(0, natural[0] - (x - view.x) / view.s)}px 0 0)`;
+      pane.querySelector(".wipe").style.left = x + "px";
+    }
+  }
+  const n = S ? pics().length : 0;
+  $("status").textContent = n ? `${Math.round(view.s * 100)}%  ·  ${natural[0]}×${natural[1]}  ·  ${n} pictures` : $("status").textContent;
+}
+
+function hook(pane) {
+  let drag = null;
+  pane.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = pane.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  pane.addEventListener("pointerdown", (e) => {
+    pane.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, y: e.clientY };
+    pane.style.cursor = "grabbing";
+  });
+  pane.addEventListener("pointermove", (e) => {
+    if (mode === "wipe" && (e.buttons === 0 || e.shiftKey)) {
+      const r = pane.getBoundingClientRect();
+      wipeAt = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      apply();
+    }
+    if (!drag || e.shiftKey) return;
+    view.x += e.clientX - drag.x; view.y += e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY;
+    apply();
+  });
+  pane.addEventListener("pointerup", () => { drag = null; pane.style.cursor = ""; });
+  pane.addEventListener("dblclick", (e) => {
+    const r = pane.getBoundingClientRect();
+    zoomAt(1 / view.s, e.clientX - r.left, e.clientY - r.top);
+  });
+}
+
+function setMode(m) {
+  mode = m;
+  for (const b of ["side", "flick", "wipe"]) $(b).classList.toggle("on", b === m);
+  build(false);
+}
+
+function step(d) {
+  const n = R ? R.sets.length : 0;
+  if (!n) return;
+  const j = (Number($("set").value) + d + n) % n;
+  $("set").value = j;
+  pickSet(j);
+}
+
+$("round").onchange = () => pickRound(Number($("round").value));
+$("set").onchange = () => pickSet(Number($("set").value));
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("side").onclick = () => setMode("side");
+$("flick").onclick = () => setMode("flick");
+$("wipe").onclick = () => setMode("wipe");
+$("fit").onclick = fit;
+$("one").onclick = () => { const [w, h] = paneSize(); zoomAt(1 / view.s, w / 2, h / 2); };
+$("px").onchange = () => build(false);
+window.addEventListener("resize", () => build(false));
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "SELECT") return;
+  const k = e.key;
+  if (k === "[") step(-1);
+  else if (k === "]") step(1);
+  else if (k === "s") setMode("side");
+  else if (k === "f") setMode("flick");
+  else if (k === "w") setMode("wipe");
+  else if (k === "0") fit();
+  else if (k === " " && S) { e.preventDefault(); cur = (cur + 1) % pics().length; setMode("flick"); }
+  else if (/^[1-9]$/.test(k) && S && Number(k) <= pics().length) { cur = Number(k) - 1; setMode("flick"); }
+  else if (k === "+" || k === "=") { const [w, h] = paneSize(); zoomAt(1.25, w / 2, h / 2); }
+  else if (k === "-") { const [w, h] = paneSize(); zoomAt(0.8, w / 2, h / 2); }
+});
+load();
+</script>
+</body>
+</html>

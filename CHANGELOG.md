@@ -7,6 +7,26 @@ version being released (docs/release.md).
 
 ## D2R-XL 2012
 
+### 0.1.29 (2026-11-22)
+
+- **Twelve of Median's own areas get much sharper art in HD graphics:** Fauztinville, Tran Athulua, Duncraig, Cathedral
+  of Vanity, Ureh, Dimensional Sanctum, Kurast 3000 BA, Vizjun, Rathma Square, Toraja, Old Bremmtown and Khalimgrad
+  are still drawn from their classic art, now upscaled four times and lit by each area's own light. They are made for
+  4K screens and also look crisper at lower resolutions. Cliff, kerb and ledge faces and the lower parts of walls,
+  which HD used to leave out, are now drawn as in classic. The download is about 80 MB larger.
+
+- **The minimap works in nine of Median's own areas:** in Fauztinville, Tran Athulua, Duncraig, Ureh, Vizjun, Rathma
+  Square, Toraja, Old Bremmtown and Khalimgrad the minimap (Tab) was almost blank, as in classic Median, because no
+  minimap lines existed for Median's own walls. Those walls now show, in HD and legacy graphics, and the legacy lines
+  are brighter so they read as clearly as in HD. D2R's own areas are unchanged.
+
+- **The Glowing Fungus is a 3D monster in HD graphics:** a model made for the mod, with its glowing cap and its own
+  walk, attacks, getting hit and death. When it dies it falls limp on its side, with its cap still attached and its
+  glow gone. Legacy graphics are unchanged.
+
+- **The Stat Book no longer leaves a crash report each time you enter a game:** a check while setting up its pages
+  read a place in memory it should not have. The game did not crash, but the report was written each time.
+
 ### 0.1.28 (2026-11-21)
 
 - **The Barbarian stances show their feathers in HD graphics:** Lion, Bear, Snake, Eagle and the other stances now have

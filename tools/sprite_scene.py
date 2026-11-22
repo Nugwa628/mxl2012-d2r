@@ -32,7 +32,7 @@ What is drawn, from the tile data alone:
       tile so, on a flat-painted map too: the ground is then Median's own floor, not the biome's (`--ground bare`: the
       biome under it grows no grass and no clutter, and the art's cells lose their biome override);
   rarity variants: a tile key with several tiles in its file draws them by their rarity, picked per cell by a fixed hash.
-Not drawn: orientations 10 and 11 (specials), 13 (shadows), 16-19 (lower walls, below the floor line).
+Not drawn: orientations 10 and 11 (specials), 13 (shadows). Lower walls (16-19, under the floor line) only with --classic, as flat paint.
 
 Sharing: a model belongs to its TILE, not to a map: data/hd/env/model/mxl/wallsprite/t/<tile file>-a<act>/<class>_o_s_q.model,
 with one albedo atlas per tile file and palette, so every cell and every map that uses a tile draws the same files.
@@ -76,13 +76,18 @@ LIST = ROOT / "tools" / "data" / "sprite_walls.json"
 CLASSIC_LIST = ROOT / "tools" / "data" / "sprite_classic.json"   # the maps tools/build.py builds with --classic
 S = math.sqrt(1.5)                 # the camera looks along (-S, -1, -S): 30 degrees above the ground (docs/maps-hd-method.md)
 PX_HEIGHT = ws.PX_PER_UNIT * S     # classic pixels per world unit of height: 9.80 (walls_sprite's 9.24 drew walls 6% too tall)
-WALL, PROP, TREE, ROOF = "wall", "prop", "tree", "roof"
-CLASS_OF = {**{o: WALL for o in range(1, 12)}, 12: PROP, 14: TREE, 15: ROOF}   # the file names' first word: walls_hd.tier
+WALL, PROP, TREE, ROOF, LOWER = "wall", "prop", "tree", "roof", "lower"
+CLASS_OF = {**{o: WALL for o in range(1, 12)}, 12: PROP, 14: TREE, 15: ROOF,   # the file names' first word: walls_hd.tier
+            **{o: LOWER for o in range(16, 20)}}
 SPECIAL = frozenset((10, 11))      # the .dt1's special wall tiles (doorways, level exits): drawn only on the maps of DOOR_MAPS
-DRAWN = frozenset(CLASS_OF) - SPECIAL   # the orientations drawn by default
+LOWER_ORIENTATIONS = frozenset(range(16, 20))   # lower walls: below the floor line, painted flat (lower_mesh); --classic only
+DRAWN = frozenset(CLASS_OF) - SPECIAL - LOWER_ORIENTATIONS   # the orientations drawn by default
 # maps whose special tiles are drawn as walls, as classic draws them: Island of the Sunless Sea's cave exit (two orientation 11
 # tiles between its torches) is otherwise D2R's flat dark plane
 DOOR_MAPS = {"rockisdead"}
+VIEW_XZ_PER_Y = math.sqrt(1.5)     # the game camera's view line (cos 30 sin 45, sin 30, cos 30 cos 45) per unit of height
+SKIRT_LIFT = 0.06                  # world units a wall picture's part under its floor line lies over the floor art (skirt_mesh)
+LOWER_LIFT = 0.02                  # world units a lower wall's paint lies over the black ground, under the floor art (FLOOR_LIFT)
 MODEL = "data/hd/env/model/mxl/wallsprite/t/%s/%s_%d_%d_%d.model"      # group, class + variant, orientation, style, sequence
 ATLAS = "data/hd/env/texture/mxl/wallsprite/t/%s_alb.texture"
 CHUNK_MODEL = "data/hd/env/model/mxl/wallsprite/m/%s/rock_%d_%d.model"   # 'rock': walls_hd.tier 2
@@ -153,17 +158,57 @@ OWN_GROUP = {"caveroom4": "hole2", "dungrm6a": "proving", "temple5": "reliquary"
 # ---- tiles -------------------------------------------------------------------------------------------------------------------
 class Variant:
     """One tile of a .dt1: its number among the tiles of its key (file order), rarity, pixels, roof height, blocked sub-tiles,
-    animated (the tile header's animation flag: the key's tiles are frames, not rarity variants)."""
-    __slots__ = ("key", "n", "rarity", "pixels", "roof", "blocked", "animated")
+    animated (the tile header's animation flag: the key's tiles are frames, not rarity variants). The pixels [(x, y, palette
+    index)] are decoded on first use from the .dt1's bytes (`raw`: data, block table offset, block count): a map's tile files
+    hold far more tiles than it draws, and decoding them all took 9 GB for the 12 classic maps."""
+    __slots__ = ("key", "n", "rarity", "_pixels", "_raw", "roof", "blocked", "animated")
 
-    def __init__(self, key, n, rarity, pixels, roof=0, blocked=0, animated=False):
-        self.key, self.n, self.rarity, self.pixels, self.roof, self.blocked = key, n, rarity, pixels, roof, blocked
-        self.animated = animated
+    def __init__(self, key, n, rarity, pixels=None, roof=0, blocked=0, animated=False, raw=None):
+        self.key, self.n, self.rarity, self._pixels, self.roof, self.blocked = key, n, rarity, pixels, roof, blocked
+        self.animated, self._raw = animated, raw
+
+    @property
+    def pixels(self) -> list:
+        if self._pixels is None:
+            self._pixels = _block_pixels(*self._raw)
+            self._raw = None
+        return self._pixels
+
+
+def _block_pixels(data: bytes, bptr: int, nblocks: int) -> list:
+    import dt1_pixels
+    px = []
+    for b in range(nblocks):
+        h = bptr + b * dt1_pixels.BLOCK_HEADER
+        if h + dt1_pixels.BLOCK_HEADER > len(data):
+            break
+        bx, by, _u, _gx, _gy, fmt, length, _u2, off = struct.unpack_from("<hhhBBhihi", data, h)
+        px += [(bx + x, by + y, c) for x, y, c in dt1_pixels.block_pixels(fmt, data[bptr + off:bptr + off + length])]
+    return px
+
+
+def _has_pixels(data: bytes, bptr: int, nblocks: int) -> bool:
+    """A block with encoded bytes inside the file (without decoding it)."""
+    import dt1_pixels
+    for b in range(nblocks):
+        h = bptr + b * dt1_pixels.BLOCK_HEADER
+        if h + dt1_pixels.BLOCK_HEADER > len(data):
+            break
+        length = struct.unpack_from("<hhhBBhihi", data, h)[6]
+        if length > 0:
+            return True
+    return False
+
+
+_FILE_TILES = {}     # (len, sha1) of a .dt1 -> its file_tiles: maps sharing a tile file share its tiles (and their pixels)
 
 
 def file_tiles(data: bytes) -> dict:
     """{(orientation, style, sequence): [Variant]} of every tile with a picture in a .dt1, rarity variants included."""
-    import dt1_pixels
+    import hashlib
+    key = (len(data), hashlib.sha1(data).hexdigest())
+    if key in _FILE_TILES:
+        return _FILE_TILES[key]
     count, ptr = struct.unpack_from("<ii", data, 0x10C)
     out = {}
     for t in range(count):
@@ -172,17 +217,12 @@ def file_tiles(data: bytes) -> dict:
         animated = bool(data[o + 7])
         orient, main, sub, rarity = struct.unpack_from("<4i", data, o + 20)
         bptr, _blen, nblocks = struct.unpack_from("<iii", data, o + 72)
-        px = []
-        for b in range(nblocks):
-            h = bptr + b * dt1_pixels.BLOCK_HEADER
-            if h + dt1_pixels.BLOCK_HEADER > len(data):
-                break
-            bx, by, _u, _gx, _gy, fmt, length, _u2, off = struct.unpack_from("<hhhBBhihi", data, h)
-            px += [(bx + x, by + y, c) for x, y, c in dt1_pixels.block_pixels(fmt, data[bptr + off:bptr + off + length])]
-        if not px:
+        if not _has_pixels(data, bptr, nblocks):
             continue
         vs = out.setdefault((orient, main, sub), [])
-        vs.append(Variant((orient, main, sub), len(vs), rarity, px, roof, sum(1 for f in data[o + 40:o + 65] if f & 1), animated))
+        vs.append(Variant((orient, main, sub), len(vs), rarity, None, roof, sum(1 for f in data[o + 40:o + 65] if f & 1),
+                          animated, raw=(data, bptr, nblocks)))
+    _FILE_TILES[key] = out
     return out
 
 
@@ -385,7 +425,53 @@ def roof_mesh(rect, uv_rect, roof_px: int):
     return verts, ws.wound(verts, (0.0, 1.0, 0.0), 0, [(0, 1, 2), (0, 2, 3)])
 
 
-def mesh_of(v: Variant, rect, uv_rect, light: str = "up"):
+def lower_mesh(rect, uv_rect, lift: float = LOWER_LIFT):
+    """(vertices, triangles) of a lower wall (orientations 16-19: the cliff, kerb or ledge face classic draws under a floor's
+    edge, before the floors): its picture laid on the floor plane where the camera shows it as classic does (maps_flat.
+    paint_mesh, wall frame), raised `lift` world units along the game camera's view line (elevation 30, azimuth 45: x and z
+    move sqrt(1.5) per unit of y), which keeps every pixel on its screen point: over the black ground, under the floor art.
+    Upright under the floor it would be hidden by the ground."""
+    import maps_flat
+    verts, tris = maps_flat.paint_mesh(rect, uv_rect, ws.WALL_Y)
+    d = lift * VIEW_XZ_PER_Y
+    return [((p[0] + d, p[1] + lift, p[2] + d), n, t, uv) for p, n, t, uv in verts], tris
+
+
+def skirt_mesh(rect, uv_rect, lift: float = SKIRT_LIFT):
+    """(vertices, triangles) of the part of an upright tile's picture under its cell's floor line (the curtain, walls_sprite.
+    tile_mesh, stops there): the front faces of raised blocks and terraces, plinths, the feet of props. Classic draws walls after
+    every floor, so those pixels cover the floors in front; here they lie flat on the floor plane where the game's camera shows
+    them as classic does (maps_flat.floor_point; on the floor line that is the curtain's own base edge, so the two meet),
+    raised `lift` along the view line: over the floor art (FLOOR_LIFT), under anything standing."""
+    import maps_flat
+    x0, y0, x1, y1 = rect
+    top, bottom = y0 + ws.WALL_Y, y1 + ws.WALL_Y
+    u0, v0, u1, v1 = uv_rect
+    if bottom <= 0:
+        return [], []
+    cuts = set(ws.columns(x0, x1, bottom))
+    for x in (ws.KINK - 2 * top, ws.KINK + 2 * top):       # where the floor line crosses the picture's top
+        if x0 < x < x1:
+            cuts.add(x)
+    xs = sorted(cuts)
+    n, t = (0.0, 1.0, 0.0), (0.7071, 0.0, -0.7071, -1.0)
+    d = lift * VIEW_XZ_PER_Y
+
+    def vertex(x, y):
+        fx, fz = maps_flat.floor_point(x, y)
+        return ((fx + d, lift, fz + d), n, t, (u0 + (u1 - u0) * (x - x0) / (x1 - x0), v0 + (v1 - v0) * (y - top) / (bottom - top)))
+    verts, tris = [], []
+    for a, b in zip(xs, xs[1:]):
+        ya, yb = min(bottom, max(top, ws.foot(a))), min(bottom, max(top, ws.foot(b)))
+        if ya >= bottom and yb >= bottom:
+            continue            # all of this piece is above the floor line: the curtain draws it
+        i = len(verts)
+        verts += [vertex(a, ya), vertex(b, yb), vertex(b, bottom), vertex(a, bottom)]
+        tris += ws.wound(verts, (0.0, 1.0, 0.0), i, [(0, 1, 2), (0, 2, 3)])
+    return verts, tris
+
+
+def mesh_of(v: Variant, rect, uv_rect, light: str = "up", skirt: bool = False):
     """A tile's mesh in its cell's frame: a floor's flat diamond, a roof's raised plane, else the curtain. light: a curtain's
     shading normal, 'up' (the light the floor gets: right under a sky light, black where the only light is the player's, which
     is lower than most of a wall) or 'camera' (CAMERA_NORMAL)."""
@@ -393,9 +479,15 @@ def mesh_of(v: Variant, rect, uv_rect, light: str = "up"):
         return ws.floor_mesh(rect, uv_rect)
     if v.key[0] == 15:
         return roof_mesh(rect, uv_rect, v.roof)
+    if v.key[0] in LOWER_ORIENTATIONS:
+        return lower_mesh(rect, uv_rect)
     verts, tris = ws.tile_mesh(rect, uv_rect, "floor", PX_HEIGHT)
     if light == "camera":
         verts = [(p, CAMERA_NORMAL, t, uv) for p, _n, t, uv in verts]
+    if skirt:
+        sv, st = skirt_mesh(rect, uv_rect)
+        tris = list(tris) + [(a + len(verts), b + len(verts), c + len(verts)) for a, b, c in st]
+        verts = list(verts) + sv
     return verts, tris
 
 
@@ -581,7 +673,8 @@ def write_groups(out: Path, handles, needed: dict, models: Models, opts) -> dict
             name = tile_name(key, n)
             (ax, ay), r = places[name], rects[name]
             uv = (ax / W, ay / H, (ax + r[2] - r[0]) / W, (ay + r[3] - r[1]) / H)
-            verts, tris = mesh_of(variants[key][n], r, uv, getattr(opts, "light", "up"))
+            verts, tris = mesh_of(variants[key][n], r, uv, getattr(opts, "light", "up"),
+                                  getattr(opts, "classic", False) and getattr(opts, "skirt", "on") == "on")
             if tris:
                 models.write(MODEL % ((group, name.split("_")[0]) + key), verts, tris, dict(tex_base, alb=alb))
         stats[group] = {"atlas": dest.stat().st_size, "tiles": len(tiles), "size": [px.shape[1], px.shape[0]], "scale": scale}
@@ -623,6 +716,12 @@ def write_floor(out: Path, h: MapHandle, floors: list, models: Models, opts, ids
     rgba, places, rects = make_atlas({v.key: v.pixels for _x, _y, _n, v in floors}, h.palette)
     rgba = solid_edges(rgba, min(2, ws.PAD - 1))
     name = h.stem + "_floor"
+    if opts.export:     # the tile table too, as write_groups does (tools/maps_upscale.py works tile by tile)
+        Path(opts.export).mkdir(parents=True, exist_ok=True)
+        (Path(opts.export) / (name + "_atlas.json")).write_text(json.dumps(
+            {"atlas": name, "size": [rgba.shape[1], rgba.shape[0]], "maps": [h.stem],
+             "tiles": {str(k): {"atlas_xy": places[k], "sprite_rect": rects[k]} for k in sorted(places)}}, indent=0),
+            encoding="utf-8")
     px, scale = texture_pixels(rgba, name, opts)
     alb = FLOOR_ATLAS % h.stem
     dest = Path(out) / alb[len("data/"):]
@@ -998,7 +1097,9 @@ def limits(h: MapHandle) -> tuple:
 
 def build_map(h: MapHandle, scene: dict, source: str, opts) -> dict:
     """The map's plan: which tiles stand where. -> {"walls": [(x, y, layer, Variant)], "floors": [...], "skipped": n}."""
-    walls = h.walls(frozenset(opts.orientations) | (SPECIAL if h.stem in DOOR_MAPS else frozenset()))
+    orients = frozenset(opts.orientations) if opts.orientations else (
+        DRAWN | LOWER_ORIENTATIONS if getattr(opts, "classic", False) else DRAWN)
+    walls = h.walls(orients | (SPECIAL if h.stem in DOOR_MAPS else frozenset()))
     flat = is_flat(scene)
     skip = h.flat_keys({v.key for *_r, v in walls}) if flat and opts.rule == "auto" else set()
     floors = [] if flat and opts.floors == "blocked" else h.floors(opts.floors)   # the flat build painted its blocked floors
@@ -1032,7 +1133,9 @@ def build(handles: list, out: Path, opts) -> dict:
                 continue                                  # a picture all under the floor line: nothing to draw
             i = per_cell.get((x, y), 0)
             per_cell[(x, y)] = i + 1
-            new.append(sprite_entity(path, x, y, i, next(ids), 0 if v.key[0] == 15 else i, getattr(opts, "fade", "wall") == "wall"))
+            lower = v.key[0] in LOWER_ORIENTATIONS
+            new.append(sprite_entity(path, x, y, i, next(ids), 0 if v.key[0] == 15 or lower else i,
+                                     getattr(opts, "fade", "wall") == "wall" and not lower))
             used[path] = group
         floor_ents, floor_atlas = write_floor(out, h, plan["floors"], models, opts, ids)
         art = {(x, y) for x, y, _n, _v in plan["floors"]}
@@ -1165,7 +1268,8 @@ def main(argv=None) -> int:
     b.add_argument("--ground", choices=("keep", "bare"), default="keep", help="bare: under floor art the scene's biome without grass and clutter, and no biome override")
     b.add_argument("--classic", action="store_true", help="the whole map from its own classic art: --floors all --ground bare --rule all, every model of the base scene dropped, black ground where the map has no floor, and the map's own light")
     b.add_argument("--rule", choices=("auto", "all"), default="auto", help="auto: tiles the flat build painted on the floor are not drawn upright")
-    b.add_argument("--orientations", default=",".join(str(o) for o in sorted(DRAWN)), help="wall layer orientations drawn (10, 11 also on DOOR_MAPS)")
+    b.add_argument("--skirt", choices=("on", "off"), default="on", help="--classic: a wall picture's part under its floor line lies flat over the floors in front, as classic draws it (off: cut, the old build)")
+    b.add_argument("--orientations", default="", help="wall layer orientations drawn (default: 1-9, 12, 14, 15; lower walls 16-19 also with --classic; 10, 11 also on DOOR_MAPS)")
     b.add_argument("--dt1", help="a .ds1 file's tile files, in order (paths below data/global/tiles or files)")
     b.add_argument("--act", type=int, help="a .ds1 file's palette (1-5)")
     b.add_argument("--name", help="a .ds1 file's map name in the game (act1/town/townn1.ds1): where its scene goes, and D2R's scene of that name is its base")

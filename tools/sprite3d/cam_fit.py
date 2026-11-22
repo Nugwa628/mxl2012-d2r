@@ -1,6 +1,14 @@
 """Fit the sprite cameras to a generated mesh (3D venv: numpy, scipy, PIL).
 
     cam_fit.py <mesh.npz> <views dir (nu_d<N>.png, RGBA)> <out cameras.json> [--elev 20,25,30,35,40] [--ky 1.0,1.1547]
+               [--ring 4,0,5,1,6,2,7,3] [--front 4] [--gen 4] [--yaw0 0] [--span 14] [--sign 1]
+
+--ring is the angular order of the sprite directions (default: the 16-direction ring below; an 8-direction monster's file
+directions turn clockwise on screen as 4,0,5,1,6,2,7,3), --front the direction that shows the mesh's +z side, --gen the
+directions the mesh was generated from (their median decides the shared yaw offset), --yaw0 a first guess of that offset
+(a mesh generated from a three-quarter view is turned by about 45 degrees), --span how far around it the search goes and
+--sign the turning sense of the ring when it is known (silhouettes of a near-symmetric figure cannot tell: for a mesh with
++x at the character's left and file directions that turn clockwise on screen it is +1).
 
 The 16 sprite directions of a Median monster sit on a ring 22.5 degrees apart (README.md): angular order
 `0 9 5 10 1 11 6 12 2 13 7 14 3 15 4 8`; direction 4 is the mesh's front (+z) and 5, 6, 7 the left, back and right views the mesh
@@ -105,34 +113,41 @@ def main():
     yoff = float(pts[:, 1].mean())
     pts = pts - np.array([0, yoff, 0])
     masks, full = {}, {}
-    for v in range(16):
+    ring = [int(x) for x in a[a.index("--ring") + 1].split(",")] if "--ring" in a else RING
+    n, step = len(ring), 360.0 / len(ring)
+    front = int(a[a.index("--front") + 1]) if "--front" in a else 4
+    gen = [int(x) for x in a[a.index("--gen") + 1].split(",")] if "--gen" in a else ([4, 5, 6, 7] if n == 16 else [front])
+    yaw0 = float(a[a.index("--yaw0") + 1]) if "--yaw0" in a else 0.0
+    span = float(a[a.index("--span") + 1]) if "--span" in a else 14.0
+    for v in ring:
         im = Image.open(f"{vdir}/nu_d{v}.png").convert("RGBA")
         alpha = np.array(im)[..., 3]
         full[v] = alpha.shape
         small = np.array(Image.fromarray(alpha).resize((alpha.shape[1] // DS, alpha.shape[0] // DS), Image.BILINEAR)) > 100
         masks[v] = small
-    i4 = RING.index(4)
+    i4 = ring.index(front)
     best = None
-    for sign in (1, -1):
+    signs = [int(a[a.index("--sign") + 1])] if "--sign" in a else [1, -1]
+    for sign in signs:
         for el in elevs:
             for ky in kys:
                 tot, res = 0, {}
-                for v in range(16):
-                    az0 = sign * 22.5 * ((RING.index(v) - i4) % 16)
+                for v in ring:
+                    az0 = yaw0 + sign * step * ((ring.index(v) - i4) % n)
                     res[v] = fit_view(pts, masks[v], az0, el, ky, span=10, step=2.5)
                     tot += res[v][0]
-                print("sign", sign, "elev", el, "ky %.3f" % ky, "mean IoU %.3f" % (tot / 16), flush=True)
+                print("sign", sign, "elev", el, "ky %.3f" % ky, "mean IoU %.3f" % (tot / n), flush=True)
                 if best is None or tot > best[0]:
                     best = (tot, sign, el, ky)
     _, sign, el, ky = best
     # the ring is exact, the generated mesh is turned a few degrees about the vertical: one shared yaw offset, then a narrow search
-    pred = {v: sign * 22.5 * ((RING.index(v) - i4) % 16) for v in range(16)}
-    first = {v: fit_view(pts, masks[v], pred[v], el, ky, span=14, step=1.0)[1] for v in range(16)}
-    dev = [((first[v] - pred[v] + 180) % 360) - 180 for v in range(16)]
-    delta = float(np.median([dev[v] for v in (4, 5, 6, 7)]))  # the four views the mesh was generated from
-    print("yaw offset %.1f (per view %s)" % (delta, [round(x) for x in dev]))
+    pred = {v: sign * step * ((ring.index(v) - i4) % n) for v in ring}
+    first = {v: fit_view(pts, masks[v], pred[v] + yaw0, el, ky, span=span, step=1.0)[1] for v in ring}
+    dev = {v: ((first[v] - pred[v] + 180) % 360) - 180 for v in ring}
+    delta = float(np.median([dev[v] for v in gen]))  # the views the mesh was generated from
+    print("yaw offset %.1f (per view %s)" % (delta, [round(dev[v]) for v in ring]))
     cams = {}
-    for v in range(16):
+    for v in ring:
         sc, az, s, tx, ty = fit_view(pts, masks[v], pred[v] + delta, el, ky, span=4, step=1.0)
         cams[v] = dict(az=float(az), el=el, ky=float(ky), s=float(s * DS), tx=float(tx * DS + DS / 2), ty=float(ty * DS + DS / 2), iou=float(sc),
                        w=int(full[v][1]), h=int(full[v][0]), yoff=yoff)

@@ -142,6 +142,17 @@ with credit on 2026-11-11. Not taken: his `frame_art.inc` and `mold.inc` (art fr
 invtabs uses no game-icons.net picture (its buttons are drawn by the plugin or cut from Median's own item pictures), so
 no CC BY 3.0 attribution is needed; one would go here, with author and licence, if such an icon is added.
 
+## Code ported into the HD model viewer (`tools/hdkit/view`)
+
+No third-party file is copied; these parts are written after the named sources, all MIT:
+
+- Granny curve decoding (`curves.py`): ported from LSLib, Copyright (c) 2015 Norbyte, MIT,
+  <https://github.com/Norbyte/lslib> @6f5f698 (`LSLib/Granny/Model/CurveData`).
+- Pose and skinning rules (`gr2.py`): after Reimagined Level Editor, MIT, @3f76c75.
+- COF layer order and blend rules (`classic.py`): after Reimagined D2R Mod Studio, MIT, @ea1a969 (`Cof.cs`).
+- Cross-checks only, no code taken: aamt by Hellcommander (MIT, @a58bb5d, `Tools/DiabloII/GrannyAnim.py`),
+  carbonenginejs tools-blender (MIT, @c97d43b, `carbon_gr2/curves.py`), rasen by rasenjs (MIT, @d2e115a).
+
 ## The downloader's 7z decoder (`launcher/third_party/lzma`)
 
 `D2R-XL-2012-Downloader.exe` unpacks the release's `.7z` with the C 7z decoder of the

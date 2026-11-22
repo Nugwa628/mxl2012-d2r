@@ -132,9 +132,21 @@ def check_automap(src_dir: Path, built_dir: Path, d2r_dir: Path, mod_objects, bu
     else:
         notes.append("the mod ships no automap and no objpreset table (patch_d2.mpq): 1.13c used its own, D2R's are those plus "
                      "D2R's additions, so D2R's stay")
-    for n in ("automap", "objpreset"):
-        if (built_dir / f"{n}.txt").exists():
-            problems.append(f"the built excel folder has a {n}.txt: it would replace D2R's table")
+    if (built_dir / "objpreset.txt").exists():
+        problems.append("the built excel folder has a objpreset.txt: it would replace D2R's table")
+    if (built_dir / "automap.txt").exists():      # tools/automap_rows.py: D2R's rows unchanged, rows for Median's walls after
+        d2r_lines = (d2r_dir / "automap.txt").read_text("utf-8", errors="replace").splitlines()
+        b_lines = (built_dir / "automap.txt").read_text("utf-8", errors="replace").splitlines()
+        if b_lines[:len(d2r_lines)] != d2r_lines:
+            problems.append("the built automap.txt does not start with D2R's rows unchanged (tools/automap_rows.py appends only)")
+        else:
+            head = b_lines[0].split("\t")
+            extra = [dict(zip(head, ln.split("\t"))) for ln in b_lines[len(d2r_lines):] if ln.strip()]
+            cels = [int(r.get(f"Cel{i}", "-1")) for r in extra for i in range(1, 5) if r.get(f"Cel{i}", "").lstrip("-").isdigit()]
+            if cels and max(cels) > MAX_AUTOMAP_CEL:
+                problems.append(f"built automap.txt has cel {max(cels)}, above D2R's atlas ({MAX_AUTOMAP_CEL})")
+            notes.append(f"built automap.txt: D2R's {len(d2r_lines) - 1} rows plus {len(extra)} for Median's own walls "
+                         f"(automap_rows.py), highest added cel {max(cels or [0])}")
     lt_mod, lt_d2r = table(built_dir / "lvltypes.txt"), table(d2r_dir / "lvltypes.txt")
     am = table(d2r_dir / "automap.txt")
     if lt_mod and lt_d2r and am:

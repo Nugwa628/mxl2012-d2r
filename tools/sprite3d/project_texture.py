@@ -1,6 +1,7 @@
 """Bake a colour texture for a generated mesh from the Median sprite directions (3D venv: numpy, scipy, PIL, numba, xatlas).
 
-    project_texture.py <mesh.npz> <cameras.json> <views dir> <out dir> [--size 2048] [--smooth 10]
+    project_texture.py <mesh.npz> <cameras.json> <views dir> <out dir> [--size 2048] [--smooth 10] [--ztol 0.04] [--trust 0] [--blend P]
+                       [--part <dir>] [--dark T] [--sharp S]
 
 mesh.npz holds pos and tris (tools/d2r_mesh.py's input); cameras.json is tools/sprite3d/cam_fit.py's output; the views dir holds
 the upscaled neutral sprites nu_d<N>.png of all 16 directions. Steps:
@@ -12,6 +13,20 @@ the upscaled neutral sprites nu_d<N>.png of all 16 directions. Steps:
    packs them (use_input_mesh_uvs).
 3. Every texel of the packed atlas is looked up in its face's best view (then the next best ones where that view does not see it)
    and the sprite is sampled there. Texels no view sees and the gutters around the charts are filled from the nearest seen texel.
+
+`--ztol` is the depth tolerance of the visibility test in mesh units (about 2 % of the mesh height works). `--trust P` weights
+every view by (its silhouette IoU / the best IoU) ** P: for a mesh generated from one view the other sprites fit badly and paint
+the wrong thing, so the views the mesh fits take more of the surface (P = 4 for the Hardliner).
+
+`--blend P` (for monsters with 8 or 16 true views; 4 to 8 is sensible) changes step 3: every texel is the mean of ALL views
+that see it, each weighted by (surface normal . view direction) ** P with the smooth vertex normal, so the colour passes
+from one view to the next over the turn of the surface and there is no hard seam at a chart border. Texels no view sees take
+the colour of the nearest seen point ON THE SURFACE (3D distance), not of the nearest texel of the atlas.
+With `--blend`, `--part <dir>` names pictures nu_d<N>.png of ONE PART of the monster on the same canvas (monster3d/s2_parts.py:
+the Fungus's cap); a texel belongs to the part when the views that see it say so, and part.png (white = part) is written:
+`--dark T` takes, outside the part, the dark base the views agree on (each view's weight falls by e per T grey levels above
+the darkest view of that texel), so a highlight only one view painted drops out and the engine's own light can draw it;
+`--sharp S` raises the weights on the part to the power S (8: nearly the single most direct view, so fine detail survives).
 
 Writes mesh_uv.npz (pos, nrm, uv, tris, vertices split along chart borders), albedo.png and coverage.png (white = sampled
 from a sprite, grey = filled) into the out dir.
@@ -144,6 +159,12 @@ def main():
     npz, camjson, vdir, out = a[:4]
     size = int(a[a.index("--size") + 1]) if "--size" in a else 2048
     nsm = int(a[a.index("--smooth") + 1]) if "--smooth" in a else 10
+    ztol = float(a[a.index("--ztol") + 1]) if "--ztol" in a else 0.04
+    trust = float(a[a.index("--trust") + 1]) if "--trust" in a else 0.0
+    blend = float(a[a.index("--blend") + 1]) if "--blend" in a else 0.0
+    parts = a[a.index("--part") + 1] if "--part" in a else None
+    dark = float(a[a.index("--dark") + 1]) if "--dark" in a else 0.0
+    sharp = float(a[a.index("--sharp") + 1]) if "--sharp" in a else 0.0
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     d = np.load(npz)
@@ -159,13 +180,16 @@ def main():
     fn = fn / np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-12)
     M = len(tris)
     cams = json.load(open(camjson))["cams"]
-    views = [View(v, cams[str(v)], vdir) for v in range(16)]
+    views = [View(int(v), cams[v], vdir) for v in sorted(cams, key=int)]  # 16 directions, or 8 (cam_fit.py --ring)
+    NV = len(views)
+    top_iou = max(c.get("iou", 1.0) for c in cams.values())
+    weight = [(cams[str(vw.v)].get("iou", 1.0) / top_iou) ** trust for vw in views]
     cen = pos[tris].mean(1)
     # probes: centroid and the three corners pulled towards it
     probes = np.stack([cen] + [cen + (pos[tris[:, k]] - cen) * 0.7 for k in range(3)], 1)  # (M,4,3)
 
-    score = np.zeros((M, 16), np.float32)
-    raw = np.zeros((M, 16), np.float32)  # facing only, for faces no camera sees
+    score = np.zeros((M, NV), np.float32)
+    raw = np.zeros((M, NV), np.float32)  # facing only, for faces no camera sees
     for k, vw in enumerate(views):
         x, y, z = vw.project(pos)
         xy = np.stack([x[tris], y[tris]], 2)
@@ -175,18 +199,18 @@ def main():
         vw.ids, vw.zb = ids, zb
         px, py, pz = vw.project(probes.reshape(-1, 3))
         xi, yi = np.clip(np.round(px).astype(int), 0, vw.W - 1), np.clip(np.round(py).astype(int), 0, vw.H - 1)
-        vis = (np.abs(zb[yi, xi] - pz) < 0.04) & vw.inside[yi, xi]
+        vis = (np.abs(zb[yi, xi] - pz) < ztol) & vw.inside[yi, xi]
         vis = vis.reshape(M, 4).mean(1)
         facing = np.clip(fn @ vw.w, 0, 1)
-        score[:, k] = facing * vis
-        raw[:, k] = facing
+        score[:, k] = facing * vis * weight[k]
+        raw[:, k] = facing * weight[k]
         print("view", vw.v, "faces seen", int((vis > 0.5).sum()), flush=True)
     # raw best views per face (kept for the lookup fallbacks) and the smoothed label
     adj = face_adjacency(tris)
     score = score + 0.02 * raw
     lab = score.argmax(1)
     for _ in range(10):
-        votes = np.zeros((M, 16), np.float32)
+        votes = np.zeros((M, NV), np.float32)
         for e in range(3):
             nb_ = adj[:, e]
             ok = nb_ >= 0
@@ -218,7 +242,7 @@ def main():
             break
         for c in small:
             fs = np.nonzero(comp == c)[0]
-            cnt = np.zeros(16)
+            cnt = np.zeros(NV)
             for f in fs:
                 for e in range(3):
                     g = adj[f, e]
@@ -227,7 +251,7 @@ def main():
             if cnt.sum() > 0:
                 lab[fs] = cnt.argmax()
     comp, n = components(lab)
-    print("charts", n, "labels used", np.bincount(lab, minlength=16).tolist())
+    print("charts", n, "labels used", np.bincount(lab, minlength=NV).tolist())
     # split vertices per chart; the uv of a vertex is its screen position in the chart's camera
     pair = tris.astype(np.int64) * n + comp[:, None]
     uniq, inv = np.unique(pair.ravel(), return_inverse=True)
@@ -272,12 +296,53 @@ def main():
     pp = P[tx_, ty_]
     res_col = np.zeros((len(ff), 3), np.float32)
     res_ok = np.zeros(len(ff), bool)
-    for c in cand:
+    seen_ok = None
+    if blend:
+        nn = np.einsum("nk,nkc->nc", bary[tx_, ty_], vn[tris[ff]].astype(np.float32))
+        nn /= np.maximum(np.linalg.norm(nn, axis=1, keepdims=True), 1e-9)
+        cols = np.zeros((NV, len(ff), 3), np.float32)
+        W = np.zeros((NV, len(ff)), np.float32)
+        vote = np.zeros(len(ff), np.float32)
+        for k, vw in enumerate(views):
+            x, y, z = vw.project(pp)
+            xi, yi = np.clip(np.round(x).astype(int), 0, vw.W - 1), np.clip(np.round(y).astype(int), 0, vw.H - 1)
+            good = (np.abs(vw.zb[yi, xi] - z) < 0.05) & vw.inside[yi, xi]
+            W[k] = np.where(good, np.clip(nn @ vw.w, 0, 1) ** blend * weight[k], 0)
+            cols[k], _ = vw.sample(x, y)
+            if parts:      # is this texel on the part (the Fungus's cap) in this view's picture of the part alone?
+                pa = np.asarray(Image.open(f"{parts}/nu_d{vw.v}.png").convert("RGBA"))[..., 3] > 100
+                vote += W[k] * pa[yi, xi]
+        wsum = W.sum(0)
+        seen_ok = wsum > 0.05 ** blend
+        part = vote > 0.5 * wsum
+        res_col[:] = (cols * W[..., None]).sum(0) / np.maximum(wsum, 1e-12)[:, None]
+        if dark:           # outside the part: the dark base the views agree on, not the highlight one of them painted
+            lum = np.where(W > 0, cols @ np.array([0.3, 0.59, 0.11], np.float32), 1e9)
+            Wd = W * np.exp(-(lum - lum.min(0)) / dark)
+            m = ~part
+            res_col[m] = ((cols * Wd[..., None]).sum(0) / np.maximum(Wd.sum(0), 1e-12)[:, None])[m]
+        if sharp:          # on the part: nearly the one view that looks at the texel most directly
+            Ws = (W / np.maximum(W.max(0), 1e-12)) ** sharp
+            res_col[part] = ((cols * Ws[..., None]).sum(0) / np.maximum(Ws.sum(0), 1e-12)[:, None])[part]
+        del cols, W
+        if seen_ok.any() and not seen_ok.all():      # unseen texels: the nearest seen point on the surface
+            from scipy.spatial import cKDTree
+            near = cKDTree(pp[seen_ok]).query(pp[~seen_ok])[1]
+            res_col[~seen_ok] = res_col[seen_ok][near]
+            part[~seen_ok] = part[seen_ok][near]
+        if parts:
+            pm = np.zeros((size, size), bool)
+            pm[tx_, ty_] = part
+            _, (jy, jx) = ndimage.distance_transform_edt(~cov, return_indices=True)
+            Image.fromarray((pm[jy, jx] * 255).astype(np.uint8)).save(out / "part.png")
+        res_ok[:] = True
+        print("texels seen by a view", int(seen_ok.sum()), "of", len(ff), "(blend %g)" % blend)
+    for c in ([] if blend else cand):
         want = ~res_ok
         if not want.any():
             break
         vv = c[ff, 0]
-        for k in range(16):
+        for k in range(NV):
             m = want & (vv == k) & (score[ff, k] > 0.02 if c is not cand[0] else True)
             if not m.any():
                 continue
@@ -297,6 +362,9 @@ def main():
     filled = color[iy, ix]
     img = np.clip(filled, 0, 255).astype(np.uint8)
     Image.fromarray(img).save(out / "albedo.png")
+    if seen_ok is not None:      # coverage.png: seen by a view, not filled from the surface
+        seen = np.zeros_like(seen)
+        seen[tx_, ty_] = seen_ok
     cv = np.where(seen, 255, np.where(cov, 128, 0)).astype(np.uint8)
     Image.fromarray(cv).save(out / "coverage.png")
     # mesh with the split vertices

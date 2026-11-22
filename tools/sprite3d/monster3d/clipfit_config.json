@@ -1,0 +1,48 @@
+{
+ "_doc": "s5_clipfit.py: pose templates per donor body type and the per-monster settings. A template parameter turns each named bone by value x weight degrees about the world axis given (x: side axis, + leans forward; y: up; z: forward), about the bone's bind joint; 'cog' also takes the translations tx and tz (bind units). 'base' is the template's rest pose (bones turned before the parameters). The monster block names its template, the part with its own colour that the score also compares (a rigid part on part_bone; part_mask is the colour test of that part in classic's frames), the bone that carries the corpse shell (kept under the floor) and which modes loop.",
+ "templates": {
+  "biped_d2r": {
+   "base": {"L_UpperArm": [0, 0, -70], "R_UpperArm": [0, 0, 70], "L_ForeArm": [20, 0, 0], "R_ForeArm": [20, 0, 0]},
+   "params": [
+    {"name": "cog_rx", "bones": {"cog": [1, 0, 0]}, "lo": -60, "hi": 200, "step": 12},
+    {"name": "cog_ry", "bones": {"cog": [0, 1, 0]}, "lo": -60, "hi": 60, "step": 12},
+    {"name": "cog_rz", "bones": {"cog": [0, 0, 1]}, "lo": -60, "hi": 60, "step": 10},
+    {"name": "tx", "translate": [1, 0, 0], "lo": -2.5, "hi": 2.5, "step": 0.4},
+    {"name": "tz", "translate": [0, 0, 1], "lo": -2.5, "hi": 3.5, "step": 0.4},
+    {"name": "bend", "bones": {"spine_01": [1, 0, 0], "chest": [0.7, 0, 0]}, "lo": -40, "hi": 70, "step": 10},
+    {"name": "side", "bones": {"spine_01": [0, 0, 1], "chest": [0, 0, 0.7]}, "lo": -40, "hi": 40, "step": 8},
+    {"name": "twist", "bones": {"spine_01": [0, 1, 0], "chest": [0, 0.7, 0]}, "lo": -45, "hi": 45, "step": 10},
+    {"name": "head_rx", "bones": {"neck": [0.5, 0, 0], "head": [1, 0, 0]}, "lo": -70, "hi": 70, "step": 10},
+    {"name": "head_rz", "bones": {"neck": [0, 0, 0.5], "head": [0, 0, 1]}, "lo": -60, "hi": 60, "step": 10},
+    {"name": "head_ry", "bones": {"head": [0, 1, 0]}, "lo": -45, "hi": 45, "step": 10},
+    {"name": "Larm_fwd", "bones": {"L_UpperArm": [-1, 0, 0]}, "lo": -90, "hi": 150, "step": 20},
+    {"name": "Larm_out", "bones": {"L_UpperArm": [0, 0, 1]}, "lo": -40, "hi": 110, "step": 15},
+    {"name": "Lelbow", "bones": {"L_ForeArm": [-1, 0, 0]}, "lo": -10, "hi": 120, "step": 20},
+    {"name": "Rarm_fwd", "bones": {"R_UpperArm": [-1, 0, 0]}, "lo": -90, "hi": 150, "step": 20},
+    {"name": "Rarm_out", "bones": {"R_UpperArm": [0, 0, -1]}, "lo": -40, "hi": 110, "step": 15},
+    {"name": "Relbow", "bones": {"R_ForeArm": [-1, 0, 0]}, "lo": -10, "hi": 120, "step": 20},
+    {"name": "Lleg_fwd", "bones": {"L_Thigh": [-1, 0, 0]}, "lo": -60, "hi": 110, "step": 15},
+    {"name": "Lleg_out", "bones": {"L_Thigh": [0, 0, 1]}, "lo": -20, "hi": 40, "step": 8},
+    {"name": "Lknee", "bones": {"L_Calf": [1, 0, 0]}, "lo": 0, "hi": 130, "step": 15},
+    {"name": "Rleg_fwd", "bones": {"R_Thigh": [-1, 0, 0]}, "lo": -60, "hi": 110, "step": 15},
+    {"name": "Rleg_out", "bones": {"R_Thigh": [0, 0, -1]}, "lo": -20, "hi": 40, "step": 8},
+    {"name": "Rknee", "bones": {"R_Calf": [1, 0, 0]}, "lo": 0, "hi": 130, "step": 15}
+   ]
+  }
+ },
+ "clip_names": {"nu": "neutral", "wl": "walk", "gh": "gethit", "a1": "attack1", "a2": "attack2", "bl": "block",
+                "sc": "cast", "s1": "skill1", "s2": "skill2", "s3": "skill3", "s4": "skill4", "kb": "knockback", "rn": "run"},
+ "monsters": {
+  "2(": {
+   "template": "biped_d2r",
+   "part_mask": {"b_min": 120, "b_over_rg": 50, "loose": {"b_min": 110, "b_over_rg": 45}, "edge_min": 0.62},
+   "part_weight": 1.0,
+   "edge_weight": 0.0,
+   "shell_bone": "loin_cloth",
+   "shell_drop": 12.0,
+   "loop": ["wl", "nu", "rn"],
+   "caprim": "fungus/round5/stages/3-caprim-g3i55s5/caprim.json",
+   "el": 35.0
+  }
+ }
+}

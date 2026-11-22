@@ -735,6 +735,65 @@ Island of the Sunless Sea (`rockisdead`, lane maplight-rockisdead, 2026-11-18):
   (`walls_hd.MAPS`), is not also on `sprite_walls.json`, and has a `CLASSIC_LIGHT` entry.
 - Upscaled atlases (for example AI 2x): `MXL2012_SPRITE_ALBEDO=DIR` (`--albedo`), off by default.
 
+### Classic maps at 4K (lane hdmaps2, 2026-11-21)
+
+Aim (owner): the classic-art maps faithful to classic and good at 3840x2160. At 4K the game's camera draws one classic pixel
+over 3.6 screen pixels (`hdkit/view/mapview/hd.py` K_4K; the viewer's HD render at classic scale 3.6 is that camera), so
+the 1x atlases are blurry and stair-stepped there. Three changes, all in `tools/sprite_scene.py build --classic`:
+
+- **Lower walls** (orientations 16-19: cliff, kerb and ledge faces classic draws under a floor's edge, before the floors)
+  were not drawn. They are now painted on the floor plane where the game's camera shows them as classic does
+  (`lower_mesh`), over the black ground and under the floor art. Belial's cliff fringe and Fauztinville's railings.
+- **Wall pictures under their floor line** (front faces of raised blocks and terraces, plinths, the feet of props) were cut
+  by the curtain. Classic draws walls after every floor, so those pixels cover the floors in front; they now lie flat there
+  (`skirt_mesh`, `--skirt off` gives the old cut). Tests check, through the game camera, that every vertex shows its own
+  pixel where classic draws it.
+- **4x atlases**: `tools/maps_upscale.py atlas EXPORT OUT` makes every exported atlas 4x with Real-ESRGAN x4plus
+  (ncnn-vulkan build, MIT; models BSD-3-Clause; `/d2work/tools/realesrgan-ncnn-vulkan-0.2.5.0`), tile by tile; floor
+  diamonds inside a 3x3 lattice of themselves (no seam ring) and with an exact diamond alpha; then
+  `MXL2012_SPRITE_ALBEDO=OUT` (`--albedo`) builds from them. Export first with `--export DIR` from the same map list
+  (the atlas layout is the build's).
+- **Back-projection** (part of `atlas`; `backproject` on existing 4x atlases): the 4x picture is corrected until its 4 x 4
+  averages give the classic pixels again, so colour and the light painted into the tiles stay Median's and only the
+  detail is the upscaler's. Plain ESRGAN drifted the floors greyer and smoother (floor colour dE 1.73 -> 2.50 against
+  classic over the 12 maps); back-projected it is 1.73 again, atlas error at 1x 3.9 -> 0.7 levels.
+
+Measures (`tools/maps_audit.py`, whole maps, every converted map ranked worst first: `/d2work/runs/hdmaps2/audit/`;
+side-by-side 4K crops: `tools/maps_rounds.py` and the map server's `/rounds` page, `docs/mapview.md`). Note: the audit's
+`missing` counts classic structure without standing HD geometry, so on the classic maps the flat-painted parts (lower
+walls, skirts, bridge edges) still count there by design; judge them on the crops.
+
+| mean of the 12 maps (`/d2work/runs/hdmaps2/audit/ABCD.txt`) | shipped | 1x + lower walls + skirts | 4x ESRGAN | 4x + back-projection |
+|-|-|-|-|-|
+| score | 91.8 | 92.9 | 91.5 | 92.4 |
+| edges F1 | 0.921 | 0.954 | 0.922 | 0.931 |
+| floor correlation | 0.805 | 0.821 | 0.796 | 0.820 |
+| floor colour dE | 1.76 | 1.73 | 2.50 | 1.73 |
+
+The audit draws whole maps at about 0.1x: there the 4x build loses some edges to aliasing the game does not show (the
+floor diamonds overlap by 1.5 classic pixels, under a screen pixel at 0.1x, 2.7 px at 1080p, 5 px at 4K). At the 4K camera
+`maps_rounds.py` measures each crop (`metrics.info`): colour dE at classic's own pixels and sharpness against a plain
+Lanczos upscale of classic (Fauztinville pilot: shipped 0.73, 4x 1.71).
+
+Cost of 4x for the 12 maps (2026-11-21, `/d2work/runs/hdmaps2/build/all4`): 62 atlases (1,330 tiles) upscaled in
+about 40 minutes on this PC's GPU; the step's output is 909 MB raw and 134 MB gzipped, against 105 MB and 18.7 MB at 1x
+(the albedo textures are BC3 with mips: 666 MB of the 909). Not yet tried: BC1 with 1-bit alpha for the atlases (the
+materials threshold alpha anyway), which would halve the textures. The default build stays at 1x until the owner picks
+4x. The upscaled atlases are in the art store (`/d2work/mxl2012-art`, 373 MB, back-projected, listed by
+`tools/data/maps_classic_4x.json`):
+`MXL_ART_STORE=/d2work/mxl2012-art python tools/maps_upscale.py fetch DIR`, then build with `MXL2012_SPRITE_ALBEDO=DIR`.
+They match the atlas layout of this map list and tile set: after a change to either, export, upscale and store again.
+
+**Owner's pick (2026-11-21): raw ESRGAN 4x**, not back-projected, for all 12 maps (Fauztinville first, then the other
+11). The raw atlases are in the art store too (`tools/data/maps_classic_4x_raw.json`, 63 files, 324 MB):
+`maps_upscale.py fetch DIR --manifest tools/data/maps_classic_4x_raw.json`, then build with `MXL2012_SPRITE_ALBEDO=DIR`
+(the build is `/d2work/runs/hdmaps2/build/all4`). Note that `store` moves the files into the store; `fetch` gives them
+back. The light is the maps' own (the base mod's light files and biomes), unchanged. `tools/maps_overlay.py BUILD_DATA OUT MAP...`
+packs maps of a build as a mod data overlay: each preset, the models (with LODs), textures, lights and particles it
+references, and the build's `model_lod_desc.bin`, byte for byte, with `OUT/overlay.json` (sha256 per file, and the
+references left to the base mod, the biomes). The Fauztinville in-game run laid exactly that set (checked
+file by file). The other 11 maps: `/d2work/runs/hdmaps2/maps4k/overlay` (1,227 files, 860 MB), checked offline in the viewer only.
+
 ## Edited D2R maps (lane hole2, bug #525, 2026-11-03)
 
 D2R builds a preset from the .ds1 in its own CASC whenever the CASC has that path, not from the mod's copy at the same path

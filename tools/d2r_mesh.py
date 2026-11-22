@@ -105,7 +105,9 @@ def replace_with_mesh(tree, keep, pos, nrm, uv, tris, bone=None, bone_idx=None, 
     old.obj = encode_vertices(vtd, pos, nrm, uv, tris, bone_idx, weights, scale)
     topo = me["PrimaryTopology"]
     idx_td = topo["Indices16"][0].td
-    topo["Indices16"] = [dm.Obj(idx_td, {"Int16": int(i)}) for i in tris.reshape(-1)]
+    # the engine reads Indices16 unsigned (stock meshes reach 45,694 vertices); the GR2 member is Int16, so values above
+    # 32767 are stored with the same bits as negatives
+    topo["Indices16"] = [dm.Obj(idx_td, {"Int16": int(i) - 65536 if i > 32767 else int(i)}) for i in tris.reshape(-1)]
     for g in topo["Groups"][1:]:
         pass
     grp = topo["Groups"][0]

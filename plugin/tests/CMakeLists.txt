@@ -4,9 +4,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(mxl2012_core_tests LANGUAGES CXX)
 
-set(names imageguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests rangeddesc_tests dodgelist_tests statelists_tests melttrail_tests lobaim_tests stunlen_tests whirlwind_tests moveonly_tests charmlength_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests spiritwarp_tests appleuse_tests vochat_tests reassign_tests savemode_tests rotwstash_tests voidfloor_tests stashpages_tests sendstash_tests medtab_tests mapreveal_tests arealvl_tests stashtip_tests tabflash_tests clearfonts_tests padinput_tests modelcache_tests devmenu_tests charmdup_tests npcgreet_tests
+set(names imageguard_tests otherplugins_tests envguard_tests harness_tests clientskills_tests missilestubs_tests itemeffect_tests skillremove_tests rangeddesc_tests dodgelist_tests statelists_tests melttrail_tests spritedir_tests lobaim_tests stunlen_tests whirlwind_tests moveonly_tests charmlength_tests origasserts_tests cubedupe_tests itemlevel_tests runeletters_tests skilltext_tests mercequip_tests dursync_tests soundguard_tests transguard_tests lvlupui_tests petspread_tests spiritwarp_tests appleuse_tests vochat_tests reassign_tests savemode_tests rotwstash_tests voidfloor_tests stashpages_tests sendstash_tests medtab_tests mapreveal_tests arealvl_tests stashtip_tests tabflash_tests clearfonts_tests padinput_tests modelcache_tests devmenu_tests charmdup_tests npcgreet_tests
           panel_tests rotwwarn_tests
-          wikilogic_tests blockrate_tests)
+          wikilogic_tests blockrate_tests testharness_tests)
 add_executable(devmenu_tests EXCLUDE_FROM_ALL devmenu_test.cpp)
 add_executable(imageguard_tests EXCLUDE_FROM_ALL image_guard_test.cpp)
 add_executable(panel_tests EXCLUDE_FROM_ALL panel_logic_test.cpp)
@@ -22,6 +22,7 @@ add_executable(rangeddesc_tests EXCLUDE_FROM_ALL ranged_desc_test.cpp)
 add_executable(dodgelist_tests EXCLUDE_FROM_ALL dodge_list_test.cpp)
 add_executable(statelists_tests EXCLUDE_FROM_ALL state_lists_test.cpp)
 add_executable(melttrail_tests EXCLUDE_FROM_ALL melt_trail_test.cpp)
+add_executable(spritedir_tests EXCLUDE_FROM_ALL sprite_dir_test.cpp)
 add_executable(lobaim_tests EXCLUDE_FROM_ALL lob_aim_test.cpp)
 add_executable(stunlen_tests EXCLUDE_FROM_ALL stun_len_test.cpp)
 add_executable(whirlwind_tests EXCLUDE_FROM_ALL whirlwind_test.cpp)
@@ -59,6 +60,7 @@ add_executable(padinput_tests EXCLUDE_FROM_ALL pad_input_test.cpp)
 add_executable(modelcache_tests EXCLUDE_FROM_ALL model_cache_test.cpp)
 add_executable(blockrate_tests EXCLUDE_FROM_ALL block_rate_test.cpp)
 add_executable(npcgreet_tests EXCLUDE_FROM_ALL npc_greet_test.cpp)
+add_executable(testharness_tests EXCLUDE_FROM_ALL testharness_logic_test.cpp)
 add_custom_target(tests DEPENDS ${names})
 
 foreach(t ${names})

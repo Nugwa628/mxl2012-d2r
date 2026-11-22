@@ -21,6 +21,7 @@
 #include "d2r.h"
 #include "item_effect.h"
 #include "skill_remove.h"
+#include "sprite_dir_logic.h"
 #include "stash_pages.h"
 #include "stash_pages_logic.h"
 #include "missile_stubs.h"
@@ -2564,6 +2565,32 @@ auto CmdClientStat(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
 	return true;
 }
 
+// `facing <monster id>` (client, UI thread): the client monster's path direction (0-63, what its art turns by), the sprite
+// card key of that direction (sprite_dir_logic.h KeyOf), its mode and spot, and the client player's spot (the view's
+// centre). Corpses answer too. tools/game_checks.py mon_turn and the hdkit in-game sign-off (tools/hdkit/signoff) label
+// their shots with it.
+auto CmdFacing(Ctx* c, const hcmd::Tokens& t) noexcept -> bool {
+	long long id = 0;
+	if (t.n < 2 || !hcmd::ParseInt(t.tok[1], &id) || id < 0) {
+		return Fail(c, "usage: facing <monster id>");
+	}
+	Unit* unit = Fn<ClientFindFn>(RvaClientFind)(static_cast<uint32_t>(id), 1);
+	if (unit == nullptr) {
+		return Fail(c, "facing: no client monster with that id");
+	}
+	void* path = Fn<void* (*)(Unit*)>(sprite_dir::RvaUnitPath)(unit);
+	const int32_t dir = path != nullptr ? Fn<int32_t (*)(void*)>(sprite_dir::RvaPathFacing)(path) : -1;
+	int32_t x = 0, y = 0, px = 0, py = 0;
+	d2r::UnitXY(unit, &x, &y);
+	Unit* player = g_playerId != 0 ? Fn<ClientFindFn>(RvaClientFind)(static_cast<uint32_t>(g_playerId), 0) : nullptr;
+	if (player != nullptr) {
+		d2r::UnitXY(player, &px, &py);
+	}
+	Out("facing id=%u class=%d mode=%d dir=%d key=%d x=%d y=%d px=%d py=%d", IdOf(unit), ClassOf(unit), ModeOf(unit), dir,
+	    dir >= 0 ? sprite_dir::KeyOf(dir) : -1, x, y, px, py);
+	return true;
+}
+
 // `block` (server) / `cblock` (client, UI thread): D2R's Chance to Block, GetBlockRate 0x347da0(unit, expansion), next to the
 // replica of block_rate_logic.h from the same unit's stats 20 / 2 / 12 and its class's charstats BlockFactor. The server's
 // expansion flag is the game's (+0x106 != 1) as its block roll passes it; the client's is !0x8d3b0() as the sheet's tooltip.
@@ -3508,6 +3535,7 @@ const Verb Verbs[] = {
     {"mapreveal", CmdMapReveal, true}, {"clearfonts", CmdClearFonts, true}, {"padui", CmdPadUi, true},
     {"pad", CmdPad, true},
     {"block", CmdBlock, false},       {"cblock", CmdClientBlock, true},  {"sbperf", CmdSbPerf, true},
+    {"facing", CmdFacing, true},
 };
 
 const Verb* FindVerb(const char* name) noexcept {
